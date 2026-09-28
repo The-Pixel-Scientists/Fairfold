@@ -1,6 +1,6 @@
 # ADR 0008: Standalone or Twenty for the relationship layer
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-09-27
 - **Deciders:** Aaron Gardner
 

@@ -1,6 +1,6 @@
 # ADR 0002: Licence and dependency policy
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-09-27
 - **Deciders:** Aaron Gardner
 

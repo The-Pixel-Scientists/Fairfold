@@ -1,6 +1,6 @@
 # ADR 0006: Design system
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-09-27
 - **Deciders:** Aaron Gardner
 

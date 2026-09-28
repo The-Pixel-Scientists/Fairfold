@@ -1,6 +1,6 @@
 # ADR 0003: Query builder, migrations and database roles
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-09-27
 - **Deciders:** Aaron Gardner
 
