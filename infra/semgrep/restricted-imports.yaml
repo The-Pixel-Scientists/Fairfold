@@ -1,0 +1,79 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Libraries that only one part of the code base may import.
+
+rules:
+  - id: pixelgrant-database-imports-only-in-db
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      Only packages/db may import pg, kysely or pg-boss. Use the helpers that
+      packages/db exports, which set the tenant for every query (ADRs 0003
+      and 0009).
+    patterns:
+      - pattern-either:
+          - pattern: import "$MODULE"
+          - pattern: import $X from "$MODULE"
+          - pattern: import * as $X from "$MODULE"
+          - pattern: import {...} from "$MODULE"
+          - pattern: import type $X from "$MODULE"
+          - pattern: import type {...} from "$MODULE"
+          - pattern: export {...} from "$MODULE"
+          - pattern: export * from "$MODULE"
+          - pattern: import("$MODULE")
+          - pattern: require("$MODULE")
+      - metavariable-regex:
+          metavariable: $MODULE
+          regex: ^['"]?(pg|pg-[a-z-]+|kysely|kysely/.+|pg-boss|pg-boss/.+)['"]?$
+    paths:
+      exclude:
+        - /packages/db/
+
+  - id: pixelgrant-better-auth-only-in-auth
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      Only apps/api/src/auth may import Better Auth (ADR 0010).
+    patterns:
+      - pattern-either:
+          - pattern: import "$MODULE"
+          - pattern: import $X from "$MODULE"
+          - pattern: import * as $X from "$MODULE"
+          - pattern: import {...} from "$MODULE"
+          - pattern: import type $X from "$MODULE"
+          - pattern: import type {...} from "$MODULE"
+          - pattern: export {...} from "$MODULE"
+          - pattern: export * from "$MODULE"
+          - pattern: import("$MODULE")
+          - pattern: require("$MODULE")
+      - metavariable-regex:
+          metavariable: $MODULE
+          regex: ^['"]?(better-auth|better-auth/.+|@better-auth/.+)['"]?$
+    paths:
+      exclude:
+        - /apps/api/src/auth/
+
+  - id: pixelgrant-radix-only-in-ui
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      Only packages/ui may import Radix. Use the wrapped component from
+      @pixelgrant/ui (ADR 0006).
+    patterns:
+      - pattern-either:
+          - pattern: import "$MODULE"
+          - pattern: import $X from "$MODULE"
+          - pattern: import * as $X from "$MODULE"
+          - pattern: import {...} from "$MODULE"
+          - pattern: import type $X from "$MODULE"
+          - pattern: import type {...} from "$MODULE"
+          - pattern: export {...} from "$MODULE"
+          - pattern: export * from "$MODULE"
+          - pattern: import("$MODULE")
+          - pattern: require("$MODULE")
+      - metavariable-regex:
+          metavariable: $MODULE
+          regex: ^['"]?(radix-ui|radix-ui/.+|@radix-ui/.+)['"]?$
+    paths:
+      exclude:
+        - /packages/ui/

@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+rules:
+  - id: pixelgrant-no-dangerously-set-inner-html
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      dangerouslySetInnerHTML bypasses React's escaping and the Content
+      Security Policy's intent (ADR 0006). Render the content as elements.
+    pattern-either:
+      - pattern: <$EL dangerouslySetInnerHTML={...} />
+      - pattern: <$EL dangerouslySetInnerHTML={...}>...</$EL>
+      - pattern: '{..., dangerouslySetInnerHTML: $VALUE, ...}'
