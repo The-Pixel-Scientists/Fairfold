@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    // Language and modules. Server code runs on Node.js with its built-in
+    // type stripping, so only erasable syntax is allowed and relative imports
+    // name the .ts file they load.
+    "target": "es2024",
+    "lib": ["es2024"],
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "moduleDetection": "force",
+    "resolveJsonModule": true,
+    "verbatimModuleSyntax": true,
+    "erasableSyntaxOnly": true,
+    "allowImportingTsExtensions": true,
+
+    // Type checking (ADR 0001).
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "types": [],
+
+    // `tsc -b` checks every workspace as a project reference. Declarations
+    // are written under node_modules so they never mix with build output.
+    "composite": true,
+    "emitDeclarationOnly": true,
+    "declaration": true
+  }
+}

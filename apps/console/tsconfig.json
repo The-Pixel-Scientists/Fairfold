@@ -1,0 +1,12 @@
+// Browser code (tsconfig.app.json) and Node.js code, such as the Vite config and Playwright tests (tsconfig.node.json), are checked separately.
+{
+  "files": [],
+  "references": [
+    {
+      "path": "./tsconfig.app.json"
+    },
+    {
+      "path": "./tsconfig.node.json"
+    }
+  ]
+}

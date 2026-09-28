@@ -1,0 +1,19 @@
+// Runs on Node.js with its built-in type stripping.
+// package.json keeps the project non-empty before its first source file exists, so `tsc -b` passes on an empty workspace.
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "node_modules/.cache/tsc",
+    "tsBuildInfoFile": "node_modules/.cache/tsc/tsconfig.tsbuildinfo",
+    "types": ["node"]
+  },
+  "include": ["src", "test", "*.ts", "package.json"],
+  "references": [
+    {
+      "path": "../../packages/domain"
+    },
+    {
+      "path": "../../packages/db"
+    }
+  ]
+}

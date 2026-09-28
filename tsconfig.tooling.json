@@ -1,0 +1,12 @@
+// Root configuration files and scripts.
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "node_modules/.cache/tsc/tooling",
+    "tsBuildInfoFile": "node_modules/.cache/tsc/tooling/tsconfig.tsbuildinfo",
+    "types": ["node"],
+    "allowJs": true,
+    "checkJs": true
+  },
+  "include": ["*.ts", "*.js", "scripts"]
+}

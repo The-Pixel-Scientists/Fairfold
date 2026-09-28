@@ -1,0 +1,30 @@
+// Every project `tsc -b` checks. Each workspace has its own tsconfig.
+{
+  "files": [],
+  "references": [
+    {
+      "path": "tsconfig.tooling.json"
+    },
+    {
+      "path": "packages/domain"
+    },
+    {
+      "path": "packages/config"
+    },
+    {
+      "path": "packages/db"
+    },
+    {
+      "path": "packages/ui"
+    },
+    {
+      "path": "apps/api"
+    },
+    {
+      "path": "apps/console"
+    },
+    {
+      "path": "apps/portal"
+    }
+  ]
+}
