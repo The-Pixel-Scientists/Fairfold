@@ -1,0 +1,74 @@
+{
+  "$comment": "Licence policy for dependencies (ADR 0002, with CC-BY-3.0 added by ADR 0013), checked by `pnpm check:licences`. A licence in allowedPerPackage passes only with an exception naming one package version, with the reason, approver and date; exceptions are reviewed every quarter. A development-only exception fails the check if the package reaches the production dependency tree. CC-BY-3.0 and CC-BY-4.0 are for data files only, and CC-BY-3.0 only in development dependencies.",
+  "allowed": [
+    "MIT",
+    "MIT-0",
+    "ISC",
+    "0BSD",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "Apache-2.0",
+    "BlueOak-1.0.0",
+    "CC0-1.0",
+    "MPL-2.0"
+  ],
+  "allowedPerPackage": [
+    "CC-BY-3.0",
+    "CC-BY-4.0",
+    "Python-2.0",
+    "Unlicense",
+    "LGPL-2.1-or-later",
+    "LGPL-3.0-only",
+    "LGPL-3.0-or-later",
+    "GPL-3.0-only",
+    "GPL-3.0-or-later",
+    "AGPL-3.0-only",
+    "AGPL-3.0-or-later"
+  ],
+  "denied": [
+    "SSPL-1.0",
+    "BUSL-1.1",
+    "Commons-Clause",
+    "Elastic-2.0",
+    "FSL-1.0-MIT",
+    "FSL-1.0-Apache-2.0",
+    "FSL-1.1-MIT",
+    "FSL-1.1-Apache-2.0",
+    "PolyForm-Noncommercial-1.0.0",
+    "PolyForm-Small-Business-1.0.0",
+    "PolyForm-Free-Trial-1.0.0",
+    "PolyForm-Internal-Use-1.0.0",
+    "PolyForm-Perimeter-1.0.0",
+    "PolyForm-Shield-1.0.0",
+    "PolyForm-Strict-1.0.0",
+    "CC-BY-NC-4.0",
+    "CC-BY-NC-SA-4.0",
+    "CC-BY-NC-ND-4.0",
+    "CC-BY-ND-4.0",
+    "JSON",
+    "GPL-2.0-only",
+    "CDDL-1.0",
+    "EPL-1.0",
+    "UNLICENSED"
+  ],
+  "exceptions": [
+    {
+      "package": "caniuse-lite",
+      "version": "1.0.30001810",
+      "licence": "CC-BY-4.0",
+      "scope": "development",
+      "reason": "Browser support data used by browserslist, through @babel/core in eslint-plugin-react-hooks. A data file, used only when linting; it never ships.",
+      "approver": "Aaron Gardner",
+      "date": "2026-09-28"
+    },
+    {
+      "package": "spdx-exceptions",
+      "version": "2.5.0",
+      "licence": "CC-BY-3.0",
+      "scope": "development",
+      "reason": "The SPDX list of licence exception identifiers, used by spdx-expression-parse in this licence check. A data file, used only in development and CI; it never ships.",
+      "approver": "Aaron Gardner",
+      "date": "2026-09-28"
+    }
+  ]
+}
