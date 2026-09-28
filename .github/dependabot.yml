@@ -1,0 +1,50 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Dependency updates arrive as one batched pull request a month for each
+# ecosystem, and only for releases at least 7 days old (ADR 0001). Security
+# fixes follow the targets in SECURITY.md, outside this schedule.
+
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 7
+    versioning-strategy: increase
+    groups:
+      npm:
+        patterns: ['*']
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 7
+    groups:
+      github-actions:
+        patterns: ['*']
+
+  - package-ecosystem: docker
+    directory: /infra/docker
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 7
+    groups:
+      docker:
+        patterns: ['*']
+
+  - package-ecosystem: docker-compose
+    directory: /infra/compose
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 7
+    groups:
+      docker-compose:
+        patterns: ['*']

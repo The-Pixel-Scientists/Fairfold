@@ -1,0 +1,292 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Checks for every pull request and every push to main (ADRs 0001 and 0002):
+# typecheck, lint, formatting and unit tests; licences; pnpm audit; Semgrep;
+# gitleaks; Trivy; and SBOMs from Syft. `pnpm check` also runs on Windows
+# every night. The database, end-to-end and accessibility jobs arrive with
+# S01-07.
+#
+# Hardening: actions are pinned by commit SHA and images by digest; every
+# downloaded tool is checked against a committed SHA-256, and against its
+# publisher's signature where there is one; jobs read the repository only
+# and receive no secrets. Scanners must also show they saw the whole
+# dependency tree and the full rule set, so a scanner that quietly reads less
+# fails the build.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '23 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # Fail rather than fall back if the pinned pnpm or Node.js is not the one running.
+  PNPM_CONFIG_PM_ON_FAIL: error
+  PNPM_CONFIG_RUNTIME_ON_FAIL: error
+  COSIGN_VERSION: 3.1.3
+  GITLEAKS_VERSION: 8.30.1
+  SYFT_VERSION: 1.52.0
+  TRIVY_VERSION: 0.74.0
+  SEMGREP_IMAGE: semgrep/semgrep:1.177.0@sha256:acaac22ffc7b7cc5926de0751b223bce0b2491c33d18422fa72f632c78d81198
+  # Rules Semgrep loaded on 2026-09-28: 321 in all, 7 of them ours. Raise
+  # these when rules are added; lower them only with a reason in review.
+  SEMGREP_MINIMUM_RULES: 300
+  SEMGREP_PROJECT_RULES: 7
+  GITHUB_OIDC_ISSUER: https://token.actions.githubusercontent.com
+
+jobs:
+  check:
+    name: Typecheck, lint, format and unit tests
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - name: Enable pnpm through Corepack
+        run: corepack enable
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Run pnpm check
+        run: pnpm check
+
+  check-windows:
+    name: pnpm check on Windows
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: windows-2025
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - name: Enable pnpm through Corepack
+        run: corepack enable
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Run pnpm check
+        run: pnpm check
+
+  licences:
+    name: Licences
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    outputs:
+      dependencies: ${{ steps.check.outputs.dependencies }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - name: Enable pnpm through Corepack
+        run: corepack enable
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Check dependency licences and SPDX lines
+        id: check
+        run: |
+          pnpm check:licences --summary "$RUNNER_TEMP/licences.json"
+          echo "dependencies=$(jq '.dependencies' "$RUNNER_TEMP/licences.json")" >> "$GITHUB_OUTPUT"
+
+  audit:
+    name: pnpm audit
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - name: Enable pnpm through Corepack
+        run: corepack enable
+      - name: Check the lockfile against the npm advisory database
+        run: pnpm audit --audit-level high
+
+  semgrep:
+    name: Semgrep
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Test the project rules against their examples
+        run: >-
+          docker run --rm --volume "$PWD:/src" --workdir /src "$SEMGREP_IMAGE"
+          semgrep --test --metrics=off infra/semgrep
+      - name: Scan with the project rules and Semgrep's default rules
+        run: >-
+          docker run --rm --volume "$PWD:/src" --volume "$RUNNER_TEMP:/out" --workdir /src
+          "$SEMGREP_IMAGE"
+          semgrep scan --metrics=off --error --time --json-output=/out/semgrep.json
+          --config infra/semgrep --config p/default
+          --exclude infra/semgrep .
+      - name: Check Semgrep loaded every rule
+        run: |
+          loaded=$(jq '.time.rules | length' "$RUNNER_TEMP/semgrep.json")
+          ours=$(jq '[.time.rules[] | select(startswith("infra.semgrep."))] | length' "$RUNNER_TEMP/semgrep.json")
+          echo "Semgrep loaded $loaded rules, $ours of them ours."
+          if [ "$loaded" -lt "$SEMGREP_MINIMUM_RULES" ] || [ "$ours" -ne "$SEMGREP_PROJECT_RULES" ]; then
+            echo "Expected at least $SEMGREP_MINIMUM_RULES rules, and exactly $SEMGREP_PROJECT_RULES of ours." >&2
+            exit 1
+          fi
+
+  gitleaks:
+    name: gitleaks
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Install gitleaks
+        run: |
+          bash .github/scripts/fetch-tool.sh \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            "$RUNNER_TEMP/tools"
+          tar -xzf "$RUNNER_TEMP/tools/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" -C "$RUNNER_TEMP/tools" gitleaks
+      - name: Scan the history for secrets
+        run: >-
+          "$RUNNER_TEMP/tools/gitleaks" git --no-banner --redact --exit-code 1
+          --config .gitleaks.toml .
+
+  trivy:
+    name: Trivy
+    if: github.event_name != 'schedule'
+    needs: licences
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install cosign
+        run: |
+          bash .github/scripts/fetch-tool.sh \
+            "https://github.com/sigstore/cosign/releases/download/v${COSIGN_VERSION}/cosign-linux-amd64" \
+            "$RUNNER_TEMP/tools"
+          chmod +x "$RUNNER_TEMP/tools/cosign-linux-amd64"
+      - name: Install Trivy and verify its signature
+        working-directory: ${{ runner.temp }}/tools
+        run: |
+          archive="trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          bash "$GITHUB_WORKSPACE/.github/scripts/fetch-tool.sh" \
+            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/${archive}" .
+          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 --retry 3 \
+            --output "${archive}.sigstore.json" \
+            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/${archive}.sigstore.json"
+          ./cosign-linux-amd64 verify-blob "$archive" \
+            --bundle "${archive}.sigstore.json" \
+            --certificate-identity "https://github.com/aquasecurity/trivy/.github/workflows/reusable-release.yaml@refs/tags/v${TRIVY_VERSION}" \
+            --certificate-oidc-issuer "$GITHUB_OIDC_ISSUER"
+          tar -xzf "$archive" trivy
+      - name: Check Trivy reads the whole lockfile
+        env:
+          LICENCE_CHECK_DEPENDENCIES: ${{ needs.licences.outputs.dependencies }}
+        run: |
+          "$RUNNER_TEMP/tools/trivy" fs --quiet --cache-dir "$RUNNER_TEMP/trivy-cache" \
+            --scanners vuln --include-dev-deps --list-all-pkgs \
+            --format json --output "$RUNNER_TEMP/trivy.json" .
+          seen=$(jq '[.Results[]? | select(.Target == "pnpm-lock.yaml") | .Packages[]?] | length' "$RUNNER_TEMP/trivy.json")
+          echo "Trivy read $seen packages; the licence check saw $LICENCE_CHECK_DEPENDENCIES."
+          if [ "$seen" -lt "$LICENCE_CHECK_DEPENDENCIES" ]; then
+            echo "Trivy read fewer packages from pnpm-lock.yaml than are installed." >&2
+            exit 1
+          fi
+      - name: Scan dependencies and Dockerfiles
+        run: >-
+          "$RUNNER_TEMP/tools/trivy" fs --quiet
+          --cache-dir "$RUNNER_TEMP/trivy-cache"
+          --scanners vuln,misconfig --include-dev-deps
+          --severity HIGH,CRITICAL --exit-code 1 .
+
+  sbom:
+    name: SBOM
+    if: github.event_name != 'schedule'
+    needs: licences
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install cosign
+        run: |
+          bash .github/scripts/fetch-tool.sh \
+            "https://github.com/sigstore/cosign/releases/download/v${COSIGN_VERSION}/cosign-linux-amd64" \
+            "$RUNNER_TEMP/tools"
+          chmod +x "$RUNNER_TEMP/tools/cosign-linux-amd64"
+      - name: Install Syft and verify its signed checksums
+        working-directory: ${{ runner.temp }}/tools
+        run: |
+          base="https://github.com/anchore/syft/releases/download/v${SYFT_VERSION}"
+          archive="syft_${SYFT_VERSION}_linux_amd64.tar.gz"
+          checksums="syft_${SYFT_VERSION}_checksums.txt"
+          bash "$GITHUB_WORKSPACE/.github/scripts/fetch-tool.sh" "${base}/${archive}" .
+          for file in "$checksums" "${checksums}.sig" "${checksums}.pem"; do
+            curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 --retry 3 \
+              --output "$file" "${base}/${file}"
+          done
+          ./cosign-linux-amd64 verify-blob "$checksums" \
+            --signature "${checksums}.sig" \
+            --certificate "${checksums}.pem" \
+            --certificate-identity "https://github.com/anchore/syft/.github/workflows/release.yaml@refs/heads/main" \
+            --certificate-oidc-issuer "$GITHUB_OIDC_ISSUER"
+          grep " ${archive}\$" "$checksums" | sha256sum --check --strict -
+          tar -xzf "$archive" syft
+      - name: Generate SPDX and CycloneDX SBOMs
+        env:
+          SYFT_CHECK_FOR_APP_UPDATE: 'false'
+        run: |
+          mkdir -p "$RUNNER_TEMP/sbom"
+          "$RUNNER_TEMP/tools/syft" scan dir:. --quiet \
+            --source-name pixelgrant --source-version "$GITHUB_SHA" \
+            --output "syft-json=$RUNNER_TEMP/syft.json" \
+            --output "spdx-json=$RUNNER_TEMP/sbom/pixelgrant.spdx.json" \
+            --output "cyclonedx-json=$RUNNER_TEMP/sbom/pixelgrant.cdx.json"
+      - name: Check the SBOM lists the whole lockfile
+        env:
+          LICENCE_CHECK_DEPENDENCIES: ${{ needs.licences.outputs.dependencies }}
+        run: |
+          seen=$(jq '[.artifacts[] | select(.type == "npm")] | length' "$RUNNER_TEMP/syft.json")
+          echo "The SBOM lists $seen npm packages; the licence check saw $LICENCE_CHECK_DEPENDENCIES."
+          if [ "$seen" -lt "$LICENCE_CHECK_DEPENDENCIES" ]; then
+            echo "Syft listed fewer packages from pnpm-lock.yaml than are installed." >&2
+            exit 1
+          fi
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sbom
+          path: ${{ runner.temp }}/sbom/
+          if-no-files-found: error
+          retention-days: 90
