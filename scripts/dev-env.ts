@@ -10,15 +10,18 @@
 //
 // Each profile names the only PixelGrant variables its command receives, so
 // a command never gets a credential it does not use (ADR 0005). Any other
-// PIXELGRANT_ variable is removed from the command's environment. For the
-// profile's variables, a non-empty value in the environment wins, then one
-// in the repository's .env file (see .env.example), then the development
-// value.
+// PIXELGRANT_ variable, in any letter case, is removed from the command's
+// environment. For the profile's variables, a non-empty value in the
+// environment wins, then one in the repository's .env file (see
+// .env.example), then the development value.
 //
-// This is for development only. It sets PIXELGRANT_DEV=1.
+// This is for development only. It sets PIXELGRANT_DEV=1, and so refuses to
+// run against a database server that is not on this machine: the fixed
+// development passwords must never be set on a shared server.
 
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
+import { isIPv4 } from 'node:net';
 import { join } from 'node:path';
 import { parseEnv } from 'node:util';
 
@@ -134,9 +137,16 @@ export function developmentValues(
   return values;
 }
 
+/** The same rule as isLoopbackHost in packages/db/scripts/settings.ts. */
+export function isLoopbackHost(host: string): boolean {
+  if (host === 'localhost' || host === '::1' || host === '[::1]') return true;
+  return isIPv4(host) && host.startsWith('127.');
+}
+
 /**
  * The environment for a command: the inherited one without any PIXELGRANT_
- * variable, plus exactly the profile's variables.
+ * variable, plus exactly the profile's variables. Throws if the database
+ * host is not on this machine.
  */
 export function profileEnvironment(
   profile: Profile,
@@ -147,7 +157,7 @@ export function profileEnvironment(
 ): Record<string, string> {
   const env: Record<string, string> = {};
   for (const [key, value] of Object.entries(inherited)) {
-    if (value !== undefined && !key.startsWith('PIXELGRANT_')) env[key] = value;
+    if (value !== undefined && !key.toUpperCase().startsWith('PIXELGRANT_')) env[key] = value;
   }
   for (const key of PROFILES[profile]) {
     if (key === OWN_DATABASES) {
@@ -160,6 +170,14 @@ export function profileEnvironment(
       if (override !== undefined && override !== '') value = override;
     }
     if (value !== undefined) env[key] = value;
+  }
+  const host = env['PIXELGRANT_DB_HOST'];
+  if (host !== undefined && !isLoopbackHost(host)) {
+    throw new Error(
+      `PIXELGRANT_DB_HOST is ${host}. The development commands work only against a database ` +
+        'server on this machine. For any other server, run packages/db/scripts/db.ts with its ' +
+        'own credentials.',
+    );
   }
   return env;
 }
