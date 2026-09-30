@@ -1,0 +1,22 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# gitleaks configuration (ADR 0002): the default rules, plus one allowlist
+# for the fixed, fake credentials in the development Compose file (ADR 0005).
+# A finding is allowed only when it is in that file and the value is one of
+# the obviously fake ones, which all end "-not-a-secret". Add no others.
+#
+# The allowlist names the rule it applies to. gitleaks 8.30 skips every file
+# a global allowlist's path matches, whatever its other conditions, so a
+# global allowlist would hide a real secret added to the file.
+
+title = "PixelGrant"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Fixed, fake development credentials, published on 127.0.0.1 only (ADR 0005)"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''^infra/compose/compose\.dev\.yaml$''']
+regexes = ['''-not-a-secret$''']
