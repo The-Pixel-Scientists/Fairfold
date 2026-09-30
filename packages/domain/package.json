@@ -1,0 +1,17 @@
+{
+  "name": "@pixelgrant/domain",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Shared domain contracts: forms, eligibility, stages, scoring and API types",
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "vitest": "5.0.1"
+  }
+}

@@ -1,0 +1,155 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Development services (ADR 0005): PostgreSQL, Mailpit, SeaweedFS and ClamAV.
+# The apps run natively on the host, so the ports they use are published, on
+# 127.0.0.1 only. Every worktree shares these containers; each one uses its
+# own database and bucket (see scripts/dev-names.ts).
+#
+#   docker compose -f infra/compose/compose.dev.yaml up -d --wait
+#
+# The credentials below are fixed, fake and for development only. The API and
+# worker refuse them outside development. Host-side tools read them from this
+# file with `docker compose config` (scripts/dev-env.ts), so they appear in no
+# other file. This is the only file the gitleaks allowlist covers.
+#
+# Images are pinned by digest, each published at least 7 days before it was
+# adopted (ADR 0001).
+#
+# First start: Postgres runs the roles script, and ClamAV copies the
+# signatures in its image into the clamav-data volume.
+
+name: pixelgrant-dev
+
+x-postgres-credentials: &postgres-credentials
+  POSTGRES_USER: postgres
+  POSTGRES_PASSWORD: dev-postgres-password-not-a-secret
+  PIXELGRANT_DB_MIGRATOR_PASSWORD: dev-migrator-password-not-a-secret
+  PIXELGRANT_DB_APP_API_PASSWORD: dev-app-api-password-not-a-secret
+  PIXELGRANT_DB_APP_WORKER_PASSWORD: dev-app-worker-password-not-a-secret
+  PIXELGRANT_DB_APP_AUTH_PASSWORD: dev-app-auth-password-not-a-secret
+  PIXELGRANT_DB_APP_QUEUE_PASSWORD: dev-app-queue-password-not-a-secret
+
+services:
+  postgres:
+    # The pinned PostgreSQL 16.15 image plus the roles script, which runs on
+    # the container's first start (infra/docker/postgres-dev.Dockerfile).
+    build:
+      context: ./postgres
+      dockerfile: ../../docker/postgres-dev.Dockerfile
+      additional_contexts:
+        db-scripts: ../../packages/db/scripts
+    image: pixelgrant-dev-postgres:16.15
+    environment:
+      <<: *postgres-credentials
+      POSTGRES_DB: postgres
+      # Lets the roles script accept the development passwords above.
+      PIXELGRANT_DEV: '1'
+    ports:
+      - 127.0.0.1:55432:5432
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD, pg_isready, --username=postgres, --dbname=postgres]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+  mailpit:
+    image: axllent/mailpit:v1.31.2@sha256:74d609a42ec279aa63c6b4622a6fa9b5408d1ad5b1d76a1c4be40a265ce0863d
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: 'false'
+      MP_SMTP_AUTH_ALLOW_INSECURE: 'true'
+      MP_SMTP_AUTH: dev-smtp:dev-smtp-password-not-a-secret
+    ports:
+      # SMTP, and the web inbox at http://127.0.0.1:58025
+      - 127.0.0.1:51025:1025
+      - 127.0.0.1:58025:8025
+    restart: unless-stopped
+
+  seaweedfs:
+    image: chrislusf/seaweedfs:4.47@sha256:ce9e796f1fe6f06968f4c04bdaf8f678dad9c8acdfef3d244133d71bfa6bf882
+    command:
+      - server
+      - -dir=/data
+      - -s3
+      - -s3.port=8333
+      - -s3.config=/etc/seaweedfs/s3.json
+      - -s3.port.iceberg=0
+      - -s3.port.lance=0
+      - -master.volumeSizeLimitMB=1024
+      - -volume.max=0
+    environment:
+      # Its own servers sign requests between them (ADR 0005).
+      WEED_JWT_SIGNING_KEY: dev-seaweedfs-write-jwt-key-not-a-secret
+      WEED_JWT_SIGNING_READ_KEY: dev-seaweedfs-read-jwt-key-not-a-secret
+      WEED_JWT_FILER_SIGNING_KEY: dev-seaweedfs-filer-jwt-key-not-a-secret
+      WEED_JWT_FILER_SIGNING_READ_KEY: dev-seaweedfs-filer-read-jwt-key-not-a-secret
+    configs:
+      - source: seaweedfs-s3
+        target: /etc/seaweedfs/s3.json
+    ports:
+      # Only the S3 API is published. Master, volume and filer stay inside
+      # the Compose network.
+      - 127.0.0.1:58333:8333
+    volumes:
+      - seaweedfs-data:/data
+    restart: unless-stopped
+
+  clamav:
+    # ClamAV 1.5.4, built 2026-09-21 with the signatures of 2026-09-20. Those
+    # seed the empty clamav-data volume on the first start, and freshclam
+    # updates them each time the container starts.
+    image: clamav/clamav:1.5.4@sha256:0e31ce089574268aefa0b543767d66b70240ab51ed49eec53e07f18d5629d817
+    environment:
+      # Anything clamd cannot fully scan counts as not clean (ADR 0005).
+      # StreamMaxLength stays at or above the upload limit.
+      CLAMD_CONF_AlertExceedsMax: 'yes'
+      CLAMD_CONF_AlertEncrypted: 'yes'
+      CLAMD_CONF_StreamMaxLength: 100M
+      CLAMD_CONF_MaxFileSize: 100M
+      CLAMD_CONF_MaxScanSize: 400M
+      # Milliseconds. A scan that runs longer is stopped and reported, not
+      # passed.
+      CLAMD_CONF_MaxScanTime: '120000'
+    ports:
+      - 127.0.0.1:53310:3310
+    volumes:
+      - clamav-data:/var/lib/clamav
+    restart: unless-stopped
+
+configs:
+  # One S3 key pair per purpose, each limited to the development buckets and
+  # the prefixes it needs (ADR 0005). dev-admin creates buckets and is used
+  # only by development tooling.
+  seaweedfs-s3:
+    content: |
+      {
+        "identities": [
+          {
+            "name": "dev-admin",
+            "credentials": [{ "accessKey": "dev-admin", "secretKey": "dev-admin-secret-key-not-a-secret" }],
+            "actions": ["Admin:pixelgrant-*", "List:pixelgrant-*", "Read:pixelgrant-*", "Write:pixelgrant-*"]
+          },
+          {
+            "name": "dev-uploads",
+            "credentials": [{ "accessKey": "dev-uploads", "secretKey": "dev-uploads-secret-key-not-a-secret" }],
+            "actions": ["Write:pixelgrant-*/quarantine/*"]
+          },
+          {
+            "name": "dev-scanner",
+            "credentials": [{ "accessKey": "dev-scanner", "secretKey": "dev-scanner-secret-key-not-a-secret" }],
+            "actions": ["Read:pixelgrant-*/quarantine/*", "Write:pixelgrant-*/quarantine/*", "Write:pixelgrant-*/clean/*"]
+          },
+          {
+            "name": "dev-downloads",
+            "credentials": [{ "accessKey": "dev-downloads", "secretKey": "dev-downloads-secret-key-not-a-secret" }],
+            "actions": ["Read:pixelgrant-*/clean/*"]
+          }
+        ]
+      }
+
+volumes:
+  postgres-data:
+  seaweedfs-data:
+  clamav-data:

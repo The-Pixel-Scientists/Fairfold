@@ -1,0 +1,21 @@
+{
+  "name": "@pixelgrant/db",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Database schema, migrations, row-level security and tenant context",
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./classification": "./classification.ts"
+  },
+  "dependencies": {
+    "kysely": "0.29.6",
+    "pg": "8.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.6",
+    "@types/pg": "8.23.1",
+    "vitest": "5.0.1"
+  }
+}

@@ -1,0 +1,9 @@
+// Shared by the browser and the server, so no DOM or Node.js types.
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "node_modules/.cache/tsc",
+    "tsBuildInfoFile": "node_modules/.cache/tsc/tsconfig.tsbuildinfo"
+  },
+  "include": ["src", "test", "package.json"]
+}

@@ -1,0 +1,51 @@
+{
+  "name": "pixelgrant",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Open source grants management for foundations and non-profits",
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "packageManager": "pnpm@12.5.1+sha512.e3f305bc784a2bc89f5ad3b6138889470fae8d2af5f36b61216ec91c2c3d64089775f9de38aac331044ea40f245cb0d5666392dfdf65824e1907ef6a2c62de5f",
+  "engines": {
+    "node": ">=24.16.0 <25"
+  },
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": "24.21.0",
+      "onFail": "warn"
+    }
+  },
+  "scripts": {
+    "check": "pnpm run typecheck && pnpm run lint && pnpm run format:check && pnpm run test:unit",
+    "typecheck": "tsc -b",
+    "lint": "eslint --max-warnings 0 .",
+    "format": "prettier --write \"**/*.{js,mjs,cjs,ts,tsx,json,yaml,yml,css,html}\" \"!pnpm-lock.yaml\" \"!infra/semgrep/**\"",
+    "format:check": "prettier --check \"**/*.{js,mjs,cjs,ts,tsx,json,yaml,yml,css,html}\" \"!pnpm-lock.yaml\" \"!infra/semgrep/**\"",
+    "test": "node scripts/test.ts",
+    "test:unit": "node scripts/vitest.ts run --project unit --project ui",
+    "test:db": "node scripts/test.ts --db-only",
+    "test:e2e": "playwright test --pass-with-no-tests",
+    "test:a11y": "playwright test --grep @a11y --pass-with-no-tests",
+    "check:licences": "node scripts/check-licences.ts",
+    "db:migrate": "node scripts/dev-env.ts database-admin node packages/db/scripts/db.ts prepare up",
+    "db:rollback": "node scripts/dev-env.ts database-admin node packages/db/scripts/db.ts prepare down",
+    "db:drop": "node scripts/dev-env.ts database-admin node packages/db/scripts/db.ts drop",
+    "dev:names": "node scripts/dev-names.ts"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
+    "@eslint/js": "10.0.1",
+    "@playwright/test": "1.63.0",
+    "@types/node": "24.13.6",
+    "eslint": "10.11.0",
+    "eslint-plugin-jsx-a11y-x": "0.2.0",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "jsdom": "30.1.0",
+    "prettier": "3.9.8",
+    "spdx-expression-parse": "5.0.0",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.70.0",
+    "vitest": "5.0.1"
+  }
+}

@@ -1,0 +1,14 @@
+// Components are bundled by Vite in the console and portal.
+// package.json keeps the project non-empty before its first source file exists, so `tsc -b` passes on an empty workspace.
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "node_modules/.cache/tsc",
+    "tsBuildInfoFile": "node_modules/.cache/tsc/tsconfig.tsbuildinfo",
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "lib": ["es2024", "dom", "dom.iterable"],
+    "jsx": "react-jsx"
+  },
+  "include": ["src", "test", "package.json"]
+}

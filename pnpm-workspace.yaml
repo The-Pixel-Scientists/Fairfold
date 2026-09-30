@@ -1,0 +1,38 @@
+packages:
+  - apps/*
+  - packages/*
+
+# Supply-chain settings (ADR 0001). Do not lower minimumReleaseAge. A security
+# fix that cannot wait goes in minimumReleaseAgeExclude as one exact version,
+# with the advisory id, approver and date recorded in the pull request, and is
+# removed once that version is 7 days old.
+minimumReleaseAge: 10080
+minimumReleaseAgeExclude: []
+
+# Refuse a version published with weaker evidence of origin than an earlier
+# one (for example, no provenance where there was provenance before), and
+# refuse git or tarball sources deep in the tree. The second is pnpm's default;
+# it is set here so a scanner, and a reader, can see it.
+trustPolicy: no-downgrade
+trustPolicyExclude:
+  # Published by an npm maintainer on 2023-07-10 without provenance, three
+  # days after 7.5.4 had it: the backported fix for CVE-2022-25883 on the 6.x
+  # line. Reached only through @babel/core in eslint-plugin-react-hooks.
+  - semver@6.3.1
+blockExoticSubdeps: true
+
+# No dependency may run install scripts. The only ones in the tree, esbuild's
+# and fsevents' (macOS only), are denied by name because pnpm fails an install
+# that leaves a build script undecided. Both packages work without them.
+allowBuilds:
+  esbuild: false
+  fsevents: false
+
+# Every dependency is pinned to an exact version.
+savePrefix: ''
+
+# Refuse packages whose engines field rules out the running Node.js.
+engineStrict: true
+
+# Run package scripts in pnpm's POSIX shell on every platform.
+shellEmulator: true

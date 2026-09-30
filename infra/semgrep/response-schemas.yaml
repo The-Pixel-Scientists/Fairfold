@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# API contracts in packages/domain/src/api must say exactly what they send,
+# so a field the caller may not see can never pass through (ADR 0004). The
+# answers projection builds its schema from the pinned form version and is
+# the one exception; it lives in packages/domain/src/api/answers/.
+
+rules:
+  - id: pixelgrant-no-loose-api-schema
+    languages: [typescript]
+    severity: ERROR
+    message: >-
+      API contracts may not use z.any, z.unknown, z.looseObject,
+      .passthrough() or a record of unknown values. Declare every field
+      (ADR 0004).
+    pattern-either:
+      - pattern: z.any(...)
+      - pattern: z.unknown(...)
+      - pattern: z.looseObject(...)
+      - pattern: $SCHEMA.passthrough(...)
+      - pattern: $SCHEMA.loose(...)
+      - pattern: z.record($KEY, z.unknown(...))
+      - pattern: z.record($KEY, z.any(...))
+    paths:
+      include:
+        - /packages/domain/src/api/
+      exclude:
+        - /packages/domain/src/api/answers/

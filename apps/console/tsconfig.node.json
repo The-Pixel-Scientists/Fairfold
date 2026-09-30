@@ -1,0 +1,11 @@
+// Code that runs on Node.js: the Vite config and Playwright tests.
+// package.json keeps the project non-empty before its first source file exists, so `tsc -b` passes on an empty workspace.
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "node_modules/.cache/tsc/node",
+    "tsBuildInfoFile": "node_modules/.cache/tsc/node/tsconfig.tsbuildinfo",
+    "types": ["node"]
+  },
+  "include": ["e2e", "*.ts", "package.json"]
+}
