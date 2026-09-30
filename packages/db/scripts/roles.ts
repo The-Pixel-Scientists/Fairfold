@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 import type pg from 'pg';
 
 import { scramSha256Verifier } from './scram.ts';
-import { readSecret, type Env } from './settings.ts';
+import { isLocalDevelopment, readSecret, type Env } from './settings.ts';
 
 /** Bump together with the version in roles.sql and database-privileges.sql. */
 export const ROLES_SCRIPT_VERSION = '1';
@@ -32,7 +32,8 @@ export function passwordVariable(role: LoginRole): string {
 
 /**
  * Read a role's password and check it may be used here: long enough, and a
- * known development password only when PIXELGRANT_DEV=1.
+ * known development password only in development (PIXELGRANT_DEV=1) against
+ * a server on this machine, so it can never be set on a shared server.
  */
 export function readRolePassword(env: Env, role: LoginRole): string {
   const name = passwordVariable(role);
@@ -40,8 +41,10 @@ export function readRolePassword(env: Env, role: LoginRole): string {
   if (password.length < MINIMUM_PASSWORD_LENGTH) {
     throw new Error(`${name} must be at least ${String(MINIMUM_PASSWORD_LENGTH)} characters.`);
   }
-  if (DEVELOPMENT_PASSWORD.test(password) && env['PIXELGRANT_DEV'] !== '1') {
-    throw new Error(`${name} is a development password. Set a real one outside development.`);
+  if (DEVELOPMENT_PASSWORD.test(password) && !isLocalDevelopment(env)) {
+    throw new Error(
+      `${name} is a development password, which works only in development against a server on this machine. Set a real one.`,
+    );
   }
   return password;
 }
@@ -52,8 +55,15 @@ export function readRolePassword(env: Env, role: LoginRole): string {
  */
 async function quietLogging(client: pg.ClientBase): Promise<void> {
   await client.query(
-    "SET log_statement = 'none'; SET log_min_duration_statement = -1; " +
-      'SET log_parameter_max_length = 0; SET log_parameter_max_length_on_error = 0',
+    [
+      "SET log_statement = 'none'",
+      'SET log_min_duration_statement = -1',
+      'SET log_min_duration_sample = -1',
+      'SET log_transaction_sample_rate = 0',
+      'SET log_min_error_statement = panic',
+      'SET log_parameter_max_length = 0',
+      'SET log_parameter_max_length_on_error = 0',
+    ].join('; '),
   );
 }
 

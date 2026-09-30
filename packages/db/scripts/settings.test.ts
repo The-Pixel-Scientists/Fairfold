@@ -2,7 +2,13 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { readDatabaseName, readSecret, readServer } from './settings.ts';
+import {
+  isLocalDevelopment,
+  isLoopbackHost,
+  readDatabaseName,
+  readSecret,
+  readServer,
+} from './settings.ts';
 
 const files: Record<string, string> = { '/run/secrets/migrator': 'from-file\n' };
 const readFile = (path: string): string => {
@@ -66,5 +72,42 @@ describe('readServer', () => {
     expect(() =>
       readServer({ PIXELGRANT_DB_HOST: '127.0.0.1', PIXELGRANT_DB_PORT: 'postgres' }),
     ).toThrow('PIXELGRANT_DB_PORT must be');
+  });
+});
+
+describe('isLoopbackHost', () => {
+  it('accepts this machine', () => {
+    for (const host of ['localhost', '127.0.0.1', '127.1.2.3', '::1', '[::1]']) {
+      expect(isLoopbackHost(host)).toBe(true);
+    }
+  });
+
+  it('refuses any other host, including names that only look local', () => {
+    for (const host of [
+      'db.example.org',
+      '10.0.0.5',
+      '192.168.1.10',
+      '0.0.0.0',
+      '127.0.0.1.nip.io',
+      'localhost.example.org',
+      '127.999.0.1',
+      '::ffff:10.0.0.5',
+      '',
+    ]) {
+      expect(isLoopbackHost(host)).toBe(false);
+    }
+  });
+});
+
+describe('isLocalDevelopment', () => {
+  it('needs both the development flag and a server on this machine', () => {
+    expect(isLocalDevelopment({ PIXELGRANT_DEV: '1', PIXELGRANT_DB_HOST: '127.0.0.1' })).toBe(true);
+    expect(isLocalDevelopment({ PIXELGRANT_DEV: '1', PIXELGRANT_DB_HOST: 'db.example.org' })).toBe(
+      false,
+    );
+    expect(isLocalDevelopment({ PIXELGRANT_DEV: '1' })).toBe(false);
+    expect(isLocalDevelopment({ PIXELGRANT_DEV: '0', PIXELGRANT_DB_HOST: '127.0.0.1' })).toBe(
+      false,
+    );
   });
 });

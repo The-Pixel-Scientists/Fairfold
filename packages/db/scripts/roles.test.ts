@@ -19,12 +19,20 @@ describe('readRolePassword', () => {
     ).toThrow('PIXELGRANT_DB_MIGRATOR_PASSWORD must be at least 16 characters.');
   });
 
-  it('refuses a development password outside development', () => {
-    const env = { PIXELGRANT_DB_MIGRATOR_PASSWORD: 'dev-migrator-password-not-a-secret' };
-    expect(() => readRolePassword(env, 'migrator')).toThrow('is a development password');
+  it('accepts a development password only in development against this machine', () => {
+    const env = {
+      PIXELGRANT_DB_MIGRATOR_PASSWORD: 'dev-migrator-password-not-a-secret',
+      PIXELGRANT_DB_HOST: '127.0.0.1',
+    };
     expect(readRolePassword({ ...env, PIXELGRANT_DEV: '1' }, 'migrator')).toBe(
       'dev-migrator-password-not-a-secret',
     );
+    expect(() => readRolePassword(env, 'migrator')).toThrow('is a development password');
+    for (const host of ['db.example.org', '10.0.0.5']) {
+      expect(() =>
+        readRolePassword({ ...env, PIXELGRANT_DEV: '1', PIXELGRANT_DB_HOST: host }, 'migrator'),
+      ).toThrow('against a server on this machine');
+    }
   });
 });
 

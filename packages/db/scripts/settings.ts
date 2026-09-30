@@ -7,6 +7,7 @@
 // (scripts/dev-env.ts).
 
 import { readFileSync } from 'node:fs';
+import { isIPv4 } from 'node:net';
 
 export type Env = Readonly<Record<string, string | undefined>>;
 
@@ -78,4 +79,20 @@ export function readServer(env: Env): ServerSettings {
     throw new Error('PIXELGRANT_DB_PORT must be a port number from 1 to 65535.');
   }
   return { host, port };
+}
+
+/**
+ * Whether a database host is this machine: localhost, an address in
+ * 127.0.0.0/8, or ::1. Development-only actions, such as accepting the fixed
+ * development passwords or dropping a database, refuse any other host.
+ */
+export function isLoopbackHost(host: string): boolean {
+  if (host === 'localhost' || host === '::1' || host === '[::1]') return true;
+  return isIPv4(host) && host.startsWith('127.');
+}
+
+/** Whether this is development against a server on this machine. */
+export function isLocalDevelopment(env: Env): boolean {
+  const host = env['PIXELGRANT_DB_HOST'];
+  return env['PIXELGRANT_DEV'] === '1' && host !== undefined && isLoopbackHost(host);
 }

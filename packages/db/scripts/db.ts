@@ -24,8 +24,15 @@ import { Kysely, PostgresDialect } from 'kysely';
 import pg from 'pg';
 
 import { createMigrator } from './migrations.ts';
-import { applyDatabasePrivileges, applyRoles, assertRoles } from './roles.ts';
 import {
+  applyDatabasePrivileges,
+  applyRoles,
+  assertRoles,
+  LOGIN_ROLES,
+  readRolePassword,
+} from './roles.ts';
+import {
+  isLoopbackHost,
   MAINTENANCE_DATABASE,
   readDatabaseName,
   readSecret,
@@ -36,8 +43,6 @@ import {
 
 /** `pnpm db:drop` refuses any other database (ADR 0005). */
 const DROPPABLE_PREFIX = 'pixelgrant_';
-
-const LOOPBACK_HOSTS = new Set(['localhost', '::1', '[::1]']);
 
 type Step = 'prepare' | 'up' | 'down' | 'drop';
 const STEPS: readonly Step[] = ['prepare', 'up', 'down', 'drop'];
@@ -82,6 +87,8 @@ async function withSuperuser<T>(
 }
 
 export async function prepareDatabase(env: Env, database: string): Promise<void> {
+  // Check every password before connecting, so a refused one changes nothing.
+  for (const role of LOGIN_ROLES) readRolePassword(env, role);
   await withSuperuser(env, MAINTENANCE_DATABASE, async (client) => {
     await applyRoles(client, env);
     const { rows } = await client.query<{ owner: string }>(
@@ -113,7 +120,7 @@ export function checkDroppable(env: Env, database: string): void {
     throw new Error('db drop runs only in development (PIXELGRANT_DEV=1).');
   }
   const host = readSetting(env, 'PIXELGRANT_DB_HOST');
-  if (!LOOPBACK_HOSTS.has(host) && !/^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host)) {
+  if (!isLoopbackHost(host)) {
     throw new Error(`Refusing to drop a database on ${host}: db drop works only on this machine.`);
   }
   if (!database.startsWith(DROPPABLE_PREFIX)) {
