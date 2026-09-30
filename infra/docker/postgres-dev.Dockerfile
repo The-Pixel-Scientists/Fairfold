@@ -9,7 +9,7 @@
 #   default     infra/compose/postgres
 #   db-scripts  packages/db/scripts
 
-FROM postgres:16.15-bookworm@sha256:efedf3595f1d6f415c08568ba171029bf54052e754cc9f030e3f2412b21f3d67
+FROM postgres:18.6-bookworm@sha256:3725f4e2499eef5134592b3b4ab79a543ed7f8e533b05b5b637af926630f6650
 
 RUN install --directory --mode=0755 /pixelgrant
 COPY --chmod=0755 initdb/10-roles.sh /docker-entrypoint-initdb.d/10-roles.sh
