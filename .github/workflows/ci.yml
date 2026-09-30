@@ -2,9 +2,10 @@
 #
 # Checks for every pull request and every push to main (ADRs 0001 and 0002):
 # typecheck, lint, formatting and unit tests; licences; pnpm audit; Semgrep;
-# gitleaks; Trivy; and SBOMs from Syft. `pnpm check` also runs on Windows
-# every night. The database, end-to-end and accessibility jobs arrive with
-# S01-07.
+# gitleaks; Trivy; and SBOMs from Syft. Every night, `pnpm check` runs on
+# Windows, and the licence check, pnpm audit and Trivy run again, so a new
+# advisory against an unchanged lockfile is caught. The database, end-to-end
+# and accessibility jobs arrive with S01-07.
 #
 # Hardening: actions are pinned by commit SHA and images by digest; every
 # downloaded tool is checked against a committed SHA-256, and against its
@@ -88,11 +89,11 @@ jobs:
 
   licences:
     name: Licences
-    if: github.event_name != 'schedule'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     outputs:
       dependencies: ${{ steps.check.outputs.dependencies }}
+      packages: ${{ steps.check.outputs.packages }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -110,10 +111,10 @@ jobs:
         run: |
           pnpm check:licences --summary "$RUNNER_TEMP/licences.json"
           echo "dependencies=$(jq '.dependencies' "$RUNNER_TEMP/licences.json")" >> "$GITHUB_OUTPUT"
+          echo "packages=$(jq --compact-output '.packages' "$RUNNER_TEMP/licences.json")" >> "$GITHUB_OUTPUT"
 
   audit:
     name: pnpm audit
-    if: github.event_name != 'schedule'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -182,7 +183,6 @@ jobs:
 
   trivy:
     name: Trivy
-    if: github.event_name != 'schedule'
     needs: licences
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -213,7 +213,14 @@ jobs:
       - name: Check Trivy reads the whole lockfile
         env:
           LICENCE_CHECK_DEPENDENCIES: ${{ needs.licences.outputs.dependencies }}
+          LICENCE_CHECK_PACKAGES: ${{ needs.licences.outputs.packages }}
         run: |
+          case "$LICENCE_CHECK_DEPENDENCIES" in
+            '' | *[!0-9]* | 0)
+              echo "The licence check reported no package count ('$LICENCE_CHECK_DEPENDENCIES')." >&2
+              exit 1
+              ;;
+          esac
           "$RUNNER_TEMP/tools/trivy" fs --quiet --cache-dir "$RUNNER_TEMP/trivy-cache" \
             --scanners vuln --include-dev-deps --list-all-pkgs \
             --format json --output "$RUNNER_TEMP/trivy.json" .
@@ -221,6 +228,14 @@ jobs:
           echo "Trivy read $seen packages; the licence check saw $LICENCE_CHECK_DEPENDENCIES."
           if [ "$seen" -lt "$LICENCE_CHECK_DEPENDENCIES" ]; then
             echo "Trivy read fewer packages from pnpm-lock.yaml than are installed." >&2
+            exit 1
+          fi
+          missing=$(jq --raw-output --argjson installed "$LICENCE_CHECK_PACKAGES" \
+            '$installed - [.Results[]? | select(.Target == "pnpm-lock.yaml") | .Packages[]? | "\(.Name)@\(.Version)"] | .[]' \
+            "$RUNNER_TEMP/trivy.json")
+          if [ -n "$missing" ]; then
+            echo "Trivy did not read these installed packages:" >&2
+            echo "$missing" >&2
             exit 1
           fi
       - name: Scan dependencies and Dockerfiles
@@ -278,6 +293,12 @@ jobs:
         env:
           LICENCE_CHECK_DEPENDENCIES: ${{ needs.licences.outputs.dependencies }}
         run: |
+          case "$LICENCE_CHECK_DEPENDENCIES" in
+            '' | *[!0-9]* | 0)
+              echo "The licence check reported no package count ('$LICENCE_CHECK_DEPENDENCIES')." >&2
+              exit 1
+              ;;
+          esac
           seen=$(jq '[.artifacts[] | select(.type == "npm")] | length' "$RUNNER_TEMP/syft.json")
           echo "The SBOM lists $seen npm packages; the licence check saw $LICENCE_CHECK_DEPENDENCIES."
           if [ "$seen" -lt "$LICENCE_CHECK_DEPENDENCIES" ]; then

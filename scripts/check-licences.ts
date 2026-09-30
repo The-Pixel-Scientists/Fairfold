@@ -7,8 +7,9 @@
 //
 //   node scripts/check-licences.ts [--summary <file>]
 //
-// --summary writes the number of dependencies checked as JSON, so CI can
-// compare it with what the vulnerability scanner and SBOM saw.
+// --summary writes the dependencies checked, as a count and as a list of
+// name@version, so CI can compare them with what the vulnerability scanner
+// and SBOM saw.
 
 import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -77,6 +78,7 @@ function listPackages(production: boolean): InstalledPackage[] {
 interface DependencyCount {
   dependencies: number;
   production: number;
+  packages: string[];
 }
 
 function checkDependencies(
@@ -104,6 +106,7 @@ function checkDependencies(
   }
   count.dependencies = all.length;
   count.production = production.length;
+  count.packages = [...new Set(all.map((pkg) => `${pkg.name}@${pkg.version}`))].sort();
   return `${String(all.length)} dependencies (${String(production.length)} in production), ${String(excepted)} by recorded exception`;
 }
 
@@ -163,7 +166,7 @@ function main(argv: readonly string[]): number {
     readFileSync(join(root, 'licence-policy.json'), 'utf8'),
   ) as LicencePolicy;
   const failures: string[] = [...policyProblems(policy)];
-  const count: DependencyCount = { dependencies: 0, production: 0 };
+  const count: DependencyCount = { dependencies: 0, production: 0, packages: [] };
   const summary = [
     checkDependencies(policy, failures, count),
     checkWorkspaceManifests(failures),
