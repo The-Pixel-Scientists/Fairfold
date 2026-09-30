@@ -30,9 +30,15 @@
 
 BEGIN;
 
+-- Keep the statements below, which handle password verifiers, out of
+-- pg_stat_statements if the server loads it.
+SET LOCAL pg_stat_statements.track = 'none';
+
 -- Two sessions changing roles at once fail with "tuple concurrently
 -- updated", even from different databases. pg_authid is shared by every
 -- database, so this lock serialises every run of this script on the server.
+-- A run that cannot get it within 30 seconds fails rather than waiting.
+SET LOCAL lock_timeout = '30s';
 LOCK TABLE pg_catalog.pg_authid IN SHARE ROW EXCLUSIVE MODE;
 
 DO $roles$
@@ -40,6 +46,7 @@ DECLARE
   roles_version CONSTANT text := '1';
   role_name text;
   role_verifier text;
+  verifier_parts text[];
   membership record;
   role_setting record;
 BEGIN
@@ -49,10 +56,13 @@ BEGIN
 
   FOREACH role_name IN ARRAY ARRAY['migrator', 'app_api', 'app_worker', 'app_auth', 'app_queue']
   LOOP
+    -- A verifier in PostgreSQL's stored format: at least 4096 iterations, a
+    -- salt of at least 16 bytes, and 32-byte stored and server keys.
     role_verifier := current_setting('pixelgrant.scram_verifier_' || role_name, true);
-    IF role_verifier IS NULL OR role_verifier !~
-        '^SCRAM-SHA-256\$[0-9]+:[A-Za-z0-9+/]+={0,2}\$[A-Za-z0-9+/]+={0,2}:[A-Za-z0-9+/]+={0,2}$' THEN
-      RAISE EXCEPTION 'Set a SCRAM-SHA-256 verifier for role % before running the roles script.', role_name;
+    verifier_parts := regexp_match(role_verifier,
+      '^SCRAM-SHA-256\$([0-9]{4,9}):[A-Za-z0-9+/]{22,}={0,2}\$[A-Za-z0-9+/]{43}=:[A-Za-z0-9+/]{43}=$');
+    IF verifier_parts IS NULL OR verifier_parts[1]::integer < 4096 THEN
+      RAISE EXCEPTION 'Set a SCRAM-SHA-256 verifier with at least 4096 iterations for role % before running the roles script.', role_name;
     END IF;
 
     IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = role_name) THEN
@@ -105,6 +115,13 @@ BEGIN
     EXCEPTION WHEN OTHERS OR query_canceled THEN
       RAISE EXCEPTION 'Could not set the password for role % (SQLSTATE %).', role_name, SQLSTATE;
     END;
+
+    -- PostgreSQL stores a well-formed verifier as given and hashes anything
+    -- else as if it were a password, so check it kept exactly this one.
+    IF (SELECT rolpassword FROM pg_catalog.pg_authid WHERE rolname = role_name)
+        IS DISTINCT FROM role_verifier THEN
+      RAISE EXCEPTION 'The password for role % was not stored as the verifier given.', role_name;
+    END IF;
   END LOOP;
 END
 $roles$;
