@@ -1,5 +1,5 @@
-# Auto detect text files and perform LF normalization
-* text=auto
+# Text files use LF line endings on every platform, as Prettier expects
+* text=auto eol=lf
 
 # Scripts and container files keep LF endings on every platform
 *.sh text eol=lf
