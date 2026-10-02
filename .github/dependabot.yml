@@ -3,6 +3,11 @@
 # Dependency updates arrive as one batched pull request a month for each
 # ecosystem, and only for releases at least 7 days old (ADR 0001). Security
 # fixes follow the targets in SECURITY.md, outside this schedule.
+#
+# Major versions are left out of the batches and upgraded by hand, after
+# reading the release notes and updating any ADR they touch. For example,
+# TypeScript 7 waits until typescript-eslint supports it, @types/node follows
+# the Node.js 24 LTS line, and PostgreSQL stays on 16.
 
 version: 2
 
@@ -14,6 +19,9 @@ updates:
     cooldown:
       default-days: 7
     versioning-strategy: increase
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
     groups:
       npm:
         patterns: ['*']
@@ -35,6 +43,9 @@ updates:
       interval: monthly
     cooldown:
       default-days: 7
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
     groups:
       docker:
         patterns: ['*']
@@ -45,6 +56,12 @@ updates:
       interval: monthly
     cooldown:
       default-days: 7
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
+      # Built locally from infra/docker, whose base image the docker entry
+      # above keeps up to date. It is on no registry for Dependabot to check.
+      - dependency-name: pixelgrant-dev-postgres
     groups:
       docker-compose:
         patterns: ['*']
