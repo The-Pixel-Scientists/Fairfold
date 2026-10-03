@@ -3,29 +3,32 @@
 The source code for **Fairfold**, an open source suite of tools for funders,
 foundations and charities, made by The Pixel Scientists.
 
-The first tool is **Fairfold Grants**. It runs a funding round from start to
-finish: setting up a programme, an applicant portal, eligibility checks,
-assessment, private decisions, releasing outcomes, and exporting data,
-including to the 360Giving Data Standard. The tools that follow share its
-record of organisations and people, its accounts and permissions, and one
-data warehouse, so an organisation switches on only the tools it needs and
-enters each fact once.
+Each Fairfold tool stands on its own. An organisation can use just one, such
+as Fairfold CRM or Fairfold Volunteers, or switch on several. Every tool runs
+on the same shared platform: accounts and permissions, an audit log, one
+record of the organisations and people it works with, and a data warehouse.
+So an organisation that uses more than one tool enters each fact once.
 
 ## Status
 
-Fairfold Grants is in development and not yet ready for real data. The first
-milestone, a complete funding round on synthetic data, is planned for the end
-of October 2026.
+**Fairfold Grants** is the first tool being built, with the shared platform
+alongside it. It runs a funding round from start to finish: setting up a
+programme, an applicant portal, eligibility checks, assessment, private
+decisions, releasing outcomes, and exporting data, including to the
+360Giving Data Standard. It is in development and not yet ready for real
+data. The first milestone, a complete funding round on synthetic data, is
+planned for the end of October 2026.
 
-The other tools are planned. Each has a placeholder folder in
-[`modules/`](modules) that says what it will do and roughly when work starts.
+The other tools are planned, and the aim is for every tool to launch in
+2027. Each has a placeholder folder in [`modules/`](modules) that says what
+it will do.
 
 ## The Fairfold suite
 
 | Tool | What it does | Status |
 | --- | --- | --- |
 | Fairfold Grants | Grant-making from programme set-up to releasing decisions and exporting data | In development |
-| [Fairfold CRM](modules/crm) | Organisations, people, relationships and consent, shared by every tool | Core in the first release; full CRM planned for 2027 |
+| [Fairfold CRM](modules/crm) | Relationships, interactions and consent, built on the shared record of organisations and people | Shared record in development; full CRM planned for 2027 |
 | [Fairfold Payments](modules/finance) | Grant payments, donations and money owed, through regulated payment providers | Planned for 2027 |
 | [Fairfold Due Diligence](modules/assure) | Checks on applicants and grantees, from registry lookups to monitoring visits | Planned for 2027 |
 | [Fairfold Impact](modules/impact) | Outcomes, indicators and evidence | Planned for 2027 |
@@ -34,26 +37,32 @@ The other tools are planned. Each has a placeholder folder in
 | [Fairfold Data Protection](modules/privacy) | Subject access, breaches, impact assessments and records of processing | Planned for 2027 |
 | [Fairfold Integrations](modules/connect) | A plugin API and connections to other systems | Planned for 2027 |
 | [Fairfold Field App](modules/field) | A mobile app for visits and work away from the office | Planned for 2027 |
-| [Fairfold Recruitment](modules/people) | Fair recruitment, from advert to shortlist | Planned for 2028 |
-| [Fairfold Forms](modules/forms) | Forms and surveys | Planned for 2028 |
-| [Fairfold Reporting](modules/insight) | Reports for trustees and regulators from the shared warehouse | Planned for 2028 |
-| [Fairfold Volunteers](modules/volunteers) | Recruiting, checking, scheduling and thanking volunteers | Planned for 2028 |
-| [Fairfold Communications](modules/engage) | Newsletters, feedback and stories, with consent | Planned for 2028 |
-| [Fairfold Fund Accounting](modules/funds) | Restricted funds, budgets and commitments | Planned for 2028 |
-| [Fairfold Fundraising](modules/fundraising) | Supporters, donations and campaigns | Planned for 2028 |
-| [Fairfold Bid Manager](modules/finder) | Finding funders and managing bids | Planned for 2028 |
-| [Fairfold Case Management](modules/cases) | Casework for the people a charity supports | Planned for 2028 |
-| [Fairfold Membership](modules/membership) | Members, subscriptions, events and CPD | Planned for 2028 |
-| [Fairfold Assistant](modules/assist) | A governed assistant that leaves every decision to people | Planned for 2028 |
-| [Fairfold Funding Map](modules/atlas) | Who funds what, and where | Planned for 2029 or later |
-| [Fairfold Organisation Profile](modules/passport) | An organisation's details, given once and reused with every funder | Planned for 2029 or later |
+| [Fairfold Recruitment](modules/people) | Fair recruitment, from advert to shortlist | Planned for 2027 |
+| [Fairfold Forms](modules/forms) | Forms and surveys | Planned for 2027 |
+| [Fairfold Reporting](modules/insight) | Reports for trustees and regulators from the shared warehouse | Planned for 2027 |
+| [Fairfold Volunteers](modules/volunteers) | Recruiting, checking, scheduling and thanking volunteers | Planned for 2027 |
+| [Fairfold Communications](modules/engage) | Newsletters, feedback and stories, with consent | Planned for 2027 |
+| [Fairfold Fund Accounting](modules/funds) | Restricted funds, budgets and commitments | Planned for 2027 |
+| [Fairfold Fundraising](modules/fundraising) | Supporters, donations and campaigns | Planned for 2027 |
+| [Fairfold Bid Manager](modules/finder) | Finding funders and managing bids | Planned for 2027 |
+| [Fairfold Case Management](modules/cases) | Casework for the people a charity supports | Planned for 2027 |
+| [Fairfold Membership](modules/membership) | Members, subscriptions, events and CPD | Planned for 2027 |
+| [Fairfold Assistant](modules/assist) | A governed assistant that leaves every decision to people | Planned for 2027 |
+| [Fairfold Funding Map](modules/atlas) | Who funds what, and where | Planned for 2027 |
+| [Fairfold Organisation Profile](modules/passport) | An organisation's details, given once and reused with every funder | Planned for 2027 |
 
 ## Repository layout
 
-One repository holds the whole suite as a pnpm workspace. Each tool becomes a
-module in `modules/<code name>/` that owns its own database schema and talks
-to the others through published contracts
-([ADR 0016](docs/adr/0016-modular-suite-and-shared-warehouse.md)).
+One repository holds the platform and every tool, as a pnpm workspace
+([ADR 0016](docs/adr/0016-modular-suite-and-shared-warehouse.md)):
+
+- **The platform**, which every tool uses and which is always on, is in
+  `apps/` and `packages/`. The shared record of organisations, people,
+  relationships and consent is an always-on module of its own,
+  `modules/party`.
+- **Each tool** is a module in `modules/<code name>/` that a tenant switches
+  on or off, independently of the others. It owns its own database schema
+  and reaches the platform and other tools only through published contracts.
 
 | Path | Package | What it is |
 | --- | --- | --- |
@@ -64,7 +73,7 @@ to the others through published contracts
 | [`packages/db`](packages/db) | `@pixelgrant/db` | Database schema, SQL migrations, row-level security, tenant context and the field classification map |
 | [`packages/ui`](packages/ui) | `@pixelgrant/ui` | Accessible components, design tokens and the router shared by the console and portal |
 | [`packages/config`](packages/config) | `@pixelgrant/config` | The programme configuration schema and its validators |
-| [`modules`](modules) | | One folder per tool; the planned tools are placeholders |
+| [`modules`](modules) | | One folder per tool, plus the shared record (`party`); the planned tools are placeholders |
 | [`infra`](infra) | | Docker Compose services, container images and Semgrep rules |
 | [`scripts`](scripts) | | Development, test and licence-check tooling |
 | [`docs`](docs) | | Plans, architecture rules, decisions and style guides |
