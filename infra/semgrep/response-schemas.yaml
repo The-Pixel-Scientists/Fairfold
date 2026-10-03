@@ -26,3 +26,5 @@ rules:
         - /packages/domain/src/api/
       exclude:
         - /packages/domain/src/api/answers/
+        # Tests of the runtime route checker build bad schemas on purpose.
+        - '*.test.ts'

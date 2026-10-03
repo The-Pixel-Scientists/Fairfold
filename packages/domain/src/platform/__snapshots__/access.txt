@@ -1,0 +1,39 @@
+Permissions:
+platform.settings.manage (console; tenant)
+platform.members.manage (console; tenant, step-up for changes)
+platform.audit.read (console; tenant)
+platform.warehouse.export (console; tenant)
+party.records.read (console; tenant)
+party.profile.manage (portal; own_person, own_organisation)
+grants.programmes.manage (console; tenant)
+grants.applications.apply (portal; own_application)
+grants.applications.read (console; tenant)
+grants.applications.triage (console; tenant)
+grants.reviews.assign (console; tenant)
+grants.reviews.score (console; assigned_review)
+grants.decisions.record (console; tenant)
+grants.decisions.release (console; tenant, step-up for changes)
+grants.data.export (console; tenant)
+
+tenant_admin (console, "Administrator"):
+  platform.settings.manage
+  platform.members.manage
+  platform.audit.read
+  platform.warehouse.export
+  grants.data.export
+
+programme_manager (console, "Programme manager"):
+  party.records.read
+  grants.programmes.manage
+  grants.applications.read
+  grants.applications.triage
+  grants.reviews.assign
+  grants.decisions.record
+  grants.decisions.release
+
+reviewer (console, "Reviewer"):
+  grants.reviews.score
+
+applicant (portal, "Applicant"):
+  party.profile.manage
+  grants.applications.apply
