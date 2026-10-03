@@ -1,0 +1,73 @@
+/*
+ * Entry stylesheet for the console and portal. Import it once from each app:
+ *
+ *   import '@pixelgrant/ui/styles.css';
+ *
+ * It loads Tailwind, the design tokens and the base rules for focus and
+ * reduced motion, and tells Tailwind to read the components in this package.
+ */
+
+@import 'tailwindcss';
+@import './tokens.css';
+
+@source '.';
+@source not './**/*.test.{ts,tsx}';
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    font-size: var(--density-body-size);
+    line-height: var(--density-body-leading);
+  }
+
+  /* One visible focus ring everywhere, at least 3:1 against the page. */
+  :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+    outline: var(--focus-ring-width) solid var(--color-focus);
+    outline-offset: var(--focus-ring-offset);
+  }
+
+  /* The main landmark takes focus from "Skip to main content"; a ring around the whole page adds nothing. */
+  main:focus {
+    outline: none;
+  }
+
+  /* Links read as links: accent colour and an underline. Preflight resets both, so this comes after it. */
+  a {
+    color: var(--color-accent);
+    text-decoration-line: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.2em;
+  }
+
+  a:hover {
+    color: var(--color-accent-hover);
+    text-decoration-thickness: 2px;
+  }
+}
+
+/* Reduced motion: no animation, no transition and no smooth scrolling. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-fast: 0ms;
+    --motion-normal: 0ms;
+  }
+
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -1,0 +1,133 @@
+/*
+ * Design tokens (ADR 0006). One source for the console and the portal.
+ *
+ * Colour tokens are checked by tokens.test.ts: text pairs reach 4.5:1 and
+ * UI pairs (borders, focus ring) reach 3:1. Change a colour here and the test
+ * says whether the pairing still works. Every colour is a six-digit hex value
+ * so the test can read it.
+ *
+ * Two density sets share one component set: comfortable (the default, for the
+ * portal) and compact (the console). Set data-density on any element.
+ */
+
+@theme static {
+  /* Colour: a closed palette. Utilities exist only for the names below. */
+  --color-*: initial;
+
+  /* Surfaces */
+  --color-canvas: #f5f6f8;
+  --color-surface: #ffffff;
+  --color-sunken: #eceef2;
+
+  /* Text */
+  --color-ink: #161a20;
+  --color-muted: #4b5360;
+
+  /* Lines. Edge outlines a control and must reach 3:1; divider is decoration. */
+  --color-edge: #78808c;
+  --color-divider: #d9dde3;
+
+  /* Accent: links, primary actions, current page */
+  --color-accent: #1f4bb8;
+  --color-accent-hover: #193d99;
+  --color-accent-soft: #e4ebfb;
+  --color-on-accent: #ffffff;
+
+  /* Status */
+  --color-danger: #b3261e;
+  --color-danger-hover: #8f1d17;
+  --color-danger-soft: #fcebea;
+  --color-on-danger: #ffffff;
+  --color-success: #17653a;
+  --color-success-soft: #e3f4ea;
+  --color-warning: #7a4a00;
+  --color-warning-soft: #fdf1d8;
+
+  /* Focus ring: 3:1 or better against every surface */
+  --color-focus: #1a2f8a;
+
+  /* Type. System fonts until self-hosted font files are chosen (ADR 0006). */
+  --font-*: initial;
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace;
+
+  --text-*: initial;
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1rem;
+  --text-sm: 0.875rem;
+  --text-sm--line-height: 1.25rem;
+  --text-base: 1rem;
+  --text-base--line-height: 1.5rem;
+  --text-lg: 1.125rem;
+  --text-lg--line-height: 1.75rem;
+  --text-xl: 1.25rem;
+  --text-xl--line-height: 1.75rem;
+  --text-2xl: 1.5rem;
+  --text-2xl--line-height: 2rem;
+  --text-3xl: 1.875rem;
+  --text-3xl--line-height: 2.25rem;
+
+  /* Spacing: multiples of 4px. The smallest target is 24px (WCAG 2.5.8). */
+  --spacing: 0.25rem;
+  --spacing-target: 24px;
+
+  /* Radii */
+  --radius-*: initial;
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-full: 9999px;
+
+  /* Elevation */
+  --shadow-*: initial;
+  --shadow-raised: 0 1px 2px rgb(22 26 32 / 0.08), 0 1px 3px rgb(22 26 32 / 0.06);
+  --shadow-overlay: 0 8px 24px rgb(22 26 32 / 0.16), 0 2px 6px rgb(22 26 32 / 0.08);
+
+  /* Motion */
+  --ease-*: initial;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* Values that change with density, plus motion and the focus ring. */
+:root,
+[data-density='comfortable'] {
+  --density-control-height: 2.75rem;
+  --density-control-px: 0.875rem;
+  --density-body-size: 1rem;
+  --density-body-leading: 1.5rem;
+  --density-gutter: 1.5rem;
+  --density-stack: 1.5rem;
+  --density-field-gap: 0.375rem;
+}
+
+[data-density='compact'] {
+  --density-control-height: 2rem;
+  --density-control-px: 0.625rem;
+  --density-body-size: 0.875rem;
+  --density-body-leading: 1.25rem;
+  --density-gutter: 1rem;
+  --density-stack: 1rem;
+  --density-field-gap: 0.25rem;
+}
+
+:root {
+  --sidebar-width: 14rem;
+
+  --focus-ring-width: 3px;
+  --focus-ring-offset: 2px;
+
+  --motion-fast: 100ms;
+  --motion-normal: 180ms;
+}
+
+/* Utilities that read the density values above. */
+@theme inline {
+  --text-body: var(--density-body-size);
+  --text-body--line-height: var(--density-body-leading);
+  --spacing-control: var(--density-control-height);
+  --spacing-control-x: var(--density-control-px);
+  --spacing-gutter: var(--density-gutter);
+  --spacing-stack: var(--density-stack);
+  --spacing-field-gap: var(--density-field-gap);
+}
