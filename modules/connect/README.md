@@ -1,6 +1,6 @@
 # Fairfold Integrations
 
-**Planned: work is due to start in 2027.** Nothing is built here yet.
+**Planned for launch in 2027.** Nothing is built here yet.
 
 A plugin API and connections to other systems, with tools to bring data in
 from what you use today.

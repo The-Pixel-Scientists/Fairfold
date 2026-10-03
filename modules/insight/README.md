@@ -1,6 +1,6 @@
 # Fairfold Reporting
 
-**Planned: work is due to start in 2028.** Nothing is built here yet.
+**Planned for launch in 2027.** Nothing is built here yet.
 
 Reports for trustees and regulators from the shared data warehouse.
 

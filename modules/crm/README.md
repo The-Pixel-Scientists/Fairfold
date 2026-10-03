@@ -1,6 +1,6 @@
 # Fairfold CRM
 
-**Planned: work on the full CRM is due to start in 2027.** Nothing is built here yet.
+**The full CRM is planned for launch in 2027.** Nothing is built here yet.
 
 Relationships, interactions and consent for the organisations and people you
 work with. It builds on the shared record of organisations and people that

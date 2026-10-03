@@ -1,6 +1,6 @@
 # Fairfold Recruitment
 
-**Planned: work is due to start in 2028.** Nothing is built here yet.
+**Planned for launch in 2027.** Nothing is built here yet.
 
 Fair recruitment first: adverts, applications and shortlisting that reduces
 bias.

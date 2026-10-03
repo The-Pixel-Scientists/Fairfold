@@ -1,6 +1,6 @@
 # Fairfold Forms
 
-**Planned: work is due to start in 2028.** Nothing is built here yet.
+**Planned for launch in 2027.** Nothing is built here yet.
 
 Forms and surveys for feedback, registrations and more, built on the same form
 engine as grant applications.

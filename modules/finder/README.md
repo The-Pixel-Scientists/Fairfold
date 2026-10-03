@@ -1,6 +1,6 @@
 # Fairfold Bid Manager
 
-**Planned: work is due to start in 2028.** Nothing is built here yet.
+**Planned for launch in 2027.** Nothing is built here yet.
 
 Finding funders and managing bids, for charities that apply for grants.
 

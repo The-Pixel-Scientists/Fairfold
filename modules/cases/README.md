@@ -1,6 +1,6 @@
 # Fairfold Case Management
 
-**Planned: work is due to start in 2028.** Nothing is built here yet.
+**Planned for launch in 2027.** Nothing is built here yet.
 
 Casework for service teams: referrals, assessments, plans and outcomes for the
 people a charity supports.

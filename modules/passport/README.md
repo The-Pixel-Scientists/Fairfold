@@ -1,6 +1,6 @@
 # Fairfold Organisation Profile
 
-**Planned for 2029 or later.** Nothing is built here yet.
+**Planned for launch in 2027.** Nothing is built here yet.
 
 An organisation's details, given once and reused with every funder it applies
 to.

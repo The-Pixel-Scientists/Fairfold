@@ -1,6 +1,6 @@
 # Fairfold Due Diligence
 
-**Planned: work is due to start in 2027.** Nothing is built here yet.
+**Planned for launch in 2027.** Nothing is built here yet.
 
 Checks on applicants and grantees: registry lookups, sanctions screening,
 fraud and safeguarding checks, and monitoring visits.

@@ -1,6 +1,6 @@
 # Fairfold Membership
 
-**Planned: work is due to start in 2028.** Nothing is built here yet.
+**Planned for launch in 2027.** Nothing is built here yet.
 
 Members, subscriptions, events and continuing professional development, for
 membership bodies.

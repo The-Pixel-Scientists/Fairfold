@@ -1,6 +1,6 @@
 # Fairfold Governance
 
-**Planned: work is due to start in 2027.** Nothing is built here yet.
+**Planned for launch in 2027.** Nothing is built here yet.
 
 Trustee boards, board packs, decisions, conflicts of interest, risks, policies
 and incidents in one place.

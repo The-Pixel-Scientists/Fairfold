@@ -1,6 +1,6 @@
 # Fairfold Assistant
 
-**Planned: work is due to start in 2028.** Nothing is built here yet.
+**Planned for launch in 2027.** Nothing is built here yet.
 
 A governed assistant that helps staff draft, summarise and find things, and
 leaves every decision to people.

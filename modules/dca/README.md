@@ -1,6 +1,6 @@
 # Fairfold Activities
 
-**Planned: work is due to start in 2027.** Nothing is built here yet.
+**Planned for launch in 2027.** Nothing is built here yet.
 
 A charity's own direct charitable activities, recorded beside its grants in
 the terms of the charity SORP, with procurement, contracts and support for

@@ -1,6 +1,6 @@
 # Fairfold Data Protection
 
-**Planned: work is due to start in 2027.** Nothing is built here yet.
+**Planned for launch in 2027.** Nothing is built here yet.
 
 Subject access requests, breaches, data protection impact assessments and
 records of processing, using how every Fairfold tool classifies its data.

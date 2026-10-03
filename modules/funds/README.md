@@ -1,6 +1,6 @@
 # Fairfold Fund Accounting
 
-**Planned: work is due to start in 2028.** Nothing is built here yet.
+**Planned for launch in 2027.** Nothing is built here yet.
 
 Restricted and unrestricted funds, budgets and commitments, so a finance team
 can see what is spent and promised against each fund.

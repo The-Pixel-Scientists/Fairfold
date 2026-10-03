@@ -1,6 +1,6 @@
 # Fairfold Communications
 
-**Planned: work is due to start in 2028.** Nothing is built here yet.
+**Planned for launch in 2027.** Nothing is built here yet.
 
 Newsletters, feedback and stories, sent only to people who have agreed to hear
 from you.

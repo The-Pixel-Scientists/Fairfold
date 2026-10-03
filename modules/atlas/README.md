@@ -1,6 +1,6 @@
 # Fairfold Funding Map
 
-**Planned for 2029 or later.** Nothing is built here yet.
+**Planned for launch in 2027.** Nothing is built here yet.
 
 Who funds what, and where, built from open grants data.
 
