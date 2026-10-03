@@ -19,8 +19,9 @@ decisions, releasing outcomes, and exporting data, including to the
 data. The first milestone, a complete funding round on synthetic data, is
 planned for the end of October 2026.
 
-The other tools are planned. Each has a placeholder folder in
-[`modules/`](modules) that says what it will do and roughly when work starts.
+The other tools are planned, and the aim is for every tool to launch in
+2027. Each has a placeholder folder in [`modules/`](modules) that says what
+it will do.
 
 ## The Fairfold suite
 
@@ -36,19 +37,19 @@ The other tools are planned. Each has a placeholder folder in
 | [Fairfold Data Protection](modules/privacy) | Subject access, breaches, impact assessments and records of processing | Planned for 2027 |
 | [Fairfold Integrations](modules/connect) | A plugin API and connections to other systems | Planned for 2027 |
 | [Fairfold Field App](modules/field) | A mobile app for visits and work away from the office | Planned for 2027 |
-| [Fairfold Recruitment](modules/people) | Fair recruitment, from advert to shortlist | Planned for 2028 |
-| [Fairfold Forms](modules/forms) | Forms and surveys | Planned for 2028 |
-| [Fairfold Reporting](modules/insight) | Reports for trustees and regulators from the shared warehouse | Planned for 2028 |
-| [Fairfold Volunteers](modules/volunteers) | Recruiting, checking, scheduling and thanking volunteers | Planned for 2028 |
-| [Fairfold Communications](modules/engage) | Newsletters, feedback and stories, with consent | Planned for 2028 |
-| [Fairfold Fund Accounting](modules/funds) | Restricted funds, budgets and commitments | Planned for 2028 |
-| [Fairfold Fundraising](modules/fundraising) | Supporters, donations and campaigns | Planned for 2028 |
-| [Fairfold Bid Manager](modules/finder) | Finding funders and managing bids | Planned for 2028 |
-| [Fairfold Case Management](modules/cases) | Casework for the people a charity supports | Planned for 2028 |
-| [Fairfold Membership](modules/membership) | Members, subscriptions, events and CPD | Planned for 2028 |
-| [Fairfold Assistant](modules/assist) | A governed assistant that leaves every decision to people | Planned for 2028 |
-| [Fairfold Funding Map](modules/atlas) | Who funds what, and where | Planned for 2029 or later |
-| [Fairfold Organisation Profile](modules/passport) | An organisation's details, given once and reused with every funder | Planned for 2029 or later |
+| [Fairfold Recruitment](modules/people) | Fair recruitment, from advert to shortlist | Planned for 2027 |
+| [Fairfold Forms](modules/forms) | Forms and surveys | Planned for 2027 |
+| [Fairfold Reporting](modules/insight) | Reports for trustees and regulators from the shared warehouse | Planned for 2027 |
+| [Fairfold Volunteers](modules/volunteers) | Recruiting, checking, scheduling and thanking volunteers | Planned for 2027 |
+| [Fairfold Communications](modules/engage) | Newsletters, feedback and stories, with consent | Planned for 2027 |
+| [Fairfold Fund Accounting](modules/funds) | Restricted funds, budgets and commitments | Planned for 2027 |
+| [Fairfold Fundraising](modules/fundraising) | Supporters, donations and campaigns | Planned for 2027 |
+| [Fairfold Bid Manager](modules/finder) | Finding funders and managing bids | Planned for 2027 |
+| [Fairfold Case Management](modules/cases) | Casework for the people a charity supports | Planned for 2027 |
+| [Fairfold Membership](modules/membership) | Members, subscriptions, events and CPD | Planned for 2027 |
+| [Fairfold Assistant](modules/assist) | A governed assistant that leaves every decision to people | Planned for 2027 |
+| [Fairfold Funding Map](modules/atlas) | Who funds what, and where | Planned for 2027 |
+| [Fairfold Organisation Profile](modules/passport) | An organisation's details, given once and reused with every funder | Planned for 2027 |
 
 ## Repository layout
 
