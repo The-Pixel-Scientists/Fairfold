@@ -1,0 +1,90 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "PixelGrant API",
+    "description": "The PixelGrant grants management API.",
+    "version": "0.0.0",
+    "license": { "name": "AGPL-3.0-or-later", "identifier": "AGPL-3.0-or-later" }
+  },
+  "components": { "schemas": {} },
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Check that the API is running",
+        "tags": ["Health"],
+        "description": "Answers while the process is running. It does not check the database.",
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "status": { "type": "string", "enum": ["ok"] } },
+                  "required": ["status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "summary": "Check that the API can serve requests",
+        "tags": ["Health"],
+        "description": "Answers 200 when the API can reach its database, and 503 when it cannot. The response never says why.",
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "enum": ["ok", "unavailable"] },
+                    "checks": {
+                      "type": "object",
+                      "properties": {
+                        "database": { "type": "string", "enum": ["ok", "unavailable"] }
+                      },
+                      "required": ["database"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["status", "checks"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "enum": ["ok", "unavailable"] },
+                    "checks": {
+                      "type": "object",
+                      "properties": {
+                        "database": { "type": "string", "enum": ["ok", "unavailable"] }
+                      },
+                      "required": ["database"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["status", "checks"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "tags": [{ "name": "Health", "description": "Probes for the platform that runs the API." }]
+}
