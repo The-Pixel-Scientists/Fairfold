@@ -1,0 +1,22 @@
+@import '@pixelgrant/ui/styles.css';
+
+/* Tell Tailwind to read the portal's own components as well. */
+@source '.';
+
+/*
+ * The page shown when JavaScript is off (see index.html). Preflight resets
+ * headings to body text and the page has no layout, so give it a readable
+ * column and heading. Unlayered, so it beats Tailwind's layers.
+ */
+noscript main {
+  max-width: 42rem;
+  margin: 0 auto;
+  padding: var(--density-gutter);
+}
+
+noscript h1 {
+  margin-bottom: calc(var(--spacing) * 4);
+  font-size: var(--text-3xl);
+  line-height: var(--text-3xl--line-height);
+  font-weight: 600;
+}
