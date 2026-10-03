@@ -41,11 +41,11 @@
     "eslint": "10.11.0",
     "eslint-plugin-jsx-a11y-x": "0.2.0",
     "eslint-plugin-react-hooks": "7.1.1",
-    "jsdom": "30.1.0",
-    "prettier": "3.9.8",
+    "jsdom": "30.1.1",
+    "prettier": "3.9.9",
     "spdx-expression-parse": "5.0.0",
     "typescript": "6.0.3",
-    "typescript-eslint": "8.70.0",
+    "typescript-eslint": "8.70.1",
     "vitest": "5.0.1"
   }
 }

@@ -10,7 +10,7 @@
     "start": "node src/main.ts"
   },
   "dependencies": {
-    "@fastify/swagger": "9.8.1",
+    "@fastify/swagger": "9.9.0",
     "@pixelgrant/db": "workspace:*",
     "@pixelgrant/domain": "workspace:*",
     "fastify": "5.12.5",
