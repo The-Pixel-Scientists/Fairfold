@@ -1,0 +1,27 @@
+@import '@pixelgrant/ui/styles.css';
+
+/* Tell Tailwind to read the console's own components as well. */
+@source '.';
+
+/*
+ * The message in index.html for browsers with JavaScript off. These rules are
+ * outside every layer, so they beat Tailwind's reset, which flattens headings
+ * and paragraphs.
+ */
+noscript main {
+  display: block;
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+noscript h1 {
+  margin: 0 0 0.75rem;
+  font-size: var(--text-2xl);
+  line-height: var(--text-2xl--line-height);
+  font-weight: 600;
+}
+
+noscript p {
+  margin: 0;
+}
