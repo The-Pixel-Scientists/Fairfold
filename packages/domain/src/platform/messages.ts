@@ -77,6 +77,9 @@ export const messages = {
   logoUnreadable:
     'We could not read this image. Save it again as a PNG or WebP file and upload it.',
 
+  // Team.
+  chooseRole: 'Choose at least one role.',
+
   // Money.
   currency: 'Enter the amount in pounds.',
 } as const;
