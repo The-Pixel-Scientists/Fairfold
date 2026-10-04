@@ -16,16 +16,16 @@ const config: ComposeConfig = {
       environment: {
         POSTGRES_USER: 'postgres',
         POSTGRES_PASSWORD: 'superuser-password-for-tests',
-        PIXELGRANT_DB_MIGRATOR_PASSWORD: 'migrator-password-for-tests',
-        PIXELGRANT_DB_APP_API_PASSWORD: 'app-api-password-for-tests',
-        PIXELGRANT_DB_APP_WORKER_PASSWORD: 'app-worker-password-for-tests',
-        PIXELGRANT_DB_APP_AUTH_PASSWORD: 'app-auth-password-for-tests',
-        PIXELGRANT_DB_APP_QUEUE_PASSWORD: 'app-queue-password-for-tests',
+        TPS_DB_MIGRATOR_PASSWORD: 'migrator-password-for-tests',
+        TPS_DB_APP_API_PASSWORD: 'app-api-password-for-tests',
+        TPS_DB_APP_WORKER_PASSWORD: 'app-worker-password-for-tests',
+        TPS_DB_APP_AUTH_PASSWORD: 'app-auth-password-for-tests',
+        TPS_DB_APP_QUEUE_PASSWORD: 'app-queue-password-for-tests',
       },
     },
   },
 };
-const names = { database: 'pixelgrant_w', testDatabase: 'pixelgrant_w_test' };
+const names = { database: 'tps_w', testDatabase: 'tps_w_test' };
 const values = developmentValues(config, names);
 const own = [names.database, names.testDatabase];
 
@@ -33,73 +33,73 @@ describe('profileEnvironment', () => {
   it('gives database-admin the superuser, every role password and the own-database list', () => {
     const env = profileEnvironment('database-admin', values, [], {}, own);
     expect(env).toMatchObject({
-      PIXELGRANT_DEV: '1',
-      PIXELGRANT_DB_HOST: '127.0.0.1',
-      PIXELGRANT_DB_PORT: '55432',
-      PIXELGRANT_DB_NAME: 'pixelgrant_w',
-      PIXELGRANT_DB_SUPERUSER_PASSWORD: 'superuser-password-for-tests',
-      PIXELGRANT_DB_APP_QUEUE_PASSWORD: 'app-queue-password-for-tests',
-      PIXELGRANT_DEV_DATABASES: 'pixelgrant_w,pixelgrant_w_test',
+      TPS_DEV: '1',
+      TPS_DB_HOST: '127.0.0.1',
+      TPS_DB_PORT: '55432',
+      TPS_DB_NAME: 'tps_w',
+      TPS_DB_SUPERUSER_PASSWORD: 'superuser-password-for-tests',
+      TPS_DB_APP_QUEUE_PASSWORD: 'app-queue-password-for-tests',
+      TPS_DEV_DATABASES: 'tps_w,tps_w_test',
     });
   });
 
   it('gives database-tests no superuser and only the test database', () => {
     const env = profileEnvironment('database-tests', values, [], {}, own);
-    expect(env['PIXELGRANT_DB_SUPERUSER']).toBeUndefined();
-    expect(env['PIXELGRANT_DB_SUPERUSER_PASSWORD']).toBeUndefined();
-    expect(env['PIXELGRANT_DB_NAME']).toBeUndefined();
-    expect(env['PIXELGRANT_TEST_DB_NAME']).toBe('pixelgrant_w_test');
+    expect(env['TPS_DB_SUPERUSER']).toBeUndefined();
+    expect(env['TPS_DB_SUPERUSER_PASSWORD']).toBeUndefined();
+    expect(env['TPS_DB_NAME']).toBeUndefined();
+    expect(env['TPS_TEST_DB_NAME']).toBe('tps_w_test');
   });
 
-  it('drops inherited PIXELGRANT_ variables outside the profile and keeps the rest', () => {
-    const inherited = { PATH: '/usr/bin', PIXELGRANT_DB_SUPERUSER_PASSWORD: 'from-the-shell' };
+  it('drops inherited TPS_ variables outside the profile and keeps the rest', () => {
+    const inherited = { PATH: '/usr/bin', TPS_DB_SUPERUSER_PASSWORD: 'from-the-shell' };
     const env = profileEnvironment('database-tests', values, [inherited], inherited, own);
     expect(env['PATH']).toBe('/usr/bin');
-    expect(env['PIXELGRANT_DB_SUPERUSER_PASSWORD']).toBeUndefined();
+    expect(env['TPS_DB_SUPERUSER_PASSWORD']).toBeUndefined();
   });
 
   it('drops them in any letter case, as Windows ignores case in variable names', () => {
     const inherited = {
       Path: 'C:\\Windows',
-      pixelgrant_db_superuser_password: 'from-the-shell',
-      PixelGrant_Dev_Databases: 'pixelgrant_production',
+      tps_db_superuser_password: 'from-the-shell',
+      Tps_Dev_Databases: 'tps_production',
     };
     const env = profileEnvironment('database-tests', values, [inherited], inherited, own);
     expect(env['Path']).toBe('C:\\Windows');
-    expect(Object.keys(env).filter((key) => key.toUpperCase().startsWith('PIXELGRANT_'))).toEqual([
-      'PIXELGRANT_DEV',
-      'PIXELGRANT_DB_HOST',
-      'PIXELGRANT_DB_PORT',
-      'PIXELGRANT_TEST_DB_NAME',
-      'PIXELGRANT_DB_MIGRATOR_PASSWORD',
-      'PIXELGRANT_DB_APP_API_PASSWORD',
-      'PIXELGRANT_DB_APP_WORKER_PASSWORD',
-      'PIXELGRANT_DB_APP_AUTH_PASSWORD',
-      'PIXELGRANT_DB_APP_QUEUE_PASSWORD',
+    expect(Object.keys(env).filter((key) => key.toUpperCase().startsWith('TPS_'))).toEqual([
+      'TPS_DEV',
+      'TPS_DB_HOST',
+      'TPS_DB_PORT',
+      'TPS_TEST_DB_NAME',
+      'TPS_DB_MIGRATOR_PASSWORD',
+      'TPS_DB_APP_API_PASSWORD',
+      'TPS_DB_APP_WORKER_PASSWORD',
+      'TPS_DB_APP_AUTH_PASSWORD',
+      'TPS_DB_APP_QUEUE_PASSWORD',
     ]);
   });
 
   it('lets the environment override .env, and .env override the development value', () => {
-    const dotEnv = { PIXELGRANT_DB_PORT: '6543', PIXELGRANT_DB_HOST: 'localhost' };
-    const shell = { PIXELGRANT_DB_PORT: '7654', PIXELGRANT_DB_HOST: '' };
+    const dotEnv = { TPS_DB_PORT: '6543', TPS_DB_HOST: 'localhost' };
+    const shell = { TPS_DB_PORT: '7654', TPS_DB_HOST: '' };
     const env = profileEnvironment('database-tests', values, [dotEnv, shell], shell, own);
-    expect(env['PIXELGRANT_DB_PORT']).toBe('7654');
-    expect(env['PIXELGRANT_DB_HOST']).toBe('localhost');
+    expect(env['TPS_DB_PORT']).toBe('7654');
+    expect(env['TPS_DB_HOST']).toBe('localhost');
   });
 
   it('refuses a database server that is not on this machine', () => {
     for (const host of ['db.example.org', '10.0.0.5', '127.0.0.1.nip.io']) {
-      const dotEnv = { PIXELGRANT_DB_HOST: host };
+      const dotEnv = { TPS_DB_HOST: host };
       expect(() => profileEnvironment('database-admin', values, [dotEnv], {}, own)).toThrow(
-        `PIXELGRANT_DB_HOST is ${host}. The development commands work only against a database server on this machine.`,
+        `TPS_DB_HOST is ${host}. The development commands work only against a database server on this machine.`,
       );
     }
   });
 
   it('never lets anything override the own-database list', () => {
-    const shell = { PIXELGRANT_DEV_DATABASES: 'pixelgrant_production' };
+    const shell = { TPS_DEV_DATABASES: 'tps_production' };
     const env = profileEnvironment('database-admin', values, [shell], shell, own);
-    expect(env['PIXELGRANT_DEV_DATABASES']).toBe('pixelgrant_w,pixelgrant_w_test');
+    expect(env['TPS_DEV_DATABASES']).toBe('tps_w,tps_w_test');
   });
 });
 

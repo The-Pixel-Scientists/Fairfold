@@ -8,14 +8,14 @@
 // development Compose file, read through `docker compose config`, so they
 // live in that one file. Database names come from dev-names.ts.
 //
-// Each profile names the only PixelGrant variables its command receives, so
+// Each profile names the only Fairfold Grants variables its command receives, so
 // a command never gets a credential it does not use (ADR 0005). Any other
-// PIXELGRANT_ variable, in any letter case, is removed from the command's
+// TPS_ variable, in any letter case, is removed from the command's
 // environment. For the profile's variables, a non-empty value in the
 // environment wins, then one in the repository's .env file (see
 // .env.example), then the development value.
 //
-// This is for development only. It sets PIXELGRANT_DEV=1, and so refuses to
+// This is for development only. It sets TPS_DEV=1, and so refuses to
 // run against a database server that is not on this machine: the fixed
 // development passwords must never be set on a shared server.
 
@@ -30,18 +30,18 @@ import { currentDevNames, repositoryRoot } from './dev-names.ts';
 const COMPOSE_FILE = join(repositoryRoot, 'infra', 'compose', 'compose.dev.yaml');
 const ENV_FILE = join(repositoryRoot, '.env');
 
-const CONNECTION = ['PIXELGRANT_DEV', 'PIXELGRANT_DB_HOST', 'PIXELGRANT_DB_PORT'] as const;
-const SUPERUSER = ['PIXELGRANT_DB_SUPERUSER', 'PIXELGRANT_DB_SUPERUSER_PASSWORD'] as const;
-const MIGRATOR_PASSWORD = 'PIXELGRANT_DB_MIGRATOR_PASSWORD';
+const CONNECTION = ['TPS_DEV', 'TPS_DB_HOST', 'TPS_DB_PORT'] as const;
+const SUPERUSER = ['TPS_DB_SUPERUSER', 'TPS_DB_SUPERUSER_PASSWORD'] as const;
+const MIGRATOR_PASSWORD = 'TPS_DB_MIGRATOR_PASSWORD';
 const APP_PASSWORDS = [
-  'PIXELGRANT_DB_APP_API_PASSWORD',
-  'PIXELGRANT_DB_APP_WORKER_PASSWORD',
-  'PIXELGRANT_DB_APP_AUTH_PASSWORD',
-  'PIXELGRANT_DB_APP_QUEUE_PASSWORD',
+  'TPS_DB_APP_API_PASSWORD',
+  'TPS_DB_APP_WORKER_PASSWORD',
+  'TPS_DB_APP_AUTH_PASSWORD',
+  'TPS_DB_APP_QUEUE_PASSWORD',
 ] as const;
 
 /** Set from the worktree's folder name. Nothing overrides it. */
-const OWN_DATABASES = 'PIXELGRANT_DEV_DATABASES';
+const OWN_DATABASES = 'TPS_DEV_DATABASES';
 
 export const PROFILES = {
   // pnpm db:migrate, db:rollback and db:drop, and the db-admin tests. The
@@ -49,8 +49,8 @@ export const PROFILES = {
   // superuser to run it.
   'database-admin': [
     ...CONNECTION,
-    'PIXELGRANT_DB_NAME',
-    'PIXELGRANT_TEST_DB_NAME',
+    'TPS_DB_NAME',
+    'TPS_TEST_DB_NAME',
     ...SUPERUSER,
     MIGRATOR_PASSWORD,
     ...APP_PASSWORDS,
@@ -58,7 +58,7 @@ export const PROFILES = {
   ],
   // Database tests in the db project: the test database only, as the app
   // roles, with migrator for fixtures. No superuser.
-  'database-tests': [...CONNECTION, 'PIXELGRANT_TEST_DB_NAME', MIGRATOR_PASSWORD, ...APP_PASSWORDS],
+  'database-tests': [...CONNECTION, 'TPS_TEST_DB_NAME', MIGRATOR_PASSWORD, ...APP_PASSWORDS],
 } as const satisfies Record<string, readonly string[]>;
 
 export type Profile = keyof typeof PROFILES;
@@ -123,13 +123,13 @@ export function developmentValues(
   const postgres = service(config, 'postgres');
   const postgresPort = publishedPort(postgres, 'postgres', 5432);
   const values: Record<string, string> = {
-    PIXELGRANT_DEV: '1',
-    PIXELGRANT_DB_HOST: postgresPort.host_ip ?? '127.0.0.1',
-    PIXELGRANT_DB_PORT: postgresPort.published ?? '',
-    PIXELGRANT_DB_NAME: names.database,
-    PIXELGRANT_TEST_DB_NAME: names.testDatabase,
-    PIXELGRANT_DB_SUPERUSER: environmentValue(postgres, 'postgres', 'POSTGRES_USER'),
-    PIXELGRANT_DB_SUPERUSER_PASSWORD: environmentValue(postgres, 'postgres', 'POSTGRES_PASSWORD'),
+    TPS_DEV: '1',
+    TPS_DB_HOST: postgresPort.host_ip ?? '127.0.0.1',
+    TPS_DB_PORT: postgresPort.published ?? '',
+    TPS_DB_NAME: names.database,
+    TPS_TEST_DB_NAME: names.testDatabase,
+    TPS_DB_SUPERUSER: environmentValue(postgres, 'postgres', 'POSTGRES_USER'),
+    TPS_DB_SUPERUSER_PASSWORD: environmentValue(postgres, 'postgres', 'POSTGRES_PASSWORD'),
   };
   for (const key of [MIGRATOR_PASSWORD, ...APP_PASSWORDS]) {
     values[key] = environmentValue(postgres, 'postgres', key);
@@ -144,7 +144,7 @@ export function isLoopbackHost(host: string): boolean {
 }
 
 /**
- * The environment for a command: the inherited one without any PIXELGRANT_
+ * The environment for a command: the inherited one without any TPS_
  * variable, plus exactly the profile's variables. Throws if the database
  * host is not on this machine.
  */
@@ -157,7 +157,7 @@ export function profileEnvironment(
 ): Record<string, string> {
   const env: Record<string, string> = {};
   for (const [key, value] of Object.entries(inherited)) {
-    if (value !== undefined && !key.toUpperCase().startsWith('PIXELGRANT_')) env[key] = value;
+    if (value !== undefined && !key.toUpperCase().startsWith('TPS_')) env[key] = value;
   }
   for (const key of PROFILES[profile]) {
     if (key === OWN_DATABASES) {
@@ -171,10 +171,10 @@ export function profileEnvironment(
     }
     if (value !== undefined) env[key] = value;
   }
-  const host = env['PIXELGRANT_DB_HOST'];
+  const host = env['TPS_DB_HOST'];
   if (host !== undefined && !isLoopbackHost(host)) {
     throw new Error(
-      `PIXELGRANT_DB_HOST is ${host}. The development commands work only against a database ` +
+      `TPS_DB_HOST is ${host}. The development commands work only against a database ` +
         'server on this machine. For any other server, run packages/db/scripts/db.ts with its ' +
         'own credentials.',
     );
