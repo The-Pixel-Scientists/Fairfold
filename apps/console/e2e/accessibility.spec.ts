@@ -5,12 +5,10 @@
 // width, at 320 px wide, and at 200% zoom, which a browser lays out as a
 // 640 px wide window at twice the pixel density.
 
-// The callbacks passed to page.evaluate run in the browser, so they use DOM types.
-/// <reference lib="dom" />
-
 import { AxeBuilder } from '@axe-core/playwright';
-import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
+
+import { expect, test } from '../../../scripts/e2e/fixtures.ts';
 
 const widths = [
   { name: 'desktop width', viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1 },
@@ -19,9 +17,15 @@ const widths = [
 ];
 
 const pages = [
-  { name: 'programmes page', path: '/', heading: 'Programmes' },
-  { name: 'not found page', path: '/no-such-page', heading: 'Page not found' },
-  { name: 'component gallery', path: '/dev/components', heading: 'Component gallery' },
+  { name: 'programmes page', path: '/', heading: 'Programmes', gallery: false },
+  { name: 'not found page', path: '/no-such-page', heading: 'Page not found', gallery: false },
+  // Production builds leave the gallery out, so the console-gallery project runs this one.
+  {
+    name: 'component gallery',
+    path: '/dev/components',
+    heading: 'Component gallery',
+    gallery: true,
+  },
 ];
 
 /** WCAG 2.0 to 2.2 level A and AA, plus axe's own best practices. */
@@ -44,7 +48,8 @@ for (const width of widths) {
     test.use({ viewport: width.viewport, deviceScaleFactor: width.deviceScaleFactor });
 
     for (const target of pages) {
-      test(`@a11y ${target.name} has no axe violations`, async ({ page }) => {
+      const tag = target.gallery ? '@gallery ' : '';
+      test(`@a11y ${tag}${target.name} has no axe violations`, async ({ page }) => {
         await page.goto(target.path);
         await expect(page.getByRole('heading', { level: 1, name: target.heading })).toBeVisible();
 
@@ -63,7 +68,9 @@ for (const width of widths) {
       await expectNoViolations(page);
     });
 
-    test('@a11y the error summary and field errors have no axe violations', async ({ page }) => {
+    test('@a11y @gallery the error summary and field errors have no axe violations', async ({
+      page,
+    }) => {
       await page.goto('/dev/components');
       await page.getByRole('button', { name: 'Check details' }).click();
       await expect(page.getByRole('alert', { name: 'There is a problem' })).toBeFocused();

@@ -4,12 +4,10 @@
 // announcements on route changes, back and forward, visible focus, reduced
 // motion and the error summary pattern.
 
-// The callbacks passed to page.evaluate run in the browser, so they use DOM types.
-/// <reference lib="dom" />
-
-import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { productName } from '@pixel-scientists/domain/platform';
+
+import { expect, test } from '../../../scripts/e2e/fixtures.ts';
 
 const SUFFIX = `– ${productName} console`;
 
@@ -44,6 +42,11 @@ test.describe('programmes page', () => {
     await expect(current).toHaveAttribute('aria-current', 'page');
     // Not colour alone: the current page is underlined, which forced colours keep.
     await expect(current).toHaveCSS('text-decoration-line', 'underline');
+  });
+
+  test('@gallery does not underline the links to other pages', async ({ page }) => {
+    await page.goto('/');
+
     await expect(page.getByRole('link', { name: 'Component gallery' })).toHaveCSS(
       'text-decoration-line',
       'none',
@@ -110,7 +113,7 @@ test.describe('skip link', () => {
     expect(new URL(page.url()).hash).toBe('');
   });
 
-  test('puts the next Tab inside the page, past the navigation', async ({ page }) => {
+  test('@gallery puts the next Tab inside the page, past the navigation', async ({ page }) => {
     await page.goto('/dev/components');
     await expect(page.getByRole('heading', { level: 1, name: 'Component gallery' })).toBeVisible();
 
@@ -124,7 +127,9 @@ test.describe('skip link', () => {
 });
 
 test.describe('moving between pages', () => {
-  test('moves focus to the new h1, updates the title and announces the page', async ({ page }) => {
+  test('@gallery moves focus to the new h1, updates the title and announces the page', async ({
+    page,
+  }) => {
     await page.goto('/');
 
     await page.getByRole('link', { name: 'Component gallery' }).focus();
@@ -138,7 +143,7 @@ test.describe('moving between pages', () => {
     await expect(announcement(page)).toHaveText('Navigated to Component gallery');
   });
 
-  test('shows the not found page, with focus on its heading, for an unknown address', async ({
+  test('@gallery shows the not found page, with focus on its heading, for an unknown address', async ({
     page,
   }) => {
     await page.goto('/dev/components');
@@ -160,7 +165,7 @@ test.describe('moving between pages', () => {
     await expect(page).toHaveTitle(`Page not found ${SUFFIX}`);
   });
 
-  test('keeps the title, heading and focus right with the back and forward buttons', async ({
+  test('@gallery keeps the title, heading and focus right with the back and forward buttons', async ({
     page,
   }) => {
     await page.goto('/');
@@ -181,7 +186,7 @@ test.describe('moving between pages', () => {
     await expect(page).toHaveTitle(`Component gallery ${SUFFIX}`);
   });
 
-  test('scrolls to the top of the new page', async ({ page }) => {
+  test('@gallery scrolls to the top of the new page', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 400 });
     await page.goto('/dev/components');
     await page
@@ -195,7 +200,7 @@ test.describe('moving between pages', () => {
     expect(await page.evaluate(() => window.scrollY)).toBe(0);
   });
 
-  test('returns to where you were scrolled with the back button, without moving the page again', async ({
+  test('@gallery returns to where you were scrolled with the back button, without moving the page again', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 400 });
@@ -213,8 +218,8 @@ test.describe('moving between pages', () => {
     expect(await page.evaluate(() => window.scrollY)).toBeCloseTo(scrolledTo, -1);
   });
 
-  test('shows and announces "Loading" when a page is slow to arrive', async ({ page }) => {
-    await page.route('**/pages/ComponentGalleryPage.tsx*', async (route) => {
+  test('@gallery shows and announces "Loading" when a page is slow to arrive', async ({ page }) => {
+    await page.route('**/ComponentGalleryPage*', async (route) => {
       await new Promise((resolve) => setTimeout(resolve, 1500));
       await route.continue();
     });
@@ -234,7 +239,7 @@ test.describe('moving between pages', () => {
   });
 
   test('shows the error page, with focus, when the first page fails to load', async ({ page }) => {
-    await page.route('**/pages/ProgrammesPage.tsx*', (route) => route.abort());
+    await page.route('**/ProgrammesPage*', (route) => route.abort());
     await page.goto('/');
 
     await expect(
@@ -247,7 +252,9 @@ test.describe('moving between pages', () => {
 });
 
 test.describe('keyboard and focus', () => {
-  test('shows a visible focus ring, at least 3px wide, on links and buttons', async ({ page }) => {
+  test('@gallery shows a visible focus ring, at least 3px wide, on links and buttons', async ({
+    page,
+  }) => {
     await page.goto('/dev/components');
     await expect(page.getByRole('heading', { level: 1, name: 'Component gallery' })).toBeVisible();
 
@@ -268,7 +275,7 @@ test.describe('keyboard and focus', () => {
     }
   });
 
-  test('makes every button, field and navigation link at least 24 by 24 pixels', async ({
+  test('@gallery makes every button, field and navigation link at least 24 by 24 pixels', async ({
     page,
   }) => {
     await page.goto('/dev/components');
@@ -296,7 +303,7 @@ test.describe('keyboard and focus', () => {
 
   test('does not scroll sideways at 320 px wide', async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 640 });
-    for (const path of ['/', '/dev/components', '/no-such-page']) {
+    for (const path of ['/', '/no-such-page']) {
       await page.goto(path);
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
       const overflow = await page.evaluate(
@@ -308,7 +315,7 @@ test.describe('keyboard and focus', () => {
 });
 
 test.describe('reduced motion', () => {
-  test('animates the loading spinner normally', async ({ page }) => {
+  test('@gallery animates the loading spinner normally', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     await page.goto('/dev/components');
     await expect(page.getByRole('heading', { level: 1, name: 'Component gallery' })).toBeVisible();
@@ -319,7 +326,7 @@ test.describe('reduced motion', () => {
     expect(name).not.toBe('none');
   });
 
-  test('stops the spinner and every transition when the person asks for reduced motion', async ({
+  test('@gallery stops the spinner and every transition when the person asks for reduced motion', async ({
     page,
   }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -339,7 +346,9 @@ test.describe('reduced motion', () => {
 });
 
 test.describe('error summary', () => {
-  test('takes focus, links to each field, and clears when the form is valid', async ({ page }) => {
+  test('@gallery takes focus, links to each field, and clears when the form is valid', async ({
+    page,
+  }) => {
     await page.goto('/dev/components');
 
     // The status element is always on the page, and empty until there is something to say.
