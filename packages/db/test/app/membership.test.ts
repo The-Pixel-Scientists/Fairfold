@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
 // app.membership (migration 0002): isolation, what app_api may write, the
-// roles and status checks, and actors from the same tenant only.
-
-import { randomUUID } from 'node:crypto';
+// roles and status checks, actors from the same tenant only, and an account
+// behind every membership (migration 0004).
 
 import { beforeAll, describe, expect, it } from 'vitest';
 
@@ -13,6 +12,7 @@ import {
   asMigratorIn,
   asRoleIn,
   createTestTenant,
+  createTestUser,
   insertStatement,
   outcome,
   type Row,
@@ -36,18 +36,19 @@ beforeAll(async () => {
 
 describe('app.membership', { timeout: 30_000 }, () => {
   it("keeps each tenant's members from every other tenant", async () => {
-    await expectCrossTenantDenial('app.membership', (_, owner) => ({
+    await expectCrossTenantDenial('app.membership', async (_, owner) => ({
       tenant_id: owner.id,
-      user_id: randomUUID(),
+      user_id: await createTestUser(),
       roles: ['reviewer'],
     }));
   });
 
   it('lets app_api add members and change their roles and status, but not delete them', async () => {
+    const user = await createTestUser();
     await asRoleIn('app_api', tenant.id, async (client) => {
       const { text, values } = insertStatement(client, 'app.membership', {
         tenant_id: tenant.id,
-        user_id: randomUUID(),
+        user_id: user,
         roles: ['reviewer'],
         created_by: admin,
         updated_by: admin,
@@ -84,7 +85,13 @@ describe('app.membership', { timeout: 30_000 }, () => {
     ['refuses an unknown status', { status: 'deleted' }, '23514'],
     ['refuses a creator from another tenant', { created_by: 'stranger' }, '23503'],
     ['refuses an updater from another tenant', { updated_by: 'stranger' }, '23503'],
+    [
+      'refuses a user without an account',
+      { user_id: '00000000-0000-4000-8000-000000000000' },
+      '23503',
+    ],
   ])('%s', async (_, change: Row, expected) => {
+    const user = await createTestUser();
     await asRoleIn('migrator', tenant.id, async (client) => {
       const actors = Object.fromEntries(
         Object.entries(change).map(([column, value]) => [
@@ -94,7 +101,7 @@ describe('app.membership', { timeout: 30_000 }, () => {
       );
       const { text, values } = insertStatement(client, 'app.membership', {
         tenant_id: tenant.id,
-        user_id: randomUUID(),
+        user_id: user,
         roles: ['reviewer'],
         ...actors,
       });
@@ -103,7 +110,7 @@ describe('app.membership', { timeout: 30_000 }, () => {
   });
 
   it('gives a user one membership per tenant', async () => {
-    const user = randomUUID();
+    const user = await createTestUser();
     const add = `INSERT INTO app.membership (tenant_id, user_id, roles) VALUES ($1, $2, '{reviewer}')`;
     await asRoleIn('migrator', other.id, async (client) => {
       await client.query(add, [other.id, user]);

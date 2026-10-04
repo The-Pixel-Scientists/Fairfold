@@ -14,6 +14,7 @@ import { z } from 'zod';
 
 import {
   createTestTenant,
+  createTestUser,
   insertRow,
   asMigratorIn,
   type TestTenant,
@@ -110,7 +111,7 @@ async function addPerson(
   roles: string[],
   status = 'active',
 ): Promise<void> {
-  const userId = randomUUID();
+  const userId = await createTestUser();
   const membershipId = await asMigratorIn(tenant.id, (client) =>
     insertRow(client, 'app.membership', { tenant_id: tenant.id, user_id: userId, roles, status }),
   );

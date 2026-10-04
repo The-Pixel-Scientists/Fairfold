@@ -111,6 +111,22 @@ export async function addTestTenant(client: pg.ClientBase): Promise<TestTenant> 
   return tenant;
 }
 
+/**
+ * Add an account and commit it, as app_auth, which alone may write
+ * auth.user, and return its id.
+ */
+export function createTestUser(): Promise<string> {
+  return withClient('app_auth', async (client) => {
+    const { rows } = await client.query<{ id: string }>(
+      'INSERT INTO auth."user" (email) VALUES ($1) RETURNING id',
+      [`${testSlug()}@example.test`],
+    );
+    const [row] = rows;
+    if (!row) throw new Error('The insert into auth.user returned no row.');
+    return row.id;
+  });
+}
+
 /** addTestTenant() on a new migrator connection. */
 export function createTestTenant(): Promise<TestTenant> {
   return withClient('migrator', addTestTenant);
@@ -154,15 +170,18 @@ export async function insertRow(
   return row.id;
 }
 
-/** Add a member with `roles` to the tenant set on `client`, and return the membership id. */
-export function addMember(
+/**
+ * Add a new account as a member with `roles` to the tenant set on `client`,
+ * and return the membership id.
+ */
+export async function addMember(
   client: pg.ClientBase,
   tenant: TestTenant,
   roles: readonly string[] = ['tenant_admin'],
 ): Promise<string> {
   return insertRow(client, 'app.membership', {
     tenant_id: tenant.id,
-    user_id: randomUUID(),
+    user_id: await createTestUser(),
     roles,
   });
 }
