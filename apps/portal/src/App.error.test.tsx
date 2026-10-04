@@ -38,7 +38,7 @@ describe('a page that fails to load', () => {
       render(<App />);
       await screen.findByRole(
         'heading',
-        { level: 1, name: 'Apply for a grant' },
+        { level: 1, name: "Use your funder's link" },
         { timeout: LOAD_TIMEOUT },
       );
 
