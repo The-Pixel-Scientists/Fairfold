@@ -15,6 +15,10 @@ const deployed: Env = {
   TPS_DB_NAME: 'tps',
   TPS_DB_TLS: 'verify-full',
   TPS_DB_APP_API_PASSWORD: 'a-long-random-password-for-tests',
+  TPS_SMTP_HOST: 'smtp.internal',
+  TPS_SMTP_PORT: '587',
+  TPS_SMTP_TLS: 'starttls',
+  TPS_SMTP_FROM: 'grants@example.org',
 };
 
 /** What `pnpm dev` supplies. */
@@ -25,6 +29,10 @@ const development: Env = {
   TPS_DB_PORT: '55432',
   TPS_DB_NAME: 'tps_2026_w40',
   TPS_DB_APP_API_PASSWORD: 'dev-app-api-password-not-a-secret',
+  TPS_SMTP_HOST: '127.0.0.1',
+  TPS_SMTP_PORT: '51025',
+  TPS_SMTP_TLS: 'none',
+  TPS_SMTP_FROM: 'grants@example.org',
 };
 
 const CERTIFICATE = '-----BEGIN CERTIFICATE-----\nMIIBtest\n-----END CERTIFICATE-----\n';
@@ -324,6 +332,127 @@ describe('database TLS', () => {
     ]);
     expect(problemsOf({ ...deployed, TPS_DB_TLS_CA_FILE: '/run/secrets/empty' })).toEqual([
       'TPS_DB_TLS_CA must hold a certificate in PEM format.',
+    ]);
+  });
+});
+
+describe('the mail server', () => {
+  const SMTP_PASSWORD_FILE = '/run/secrets/smtp_password';
+  const withFiles: Record<string, string> = {
+    ...files,
+    [SMTP_PASSWORD_FILE]: 'smtp-password-from-a-file\n',
+  };
+  const readSmtpFile = (path: string): string => {
+    const content = withFiles[path];
+    if (content === undefined) throw new Error(`ENOENT: ${path}`);
+    return content;
+  };
+
+  it('starts without a mail server, as the stack and pnpm dev do until the sender exists', () => {
+    const noMail = (env: Env): Env =>
+      Object.fromEntries(Object.entries(env).filter(([key]) => !key.startsWith('TPS_SMTP_')));
+
+    expect(loadConfig(noMail(deployed), readFile).smtp).toBeUndefined();
+    expect(loadConfig(noMail(development), readFile).smtp).toBeUndefined();
+  });
+
+  it('names every mail setting still missing once any is set', () => {
+    expect(problemsOf({ TPS_SMTP_HOST: 'smtp.internal' })).toEqual(
+      expect.arrayContaining([
+        'Set TPS_SMTP_PORT.',
+        'Set TPS_SMTP_TLS.',
+        'Set TPS_SMTP_FROM.',
+      ]) as string[],
+    );
+    expect(problemsOf(without(deployed, 'TPS_SMTP_TLS'))).toEqual(['Set TPS_SMTP_TLS.']);
+  });
+
+  it('refuses no TLS for a mail server on the stack network, which is not on this machine', () => {
+    const stack = { ...development, TPS_SMTP_HOST: 'mailpit' };
+
+    expect(problemsOf({ ...stack, TPS_SMTP_TLS: 'none' })).toEqual([
+      expect.stringContaining('TPS_SMTP_TLS=none') as string,
+    ]);
+  });
+
+  it('reads the mail server, with no credentials unless both are set', () => {
+    expect(loadConfig(deployed, readFile).smtp).toEqual({
+      host: 'smtp.internal',
+      port: 587,
+      tls: 'starttls',
+      from: 'grants@example.org',
+    });
+  });
+
+  it('reads the password from a variable or a file, and keeps it out of output', () => {
+    const env = { ...deployed, TPS_SMTP_USER: 'mailer' };
+    const fromVariable = loadConfig({ ...env, TPS_SMTP_PASSWORD: 'p4ss' }, readFile).smtp;
+    expect(fromVariable?.auth?.user).toBe('mailer');
+    expect(fromVariable?.auth?.password.reveal()).toBe('p4ss');
+    const fromFile = loadConfig(
+      { ...env, TPS_SMTP_PASSWORD_FILE: SMTP_PASSWORD_FILE },
+      readSmtpFile,
+    ).smtp;
+    expect(fromFile?.auth?.password.reveal()).toBe('smtp-password-from-a-file');
+    expect(JSON.stringify(fromFile)).not.toContain('smtp-password-from-a-file');
+    expect(inspect(fromFile)).not.toContain('smtp-password-from-a-file');
+  });
+
+  it('refuses a user without a password and a password without a user', () => {
+    expect(problemsOf({ ...deployed, TPS_SMTP_USER: 'mailer' })).toEqual([
+      expect.stringContaining('Set TPS_SMTP_PASSWORD or TPS_SMTP_PASSWORD_FILE') as string,
+    ]);
+    expect(problemsOf({ ...deployed, TPS_SMTP_PASSWORD: 'p4ss' })).toEqual([
+      expect.stringContaining('Set TPS_SMTP_USER') as string,
+    ]);
+  });
+
+  it('refuses setting a password both ways', () => {
+    expect(
+      problemsOf({
+        ...deployed,
+        TPS_SMTP_USER: 'mailer',
+        TPS_SMTP_PASSWORD: 'p4ss',
+        TPS_SMTP_PASSWORD_FILE: SMTP_PASSWORD_FILE,
+      }),
+    ).toEqual(['Set TPS_SMTP_PASSWORD or TPS_SMTP_PASSWORD_FILE, not both.']);
+  });
+
+  it('accepts starttls and tls, and refuses any other mode', () => {
+    expect(loadConfig({ ...deployed, TPS_SMTP_TLS: 'tls' }, readFile).smtp?.tls).toBe('tls');
+    expect(problemsOf({ ...deployed, TPS_SMTP_TLS: 'ssl' })).toEqual([
+      'TPS_SMTP_TLS must be starttls, tls or none.',
+    ]);
+  });
+
+  it('allows no TLS only in development, with a mail server on this machine', () => {
+    expect(loadConfig(development, readFile).smtp?.tls).toBe('none');
+    const refusal = [expect.stringContaining('TPS_SMTP_TLS=none') as string];
+    expect(problemsOf({ ...deployed, TPS_SMTP_TLS: 'none' })).toEqual(refusal);
+    expect(problemsOf({ ...deployed, TPS_SMTP_TLS: 'none', TPS_SMTP_HOST: '127.0.0.1' })).toEqual(
+      refusal,
+    );
+    expect(problemsOf({ ...development, TPS_SMTP_HOST: 'smtp.internal' })).toEqual(refusal);
+  });
+
+  it('refuses a sender address that is not an address, or holds a line break', () => {
+    for (const from of ['grants', 'a@b.c\r\nBcc: x@y.z', 'grants@example.org\n', ' a@b.org']) {
+      expect(problemsOf({ ...deployed, TPS_SMTP_FROM: from }), from).toEqual([
+        'TPS_SMTP_FROM must be an email address, such as grants@example.org.',
+      ]);
+    }
+  });
+
+  it('refuses a host or port that is not valid', () => {
+    expect(problemsOf({ ...deployed, TPS_SMTP_HOST: 'smtp host', TPS_SMTP_PORT: '0' })).toEqual([
+      'TPS_SMTP_HOST must be a host name or an IP address.',
+      'TPS_SMTP_PORT must be a port number from 1 to 65535.',
+    ]);
+  });
+
+  it('refuses a user with a line break', () => {
+    expect(problemsOf({ ...deployed, TPS_SMTP_USER: 'a\nb', TPS_SMTP_PASSWORD: 'p4ss' })).toEqual([
+      expect.stringContaining('TPS_SMTP_USER must be') as string,
     ]);
   });
 });
