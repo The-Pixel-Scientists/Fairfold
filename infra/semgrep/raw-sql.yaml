@@ -5,7 +5,7 @@
 # bound parameters instead.
 
 rules:
-  - id: pixelgrant-no-raw-sql
+  - id: tps-no-raw-sql
     languages: [typescript, javascript]
     severity: ERROR
     message: >-
@@ -20,7 +20,7 @@ rules:
         # The migration runner executes the reviewed up.sql and down.sql files.
         - /packages/db/scripts/migrations.ts
 
-  - id: pixelgrant-no-dynamic-sql-identifier
+  - id: tps-no-dynamic-sql-identifier
     languages: [typescript, javascript]
     severity: ERROR
     message: >-

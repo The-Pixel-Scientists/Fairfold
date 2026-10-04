@@ -5,19 +5,19 @@ declare const html: string;
 declare const createElement: (tag: string, props: object) => unknown;
 
 export function Unsafe() {
-  // ruleid: pixelgrant-no-dangerously-set-inner-html
+  // ruleid: tps-no-dangerously-set-inner-html
   return <div dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
 export function UnsafeWithChildren() {
-  // ruleid: pixelgrant-no-dangerously-set-inner-html
+  // ruleid: tps-no-dangerously-set-inner-html
   return <div dangerouslySetInnerHTML={{ __html: html }}></div>;
 }
 
-// ruleid: pixelgrant-no-dangerously-set-inner-html
+// ruleid: tps-no-dangerously-set-inner-html
 createElement('div', { dangerouslySetInnerHTML: { __html: html } });
 
 export function Safe() {
-  // ok: pixelgrant-no-dangerously-set-inner-html
+  // ok: tps-no-dangerously-set-inner-html
   return <div>{html}</div>;
 }

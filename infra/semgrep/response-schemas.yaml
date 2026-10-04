@@ -6,7 +6,7 @@
 # the one exception; it lives in packages/domain/src/api/answers/.
 
 rules:
-  - id: pixelgrant-no-loose-api-schema
+  - id: tps-no-loose-api-schema
     languages: [typescript]
     severity: ERROR
     message: >-

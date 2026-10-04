@@ -6,29 +6,29 @@ import { CompiledQuery, sql } from 'kysely';
 declare const input: string;
 declare const tenantId: string;
 
-// ruleid: pixelgrant-no-raw-sql
+// ruleid: tps-no-raw-sql
 sql.raw(`SELECT * FROM app.tenant WHERE id = '${input}'`);
 
-// ruleid: pixelgrant-no-raw-sql
+// ruleid: tps-no-raw-sql
 sql.lit(input);
 
-// ruleid: pixelgrant-no-raw-sql
+// ruleid: tps-no-raw-sql
 CompiledQuery.raw(input);
 
-// ok: pixelgrant-no-raw-sql
+// ok: tps-no-raw-sql
 sql`SELECT * FROM app.tenant WHERE id = ${tenantId}`;
 
-// ruleid: pixelgrant-no-dynamic-sql-identifier
+// ruleid: tps-no-dynamic-sql-identifier
 sql.id(input);
 
-// ruleid: pixelgrant-no-dynamic-sql-identifier
+// ruleid: tps-no-dynamic-sql-identifier
 sql.ref(`app.${input}`);
 
-// ruleid: pixelgrant-no-dynamic-sql-identifier
+// ruleid: tps-no-dynamic-sql-identifier
 sql.table(input);
 
-// ok: pixelgrant-no-dynamic-sql-identifier
+// ok: tps-no-dynamic-sql-identifier
 sql.table('app.tenant');
 
-// ok: pixelgrant-no-dynamic-sql-identifier
+// ok: tps-no-dynamic-sql-identifier
 sql.ref('tenant.id');
