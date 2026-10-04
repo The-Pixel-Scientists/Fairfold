@@ -1,30 +1,59 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
-# API contracts in packages/domain/src/api must say exactly what they send,
-# so a field the caller may not see can never pass through (ADR 0004). The
-# answers projection builds its schema from the pinned form version and is
-# the one exception; it lives in packages/domain/src/api/answers/.
+# Contracts must say exactly what they send, so a field the caller may not see
+# can never pass through (ADR 0004). That covers the API, auth and platform
+# contracts in packages/domain and each module's contracts. The answers
+# projection builds its schema from the pinned form version and is the one
+# exception; it lives in packages/domain/src/api/answers/. Contracts import
+# Zod only as { z } from 'zod', so the first rule sees every schema they
+# build.
 
 rules:
   - id: tps-no-loose-api-schema
     languages: [typescript]
     severity: ERROR
     message: >-
-      API contracts may not use z.any, z.unknown, z.looseObject,
-      .passthrough() or a record of unknown values. Declare every field
-      (ADR 0004).
+      Contracts may not use z.any, z.unknown, z.json, z.custom,
+      z.looseObject, .passthrough(), .loose(), .catchall() or a record of
+      unknown values. Declare every field (ADR 0004).
     pattern-either:
       - pattern: z.any(...)
       - pattern: z.unknown(...)
+      - pattern: z.json(...)
+      - pattern: z.custom(...)
       - pattern: z.looseObject(...)
       - pattern: $SCHEMA.passthrough(...)
       - pattern: $SCHEMA.loose(...)
+      - pattern: $SCHEMA.catchall(...)
       - pattern: z.record($KEY, z.unknown(...))
       - pattern: z.record($KEY, z.any(...))
     paths:
       include:
         - /packages/domain/src/api/
+        - /packages/domain/src/auth/
+        - /packages/domain/src/platform/
+        - /modules/*/src/contracts/
       exclude:
         - /packages/domain/src/api/answers/
         # Tests of the runtime route checker build bad schemas on purpose.
+        - '*.test.ts'
+
+  - id: tps-contracts-import-z-only
+    languages: [typescript]
+    severity: ERROR
+    message: >-
+      Contracts import Zod only as import { z } from 'zod', or as types, so
+      every schema they build is checked for loose objects (ADR 0004).
+    patterns:
+      - pattern-regex: (?m)^[ \t]*(?:import|export)\b[^;]*?\bfrom[ \t]*['"]zod(?:/[^'"]*)?['"]
+      - pattern-not-regex: (?m)^[ \t]*import[ \t]+\{[ \t]*z[ \t]*\}[ \t]*from[ \t]*['"]zod['"]
+      - pattern-not-regex: (?m)^[ \t]*(?:import|export)[ \t]+type\b[^;]*?\bfrom[ \t]*['"]zod(?:/[^'"]*)?['"]
+    paths:
+      include:
+        - /packages/domain/src/api/
+        - /packages/domain/src/auth/
+        - /packages/domain/src/platform/
+        - /modules/*/src/contracts/
+      exclude:
+        - /packages/domain/src/api/answers/
         - '*.test.ts'
