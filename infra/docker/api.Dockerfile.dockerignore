@@ -1,0 +1,22 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# What api.Dockerfile may see: the workspace manifests, and the source the API
+# runs. Everything else, including .env files and node_modules, stays out.
+
+*
+!package.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+!apps/*/package.json
+!packages/*/package.json
+!apps/api/src/
+!packages/db/classification.ts
+!packages/db/migrations/
+!packages/db/scripts/
+!packages/db/src/
+!packages/domain/src/
+**/*.test.ts
+# Never secrets, wherever they sit.
+**/.env*
+**/*.pem
+**/*.key
