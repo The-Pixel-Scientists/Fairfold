@@ -2,46 +2,45 @@
 //
 // Axe checks for the console in a real browser, because jsdom cannot judge
 // colour contrast or target size (ADR 0006). Each page is checked at desktop
-// width, at 320 px wide, and at 200% zoom, which a browser lays out as a
-// 640 px wide window at twice the pixel density.
-
-import { AxeBuilder } from '@axe-core/playwright';
-import type { Page } from '@playwright/test';
+// width, at 320 px wide, and at 200% zoom. The sign-in screens and their
+// states are in auth-accessibility.spec.ts.
 
 import { expect, test } from '../../../scripts/e2e/fixtures.ts';
 
-const widths = [
-  { name: 'desktop width', viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1 },
-  { name: '320 px width', viewport: { width: 320, height: 640 }, deviceScaleFactor: 1 },
-  { name: '200% zoom', viewport: { width: 640, height: 400 }, deviceScaleFactor: 2 },
-];
+import { stubSignedIn } from './auth-api.ts';
+import { expectNoHorizontalScroll, expectNoViolations, widths } from './auth-axe.ts';
 
 const pages = [
-  { name: 'programmes page', path: '/', heading: 'Programmes', gallery: false },
-  { name: 'not found page', path: '/no-such-page', heading: 'Page not found', gallery: false },
+  {
+    name: 'programmes page',
+    path: '/northfield/',
+    heading: 'Programmes',
+    signedIn: true,
+    gallery: false,
+  },
+  {
+    name: 'start page',
+    path: '/',
+    heading: "Use your funder's link",
+    signedIn: false,
+    gallery: false,
+  },
+  {
+    name: 'not found page',
+    path: '/Not-A-Funder',
+    heading: 'Page not found',
+    signedIn: false,
+    gallery: false,
+  },
   // Production builds leave the gallery out, so the console-gallery project runs this one.
   {
     name: 'component gallery',
     path: '/dev/components',
     heading: 'Component gallery',
+    signedIn: false,
     gallery: true,
   },
 ];
-
-/** WCAG 2.0 to 2.2 level A and AA, plus axe's own best practices. */
-const tags = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice'];
-
-async function expectNoViolations(page: Page): Promise<void> {
-  const results = await new AxeBuilder({ page }).withTags(tags).analyze();
-  expect(results.violations, JSON.stringify(results.violations, null, 2)).toEqual([]);
-}
-
-async function expectNoHorizontalScroll(page: Page): Promise<void> {
-  const overflow = await page.evaluate(
-    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-  );
-  expect(overflow, 'The page scrolls sideways').toBeLessThanOrEqual(0);
-}
 
 for (const width of widths) {
   test.describe(`at ${width.name}`, () => {
@@ -50,6 +49,7 @@ for (const width of widths) {
     for (const target of pages) {
       const tag = target.gallery ? '@gallery ' : '';
       test(`@a11y ${tag}${target.name} has no axe violations`, async ({ page }) => {
+        if (target.signedIn) await stubSignedIn(page);
         await page.goto(target.path);
         await expect(page.getByRole('heading', { level: 1, name: target.heading })).toBeVisible();
 
@@ -60,7 +60,9 @@ for (const width of widths) {
 
     test('@a11y the skip link has no axe violations while it has focus', async ({ page }) => {
       await page.goto('/');
-      await expect(page.getByRole('heading', { level: 1, name: 'Programmes' })).toBeVisible();
+      await expect(
+        page.getByRole('heading', { level: 1, name: "Use your funder's link" }),
+      ).toBeVisible();
 
       await page.keyboard.press('Tab');
       await expect(page.getByRole('link', { name: 'Skip to main content' })).toBeFocused();
@@ -74,6 +76,30 @@ for (const width of widths) {
       await page.goto('/dev/components');
       await page.getByRole('button', { name: 'Check details' }).click();
       await expect(page.getByRole('alert', { name: 'There is a problem' })).toBeFocused();
+
+      await expectNoViolations(page);
+      await expectNoHorizontalScroll(page);
+    });
+
+    test('@a11y @gallery an open dialog has no axe violations', async ({ page }) => {
+      await page.goto('/dev/components');
+      await page.getByRole('button', { name: 'Open dialog' }).click();
+      await expect(page.getByRole('dialog', { name: 'Switch funder' })).toBeVisible();
+
+      await expectNoViolations(page);
+      await expectNoHorizontalScroll(page);
+    });
+
+    test('@a11y @gallery the step-up dialog, with its error, has no axe violations', async ({
+      page,
+    }) => {
+      await page.goto('/dev/components');
+      await page.getByRole('button', { name: 'Open step-up dialog' }).click();
+      const dialog = page.getByRole('dialog', { name: 'Confirm it is you' });
+      await dialog.getByLabel('Password').fill('correct horse battery');
+      await dialog.getByLabel('Code from your authenticator app').fill('123456');
+      await dialog.getByRole('button', { name: 'Confirm it is you' }).click();
+      await expect(dialog.getByRole('alert', { name: 'There is a problem' })).toBeFocused();
 
       await expectNoViolations(page);
       await expectNoHorizontalScroll(page);
