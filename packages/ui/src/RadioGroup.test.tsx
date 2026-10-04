@@ -92,4 +92,14 @@ describe('RadioGroup', () => {
       'Error: Choose a preset.',
     ]);
   });
+
+  it('gives its id to the first radio button, so an error summary can link to it', () => {
+    render(<Example id="f_preset" />);
+
+    expect(screen.getAllByRole('radio').map(({ id }) => id)).toEqual([
+      'f_preset',
+      'f_preset-1',
+      'f_preset-2',
+    ]);
+  });
 });

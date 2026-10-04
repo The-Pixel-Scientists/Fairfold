@@ -3,7 +3,7 @@
 import { useId } from 'react';
 import type { ReactNode } from 'react';
 
-import { cx } from './cx.ts';
+import { FieldGroup } from './FieldGroup.tsx';
 
 export interface RadioOption {
   value: string;
@@ -25,6 +25,8 @@ export interface RadioGroupProps {
   hint?: ReactNode;
   /** What went wrong and how to fix it. Leave it out when the choice is valid. */
   error?: ReactNode;
+  /** The id of the first radio button, so an ErrorSummary can link to it. Generated when left out. */
+  id?: string;
   className?: string;
 }
 
@@ -42,43 +44,21 @@ export function RadioGroup({
   options,
   hint,
   error,
+  id,
   className,
 }: RadioGroupProps) {
-  const id = useId();
-  const hintId = `${id}-hint`;
-  const errorId = `${id}-error`;
-  const hasHint = hint !== undefined && hint !== null && hint !== false;
-  const hasError = error !== undefined && error !== null && error !== false;
-  const describedBy = [hasHint ? hintId : null, hasError ? errorId : null]
-    .filter(Boolean)
-    .join(' ');
+  const generatedId = useId();
+  const baseId = id ?? generatedId;
+  const inputId = (index: number) => (index === 0 ? baseId : `${baseId}-${String(index)}`);
 
   return (
-    <fieldset
-      aria-describedby={describedBy === '' ? undefined : describedBy}
-      className={cx(
-        'flex min-w-0 flex-col gap-field-gap',
-        hasError && 'border-l-4 border-danger pl-3',
-        className,
-      )}
-    >
-      <legend className="text-body font-medium text-ink">{legend}</legend>
-      {hasHint && (
-        <p id={hintId} className="text-body text-muted">
-          {hint}
-        </p>
-      )}
-      {hasError && (
-        <p id={errorId} className="text-body font-medium text-danger">
-          <span className="sr-only">Error:</span> {error}
-        </p>
-      )}
+    <FieldGroup legend={legend} hint={hint} error={error} id={baseId} className={className}>
       {options.map((option, index) => {
-        const optionHintId = `${id}-option-${String(index)}`;
+        const optionHintId = `${baseId}-option-${String(index)}`;
         return (
           <div key={option.value} className="flex min-h-target items-start gap-2 text-body">
             <input
-              id={`${id}-${String(index)}`}
+              id={inputId(index)}
               type="radio"
               name={name}
               value={option.value}
@@ -90,7 +70,7 @@ export function RadioGroup({
               className="size-6 shrink-0 accent-accent"
             />
             <div className="flex flex-col pt-0.5">
-              <label htmlFor={`${id}-${String(index)}`} className="text-ink">
+              <label htmlFor={inputId(index)} className="text-ink">
                 {option.label}
               </label>
               {option.hint !== undefined && (
@@ -102,6 +82,6 @@ export function RadioGroup({
           </div>
         );
       })}
-    </fieldset>
+    </FieldGroup>
   );
 }
