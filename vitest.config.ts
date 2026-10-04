@@ -55,6 +55,9 @@ export default defineConfig({
           // rendered when the test ends.
           globals: true,
           setupFiles: ['scripts/vitest-dom-setup.ts'],
+          // Typing into a form with user-event can take several seconds on a
+          // busy machine or a small CI runner, past Vitest's five-second default.
+          testTimeout: 15_000,
         },
       },
       {
