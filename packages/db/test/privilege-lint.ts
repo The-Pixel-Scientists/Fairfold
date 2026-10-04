@@ -4,8 +4,9 @@
 // sentences, every way the database breaks these rules.
 //
 // In every schema but PostgreSQL's own, excepted ones included:
-// - PUBLIC holds no right on any table, view, sequence or column, and no app
-//   role holds TRUNCATE, REFERENCES or TRIGGER.
+// - PUBLIC holds no right on any schema, table, view, sequence or column,
+//   beyond PUBLIC_RIGHTS, and no app role holds TRUNCATE, REFERENCES or
+//   TRIGGER.
 // - No function is SECURITY DEFINER or executable by PUBLIC, and the app
 //   roles can execute exactly the functions in EXECUTABLE_BY.
 //
@@ -17,6 +18,11 @@
 // - No app role owns anything (sequences included), has CREATE on any
 //   schema, can use an excepted schema, or has CREATE or TEMPORARY on the
 //   database.
+// - No app role holds any right WITH GRANT OPTION, and app_auth and
+//   app_queue hold rights only in their own schemas, beyond those listed in
+//   OWN_SCHEMAS (ADR 0003, "Roles").
+// - No default privileges grant anything to a role other than the objects'
+//   owner, so nothing a migration creates starts with a grant.
 // - There is no publication: logical replication ignores row-level security.
 //
 // It reads only catalogues that PUBLIC can read, so any role can run it.
@@ -32,9 +38,49 @@ export const EXECUTABLE_BY: ReadonlyMap<string, readonly AppRole[]> = new Map([
   ['app.current_tenant_id()', APP_ROLES],
 ]);
 
+/** Rights PUBLIC may hold, as "<privilege> on <object>", each with its reason. */
+export const PUBLIC_RIGHTS: ReadonlyMap<string, string> = new Map([
+  [
+    'USAGE on schema public',
+    "PostgreSQL's own grant on the public schema, which no migration uses. Remove this entry once the database privileges script revokes it.",
+  ],
+]);
+
+/**
+ * The schema each of app_auth and app_queue has its rights in, and the only
+ * rights, as "<privilege> on <object>", it may hold outside it (ADR 0003).
+ */
+export const OWN_SCHEMAS: ReadonlyMap<string, { schema: string; outside: readonly string[] }> =
+  new Map([
+    [
+      'app_auth',
+      {
+        schema: 'auth',
+        outside: ['USAGE on schema app', 'EXECUTE on function app.current_tenant_id()'],
+      },
+    ],
+    [
+      'app_queue',
+      {
+        schema: 'pgboss',
+        outside: ['USAGE on schema app', 'EXECUTE on function app.current_tenant_id()'],
+      },
+    ],
+  ]);
+
 /** Any schema but PostgreSQL's own. */
 export const NON_SYSTEM_SCHEMA = `NOT pg_catalog.starts_with(n.nspname, 'pg_')
   AND n.nspname <> 'information_schema'`;
+
+/** The kinds of object pg_default_acl names, as an error message says them. */
+const DEFAULT_ACL_OBJECTS: Readonly<Record<string, string>> = {
+  r: 'tables',
+  S: 'sequences',
+  f: 'functions',
+  T: 'types',
+  n: 'schemas',
+  L: 'large objects',
+};
 
 interface FunctionRow {
   signature: string;
@@ -50,6 +96,8 @@ export async function findPrivilegeProblems(
 ): Promise<string[]> {
   const problems = await privilegeProblems(client);
   problems.push(...(await roleProblems(client, excepted)));
+  problems.push(...(await appRoleGrantProblems(client)));
+  problems.push(...(await defaultPrivilegeProblems(client)));
   problems.push(...(await functionProblems(client)));
 
   const publications = await client.query<{ name: string }>(
@@ -82,6 +130,11 @@ async function privilegeProblems(client: pg.ClientBase): Promise<string[]> {
            JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
           CROSS JOIN LATERAL pg_catalog.aclexplode(t.attacl) a
           WHERE ${NON_SYSTEM_SCHEMA} AND t.attnum > 0 AND NOT t.attisdropped
+         UNION ALL
+         SELECT 'schema ' || n.nspname, a.grantee, a.privilege_type
+           FROM pg_catalog.pg_namespace n
+          CROSS JOIN LATERAL pg_catalog.aclexplode(n.nspacl) a
+          WHERE ${NON_SYSTEM_SCHEMA}
        ) grants
       WHERE grantee = 0
          OR (grantee IN (SELECT oid FROM pg_catalog.pg_roles WHERE rolname = ANY ($1::text[]))
@@ -89,10 +142,100 @@ async function privilegeProblems(client: pg.ClientBase): Promise<string[]> {
       ORDER BY 1, 2, 3`,
     [APP_ROLES],
   );
-  return rows.map(
-    ({ name, grantee, privilege }) =>
-      `${grantee === 'PUBLIC' ? 'PUBLIC' : `Role ${grantee}`} holds ${privilege} on ${name}.`,
+  return rows
+    .filter(
+      ({ name, grantee, privilege }) =>
+        grantee !== 'PUBLIC' || !PUBLIC_RIGHTS.has(`${privilege} on ${name}`),
+    )
+    .map(
+      ({ name, grantee, privilege }) =>
+        `${grantee === 'PUBLIC' ? 'PUBLIC' : `Role ${grantee}`} holds ${privilege} on ${name}.`,
+    );
+}
+
+/**
+ * Rights the app roles hold WITH GRANT OPTION, and rights app_auth and
+ * app_queue hold outside their own schemas, in every schema including
+ * PostgreSQL's own.
+ */
+async function appRoleGrantProblems(client: pg.ClientBase): Promise<string[]> {
+  const { rows } = await client.query<{
+    role: string;
+    schema: string | null;
+    object: string;
+    privilege: string;
+    grantable: boolean;
+  }>(
+    `SELECT r.rolname AS role, o.schema, o.object, a.privilege_type AS privilege,
+            a.is_grantable AS grantable
+       FROM (
+         SELECT n.nspname AS schema, n.nspname || '.' || c.relname AS object, c.relacl AS acl
+           FROM pg_catalog.pg_class c
+           JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+         UNION ALL
+         SELECT n.nspname, 'column ' || n.nspname || '.' || c.relname || '.' || t.attname, t.attacl
+           FROM pg_catalog.pg_attribute t
+           JOIN pg_catalog.pg_class c ON c.oid = t.attrelid
+           JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+          WHERE t.attnum > 0 AND NOT t.attisdropped
+         UNION ALL
+         SELECT n.nspname, 'function ' || p.oid::pg_catalog.regprocedure::text, p.proacl
+           FROM pg_catalog.pg_proc p
+           JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace
+         UNION ALL
+         SELECT n.nspname, 'type ' || t.oid::pg_catalog.regtype::text, t.typacl
+           FROM pg_catalog.pg_type t
+           JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace
+         UNION ALL
+         SELECT n.nspname, 'schema ' || n.nspname, n.nspacl FROM pg_catalog.pg_namespace n
+         UNION ALL
+         SELECT NULL, 'the database', d.datacl
+           FROM pg_catalog.pg_database d WHERE d.datname = pg_catalog.current_database()
+       ) o
+      CROSS JOIN LATERAL pg_catalog.aclexplode(o.acl) a
+       JOIN pg_catalog.pg_roles r ON r.oid = a.grantee
+      WHERE r.rolname = ANY ($1::text[])
+      ORDER BY 1, 3, 4`,
+    [APP_ROLES],
   );
+
+  const problems: string[] = [];
+  for (const { role, schema, object, privilege, grantable } of rows) {
+    const right = `${privilege} on ${object}`;
+    if (grantable) problems.push(`Role ${role} holds ${right} with grant option.`);
+    const own = OWN_SCHEMAS.get(role);
+    if (own && schema !== null && schema !== own.schema && !own.outside.includes(right)) {
+      problems.push(`Role ${role} holds ${right}, outside its own schema ${own.schema}.`);
+    }
+  }
+  return problems;
+}
+
+/** Default privileges that grant anything to a role other than the objects' owner. */
+async function defaultPrivilegeProblems(client: pg.ClientBase): Promise<string[]> {
+  const { rows } = await client.query<{
+    owner: string;
+    schema: string | null;
+    kind: string;
+    grantee: string;
+    privilege: string;
+  }>(
+    `SELECT d.defaclrole::regrole::text AS owner,
+            CASE WHEN d.defaclnamespace <> 0 THEN d.defaclnamespace::regnamespace::text END
+              AS schema,
+            d.defaclobjtype AS kind,
+            CASE WHEN a.grantee = 0 THEN 'PUBLIC' ELSE a.grantee::regrole::text END AS grantee,
+            a.privilege_type AS privilege
+       FROM pg_catalog.pg_default_acl d
+      CROSS JOIN LATERAL pg_catalog.aclexplode(d.defaclacl) a
+      WHERE a.grantee <> d.defaclrole
+      ORDER BY 1, 2, 3, 4, 5`,
+  );
+  return rows.map(({ owner, schema, kind, grantee, privilege }) => {
+    const where = schema === null ? '' : ` in schema ${schema}`;
+    const objects = DEFAULT_ACL_OBJECTS[kind] ?? kind;
+    return `Default privileges for role ${owner}${where} grant ${privilege} on new ${objects} to ${grantee}.`;
+  });
 }
 
 async function roleProblems(client: pg.ClientBase, excepted: readonly string[]): Promise<string[]> {
