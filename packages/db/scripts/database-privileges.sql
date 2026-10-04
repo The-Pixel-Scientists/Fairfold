@@ -1,13 +1,13 @@
 -- SPDX-License-Identifier: AGPL-3.0-or-later
 --
--- Fairfold Grants database roles, version 1 (ADR 0003), part 2 of 2: the rights
+-- Fairfold Grants database roles, version 2 (ADR 0003), part 2 of 2: the rights
 -- PUBLIC holds in one database.
 --
 -- Run as a superuser, connected to a Fairfold Grants database, after roles.sql.
 -- It is safe to run any number of times. Only the five login roles may
--- connect; PUBLIC loses CONNECT and TEMP on the database, CREATE on every
--- schema and EXECUTE on every routine, including those migrator creates
--- later.
+-- connect; function owners never log in. PUBLIC loses CONNECT and TEMP on
+-- the database, CREATE on every schema and EXECUTE on every routine,
+-- including those migrator creates later.
 
 BEGIN;
 
