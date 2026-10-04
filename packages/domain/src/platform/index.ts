@@ -21,6 +21,7 @@ export {
   type AuditAction,
   type PlatformAuditAction,
 } from './audit.ts';
+export { productName, suiteName } from './brand.ts';
 export {
   checkLogo,
   LOGO_MAX_BYTES,
