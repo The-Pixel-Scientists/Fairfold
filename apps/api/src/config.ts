@@ -10,6 +10,9 @@
 //     Compose or Kubernetes secret). Setting both is an error.
 //   - A database server that is not on this machine needs TPS_DB_TLS:
 //     verify-full, or disable on a private network such as Compose's.
+//   - Proxies are trusted only by address: TPS_API_TRUST_PROXY lists
+//     the addresses or ranges of the reverse proxy, and nothing is trusted
+//     when it is unset.
 //   - A development password is accepted only with TPS_DEV=1 and a
 //     database server on this machine, and TPS_DEV=1 makes the
 //     listener bind to the loopback address.
@@ -57,6 +60,8 @@ export interface Config {
   readonly development: boolean;
   readonly logLevel: LogLevel;
   readonly listen: { readonly host: string; readonly port: number };
+  /** Addresses or ranges of the reverse proxies whose forwarded headers are believed. */
+  readonly trustProxy: readonly string[];
   /** Connection to PostgreSQL as the `app_api` role. */
   readonly database: {
     readonly host: string;
@@ -129,6 +134,21 @@ function hostVariable(name: string): z.ZodString {
   return required(name).refine((host) => isIP(host) !== 0 || HOST_NAME.test(host), message);
 }
 
+const MAX_TRUSTED_PROXIES = 32;
+
+/** An address, or a range such as 10.0.0.0/8. A range of every address trusts everyone, so it is refused. */
+function isTrustedProxy(entry: string): boolean {
+  const [address = '', prefix, ...rest] = entry.split('/');
+  const family = isIP(address);
+  if (family === 0 || rest.length > 0) return false;
+  if (prefix === undefined) return true;
+  return (
+    /^[0-9]{1,3}$/.test(prefix) &&
+    Number(prefix) >= 1 &&
+    Number(prefix) <= (family === 4 ? 32 : 128)
+  );
+}
+
 /**
  * The schema for the environment. Its keys are the variable names, so a
  * problem always names its variable. `development` is TPS_DEV, read
@@ -157,6 +177,20 @@ function environmentSchema(development: boolean) {
             .optional()
         : hostVariable('TPS_API_HOST'),
       TPS_API_PORT: portVariable('TPS_API_PORT'),
+      TPS_API_TRUST_PROXY: z
+        .string()
+        .transform((value) => value.split(',').map((entry) => entry.trim()))
+        .pipe(
+          z
+            .array(z.string())
+            .max(MAX_TRUSTED_PROXIES)
+            .refine(
+              (entries) => entries.every(isTrustedProxy),
+              'TPS_API_TRUST_PROXY must list proxy addresses or ranges, such as 10.0.0.0/8, ' +
+                'separated by commas. A range of every address is not allowed.',
+            ),
+        )
+        .optional(),
       TPS_DB_HOST: hostVariable('TPS_DB_HOST'),
       TPS_DB_PORT: portVariable('TPS_DB_PORT'),
       TPS_DB_NAME: required('TPS_DB_NAME').refine(
@@ -285,6 +319,7 @@ export function loadConfig(env: Env, readFile: (path: string) => string = readTe
     development: values.TPS_DEV,
     logLevel: values.TPS_LOG_LEVEL,
     listen: { host: values.TPS_API_HOST ?? LOOPBACK_HOST, port: values.TPS_API_PORT },
+    trustProxy: values.TPS_API_TRUST_PROXY ?? [],
     database: {
       host: values.TPS_DB_HOST,
       port: values.TPS_DB_PORT,

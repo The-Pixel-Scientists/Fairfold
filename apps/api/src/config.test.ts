@@ -149,6 +149,36 @@ describe('loadConfig', () => {
   });
 });
 
+describe('trusted proxies', () => {
+  const TRUST = 'TPS_API_TRUST_PROXY';
+
+  it('trusts no proxy unless some are listed', () => {
+    expect(loadConfig(deployed, readFile).trustProxy).toEqual([]);
+  });
+
+  it('reads a list of addresses and ranges', () => {
+    const env = { ...deployed, [TRUST]: '10.0.0.0/8, 192.168.1.5,fd00::/8' };
+    expect(loadConfig(env, readFile).trustProxy).toEqual(['10.0.0.0/8', '192.168.1.5', 'fd00::/8']);
+  });
+
+  it('refuses anything else, and a range that holds every address', () => {
+    for (const value of [
+      'true',
+      '*',
+      'proxy.internal',
+      '10.0.0.0/0',
+      '::/0',
+      '10.0.0.0/33',
+      '10.0.0.1,',
+      '10.0.0.0/8/8',
+    ]) {
+      expect(problemsOf({ ...deployed, [TRUST]: value }), value).toEqual([
+        expect.stringContaining(TRUST),
+      ]);
+    }
+  });
+});
+
 describe('secrets', () => {
   const withoutPassword = without(deployed, 'TPS_DB_APP_API_PASSWORD');
 
