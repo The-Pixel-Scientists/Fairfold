@@ -3,17 +3,17 @@
 #
 # Runs once, as the superuser, when the Postgres container creates its data
 # directory. It applies part 1 of the roles script
-# (packages/db/scripts/roles.sql, copied to /pixelgrant/roles.sql) in the
+# (packages/db/scripts/roles.sql, copied to /tps/roles.sql) in the
 # default database. `pnpm db:migrate` runs both parts again before
-# migrating, and part 2 in each PixelGrant database.
+# migrating, and part 2 in each Fairfold Grants database.
 #
 # Each role password comes from the container's environment, either in
-# PIXELGRANT_DB_<ROLE>_PASSWORD or in a file named by
-# PIXELGRANT_DB_<ROLE>_PASSWORD_FILE. It is turned into a SCRAM-SHA-256
+# TPS_DB_<ROLE>_PASSWORD or in a file named by
+# TPS_DB_<ROLE>_PASSWORD_FILE. It is turned into a SCRAM-SHA-256
 # verifier here, as packages/db/scripts/scram.ts does, so the password never
 # reaches the server, and psql sends each verifier as a bound parameter, so
 # it is never part of SQL text. A development password (ending
-# "not-a-secret") is refused unless PIXELGRANT_DEV=1; this script only ever
+# "not-a-secret") is refused unless TPS_DEV=1; this script only ever
 # reaches the server in its own container, through the local socket.
 #
 # The development image installs this script as executable, so the
@@ -41,7 +41,7 @@
     fi
     case "$value" in
       *not-a-secret)
-        if [ "${PIXELGRANT_DEV:-}" != 1 ]; then
+        if [ "${TPS_DEV:-}" != 1 ]; then
           echo "10-roles.sh: $name is a development password. Set a real one outside development." >&2
           exit 1
         fi
@@ -54,8 +54,8 @@
   # with PostgreSQL's default 4096 iterations and a 16-byte random salt. The
   # password is passed in the environment, never on a command line.
   scram_verifier() {
-    PIXELGRANT_SCRAM_PASSWORD=$1 perl -MDigest::SHA=hmac_sha256,sha256 -MMIME::Base64 -e '
-      my $password = $ENV{PIXELGRANT_SCRAM_PASSWORD};
+    TPS_SCRAM_PASSWORD=$1 perl -MDigest::SHA=hmac_sha256,sha256 -MMIME::Base64 -e '
+      my $password = $ENV{TPS_SCRAM_PASSWORD};
       die "Database passwords must use printable ASCII characters only.\n"
         unless $password =~ /\A[\x20-\x7e]+\z/;
       open my $random, "<:raw", "/dev/urandom" or die "Cannot read /dev/urandom\n";
@@ -75,9 +75,9 @@
   }
 
   for role in MIGRATOR APP_API APP_WORKER APP_AUTH APP_QUEUE; do
-    password=$(read_secret "PIXELGRANT_DB_${role}_PASSWORD")
+    password=$(read_secret "TPS_DB_${role}_PASSWORD")
     verifier=$(scram_verifier "$password")
-    export "PIXELGRANT_DB_${role}_VERIFIER=$verifier"
+    export "TPS_DB_${role}_VERIFIER=$verifier"
   done
   unset password
 
@@ -90,24 +90,24 @@ SET log_transaction_sample_rate = 0;
 SET log_min_error_statement = panic;
 SET log_parameter_max_length = 0;
 SET log_parameter_max_length_on_error = 0;
-\getenv verifier_migrator PIXELGRANT_DB_MIGRATOR_VERIFIER
-\getenv verifier_app_api PIXELGRANT_DB_APP_API_VERIFIER
-\getenv verifier_app_worker PIXELGRANT_DB_APP_WORKER_VERIFIER
-\getenv verifier_app_auth PIXELGRANT_DB_APP_AUTH_VERIFIER
-\getenv verifier_app_queue PIXELGRANT_DB_APP_QUEUE_VERIFIER
+\getenv verifier_migrator TPS_DB_MIGRATOR_VERIFIER
+\getenv verifier_app_api TPS_DB_APP_API_VERIFIER
+\getenv verifier_app_worker TPS_DB_APP_WORKER_VERIFIER
+\getenv verifier_app_auth TPS_DB_APP_AUTH_VERIFIER
+\getenv verifier_app_queue TPS_DB_APP_QUEUE_VERIFIER
 \o /dev/null
 -- psql binds each value as it is: a verifier holds no spaces or quotes.
-SELECT pg_catalog.set_config($1, $2, false) \bind pixelgrant.scram_verifier_migrator :verifier_migrator \g
-SELECT pg_catalog.set_config($1, $2, false) \bind pixelgrant.scram_verifier_app_api :verifier_app_api \g
-SELECT pg_catalog.set_config($1, $2, false) \bind pixelgrant.scram_verifier_app_worker :verifier_app_worker \g
-SELECT pg_catalog.set_config($1, $2, false) \bind pixelgrant.scram_verifier_app_auth :verifier_app_auth \g
-SELECT pg_catalog.set_config($1, $2, false) \bind pixelgrant.scram_verifier_app_queue :verifier_app_queue \g
+SELECT pg_catalog.set_config($1, $2, false) \bind tps.scram_verifier_migrator :verifier_migrator \g
+SELECT pg_catalog.set_config($1, $2, false) \bind tps.scram_verifier_app_api :verifier_app_api \g
+SELECT pg_catalog.set_config($1, $2, false) \bind tps.scram_verifier_app_worker :verifier_app_worker \g
+SELECT pg_catalog.set_config($1, $2, false) \bind tps.scram_verifier_app_auth :verifier_app_auth \g
+SELECT pg_catalog.set_config($1, $2, false) \bind tps.scram_verifier_app_queue :verifier_app_queue \g
 \o
 \unset verifier_migrator
 \unset verifier_app_api
 \unset verifier_app_worker
 \unset verifier_app_auth
 \unset verifier_app_queue
-\i /pixelgrant/roles.sql
+\i /tps/roles.sql
 SQL
 )

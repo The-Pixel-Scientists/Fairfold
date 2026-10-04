@@ -1,9 +1,9 @@
 -- SPDX-License-Identifier: AGPL-3.0-or-later
 --
--- PixelGrant database roles, version 1 (ADR 0003), part 2 of 2: the rights
+-- Fairfold Grants database roles, version 1 (ADR 0003), part 2 of 2: the rights
 -- PUBLIC holds in one database.
 --
--- Run as a superuser, connected to a PixelGrant database, after roles.sql.
+-- Run as a superuser, connected to a Fairfold Grants database, after roles.sql.
 -- It is safe to run any number of times. Only the five login roles may
 -- connect; PUBLIC loses CONNECT and TEMP on the database, CREATE on every
 -- schema and EXECUTE on every routine, including those migrator creates
@@ -23,7 +23,7 @@ BEGIN
     RAISE EXCEPTION 'Run the database privileges script as a superuser.';
   END IF;
   IF current_database() IN ('postgres', 'template0', 'template1') THEN
-    RAISE EXCEPTION 'Run the database privileges script in a PixelGrant database, not %.', current_database();
+    RAISE EXCEPTION 'Run the database privileges script in a Fairfold Grants database, not %.', current_database();
   END IF;
 
   EXECUTE format('REVOKE CONNECT, TEMPORARY ON DATABASE %I FROM PUBLIC', current_database());

@@ -1,11 +1,11 @@
 -- SPDX-License-Identifier: AGPL-3.0-or-later
 --
--- PixelGrant database roles, version 1 (ADR 0003), part 1 of 2: the roles.
+-- Fairfold Grants database roles, version 1 (ADR 0003), part 1 of 2: the roles.
 --
 -- Creates the login roles and resets their attributes, memberships, settings
 -- and passwords. Roles belong to the whole server, so this runs as a
 -- superuser connected to the maintenance database (postgres). Part 2,
--- database-privileges.sql, then runs in each PixelGrant database. Both are
+-- database-privileges.sql, then runs in each Fairfold Grants database. Both are
 -- safe to run any number of times. They run when the server is first created
 -- and again before every migration run; migrations never create or alter a
 -- role.
@@ -13,11 +13,11 @@
 -- Passwords never reach this file or the server in clear. Before running it,
 -- the caller computes a SCRAM-SHA-256 verifier for each role's password and
 -- sets it as a session setting:
---   pixelgrant.scram_verifier_migrator
---   pixelgrant.scram_verifier_app_api
---   pixelgrant.scram_verifier_app_worker
---   pixelgrant.scram_verifier_app_auth
---   pixelgrant.scram_verifier_app_queue
+--   tps.scram_verifier_migrator
+--   tps.scram_verifier_app_api
+--   tps.scram_verifier_app_worker
+--   tps.scram_verifier_app_auth
+--   tps.scram_verifier_app_queue
 -- The script clears them before it commits. The callers are
 -- packages/db/scripts/roles.ts (Node.js) and
 -- infra/compose/postgres/initdb/10-roles.sh (psql, on the first start).
@@ -58,7 +58,7 @@ BEGIN
   LOOP
     -- A verifier in PostgreSQL's stored format: at least 4096 iterations, a
     -- salt of at least 16 bytes, and 32-byte stored and server keys.
-    role_verifier := current_setting('pixelgrant.scram_verifier_' || role_name, true);
+    role_verifier := current_setting('tps.scram_verifier_' || role_name, true);
     verifier_parts := regexp_match(role_verifier,
       '^SCRAM-SHA-256\$([0-9]{4,9}):[A-Za-z0-9+/]{22,}={0,2}\$[A-Za-z0-9+/]{43}=:[A-Za-z0-9+/]{43}=$');
     IF verifier_parts IS NULL OR verifier_parts[1]::integer < 4096 THEN
@@ -105,7 +105,7 @@ BEGIN
 
     -- The migrate job, API and worker read this at start-up and refuse to
     -- run against roles from another version of this script.
-    EXECUTE format('COMMENT ON ROLE %I IS %L', role_name, 'pixelgrant-roles-version=' || roles_version);
+    EXECUTE format('COMMENT ON ROLE %I IS %L', role_name, 'tps-roles-version=' || roles_version);
 
     -- The password statement runs on its own, and a failure is reported
     -- without the statement text, so the verifier never reaches an error
@@ -126,10 +126,10 @@ BEGIN
 END
 $roles$;
 
-RESET pixelgrant.scram_verifier_migrator;
-RESET pixelgrant.scram_verifier_app_api;
-RESET pixelgrant.scram_verifier_app_worker;
-RESET pixelgrant.scram_verifier_app_auth;
-RESET pixelgrant.scram_verifier_app_queue;
+RESET tps.scram_verifier_migrator;
+RESET tps.scram_verifier_app_api;
+RESET tps.scram_verifier_app_worker;
+RESET tps.scram_verifier_app_auth;
+RESET tps.scram_verifier_app_queue;
 
 COMMIT;

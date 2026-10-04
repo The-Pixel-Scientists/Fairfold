@@ -23,16 +23,14 @@ import { scramSha256Verifier } from './scram.ts';
 import { MAINTENANCE_DATABASE, readDatabaseName, readServer, readSetting } from './settings.ts';
 
 const env = process.env;
-const testDatabase = readDatabaseName(env, 'PIXELGRANT_TEST_DB_NAME');
+const testDatabase = readDatabaseName(env, 'TPS_TEST_DB_NAME');
 
 async function connect(database: string, user?: LoginRole): Promise<pg.Client> {
   const client = new pg.Client({
     ...readServer(env),
     database,
-    user: user ?? readSetting(env, 'PIXELGRANT_DB_SUPERUSER'),
-    password: user
-      ? readRolePassword(env, user)
-      : readSetting(env, 'PIXELGRANT_DB_SUPERUSER_PASSWORD'),
+    user: user ?? readSetting(env, 'TPS_DB_SUPERUSER'),
+    password: user ? readRolePassword(env, user) : readSetting(env, 'TPS_DB_SUPERUSER_PASSWORD'),
   });
   await client.connect();
   return client;

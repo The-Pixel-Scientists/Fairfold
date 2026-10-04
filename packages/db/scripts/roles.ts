@@ -27,12 +27,12 @@ const DEVELOPMENT_PASSWORD = /not-a-secret$/;
 
 /** The environment variable that holds each role's password. */
 export function passwordVariable(role: LoginRole): string {
-  return `PIXELGRANT_DB_${role.toUpperCase()}_PASSWORD`;
+  return `TPS_DB_${role.toUpperCase()}_PASSWORD`;
 }
 
 /**
  * Read a role's password and check it may be used here: long enough, and a
- * known development password only in development (PIXELGRANT_DEV=1) against
+ * known development password only in development (TPS_DEV=1) against
  * a server on this machine, so it can never be set on a shared server.
  */
 export function readRolePassword(env: Env, role: LoginRole): string {
@@ -91,7 +91,7 @@ export async function applyRoleVerifiers(
   await quietLogging(client);
   for (const role of LOGIN_ROLES) {
     await client.query('SELECT pg_catalog.set_config($1, $2, false)', [
-      `pixelgrant.scram_verifier_${role}`,
+      `tps.scram_verifier_${role}`,
       verifiers[role],
     ]);
   }
@@ -100,7 +100,7 @@ export async function applyRoleVerifiers(
   await client.query(readFileSync(ROLES_SQL, 'utf8'));
 }
 
-/** Run database-privileges.sql as a superuser, connected to a PixelGrant database. */
+/** Run database-privileges.sql as a superuser, connected to a Fairfold Grants database. */
 export async function applyDatabasePrivileges(client: pg.ClientBase): Promise<void> {
   await client.query(readFileSync(DATABASE_PRIVILEGES_SQL, 'utf8'));
 }
@@ -147,7 +147,7 @@ export async function findRoleProblems(client: pg.ClientBase): Promise<string[]>
   );
 
   const problems: string[] = [];
-  const expectedComment = `pixelgrant-roles-version=${ROLES_SCRIPT_VERSION}`;
+  const expectedComment = `tps-roles-version=${ROLES_SCRIPT_VERSION}`;
   for (const role of LOGIN_ROLES) {
     const row = rows.find((candidate) => candidate.rolname === role);
     if (!row) {
