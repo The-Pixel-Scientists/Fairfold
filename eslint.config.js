@@ -53,4 +53,33 @@ export default defineConfig(
     files: reactFiles,
     ...jsxA11y.configs.strict,
   },
+  {
+    files: reactFiles,
+    rules: {
+      // Preflight's list-style: none makes Safari with VoiceOver drop the list
+      // role, so lists put it back with role="list".
+      'jsx-a11y-x/no-redundant-roles': [
+        'error',
+        { nav: ['navigation'], ol: ['list'], ul: ['list'] },
+      ],
+    },
+  },
+  {
+    files: ['apps/*/e2e/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@playwright/test',
+              message:
+                'Import test and expect from scripts/e2e/fixtures.ts, which fails a test that breaks the Content Security Policy.',
+              allowTypeImports: true,
+            },
+          ],
+        },
+      ],
+    },
+  },
 );
