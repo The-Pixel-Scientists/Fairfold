@@ -22,6 +22,7 @@ import {
   type Permission,
 } from '@pixel-scientists/domain/platform';
 
+import { recordAudit, recordRead, type AuditActor } from '../audit/writer.ts';
 import type { MemberContext, RequestContext, RequestSession } from '../context.ts';
 import type { InTenant, TenantTransaction } from '../database.ts';
 import { ApiError } from '../problems.ts';
@@ -147,10 +148,19 @@ export async function asMember<T>(
     });
     if (!inScope) throw refuse(404, 'out_of_scope');
 
+    const actor: AuditActor = {
+      kind: 'user',
+      membershipId: membership.id,
+      requestId: context.requestId,
+    };
     return run(tx, {
       ...context,
       app: session.app,
       session,
+      audit: {
+        record: (event) => recordAudit(tx, actor, event),
+        read: (entity) => recordRead(tx, actor, entity),
+      },
       membership: { id: membership.id, permissions },
     });
   });

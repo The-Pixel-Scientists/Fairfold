@@ -9,6 +9,8 @@ import type { TenantId } from '@pixel-scientists/db';
 import type { App, Permission } from '@pixel-scientists/domain/platform';
 import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
 
+import type { AuditEvent } from './audit/writer.ts';
+
 /** Where the session stands on MFA, as in the session the apps read. */
 export type MfaState = 'enrol' | 'verify' | 'complete' | 'not_required';
 
@@ -33,10 +35,19 @@ export interface RequestContext {
   readonly session: RequestSession | null;
 }
 
+/** The audit writer bound to the request's transaction and the acting membership. */
+export interface RequestAudit {
+  /** Record a state change in the request's transaction. */
+  record(event: AuditEvent): Promise<void>;
+  /** Record a sensitive read. */
+  read(entity: Pick<AuditEvent, 'action' | 'entityId'>): Promise<void>;
+}
+
 /** The context of a console or portal route, after the policy has let the caller in. */
 export interface MemberContext extends RequestContext {
   readonly app: App;
   readonly session: RequestSession;
+  readonly audit: RequestAudit;
   readonly membership: {
     readonly id: string;
     /** What the caller's roles give in this app, from the role map. */
