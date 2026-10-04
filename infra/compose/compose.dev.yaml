@@ -18,16 +18,16 @@
 # First start: Postgres runs the roles script, and ClamAV copies the
 # signatures in its image into the clamav-data volume.
 
-name: pixelgrant-dev
+name: tps-dev
 
 x-postgres-credentials: &postgres-credentials
   POSTGRES_USER: postgres
   POSTGRES_PASSWORD: dev-postgres-password-not-a-secret
-  PIXELGRANT_DB_MIGRATOR_PASSWORD: dev-migrator-password-not-a-secret
-  PIXELGRANT_DB_APP_API_PASSWORD: dev-app-api-password-not-a-secret
-  PIXELGRANT_DB_APP_WORKER_PASSWORD: dev-app-worker-password-not-a-secret
-  PIXELGRANT_DB_APP_AUTH_PASSWORD: dev-app-auth-password-not-a-secret
-  PIXELGRANT_DB_APP_QUEUE_PASSWORD: dev-app-queue-password-not-a-secret
+  TPS_DB_MIGRATOR_PASSWORD: dev-migrator-password-not-a-secret
+  TPS_DB_APP_API_PASSWORD: dev-app-api-password-not-a-secret
+  TPS_DB_APP_WORKER_PASSWORD: dev-app-worker-password-not-a-secret
+  TPS_DB_APP_AUTH_PASSWORD: dev-app-auth-password-not-a-secret
+  TPS_DB_APP_QUEUE_PASSWORD: dev-app-queue-password-not-a-secret
 
 services:
   postgres:
@@ -38,12 +38,12 @@ services:
       dockerfile: ../../docker/postgres-dev.Dockerfile
       additional_contexts:
         db-scripts: ../../packages/db/scripts
-    image: pixelgrant-dev-postgres:16.15
+    image: tps-dev-postgres:16.15
     environment:
       <<: *postgres-credentials
       POSTGRES_DB: postgres
       # Lets the roles script accept the development passwords above.
-      PIXELGRANT_DEV: '1'
+      TPS_DEV: '1'
     ports:
       - 127.0.0.1:55432:5432
     volumes:
@@ -129,22 +129,22 @@ configs:
           {
             "name": "dev-admin",
             "credentials": [{ "accessKey": "dev-admin", "secretKey": "dev-admin-secret-key-not-a-secret" }],
-            "actions": ["Admin:pixelgrant-*", "List:pixelgrant-*", "Read:pixelgrant-*", "Write:pixelgrant-*"]
+            "actions": ["Admin:tps-*", "List:tps-*", "Read:tps-*", "Write:tps-*"]
           },
           {
             "name": "dev-uploads",
             "credentials": [{ "accessKey": "dev-uploads", "secretKey": "dev-uploads-secret-key-not-a-secret" }],
-            "actions": ["Write:pixelgrant-*/quarantine/*"]
+            "actions": ["Write:tps-*/quarantine/*"]
           },
           {
             "name": "dev-scanner",
             "credentials": [{ "accessKey": "dev-scanner", "secretKey": "dev-scanner-secret-key-not-a-secret" }],
-            "actions": ["Read:pixelgrant-*/quarantine/*", "Write:pixelgrant-*/quarantine/*", "Write:pixelgrant-*/clean/*"]
+            "actions": ["Read:tps-*/quarantine/*", "Write:tps-*/quarantine/*", "Write:tps-*/clean/*"]
           },
           {
             "name": "dev-downloads",
             "credentials": [{ "accessKey": "dev-downloads", "secretKey": "dev-downloads-secret-key-not-a-secret" }],
-            "actions": ["Read:pixelgrant-*/clean/*"]
+            "actions": ["Read:tps-*/clean/*"]
           }
         ]
       }

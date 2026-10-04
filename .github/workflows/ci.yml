@@ -285,10 +285,10 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/sbom"
           "$RUNNER_TEMP/tools/syft" scan dir:. --quiet \
-            --source-name pixelgrant --source-version "$GITHUB_SHA" \
+            --source-name pixel-scientists-workspace --source-version "$GITHUB_SHA" \
             --output "syft-json=$RUNNER_TEMP/syft.json" \
-            --output "spdx-json=$RUNNER_TEMP/sbom/pixelgrant.spdx.json" \
-            --output "cyclonedx-json=$RUNNER_TEMP/sbom/pixelgrant.cdx.json"
+            --output "spdx-json=$RUNNER_TEMP/sbom/pixel-scientists-workspace.spdx.json" \
+            --output "cyclonedx-json=$RUNNER_TEMP/sbom/pixel-scientists-workspace.cdx.json"
       - name: Check the SBOM lists the whole lockfile
         env:
           LICENCE_CHECK_DEPENDENCIES: ${{ needs.licences.outputs.dependencies }}
