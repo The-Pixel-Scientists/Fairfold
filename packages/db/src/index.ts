@@ -20,3 +20,11 @@ export {
   type DatabaseTls,
 } from './database.ts';
 export { TenantLeakError, withTenant, type TenantId } from './tenant-context.ts';
+export {
+  createTenant,
+  publicTenant,
+  publicTenantLogo,
+  sessionMemberships,
+  type PublicTenantRow,
+  type SessionMembership,
+} from './tenant-functions.ts';
