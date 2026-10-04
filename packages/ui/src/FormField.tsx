@@ -155,3 +155,15 @@ export function Textarea({ className, rows = 4, ...rest }: TextareaProps) {
     <textarea {...withField(rest, field)} rows={rows} className={cx(controlClassName, className)} />
   );
 }
+
+export type SelectProps = ComponentProps<'select'>;
+
+/**
+ * A drop-down list for choosing one of a fixed set of values, such as a time
+ * zone. It is the browser's own, so it works with the keyboard, type-ahead and
+ * assistive technology. Inside a FormField it takes the field's wiring, like Input.
+ */
+export function Select({ className, ...rest }: SelectProps) {
+  const field = useFormFieldControl();
+  return <select {...withField(rest, field)} className={cx(controlClassName, className)} />;
+}

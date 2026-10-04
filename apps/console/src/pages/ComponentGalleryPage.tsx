@@ -12,6 +12,8 @@ import {
   Link,
   LoadingState,
   PageHeading,
+  RadioGroup,
+  Select,
   StepUpDialog,
   Textarea,
   buttonClassName,
@@ -32,6 +34,34 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 function fieldValue(data: FormData, name: string): string {
   const value = data.get(name);
   return typeof value === 'string' ? value.trim() : '';
+}
+
+/** A question with a few answers, and a list to choose from, so they can be tried by keyboard. */
+function ChoiceExamples() {
+  const [corners, setCorners] = useState('standard');
+  return (
+    <div className="flex max-w-xl flex-col gap-4">
+      <RadioGroup
+        legend="Corners"
+        name="corners"
+        value={corners}
+        onValueChange={setCorners}
+        hint="Changes how rounded buttons and panels look."
+        options={[
+          { value: 'standard', label: 'Standard', hint: 'Small rounded corners.' },
+          { value: 'rounded', label: 'Rounded', hint: 'Larger rounded corners.' },
+          { value: 'square', label: 'Square' },
+        ]}
+      />
+      <FormField label="Financial year starts in" hint="The month your financial year begins.">
+        <Select defaultValue="4">
+          <option value="1">January</option>
+          <option value="4">April</option>
+          <option value="10">October</option>
+        </Select>
+      </FormField>
+    </div>
+  );
 }
 
 /** A form that fails the way real ones do, so the error pattern can be tried by keyboard. */
@@ -187,6 +217,10 @@ export default function ComponentGalleryPage() {
             <Textarea />
           </FormField>
         </div>
+      </Section>
+
+      <Section title="Choices">
+        <ChoiceExamples />
       </Section>
 
       <Section title="Error summary">
