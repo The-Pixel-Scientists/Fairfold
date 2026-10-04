@@ -357,7 +357,7 @@ test.describe('error summary', () => {
     await page.goto('/dev/components');
 
     // The status element is always on the page, and empty until there is something to say.
-    const status = page.locator('form [role="status"]');
+    const status = page.locator('form:has(#example-name) [role="status"]');
     await expect(status).toHaveText('');
     await page.getByRole('button', { name: 'Check details' }).click();
 
