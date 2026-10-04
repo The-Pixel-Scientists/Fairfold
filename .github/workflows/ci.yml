@@ -124,6 +124,10 @@ jobs:
     container:
       image: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
       options: --ipc=host
+    # The job runs as root, but Actions sets HOME to a folder another user
+    # owns, and Firefox will not start then (Playwright's documented fix).
+    env:
+      HOME: /root
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -262,6 +266,29 @@ jobs:
           package-manager-cache: false
       - name: Enable pnpm through Corepack
         run: corepack enable
+      - name: Check that every accepted advisory is dated and still in date
+        run: |
+          today=$(date -u +%Y-%m-%d)
+          ids=$(grep -c '^ *- id:' .trivyignore.yaml || true)
+          dates=$(grep -c '^ *expired_at:' .trivyignore.yaml || true)
+          if [ "$ids" != "$dates" ]; then
+            echo "Every entry in .trivyignore.yaml needs an expired_at date." >&2
+            exit 1
+          fi
+          # Expired on its date, as Trivy treats it.
+          while read -r expiry; do
+            if [[ ! "$expiry" > "$today" ]]; then
+              echo "An advisory accepted until $expiry has expired; review .trivyignore.yaml and pnpm-workspace.yaml." >&2
+              exit 1
+            fi
+          done < <(sed -n 's/^ *expired_at: *//p' .trivyignore.yaml)
+          # pnpm's ignores carry no date of their own, so each needs a dated Trivy entry.
+          while read -r ghsa; do
+            if ! grep -q "^ *- id: $ghsa\$" .trivyignore.yaml; then
+              echo "$ghsa is ignored in pnpm-workspace.yaml but has no dated entry in .trivyignore.yaml." >&2
+              exit 1
+            fi
+          done < <(sed -n '/^auditConfig:/,/^[^ #]/s/^ *- \(GHSA-[a-z0-9-]*\)$/\1/p' pnpm-workspace.yaml)
       - name: Check the lockfile against the npm advisory database
         run: pnpm audit --audit-level high
 
@@ -378,6 +405,15 @@ jobs:
           "$RUNNER_TEMP/tools/trivy" fs --quiet
           --cache-dir "$RUNNER_TEMP/trivy-cache"
           --scanners vuln,misconfig --include-dev-deps
+          --ignorefile .trivyignore.yaml
+          --severity HIGH,CRITICAL --exit-code 1 .
+      # The accepted advisories are for development dependencies only, so
+      # production dependencies are scanned again with nothing ignored.
+      - name: Scan production dependencies with no accepted advisories
+        run: >-
+          "$RUNNER_TEMP/tools/trivy" fs --quiet
+          --cache-dir "$RUNNER_TEMP/trivy-cache"
+          --scanners vuln
           --severity HIGH,CRITICAL --exit-code 1 .
 
   sbom:

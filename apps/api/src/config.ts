@@ -18,9 +18,10 @@
 //     listener bind to the loopback address.
 //   - The mail server is optional for now. Once any TPS_SMTP_ variable
 //     is set, host, port, TLS mode and sender are all needed. The TLS mode is
-//     starttls (required), tls, or none, which is accepted only with
-//     TPS_DEV=1 and a mail server on this machine. Its user and
-//     password are set together or not at all.
+//     starttls (required), tls, or none, which is accepted only for a
+//     mail server at a loopback IP address, so mail never leaves the machine
+//     (or the stack's shared network namespace), and with a login only with
+//     TPS_DEV=1. Its user and password are set together or not at all.
 //
 // Every problem is reported at once, so one restart fixes them all.
 
@@ -79,7 +80,7 @@ const SMTP_REQUIRED = ['TPS_SMTP_HOST', 'TPS_SMTP_PORT', 'TPS_SMTP_TLS', 'TPS_SM
 export interface SmtpSettings {
   readonly host: string;
   readonly port: number;
-  /** starttls: upgrade or fail. tls: encrypted from the first byte. none: development only. */
+  /** starttls: upgrade or fail. tls: encrypted from the first byte. none: a loopback IP address only. */
   readonly tls: SmtpTlsMode;
   /** The address mail is sent from. */
   readonly from: string;
@@ -329,16 +330,25 @@ function environmentSchema(development: boolean) {
             'user: they go together.',
         });
       }
-      if (
-        env.TPS_SMTP_TLS === 'none' &&
-        !(development && isLoopbackHost(env.TPS_SMTP_HOST ?? ''))
-      ) {
+      // An IP literal, not a name: the mail client asks DNS before /etc/hosts,
+      // so a spoofed answer could send a name such as localhost elsewhere.
+      const smtpHost = env.TPS_SMTP_HOST ?? '';
+      if (env.TPS_SMTP_TLS === 'none' && !(isIP(smtpHost) !== 0 && isLoopbackHost(smtpHost))) {
         context.addIssue({
           code: 'custom',
           path: ['TPS_SMTP_TLS'],
           message:
-            'TPS_SMTP_TLS=none works only with TPS_DEV=1 and a mail server on this ' +
-            'machine. Use starttls or tls.',
+            'TPS_SMTP_TLS=none works only for a mail server at a loopback IP address, ' +
+            'such as 127.0.0.1. Use starttls or tls.',
+        });
+      }
+      if (env.TPS_SMTP_TLS === 'none' && env.TPS_SMTP_USER !== undefined && !development) {
+        context.addIssue({
+          code: 'custom',
+          path: ['TPS_SMTP_USER'],
+          message:
+            'A mail server login is sent in clear with TPS_SMTP_TLS=none, so it is allowed ' +
+            'only with TPS_DEV=1. Use starttls or tls, or a relay that needs no login.',
         });
       }
       const developmentServer = env.TPS_DEV && isLoopbackHost(env.TPS_DB_HOST);
