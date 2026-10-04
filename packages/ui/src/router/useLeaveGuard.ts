@@ -5,14 +5,17 @@ import { useEffect } from 'react';
 import { useRouterContext } from './context.ts';
 
 export const DEFAULT_LEAVE_MESSAGE =
-  'Leave this page? You have unsaved changes, and you will lose them if you leave.';
+  'You have unsaved changes. If you leave this page, you will lose them.';
 
 /**
  * Ask before leaving a page that has unsaved changes. While `when` is true:
  *
- * - going to another page through a Link or useNavigate asks first;
- * - the back and forward buttons ask first, and stay put if you decline;
- * - closing the tab or reloading shows the browser's own warning.
+ * - going to another page through a Link or useNavigate opens a dialog that
+ *   says `message` and offers "Stay on this page" or "Leave and lose changes";
+ * - the back and forward buttons open the same dialog, and stay put if the
+ *   person stays;
+ * - closing the tab or reloading shows the browser's own warning, which a page
+ *   cannot reword.
  *
  * Changing only the search string or the hash stays on the page, so it never asks.
  */

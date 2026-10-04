@@ -59,7 +59,7 @@ export interface NavigateOptions {
 export type NavigateFunction = (to: string, options?: NavigateOptions) => void;
 
 export interface LeaveGuard {
-  /** The question asked before leaving. */
+  /** What the dialog before leaving says is at risk. */
   message: string;
 }
 

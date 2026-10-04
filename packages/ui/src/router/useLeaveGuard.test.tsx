@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -9,46 +9,98 @@ import { activeHeading, renderRouter, setUpRouterTests } from '../../test/router
 
 setUpRouterTests();
 
+const dialog = () => screen.findByRole('dialog', { name: 'Leave this page?' });
+const noDialog = () => {
+  expect(screen.queryByRole('dialog')).toBeNull();
+};
+
 describe('useLeaveGuard', () => {
   it('does nothing while there is nothing unsaved', async () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const confirm = vi.spyOn(window, 'confirm');
     const user = userEvent.setup();
     renderRouter('/edit');
 
     await user.click(screen.getByRole('link', { name: 'Back to programmes' }));
 
     await screen.findByRole('heading', { level: 1, name: 'Programmes' });
+    noDialog();
     expect(confirm).not.toHaveBeenCalled();
   });
 
-  it('asks before a link leaves the page, and stays when the person declines', async () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+  it('opens a dialog, not the browser confirm, before a link leaves the page', async () => {
+    const confirm = vi.spyOn(window, 'confirm');
     const user = userEvent.setup();
     renderRouter('/edit');
     await user.type(screen.getByRole('textbox', { name: 'Programme name' }), 'Draft');
 
     await user.click(screen.getByRole('link', { name: 'Back to programmes' }));
 
-    expect(confirm).toHaveBeenCalledWith(DEFAULT_LEAVE_MESSAGE);
+    const open = await dialog();
+    expect(within(open).getByText(DEFAULT_LEAVE_MESSAGE)).toBeTruthy();
+    expect(
+      within(open)
+        .getAllByRole('button')
+        .map((button) => button.textContent),
+    ).toEqual(['Leave and lose changes', 'Stay on this page']);
+    expect(confirm).not.toHaveBeenCalled();
+    expect(window.location.pathname).toBe('/edit');
+  });
+
+  it('puts focus on the safe choice, and stays when the person stays, with focus back on the link', async () => {
+    const user = userEvent.setup();
+    renderRouter('/edit');
+    await user.type(screen.getByRole('textbox', { name: 'Programme name' }), 'Draft');
+    const link = screen.getByRole('link', { name: 'Back to programmes' });
+    await user.click(link);
+
+    const open = await dialog();
+    expect(document.activeElement).toBe(
+      within(open).getByRole('button', { name: 'Stay on this page' }),
+    );
+    await user.keyboard('{Enter}');
+
+    await waitFor(noDialog);
     expect(window.location.pathname).toBe('/edit');
     expect(screen.getByRole('heading', { level: 1, name: 'Edit programme' })).toBeTruthy();
+    expect(screen.getByRole('textbox', { name: 'Programme name' })).toHaveProperty(
+      'value',
+      'Draft',
+    );
+    expect(document.activeElement).toBe(link);
   });
 
-  it('leaves when the person agrees', async () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+  it('stays when the person presses Escape', async () => {
     const user = userEvent.setup();
     renderRouter('/edit');
     await user.type(screen.getByRole('textbox', { name: 'Programme name' }), 'Draft');
-
     await user.click(screen.getByRole('link', { name: 'Back to programmes' }));
+    await dialog();
 
-    expect(confirm).toHaveBeenCalledTimes(1);
-    expect(await screen.findByRole('heading', { level: 1, name: 'Programmes' })).toBeTruthy();
-    expect(window.location.pathname).toBe('/');
+    await user.keyboard('{Escape}');
+
+    await waitFor(noDialog);
+    expect(window.location.pathname).toBe('/edit');
   });
 
-  it('puts the person back when they decline to leave with the back button', async () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+  it('leaves when the person agrees, and moves focus to the new page heading', async () => {
+    const user = userEvent.setup();
+    renderRouter('/edit');
+    await user.type(screen.getByRole('textbox', { name: 'Programme name' }), 'Draft');
+    await user.click(screen.getByRole('link', { name: 'Back to programmes' }));
+
+    await user.click(
+      within(await dialog()).getByRole('button', { name: 'Leave and lose changes' }),
+    );
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Programmes' })).toBeTruthy();
+    expect(window.location.pathname).toBe('/');
+    await waitFor(noDialog);
+    await waitFor(() => {
+      expect(activeHeading()).toBe('Programmes');
+    });
+  });
+
+  it('puts the person back, and asks, when they press the back button', async () => {
     const user = userEvent.setup();
     renderRouter('/');
     await user.click(screen.getByRole('link', { name: 'Edit this programme' }));
@@ -57,21 +109,38 @@ describe('useLeaveGuard', () => {
 
     window.history.back();
 
-    await waitFor(() => {
-      expect(confirm).toHaveBeenCalledTimes(1);
-    });
+    await dialog();
     await waitFor(() => {
       expect(window.location.pathname).toBe('/edit');
     });
-    expect(screen.getByRole('heading', { level: 1, name: 'Edit programme' })).toBeTruthy();
+    // The page behind the dialog is hidden from assistive technology, but still there.
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Edit programme', hidden: true }),
+    ).toBeTruthy();
 
-    // After agreeing, back works as normal.
-    confirm.mockReturnValue(true);
+    // Staying leaves the person where they were.
+    await user.click(screen.getByRole('button', { name: 'Stay on this page' }));
+    await waitFor(noDialog);
+    expect(window.location.pathname).toBe('/edit');
+  });
+
+  it('goes back when the person agrees to leave with the back button, and asks once', async () => {
+    const user = userEvent.setup();
+    renderRouter('/');
+    await user.click(screen.getByRole('link', { name: 'Edit this programme' }));
+    await screen.findByRole('heading', { level: 1, name: 'Edit programme' });
+    await user.type(screen.getByRole('textbox', { name: 'Programme name' }), 'Draft');
+
     window.history.back();
+    await user.click(
+      within(await dialog()).getByRole('button', { name: 'Leave and lose changes' }),
+    );
+
     await waitFor(() => {
       expect(activeHeading()).toBe('Programmes');
     });
     expect(window.location.pathname).toBe('/');
+    await waitFor(noDialog);
   });
 
   it('shows the browser warning when the tab closes, but only while changes are unsaved', async () => {
@@ -89,11 +158,13 @@ describe('useLeaveGuard', () => {
   });
 
   it('stops warning once the page is gone', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
     const user = userEvent.setup();
     renderRouter('/edit');
     await user.type(screen.getByRole('textbox', { name: 'Programme name' }), 'Draft');
     await user.click(screen.getByRole('link', { name: 'Back to programmes' }));
+    await user.click(
+      within(await dialog()).getByRole('button', { name: 'Leave and lose changes' }),
+    );
     await screen.findByRole('heading', { level: 1, name: 'Programmes' });
 
     const event = new Event('beforeunload', { cancelable: true });
