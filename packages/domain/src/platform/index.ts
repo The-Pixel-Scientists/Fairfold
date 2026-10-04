@@ -2,6 +2,8 @@
 //
 // Platform contracts: the `/platform` subpath of the domain package.
 
+import '../jitless/index.ts';
+
 export {
   appSchema,
   apps,

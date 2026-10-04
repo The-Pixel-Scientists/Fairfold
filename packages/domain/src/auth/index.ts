@@ -2,6 +2,8 @@
 //
 // Auth contracts: the `/auth` subpath of the domain package.
 
+import '../jitless/index.ts';
+
 export { authEventCodes, type AuthEventCode } from './events.ts';
 export { confirmTotp, enrolTotp, stepUp, verifyTotp } from './mfa-routes.ts';
 export {

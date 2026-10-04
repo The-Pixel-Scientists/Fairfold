@@ -2,6 +2,8 @@
 //
 // Route contracts and the apps' API client: the `/api` subpath of the domain package.
 
+import '../jitless/index.ts';
+
 export {
   apiBasePath,
   call,
