@@ -1,7 +1,7 @@
 # ADR 0019: Tenant addresses, public pages and theming
 
-- **Status:** proposed
-- **Date:** 2026-10-03
+- **Status:** accepted
+- **Date:** 2026-10-04
 - **Deciders:** Aaron Gardner
 
 ## Context
@@ -65,7 +65,7 @@ These join ADR 0003's approved definer functions:
 | Function | Callable by | Returns | Its owner holds |
 | --- | --- | --- | --- |
 | `app.public_tenant(slug)` | `app_api`, `app_auth` | For an active tenant: id, name, brand colour, preset, and whether it has a logo; nothing otherwise | `SELECT` on `id`, `slug`, `name` and `status` of `app.tenant`, and on `tenant_id`, `brand_colour`, `preset` and `logo_type` of `app.tenant_theme`, each with a `SELECT` policy `TO` it that is `USING (true)` |
-| `app.public_tenant_logo(slug)` | `app_api` | For an active tenant: the logo and its type; nothing otherwise | The same on `app.tenant`, and `SELECT` on `tenant_id`, `logo` and `logo_type` of `app.tenant_theme` |
+| `app.public_tenant_logo(slug)` | `app_api` | For an active tenant: the logo and its type; nothing otherwise | `SELECT` on `id`, `slug` and `status` of `app.tenant`, and on `tenant_id`, `logo` and `logo_type` of `app.tenant_theme`, each with a `SELECT` policy `TO` it that is `USING (true)` |
 
 - `/public/tenants/{slug}`, `/public/tenants/{slug}/theme.css` and
   `/public/tenants/{slug}/logo` use only these functions and set no tenant.
@@ -73,6 +73,18 @@ These join ADR 0003's approved definer functions:
 - Before sign-in the portal shows the tenant's name and look and asks the
   applicant to sign in or create an account. Listing open programmes before
   sign-in comes later, by adding a function in the same pattern.
+
+### A session's memberships
+
+This also joins ADR 0003's approved definer functions:
+
+| Function | Callable by | Returns | Its owner holds |
+| --- | --- | --- | --- |
+| `auth.session_memberships(token_hash)` | `app_api` | For a live session (not revoked, its user active, inside its app's idle and absolute timeouts and its expiry) that has finished MFA or does not need it: the user's active memberships in active tenants, with membership id, tenant id, slug, name and roles; nothing otherwise | `SELECT` on `token_hash`, `user_id`, `app`, `mfa_state`, `expires_at`, `created_at`, `last_seen_at` and `revoked_at` of `auth.session`; on `id` and `status` of `auth.user`; on `id`, `tenant_id`, `user_id`, `roles` and `status` of `app.membership`; and on `id`, `slug`, `name` and `status` of `app.tenant`; each with a `SELECT` policy `TO` it that is `USING (true)` |
+
+- It lists a signed-in user's funders and lets them switch between them. No
+  app role can read memberships across tenants, and a session waiting for
+  MFA gets nothing.
 
 ### Creating a tenant
 
@@ -86,6 +98,10 @@ These join ADR 0003's approved definer functions:
   `apps/api/src/operator/` may import sets it, as `app_worker`, so the
   command can write the tenant's audit event and first invitation. A Semgrep
   rule bans the helper and the function anywhere else.
+- For that audit event, `app_worker` gains `INSERT` on `app.audit_event`
+  (every column but `occurred_at` and `retain_until`, which the database
+  sets) and `SELECT` on `app.retention_policy`, which the retention trigger
+  reads with the inserting role's rights, as it does for `app_api`.
 
 ### Theming
 
@@ -114,8 +130,8 @@ These join ADR 0003's approved definer functions:
 ## Consequences
 
 - No anonymous request ever runs with a tenant set.
-- ADR 0003's approved functions gain three rows and its tenant sources one;
-  the roles script gains three `NOLOGIN` owners, and the catalogue test
+- ADR 0003's approved functions gain four rows and its tenant sources one;
+  the roles script gains four `NOLOGIN` owners, and the catalogue test
   checks each owner's grants and policies.
 - The sign-in, theme and logo routes need rate limits before the API faces
   the internet, as the other public routes do.
