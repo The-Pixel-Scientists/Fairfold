@@ -77,3 +77,28 @@ rules:
     paths:
       exclude:
         - /packages/ui/
+
+  - id: tps-nodemailer-only-in-email
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      Only apps/api/src/email may import nodemailer. Send mail through the
+      sender it exports, so every message goes through one checked path.
+    patterns:
+      - pattern-either:
+          - pattern: import "$MODULE"
+          - pattern: import $X from "$MODULE"
+          - pattern: import * as $X from "$MODULE"
+          - pattern: import {...} from "$MODULE"
+          - pattern: import type $X from "$MODULE"
+          - pattern: import type {...} from "$MODULE"
+          - pattern: export {...} from "$MODULE"
+          - pattern: export * from "$MODULE"
+          - pattern: import("$MODULE")
+          - pattern: require("$MODULE")
+      - metavariable-regex:
+          metavariable: $MODULE
+          regex: ^['"]?(nodemailer|nodemailer/.+)['"]?$
+    paths:
+      exclude:
+        - /apps/api/src/email/

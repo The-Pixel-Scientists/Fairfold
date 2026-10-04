@@ -21,6 +21,15 @@ import { sso } from '@better-auth/sso';
 // ok: tps-better-auth-only-in-auth
 import { z } from 'zod';
 
+// ruleid: tps-nodemailer-only-in-email
+import nodemailer from 'nodemailer';
+// ruleid: tps-nodemailer-only-in-email
+import type { Transporter } from 'nodemailer';
+// ruleid: tps-nodemailer-only-in-email
+const smtp = await import('nodemailer/lib/smtp-transport');
+// ok: tps-nodemailer-only-in-email
+import { sendEmail } from './email/index.ts';
+
 // ruleid: tps-radix-only-in-ui
 import { Dialog } from 'radix-ui';
 // ruleid: tps-radix-only-in-ui
@@ -28,5 +37,6 @@ export * from '@radix-ui/react-dialog';
 // ok: tps-radix-only-in-ui
 import { Button } from '@pixel-scientists/ui';
 
-export { pg, Kysely, Migrator, pool, withTenant, betterAuth, sso, z, Dialog, Button };
-export type { PgBoss };
+export { pg, Kysely, Migrator, pool, withTenant, betterAuth, sso, z, nodemailer, smtp, sendEmail };
+export { Dialog, Button };
+export type { PgBoss, Transporter };
