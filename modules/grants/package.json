@@ -1,0 +1,14 @@
+{
+  "name": "@pixel-scientists/grants",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Grants: programmes, applications, assessment and decisions, through to release and export",
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "exports": {
+    "./contracts": "./src/contracts/index.ts",
+    "./server": "./src/server/index.ts",
+    "./console": "./src/console/index.ts",
+    "./portal": "./src/portal/index.ts"
+  }
+}

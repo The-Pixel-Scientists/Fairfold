@@ -344,6 +344,10 @@ importers:
         specifier: 5.0.1
         version: 5.0.1(@types/node@24.13.6)(jsdom@30.1.1)(vite@8.3.1(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
+  modules/grants: {}
+
+  modules/party: {}
+
   packages/config:
     dependencies:
       zod:

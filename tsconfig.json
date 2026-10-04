@@ -18,6 +18,12 @@
       "path": "packages/ui"
     },
     {
+      "path": "modules/party"
+    },
+    {
+      "path": "modules/grants"
+    },
+    {
       "path": "apps/api"
     },
     {

@@ -1,5 +1,6 @@
 packages:
   - apps/*
+  - modules/*
   - packages/*
 
 # Supply-chain settings (ADR 0001). Do not lower minimumReleaseAge. A security
