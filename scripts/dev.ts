@@ -4,7 +4,9 @@
 // are not running, prepare and migrate this worktree's database, then run
 // the API, console and portal on this machine with reload, on this
 // worktree's ports (dev-names.ts). The API gets the `api` profile of
-// dev-env.ts. Ctrl+C stops the apps and leaves the services running.
+// dev-env.ts. The console and portal get no TPS_ variable but the
+// API's address, so their Vite servers proxy `/api` to it on their own
+// origin. Ctrl+C stops the apps and leaves the services running.
 
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { readFileSync } from 'node:fs';
@@ -12,14 +14,14 @@ import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { createInterface } from 'node:readline';
 
-import { developmentEnvironment } from './dev-env.ts';
+import { developmentEnvironment, viteEnvironment } from './dev-env.ts';
 import { currentDevNames, repositoryRoot } from './dev-names.ts';
 
 interface App {
   name: string;
   folder: string;
   args: string[];
-  env?: NodeJS.ProcessEnv;
+  env: NodeJS.ProcessEnv;
 }
 
 /** The script behind a package's command, as installed for the workspace in `folder`. */
@@ -43,7 +45,7 @@ function runOrExit(command: string, args: readonly string[]): void {
 function start(app: App): ChildProcess {
   const child = spawn(process.execPath, app.args, {
     cwd: join(repositoryRoot, app.folder),
-    env: app.env ?? process.env,
+    env: app.env,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   const prefix = `${app.name.padEnd(7)} | `;
@@ -84,14 +86,19 @@ runOrExit(process.execPath, [
 ]);
 
 const { ports } = currentDevNames();
-const vite = (folder: string, port: number): string[] => [
-  commandScript(folder, 'vite'),
-  '--host',
-  '127.0.0.1',
-  '--port',
-  String(port),
-  '--strictPort',
-];
+const vite = (name: string, port: number): App => ({
+  name,
+  folder: `apps/${name}`,
+  args: [
+    commandScript(`apps/${name}`, 'vite'),
+    '--host',
+    '127.0.0.1',
+    '--port',
+    String(port),
+    '--strictPort',
+  ],
+  env: viteEnvironment(process.env, ports.api),
+});
 const apps: App[] = [
   {
     name: 'api',
@@ -99,8 +106,8 @@ const apps: App[] = [
     args: [commandScript('apps/api', 'tsx'), 'watch', '--clear-screen=false', 'src/main.ts'],
     env: developmentEnvironment('api'),
   },
-  { name: 'console', folder: 'apps/console', args: vite('apps/console', ports.console) },
-  { name: 'portal', folder: 'apps/portal', args: vite('apps/portal', ports.portal) },
+  vite('console', ports.console),
+  vite('portal', ports.portal),
 ];
 
 console.log(`Console: http://console.localhost:${String(ports.console)}`);
