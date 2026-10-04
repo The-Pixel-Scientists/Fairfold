@@ -2,7 +2,9 @@
 #
 # The console or portal release image (ADRs 0005 and 0006): the production
 # build, served by scripts/web-server.ts with the Content Security Policy and
-# a fresh nonce on each page.
+# a fresh nonce on each page. It forwards /api/ to the API at
+# http://api:3000, so the app reaches the API on its own origin; to use
+# another address, run it with the same command and another --api.
 #
 #   docker build --file infra/docker/web.Dockerfile --build-arg APP=console .
 #
@@ -38,4 +40,4 @@ COPY --from=build /app/apps/${APP}/dist dist
 COPY --from=build /app/scripts/web-server.ts web-server.ts
 USER node
 EXPOSE 8080
-CMD ["node", "web-server.ts", "--root", "dist", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["node", "web-server.ts", "--root", "dist", "--host", "0.0.0.0", "--port", "8080", "--api", "http://api:3000"]

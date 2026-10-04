@@ -6,6 +6,7 @@
 // the tests see what ships.
 //
 //   node scripts/web-server.ts --root <built app> --port <port> [--host <address>]
+//                              [--api <API origin>]
 //
 // Every response carries ADR 0006's Content Security Policy and security
 // headers. index.html gets a fresh nonce on each response: the nonce goes in
@@ -16,10 +17,25 @@
 // Files are read once, at start-up, and served from memory, so no request
 // reaches the file system. Only Node.js built-ins are used, so a release
 // image needs just this file and the build.
+//
+// With --api, requests under /api/ go to the API unchanged, so the app
+// reaches it on its own origin (ADRs 0005 and 0022). The Host header is kept,
+// so the API can tell the console from the portal; any X-Forwarded-* or
+// Forwarded header the client sent is dropped, and the server sets its own.
+// The API's probes and OpenAPI document are not under /api/ and are never
+// forwarded.
 
 import { randomBytes } from 'node:crypto';
 import { readdirSync, readFileSync } from 'node:fs';
-import { createServer, type Server, type ServerResponse } from 'node:http';
+import {
+  createServer,
+  request as httpRequest,
+  type IncomingHttpHeaders,
+  type IncomingMessage,
+  type OutgoingHttpHeaders,
+  type Server,
+  type ServerResponse,
+} from 'node:http';
 import { extname, join, relative, sep } from 'node:path';
 import { parseArgs } from 'node:util';
 
@@ -47,6 +63,25 @@ const SECURITY_HEADERS: Readonly<Record<string, string>> = {
     'camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), hid=()',
   'Cross-Origin-Opener-Policy': 'same-origin',
 };
+
+/** Where the API's contract routes live (`apiBasePath` in packages/domain). */
+const API_PATH = '/api';
+
+/** How long the API may take to answer before the request is dropped. */
+const API_TIMEOUT_MS = 60_000;
+
+/** Headers that belong to one connection, never passed on (RFC 9110, section 7.6.1). */
+const HOP_BY_HOP = new Set([
+  'connection',
+  'keep-alive',
+  'proxy-authenticate',
+  'proxy-authorization',
+  'proxy-connection',
+  'te',
+  'trailer',
+  'transfer-encoding',
+  'upgrade',
+]);
 
 /** ADR 0006's policy. Only index.html has a nonce. */
 export function contentSecurityPolicy(nonce?: string): string {
@@ -113,8 +148,89 @@ function requestPath(url = '/'): string | undefined {
   }
 }
 
-/** A server for the built app in `root`. Throws if it has no index.html. */
-export function createWebServer(root: string): Server {
+/**
+ * Whether a request is for the API: its path, both as sent and with dot
+ * segments resolved, is /api or under /api/.
+ */
+export function isApiRequest(url = '/'): boolean {
+  const under = (path: string): boolean => path === API_PATH || path.startsWith(`${API_PATH}/`);
+  let resolved: string;
+  try {
+    resolved = new URL(url, 'http://localhost').pathname;
+  } catch {
+    return false;
+  }
+  return under(url.split('?', 1)[0] ?? '') && under(resolved);
+}
+
+/** The headers to pass on: none that belong to the connection, and none `drop` picks. */
+function endToEnd(
+  headers: IncomingHttpHeaders,
+  drop: (name: string) => boolean = () => false,
+): OutgoingHttpHeaders {
+  const named = new Set(
+    (headers.connection ?? '').split(',').map((name) => name.trim().toLowerCase()),
+  );
+  const kept: OutgoingHttpHeaders = {};
+  for (const [name, value] of Object.entries(headers)) {
+    if (value !== undefined && !HOP_BY_HOP.has(name) && !named.has(name) && !drop(name)) {
+      kept[name] = value;
+    }
+  }
+  return kept;
+}
+
+/** The request's headers for the API, with this server's own forwarding headers. */
+function forwardedHeaders(request: IncomingMessage): OutgoingHttpHeaders {
+  const { host } = request.headers;
+  return {
+    ...endToEnd(request.headers, (name) => name.startsWith('x-forwarded-') || name === 'forwarded'),
+    'x-forwarded-for': request.socket.remoteAddress ?? '',
+    ...(host === undefined ? {} : { 'x-forwarded-host': host }),
+    'x-forwarded-proto': 'http',
+  };
+}
+
+/** Pass a request to the API as it came, and its answer back. */
+function forward(request: IncomingMessage, response: ServerResponse, api: URL): void {
+  const upstream = httpRequest(
+    {
+      host: api.hostname,
+      port: api.port,
+      method: request.method,
+      path: request.url,
+      headers: forwardedHeaders(request),
+      timeout: API_TIMEOUT_MS,
+    },
+    // The API's own headers replace the server's security headers of the same name.
+    (answer) => {
+      response.writeHead(answer.statusCode ?? 502, endToEnd(answer.headers));
+      answer.pipe(response);
+    },
+  );
+  upstream.on('timeout', () => upstream.destroy());
+  upstream.on('error', () => {
+    if (response.headersSent) response.destroy();
+    else sendText(response, 502, 'The API did not answer. Try again in a moment.');
+  });
+  response.on('close', () => upstream.destroy());
+  request.pipe(upstream);
+}
+
+/** The API origin given with --api: plain HTTP to a host and port, with nothing else. */
+export function apiOrigin(value: string): URL {
+  const url = new URL(value);
+  if (url.protocol !== 'http:' || url.origin + '/' !== url.href) {
+    throw new Error(`--api must be an origin such as http://api:3000, not ${value}.`);
+  }
+  return url;
+}
+
+/**
+ * A server for the built app in `root`, which forwards /api/ to `api` if
+ * given. Throws if the build has no index.html.
+ */
+export function createWebServer(root: string, api?: URL): Server {
   const files = readBuild(root);
   const index = files.get('/index.html');
   if (!index) throw new Error(`${root} has no index.html. Build the app first.`);
@@ -122,6 +238,10 @@ export function createWebServer(root: string): Server {
 
   return createServer((request, response) => {
     for (const [name, value] of Object.entries(SECURITY_HEADERS)) response.setHeader(name, value);
+    if (api !== undefined && isApiRequest(request.url)) {
+      forward(request, response, api);
+      return;
+    }
 
     if (request.method !== 'GET' && request.method !== 'HEAD') {
       response.setHeader('Allow', 'GET, HEAD');
@@ -160,17 +280,21 @@ if (import.meta.main) {
       root: { type: 'string' },
       port: { type: 'string' },
       host: { type: 'string', default: '127.0.0.1' },
+      api: { type: 'string' },
     },
   });
   if (values.root === undefined || values.port === undefined) {
     console.error(
-      'Usage: node scripts/web-server.ts --root <built app> --port <port> [--host <address>]',
+      'Usage: node scripts/web-server.ts --root <built app> --port <port> [--host <address>] [--api <API origin>]',
     );
     process.exit(2);
   }
   const { root, host } = values;
   const port = Number(values.port);
-  const server = createWebServer(root);
+  const server = createWebServer(
+    root,
+    values.api === undefined ? undefined : apiOrigin(values.api),
+  );
   server.listen(port, host, () => {
     console.log(`Serving ${root} at http://${host}:${String(port)}`);
   });
