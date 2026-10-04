@@ -1,8 +1,8 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "PixelGrant API",
-    "description": "The PixelGrant grants management API.",
+    "title": "Fairfold API",
+    "description": "The Fairfold grants management API.",
     "version": "0.0.0",
     "license": { "name": "AGPL-3.0-or-later", "identifier": "AGPL-3.0-or-later" }
   },

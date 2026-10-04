@@ -7,6 +7,7 @@
 import swagger from '@fastify/swagger';
 import type { FastifyBaseLogger, FastifyInstance } from 'fastify';
 import { jsonSchemaTransform } from 'fastify-type-provider-zod';
+import { suiteName } from '@pixel-scientists/domain/platform';
 
 import manifest from '../package.json' with { type: 'json' };
 import { createReadinessCheck, healthRoutes } from './routes/health.ts';
@@ -30,8 +31,8 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     openapi: {
       openapi: '3.1.0',
       info: {
-        title: 'PixelGrant API',
-        description: 'The PixelGrant grants management API.',
+        title: `${suiteName} API`,
+        description: `The ${suiteName} grants management API.`,
         version: manifest.version,
         license: { name: 'AGPL-3.0-or-later', identifier: 'AGPL-3.0-or-later' },
       },

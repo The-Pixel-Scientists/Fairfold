@@ -1,4 +1,4 @@
-# PixelGrant API
+# Fairfold API
 
 The Fastify server behind the console and the portal. Routes are registered
 with Zod schemas (`fastify-type-provider-zod`), which validate every request,
@@ -7,7 +7,7 @@ encode every response and produce the OpenAPI document
 
 ```sh
 node src/main.ts                    # start the API
-pnpm --filter @pixelgrant/api dev   # start it with reload
+pnpm --filter @pixel-scientists/api dev   # start it with reload
 ```
 
 ## Settings
@@ -23,17 +23,17 @@ unset. The plain variable is for development and tests. Setting both is an error
 
 | Variable | Required | Meaning |
 | --- | --- | --- |
-| `PIXELGRANT_API_HOST` | Yes, except in development | Address to listen on, such as `0.0.0.0` in a container |
-| `PIXELGRANT_API_PORT` | Yes | Port to listen on, 1 to 65535 |
-| `PIXELGRANT_DB_HOST` | Yes | PostgreSQL host |
-| `PIXELGRANT_DB_PORT` | Yes | PostgreSQL port |
-| `PIXELGRANT_DB_NAME` | Yes | Database name: lower-case letters, digits and underscores, at most 63 characters, not one of PostgreSQL's own databases |
-| `PIXELGRANT_DB_TLS` | Yes, unless the database server is on this machine | `verify-full` encrypts the connection and checks the server's certificate and host name. `disable` sends everything in clear, and belongs only on a private network such as Compose's |
-| `PIXELGRANT_DB_TLS_CA` or `PIXELGRANT_DB_TLS_CA_FILE` | No | Certificate authority of the database server, in PEM, when Node.js does not already trust it. Only with `verify-full` |
-| `PIXELGRANT_DB_APP_API_PASSWORD_FILE` | Yes in a deployment | Path of the file that holds the password of the `app_api` role, at least 16 characters |
-| `PIXELGRANT_DB_APP_API_PASSWORD` | Instead of the file, in development | The password itself |
-| `PIXELGRANT_LOG_LEVEL` | No | `fatal`, `error`, `warn`, `info` (the default), `debug`, `trace` or `silent` |
-| `PIXELGRANT_DEV` | No | `1` for development: the listener binds to `127.0.0.1`, and the fixed development passwords are accepted, but only against a database server on this machine |
+| `TPS_API_HOST` | Yes, except in development | Address to listen on, such as `0.0.0.0` in a container |
+| `TPS_API_PORT` | Yes | Port to listen on, 1 to 65535 |
+| `TPS_DB_HOST` | Yes | PostgreSQL host |
+| `TPS_DB_PORT` | Yes | PostgreSQL port |
+| `TPS_DB_NAME` | Yes | Database name: lower-case letters, digits and underscores, at most 63 characters, not one of PostgreSQL's own databases |
+| `TPS_DB_TLS` | Yes, unless the database server is on this machine | `verify-full` encrypts the connection and checks the server's certificate and host name. `disable` sends everything in clear, and belongs only on a private network such as Compose's |
+| `TPS_DB_TLS_CA` or `TPS_DB_TLS_CA_FILE` | No | Certificate authority of the database server, in PEM, when Node.js does not already trust it. Only with `verify-full` |
+| `TPS_DB_APP_API_PASSWORD_FILE` | Yes in a deployment | Path of the file that holds the password of the `app_api` role, at least 16 characters |
+| `TPS_DB_APP_API_PASSWORD` | Instead of the file, in development | The password itself |
+| `TPS_LOG_LEVEL` | No | `fatal`, `error`, `warn`, `info` (the default), `debug`, `trace` or `silent` |
+| `TPS_DEV` | No | `1` for development: the listener binds to `127.0.0.1`, and the fixed development passwords are accepted, but only against a database server on this machine |
 
 ## Endpoints
 
