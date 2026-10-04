@@ -4,7 +4,7 @@
 // words for a refused request and the two session calls the provider needs.
 
 import { call, ProblemError } from '@pixel-scientists/domain/api';
-import type { CallInput, CallResult, RouteContract } from '@pixel-scientists/domain/api';
+import type { CallInput, CallResult, JsonRouteContract } from '@pixel-scientists/domain/api';
 import { getSession, signOut } from '@pixel-scientists/domain/auth';
 import type { Session } from '@pixel-scientists/domain/auth';
 
@@ -31,7 +31,7 @@ export function tooManyAttempts(seconds: number | null): string {
  * call() with the answer to a 429 in words: the API's `Retry-After` is turned
  * into how long to wait, which call() itself does not pass on.
  */
-export async function callApi<const C extends RouteContract>(
+export async function callApi<const C extends JsonRouteContract>(
   route: C,
   input: CallInput<C>,
 ): Promise<CallResult<C>> {
