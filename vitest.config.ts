@@ -5,7 +5,9 @@
 //   ui        Component tests in jsdom.
 //   db-admin  Tests of the roles script and migration tooling, which connect
 //             to PostgreSQL as the superuser. Files end in .db.test.ts.
-//   db        Tests that need PostgreSQL and connect as the app roles.
+//   db        Tests that need PostgreSQL and connect as the app roles: those
+//             in packages/db/test, and the API's, which end in
+//             .integration.test.ts.
 // `pnpm check` runs unit and ui. `pnpm test:db` runs db-admin and db, each
 // with only the credentials it needs; `pnpm test` runs all four
 // (scripts/test.ts).
@@ -25,11 +27,12 @@ export default defineConfig({
           include: [
             'packages/domain/**/*.test.ts',
             'packages/config/**/*.test.ts',
+            'packages/db/src/**/*.test.ts',
             'packages/db/scripts/**/*.test.ts',
             'apps/api/**/*.test.ts',
             'scripts/**/*.test.ts',
           ],
-          exclude: [...exclude, '**/*.db.test.ts'],
+          exclude: [...exclude, '**/*.db.test.ts', '**/*.integration.test.ts'],
         },
       },
       {
@@ -42,6 +45,10 @@ export default defineConfig({
             'apps/portal/**/*.test.{ts,tsx}',
           ],
           exclude,
+          // With Vitest's globals, Testing Library unmounts what each test
+          // rendered when the test ends.
+          globals: true,
+          setupFiles: ['scripts/vitest-dom-setup.ts'],
         },
       },
       {
@@ -58,7 +65,7 @@ export default defineConfig({
         test: {
           name: 'db',
           environment: 'node',
-          include: ['packages/db/src/**/*.test.ts', 'packages/db/test/**/*.test.ts'],
+          include: ['packages/db/test/**/*.test.ts', 'apps/api/**/*.integration.test.ts'],
           exclude,
           // Database tests share one database, so files run one at a time.
           fileParallelism: false,
