@@ -61,4 +61,12 @@ describe('starting the API', () => {
     expect(result.stderr).toContain('TPS_DB_APP_API_PASSWORD must be at least 16 characters.');
     expect(result.stderr).not.toContain('SECRET');
   });
+
+  it('does not print the mail password it was given', () => {
+    const result = start({ TPS_SMTP_PASSWORD: 'mail-SECRET' });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('Set TPS_SMTP_HOST');
+    expect(result.stderr).not.toContain('SECRET');
+  });
 });

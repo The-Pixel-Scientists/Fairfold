@@ -13,6 +13,14 @@ import { expect } from 'vitest';
 
 import type { AuthModule, MfaState, RequestSession, SessionRead } from '../src/context.ts';
 
+/** Mail settings for tests that load the configuration (the db project sets TPS_DEV=1). Nothing connects. */
+export const smtpTestSettings = {
+  TPS_SMTP_HOST: '127.0.0.1',
+  TPS_SMTP_PORT: '51025',
+  TPS_SMTP_TLS: 'none',
+  TPS_SMTP_FROM: 'grants@example.org',
+} as const;
+
 export type LogLine = Record<string, unknown> & { level: string; msg?: string };
 
 /** A log destination that keeps what is written, so a test can read the lines. */

@@ -16,12 +16,18 @@
 //   - A development password is accepted only with TPS_DEV=1 and a
 //     database server on this machine, and TPS_DEV=1 makes the
 //     listener bind to the loopback address.
+//   - The mail server is optional for now. Once any TPS_SMTP_ variable
+//     is set, host, port, TLS mode and sender are all needed. The TLS mode is
+//     starttls (required), tls, or none, which is accepted only with
+//     TPS_DEV=1 and a mail server on this machine. Its user and
+//     password are set together or not at all.
 //
 // Every problem is reported at once, so one restart fixes them all.
 
 import { readFileSync } from 'node:fs';
 import { isIP, isIPv4 } from 'node:net';
 
+import { emailSchema } from '@pixel-scientists/domain/auth';
 import { z } from 'zod';
 
 export type Env = Readonly<Record<string, string | undefined>>;
@@ -55,6 +61,31 @@ export class Secret {
 export const LOG_LEVELS = ['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'] as const;
 export type LogLevel = (typeof LOG_LEVELS)[number];
 
+export const SMTP_TLS_MODES = ['starttls', 'tls', 'none'] as const;
+export type SmtpTlsMode = (typeof SMTP_TLS_MODES)[number];
+
+const SMTP_VARIABLES = [
+  'TPS_SMTP_HOST',
+  'TPS_SMTP_PORT',
+  'TPS_SMTP_TLS',
+  'TPS_SMTP_FROM',
+  'TPS_SMTP_USER',
+  'TPS_SMTP_PASSWORD',
+] as const;
+
+const SMTP_REQUIRED = ['TPS_SMTP_HOST', 'TPS_SMTP_PORT', 'TPS_SMTP_TLS', 'TPS_SMTP_FROM'] as const;
+
+/** The outbound mail server (ADR 0010: a fixed destination, reached only through its own client). */
+export interface SmtpSettings {
+  readonly host: string;
+  readonly port: number;
+  /** starttls: upgrade or fail. tls: encrypted from the first byte. none: development only. */
+  readonly tls: SmtpTlsMode;
+  /** The address mail is sent from. */
+  readonly from: string;
+  readonly auth?: { readonly user: string; readonly password: Secret };
+}
+
 export interface Config {
   /** TPS_DEV=1: development values may be used, and the listener binds to loopback. */
   readonly development: boolean;
@@ -71,6 +102,8 @@ export interface Config {
     /** Left out for a server on this machine, which is reached without TLS. */
     readonly tls?: { readonly mode: 'verify-full' | 'disable'; readonly ca?: string };
   };
+  /** Left out until main.ts creates the sender (S02-16, last commit); then these become required. */
+  readonly smtp?: SmtpSettings;
 }
 
 /** Thrown when the environment does not hold a valid configuration. */
@@ -115,6 +148,7 @@ export function isLoopbackHost(host: string): boolean {
 const FILE_VARIABLES = [
   { name: 'TPS_DB_APP_API_PASSWORD', trimFinalNewline: true },
   { name: 'TPS_DB_TLS_CA', trimFinalNewline: false },
+  { name: 'TPS_SMTP_PASSWORD', trimFinalNewline: true },
 ] as const;
 
 function required(name: string): z.ZodString {
@@ -132,6 +166,17 @@ function portVariable(name: string) {
 function hostVariable(name: string): z.ZodString {
   const message = `${name} must be a host name or an IP address.`;
   return required(name).refine((host) => isIP(host) !== 0 || HOST_NAME.test(host), message);
+}
+
+/** True for a control character, which includes every line break, so a value cannot add a header line. */
+export function hasControlCharacter(value: string): boolean {
+  for (let index = 0; index < value.length; index++) {
+    const code = value.charCodeAt(index);
+    if (code < 0x20 || (code >= 0x7f && code <= 0x9f) || code === 0x2028 || code === 0x2029) {
+      return true;
+    }
+  }
+  return false;
 }
 
 const MAX_TRUSTED_PROXIES = 32;
@@ -216,6 +261,40 @@ function environmentSchema(development: boolean) {
           MINIMUM_PASSWORD_LENGTH,
           `TPS_DB_APP_API_PASSWORD must be at least ${String(MINIMUM_PASSWORD_LENGTH)} characters.`,
         ),
+      // Optional as a block: loadConfig requires SMTP_REQUIRED once any mail setting is set.
+      TPS_SMTP_HOST: hostVariable('TPS_SMTP_HOST').optional(),
+      TPS_SMTP_PORT: portVariable('TPS_SMTP_PORT').optional(),
+      TPS_SMTP_TLS: z
+        .enum(SMTP_TLS_MODES, {
+          error: () => 'TPS_SMTP_TLS must be starttls, tls or none.',
+        })
+        .optional(),
+      TPS_SMTP_USER: z
+        .string()
+        .max(256)
+        .refine(
+          (user) => user !== '' && !hasControlCharacter(user),
+          'TPS_SMTP_USER must be 1 to 256 characters with no control characters.',
+        )
+        .optional(),
+      TPS_SMTP_PASSWORD: z
+        .string()
+        .max(256)
+        .refine(
+          (password) => !hasControlCharacter(password),
+          'TPS_SMTP_PASSWORD must be at most 256 characters with no control characters.',
+        )
+        .optional(),
+      TPS_SMTP_FROM: z
+        .string()
+        .refine(
+          (from) =>
+            from === from.trim() &&
+            !hasControlCharacter(from) &&
+            emailSchema.safeParse(from).success,
+          'TPS_SMTP_FROM must be an email address, such as grants@example.org.',
+        )
+        .optional(),
     })
     .superRefine((env, context) => {
       if (env.TPS_DB_TLS === undefined && !isLoopbackHost(env.TPS_DB_HOST)) {
@@ -234,6 +313,34 @@ function environmentSchema(development: boolean) {
           message: 'TPS_DB_TLS_CA is used only with TPS_DB_TLS=verify-full.',
         });
       }
+      if (env.TPS_SMTP_USER === undefined && env.TPS_SMTP_PASSWORD !== undefined) {
+        context.addIssue({
+          code: 'custom',
+          path: ['TPS_SMTP_USER'],
+          message: 'Set TPS_SMTP_USER, or leave out the password: they go together.',
+        });
+      }
+      if (env.TPS_SMTP_USER !== undefined && env.TPS_SMTP_PASSWORD === undefined) {
+        context.addIssue({
+          code: 'custom',
+          path: ['TPS_SMTP_PASSWORD'],
+          message:
+            'Set TPS_SMTP_PASSWORD or TPS_SMTP_PASSWORD_FILE, or leave out the ' +
+            'user: they go together.',
+        });
+      }
+      if (
+        env.TPS_SMTP_TLS === 'none' &&
+        !(development && isLoopbackHost(env.TPS_SMTP_HOST ?? ''))
+      ) {
+        context.addIssue({
+          code: 'custom',
+          path: ['TPS_SMTP_TLS'],
+          message:
+            'TPS_SMTP_TLS=none works only with TPS_DEV=1 and a mail server on this ' +
+            'machine. Use starttls or tls.',
+        });
+      }
       const developmentServer = env.TPS_DEV && isLoopbackHost(env.TPS_DB_HOST);
       if (DEVELOPMENT_PASSWORD.test(env.TPS_DB_APP_API_PASSWORD) && !developmentServer) {
         context.addIssue({
@@ -245,6 +352,26 @@ function environmentSchema(development: boolean) {
         });
       }
     });
+}
+
+type Values = z.infer<ReturnType<typeof environmentSchema>>;
+
+function mailSettings(values: Values): SmtpSettings | undefined {
+  const { TPS_SMTP_HOST: host, TPS_SMTP_PORT: port } = values;
+  const { TPS_SMTP_TLS: tls, TPS_SMTP_FROM: from } = values;
+  const { TPS_SMTP_USER: user, TPS_SMTP_PASSWORD: password } = values;
+  if (host === undefined || port === undefined || tls === undefined || from === undefined) {
+    return undefined;
+  }
+  return {
+    host,
+    port,
+    tls,
+    from,
+    ...(user === undefined || password === undefined
+      ? {}
+      : { auth: { user, password: new Secret(password) } }),
+  };
 }
 
 /** Every variable the schema reads, in the order problems are reported. */
@@ -297,6 +424,13 @@ export function loadConfig(env: Env, readFile: (path: string) => string = readTe
     if (resolved.problem !== undefined) problems.set(name, resolved.problem);
   }
 
+  // Checked here, not in the schema, so it is reported with every other problem.
+  if (SMTP_VARIABLES.some((name) => raw[name] !== undefined)) {
+    for (const name of SMTP_REQUIRED) {
+      if (raw[name] === undefined) problems.set(name, `Set ${name}.`);
+    }
+  }
+
   const result = environmentSchema(raw['TPS_DEV'] === '1').safeParse(raw);
   if (!result.success) {
     for (const issue of result.error.issues) {
@@ -330,5 +464,6 @@ export function loadConfig(env: Env, readFile: (path: string) => string = readTe
           ? undefined
           : { mode: tlsMode, ...(tlsCa === undefined ? {} : { ca: tlsCa }) },
     },
+    smtp: mailSettings(values),
   };
 }

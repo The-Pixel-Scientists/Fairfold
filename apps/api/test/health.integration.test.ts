@@ -10,7 +10,7 @@ import { buildApp } from '../src/app.ts';
 import { loadConfig } from '../src/config.ts';
 import { openDatabase, type ApiDatabase } from '../src/database.ts';
 import { createLogger } from '../src/logger.ts';
-import { captureLogs } from './support.ts';
+import { captureLogs, smtpTestSettings } from './support.ts';
 
 const WRONG_PASSWORD = 'a-wrong-password-for-the-test';
 
@@ -28,6 +28,7 @@ afterEach(async () => {
 async function startApi(password = process.env['TPS_DB_APP_API_PASSWORD']) {
   const { database: settings } = loadConfig({
     ...process.env,
+    ...smtpTestSettings,
     // Not read here: the API listens on no port in this test.
     TPS_API_PORT: '41000',
     TPS_DB_NAME: process.env['TPS_TEST_DB_NAME'],

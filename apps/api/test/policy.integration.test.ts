@@ -24,7 +24,13 @@ import { loadConfig } from '../src/config.ts';
 import { openDatabase, type ApiDatabase } from '../src/database.ts';
 import { createLogger } from '../src/logger.ts';
 import { route } from '../src/routes/register.ts';
-import { expectLooksMissing, testAuth, testSession, type TestSessionOptions } from './support.ts';
+import {
+  expectLooksMissing,
+  smtpTestSettings,
+  testAuth,
+  testSession,
+  type TestSessionOptions,
+} from './support.ts';
 
 const count = z.object({ members: z.number().int() });
 const done = z.object({ ok: z.boolean() });
@@ -121,6 +127,7 @@ async function addPerson(
 beforeAll(async () => {
   const { database: settings } = loadConfig({
     ...process.env,
+    ...smtpTestSettings,
     TPS_API_PORT: '41000',
     TPS_DB_NAME: process.env['TPS_TEST_DB_NAME'],
   });
