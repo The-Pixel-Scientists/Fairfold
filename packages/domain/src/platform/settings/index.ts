@@ -3,6 +3,8 @@
 // Settings, theme, module and public tenant contracts: the
 // `/platform/settings` subpath of the domain package.
 
+import '../../jitless/index.ts';
+
 export {
   configDiffSchemas,
   configEntityTypes,

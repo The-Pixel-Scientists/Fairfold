@@ -3,6 +3,8 @@
 // Team and invitation contracts: the `/platform/team` subpath of the domain
 // package. Accepting an invitation is an auth route (`/auth`).
 
+import '../../jitless/index.ts';
+
 export {
   changeMemberRoles,
   getTeam,

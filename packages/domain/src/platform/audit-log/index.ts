@@ -2,6 +2,8 @@
 //
 // Audit log contracts: the `/platform/audit-log` subpath of the domain package.
 
+import '../../jitless/index.ts';
+
 export { auditActionLabel } from './label.ts';
 export { listAuditEvents } from './routes.ts';
 export {
