@@ -11,13 +11,30 @@ rules:
     message: >-
       Raw SQL is not allowed. Use Kysely's query builder or the sql template
       tag with bound parameters (ADR 0003).
-    pattern-either:
-      - pattern: sql.raw(...)
-      - pattern: sql.lit(...)
-      - pattern: CompiledQuery.raw(...)
+    patterns:
+      - pattern-either:
+          - pattern: sql.raw(...)
+          - pattern: sql.lit(...)
+          - pattern: CompiledQuery.raw(...)
+          # Called as a function rather than a tag, sql takes its text from an array.
+          - pattern: sql(...)
+      - pattern-not: sql`...`
     paths:
       exclude:
         # The migration runner executes the reviewed up.sql and down.sql files.
+        - /packages/db/scripts/migrations.ts
+
+  - id: tps-no-execute-query
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      executeQuery() runs a compiled query as it is, so its SQL text can come
+      from anywhere. Use Kysely's query builder or the sql template tag
+      (ADR 0003).
+    pattern: $DB.executeQuery(...)
+    paths:
+      exclude:
+        - /packages/db/src/
         - /packages/db/scripts/migrations.ts
 
   - id: tps-no-dynamic-sql-identifier
@@ -32,3 +49,36 @@ rules:
           - pattern: sql.ref($ARG, ...)
           - pattern: sql.table($ARG, ...)
       - pattern-not: sql.$FN("...", ...)
+
+  - id: tps-no-dynamic-sql-function
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      Kysely's fn() and fn.agg() take only a string literal as the function's
+      name, and keep the name fn. A name built at run time could call
+      set_config and change the tenant (ADR 0003).
+    patterns:
+      - pattern-either:
+          - pattern: fn($NAME, ...)
+          - pattern: $OBJ.fn($NAME, ...)
+          - pattern: fn.agg($NAME, ...)
+          - pattern: $OBJ.fn.agg($NAME, ...)
+          # fn under another name, where the calls above cannot be seen.
+          - patterns:
+              - pattern-either:
+                  - pattern: 'const {..., fn: $F, ...} = $EB;'
+                  - pattern: '({..., fn: $F, ...}) => $BODY'
+                  - pattern: '({..., fn: $F, ...}: $T) => $BODY'
+                  - pattern: 'function $NAME(..., {..., fn: $F, ...}, ...) { ... }'
+                  - pattern: 'function $NAME(..., {..., fn: $F, ...}: $T, ...) { ... }'
+              - metavariable-regex:
+                  metavariable: $F
+                  regex: ^(?!fn$)
+          - pattern: $F = $OBJ.fn
+          - pattern: $OBJ['fn']
+      - pattern-not: fn("...", ...)
+      - pattern-not: $OBJ.fn("...", ...)
+      - pattern-not: fn.agg("...", ...)
+      - pattern-not: $OBJ.fn.agg("...", ...)
+      # Vitest's mock functions.
+      - pattern-not: vi.fn(...)
