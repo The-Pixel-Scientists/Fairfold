@@ -425,14 +425,34 @@ describe('the mail server', () => {
     ]);
   });
 
-  it('allows no TLS only in development, with a mail server on this machine', () => {
+  it('allows no TLS only for a mail server at a loopback IP address, with or without TPS_DEV', () => {
     expect(loadConfig(development, readFile).smtp?.tls).toBe('none');
+    // The stack: no TPS_DEV, and Mailpit on the API container's own loopback.
+    for (const host of ['127.0.0.1', '::1']) {
+      const smtp = loadConfig(
+        { ...deployed, TPS_SMTP_TLS: 'none', TPS_SMTP_HOST: host },
+        readFile,
+      ).smtp;
+      expect(smtp).toMatchObject({ host, tls: 'none' });
+    }
     const refusal = [expect.stringContaining('TPS_SMTP_TLS=none') as string];
     expect(problemsOf({ ...deployed, TPS_SMTP_TLS: 'none' })).toEqual(refusal);
-    expect(problemsOf({ ...deployed, TPS_SMTP_TLS: 'none', TPS_SMTP_HOST: '127.0.0.1' })).toEqual(
-      refusal,
-    );
     expect(problemsOf({ ...development, TPS_SMTP_HOST: 'smtp.internal' })).toEqual(refusal);
+    // A name, even localhost, is resolved through DNS first, so it could lead elsewhere.
+    expect(problemsOf({ ...development, TPS_SMTP_HOST: 'localhost' })).toEqual(refusal);
+  });
+
+  it('refuses a mail server login sent in clear outside development', () => {
+    const login = {
+      TPS_SMTP_HOST: '127.0.0.1',
+      TPS_SMTP_TLS: 'none',
+      TPS_SMTP_USER: 'mailer',
+      TPS_SMTP_PASSWORD: 'p4ss',
+    };
+    expect(problemsOf({ ...deployed, ...login })).toEqual([
+      expect.stringContaining('A mail server login is sent in clear') as string,
+    ]);
+    expect(loadConfig({ ...development, ...login }, readFile).smtp?.auth?.user).toBe('mailer');
   });
 
   it('refuses a sender address that is not an address, or holds a line break', () => {
