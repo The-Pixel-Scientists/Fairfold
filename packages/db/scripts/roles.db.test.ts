@@ -16,6 +16,7 @@ import {
   applyRoleVerifiers,
   findRoleProblems,
   LOGIN_ROLES,
+  OWNER_ROLES,
   readRolePassword,
   type LoginRole,
 } from './roles.ts';
@@ -110,6 +111,113 @@ describe('roles.sql', () => {
       const problems = await withClient(testDatabase, (client) => findRoleProblems(client), role);
       expect(problems).toEqual([]);
     }
+  });
+
+  it('sets every function owner up with no login and no password, even after a change by hand', async () => {
+    const role = 'owner_app_create_tenant';
+    await withClient(MAINTENANCE_DATABASE, (client) =>
+      client.query(`ALTER ROLE ${role} LOGIN BYPASSRLS PASSWORD 'a-password-set-by-hand'`),
+    );
+    let problems: string[];
+    try {
+      problems = await withClient(testDatabase, (client) => findRoleProblems(client));
+    } finally {
+      await withClient(MAINTENANCE_DATABASE, (client) => applyRoles(client, env));
+    }
+    expect(problems).toEqual([
+      `role ${role} can log in`,
+      `role ${role} bypasses row-level security`,
+    ]);
+
+    const { rows } = await withClient(MAINTENANCE_DATABASE, (client) =>
+      client.query<{ rolname: string; rolcanlogin: boolean; rolpassword: string | null }>(
+        `SELECT rolname, rolcanlogin, rolpassword FROM pg_catalog.pg_authid
+          WHERE rolname = ANY($1::text[]) ORDER BY array_position($1::text[], rolname::text)`,
+        [OWNER_ROLES],
+      ),
+    );
+    expect(rows).toEqual(
+      OWNER_ROLES.map((rolname) => ({ rolname, rolcanlogin: false, rolpassword: null })),
+    );
+    await expectRolesUnchanged();
+  });
+
+  it("reports any membership but migrator's SET-only one in each owner, and resets it", async () => {
+    await withClient(MAINTENANCE_DATABASE, (client) =>
+      client.query(
+        `REVOKE owner_app_public_tenant FROM migrator;
+         GRANT owner_auth_session_context TO migrator WITH INHERIT TRUE;
+         GRANT owner_app_create_tenant TO app_api;`,
+      ),
+    );
+    let problems: string[];
+    try {
+      problems = await withClient(testDatabase, (client) => findRoleProblems(client));
+    } finally {
+      await withClient(MAINTENANCE_DATABASE, (client) => applyRoles(client, env));
+    }
+    expect(problems).toEqual([
+      'role migrator has a role membership the roles script does not grant',
+      'role app_api has a role membership the roles script does not grant',
+      'role owner_auth_session_context has a role membership the roles script does not grant',
+      'migrator is not a SET-only member of role owner_auth_session_context',
+      'migrator is not a SET-only member of role owner_app_public_tenant',
+      'role owner_app_create_tenant has a role membership the roles script does not grant',
+    ]);
+    await expectRolesUnchanged();
+  });
+
+  it('lets a migration hand a function to its owner, and replace it as that owner, as ADR 0023 sets out', async () => {
+    const owner = 'owner_auth_session_context';
+    await withClient(
+      testDatabase,
+      async (client) => {
+        await client.query('BEGIN');
+        try {
+          await client.query(
+            `CREATE SCHEMA owner_transfer;
+             GRANT USAGE ON SCHEMA owner_transfer TO app_api;
+             CREATE FUNCTION owner_transfer.answer() RETURNS integer LANGUAGE sql AS 'SELECT 1';
+             GRANT EXECUTE ON FUNCTION owner_transfer.answer() TO app_api;
+             SAVEPOINT without_create;`,
+          );
+          // The owner never holds CREATE on a schema beyond the transfer itself.
+          await expect(
+            client.query(`ALTER FUNCTION owner_transfer.answer() OWNER TO ${owner}`),
+          ).rejects.toThrow('permission denied for schema owner_transfer');
+          await client.query(
+            `ROLLBACK TO SAVEPOINT without_create;
+             GRANT CREATE ON SCHEMA owner_transfer TO ${owner};
+             ALTER FUNCTION owner_transfer.answer() OWNER TO ${owner};
+             SET LOCAL ROLE ${owner};
+             CREATE OR REPLACE FUNCTION owner_transfer.answer() RETURNS integer LANGUAGE sql AS 'SELECT 2';
+             RESET ROLE;
+             REVOKE CREATE ON SCHEMA owner_transfer FROM ${owner};`,
+          );
+          const { rows } = await client.query(
+            `SELECT p.proowner::regrole::text AS owner, p.prosrc AS source,
+                    pg_catalog.has_schema_privilege($1, 'owner_transfer', 'CREATE') AS owner_can_create,
+                    pg_catalog.pg_has_role('migrator', $1, 'USAGE') AS migrator_inherits,
+                    pg_catalog.has_function_privilege('app_api', p.oid, 'EXECUTE') AS app_api_can_run
+               FROM pg_catalog.pg_proc p
+              WHERE p.oid = 'owner_transfer.answer()'::regprocedure`,
+            [owner],
+          );
+          expect(rows).toEqual([
+            {
+              owner,
+              source: 'SELECT 2',
+              owner_can_create: false,
+              migrator_inherits: false,
+              app_api_can_run: true,
+            },
+          ]);
+        } finally {
+          await client.query('ROLLBACK');
+        }
+      },
+      'migrator',
+    );
   });
 
   it('never repeats a password verifier in its errors', async () => {
