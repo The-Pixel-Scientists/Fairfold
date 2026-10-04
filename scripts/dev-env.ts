@@ -59,6 +59,8 @@ export const PROFILES = {
   // Database tests in the db project: the test database only, as the app
   // roles, with migrator for fixtures. No superuser.
   'database-tests': [...CONNECTION, 'TPS_TEST_DB_NAME', MIGRATOR_PASSWORD, ...APP_PASSWORDS],
+  // The API in `pnpm dev`: this worktree's database as app_api, on its port.
+  api: [...CONNECTION, 'TPS_DB_NAME', 'TPS_DB_APP_API_PASSWORD', 'TPS_API_PORT'],
 } as const satisfies Record<string, readonly string[]>;
 
 export type Profile = keyof typeof PROFILES;
@@ -118,12 +120,13 @@ function publishedPort(found: ComposeService, serviceName: string, target: numbe
 /** Every development setting for this worktree, before overrides. */
 export function developmentValues(
   config: ComposeConfig,
-  names: { database: string; testDatabase: string },
+  names: { database: string; testDatabase: string; ports: { api: number } },
 ): Record<string, string> {
   const postgres = service(config, 'postgres');
   const postgresPort = publishedPort(postgres, 'postgres', 5432);
   const values: Record<string, string> = {
     TPS_DEV: '1',
+    TPS_API_PORT: String(names.ports.api),
     TPS_DB_HOST: postgresPort.host_ip ?? '127.0.0.1',
     TPS_DB_PORT: postgresPort.published ?? '',
     TPS_DB_NAME: names.database,
@@ -186,6 +189,18 @@ function isProfile(name: string): name is Profile {
   return Object.hasOwn(PROFILES, name);
 }
 
+/** The environment for a command run with `profile` in this worktree. */
+export function developmentEnvironment(profile: Profile): Record<string, string> {
+  const names = currentDevNames();
+  return profileEnvironment(
+    profile,
+    developmentValues(readComposeConfig(), names),
+    [existsSync(ENV_FILE) ? parseEnv(readFileSync(ENV_FILE, 'utf8')) : {}, process.env],
+    process.env,
+    [names.database, names.testDatabase],
+  );
+}
+
 function main(argv: readonly string[]): number {
   const [profile, command, ...args] = argv;
   if (!profile || !isProfile(profile) || !command) {
@@ -195,14 +210,7 @@ function main(argv: readonly string[]): number {
     return 2;
   }
 
-  const names = currentDevNames();
-  const env = profileEnvironment(
-    profile,
-    developmentValues(readComposeConfig(), names),
-    [existsSync(ENV_FILE) ? parseEnv(readFileSync(ENV_FILE, 'utf8')) : {}, process.env],
-    process.env,
-    [names.database, names.testDatabase],
-  );
+  const env = developmentEnvironment(profile);
 
   // Run Node.js commands with this Node.js, so no shell is needed on Windows.
   const executable = command === 'node' ? process.execPath : command;

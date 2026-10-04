@@ -81,11 +81,23 @@ describe('devNames', () => {
       database: 'tps_2026_w40',
       testDatabase: 'tps_2026_w40_test',
       bucket: 'tps-2026-w40',
+      stackProject: 'tps_stack_2026_w40',
     });
-    expect(names.ports.console).toBe(names.ports.api + 1);
-    expect(names.ports.portal).toBe(names.ports.api + 2);
-    expect(names.ports.api).toBeGreaterThanOrEqual(41000);
-    expect(names.ports.portal).toBeLessThan(49000);
+    const first = names.ports.api;
+    expect(names.ports).toEqual({
+      api: first,
+      console: first + 1,
+      portal: first + 2,
+      consoleBuild: first + 3,
+      portalBuild: first + 4,
+      galleryBuild: first + 5,
+      stackApi: first + 6,
+      stackConsole: first + 7,
+      stackPortal: first + 8,
+    });
+    expect(first).toBeGreaterThanOrEqual(41000);
+    expect(first % 10).toBe(0);
+    expect(names.ports.stackPortal).toBeLessThan(49000);
   });
 
   it('never gives two worktrees the same ports', () => {

@@ -25,7 +25,11 @@ const config: ComposeConfig = {
     },
   },
 };
-const names = { database: 'tps_w', testDatabase: 'tps_w_test' };
+const names = {
+  database: 'tps_w',
+  testDatabase: 'tps_w_test',
+  ports: { api: 41230 },
+};
 const values = developmentValues(config, names);
 const own = [names.database, names.testDatabase];
 
@@ -49,6 +53,20 @@ describe('profileEnvironment', () => {
     expect(env['TPS_DB_SUPERUSER_PASSWORD']).toBeUndefined();
     expect(env['TPS_DB_NAME']).toBeUndefined();
     expect(env['TPS_TEST_DB_NAME']).toBe('tps_w_test');
+  });
+
+  it('gives the API its port, the worktree database and the app_api password only', () => {
+    const env = profileEnvironment('api', values, [], {}, own);
+    expect(
+      Object.fromEntries(Object.entries(env).filter(([key]) => key.startsWith('TPS_'))),
+    ).toEqual({
+      TPS_DEV: '1',
+      TPS_DB_HOST: '127.0.0.1',
+      TPS_DB_PORT: '55432',
+      TPS_DB_NAME: 'tps_w',
+      TPS_DB_APP_API_PASSWORD: 'app-api-password-for-tests',
+      TPS_API_PORT: '41230',
+    });
   });
 
   it('drops inherited TPS_ variables outside the profile and keeps the rest', () => {

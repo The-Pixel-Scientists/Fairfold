@@ -21,12 +21,32 @@ const FIRST_PORT = 41000;
 const PORTS_PER_BLOCK = 10;
 const PORT_BLOCKS = 800;
 
+/**
+ * The ports in a block, in order: `pnpm dev` serves the API, console and
+ * portal; Playwright serves its production builds and the gallery build;
+ * `pnpm stack` publishes its API, console and portal.
+ */
+const PORT_NAMES = [
+  'api',
+  'console',
+  'portal',
+  'consoleBuild',
+  'portalBuild',
+  'galleryBuild',
+  'stackApi',
+  'stackConsole',
+  'stackPortal',
+] as const;
+export type PortName = (typeof PORT_NAMES)[number];
+
 export interface DevNames {
   worktree: string;
   database: string;
   testDatabase: string;
   bucket: string;
-  ports: { api: number; console: number; portal: number };
+  /** The Compose project of `pnpm stack`. */
+  stackProject: string;
+  ports: Record<PortName, number>;
 }
 
 /** Lower-case the folder name and replace every character outside [a-z0-9_] with `_`. */
@@ -101,7 +121,11 @@ export function devNames(worktree: string, otherWorktrees: readonly string[] = [
     worktree,
     ...databaseNames(slug),
     bucket: bucketName(slug),
-    ports: { api: firstPort, console: firstPort + 1, portal: firstPort + 2 },
+    stackProject: fitName(`tps_stack_${slug}`, MAX_NAME_LENGTH, '_'),
+    ports: Object.fromEntries(PORT_NAMES.map((name, index) => [name, firstPort + index])) as Record<
+      PortName,
+      number
+    >,
   };
 }
 
