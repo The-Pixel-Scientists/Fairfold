@@ -1,4 +1,4 @@
-# PixelSuite
+# Fairfold
 
 The source code for **Fairfold**, an open source suite of tools for funders,
 foundations and charities, made by The Pixel Scientists.
