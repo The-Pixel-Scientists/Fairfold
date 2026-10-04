@@ -34,6 +34,8 @@
     "db:migrate": "node scripts/dev-env.ts database-admin node packages/db/scripts/db.ts prepare up",
     "db:rollback": "node scripts/dev-env.ts database-admin node packages/db/scripts/db.ts prepare down",
     "db:drop": "node scripts/dev-env.ts database-admin node packages/db/scripts/db.ts drop",
+    "db:seed": "node scripts/dev-env.ts seed node packages/db/seed/seed.ts",
+    "tenant:create": "node scripts/dev-env.ts operator node apps/api/src/operator/create-tenant.ts",
     "dev:names": "node scripts/dev-names.ts"
   },
   "devDependencies": {

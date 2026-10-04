@@ -6,7 +6,7 @@
 //
 // Connection details and the fixed development credentials come from the
 // development Compose file, read through `docker compose config`, so they
-// live in that one file. Database names come from dev-names.ts.
+// live in that one file. Database names and ports come from dev-names.ts.
 //
 // Each profile names the only Fairfold Grants variables its command receives, so
 // a command never gets a credential it does not use (ADR 0005). Any other
@@ -15,14 +15,21 @@
 // environment wins, then one in the repository's .env file (see
 // .env.example), then the development value.
 //
+// The auth secret and the seed password are random for each worktree, made
+// on first use and kept outside the checkout in
+// ~/.tps/dev/<database>, one file each, readable by this user only.
+// Commands get the path of the file, never the value.
+//
 // This is for development only. It sets TPS_DEV=1, and so refuses to
 // run against a database server that is not on this machine: the fixed
 // development passwords must never be set on a shared server.
 
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { randomBytes } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { isIPv4 } from 'node:net';
-import { join } from 'node:path';
+import { homedir } from 'node:os';
+import { dirname, join } from 'node:path';
 import { parseEnv } from 'node:util';
 
 import { currentDevNames, repositoryRoot } from './dev-names.ts';
@@ -43,6 +50,18 @@ const APP_PASSWORDS = [
 /** Set from the worktree's folder name. Nothing overrides it. */
 const OWN_DATABASES = 'TPS_DEV_DATABASES';
 
+/** Random for each worktree; see secretsFolder(). */
+const SECRET_FILES = ['TPS_AUTH_SECRET_FILE', 'TPS_SEED_PASSWORD_FILE'] as const;
+const CONSOLE_ORIGIN = 'TPS_CONSOLE_ORIGIN';
+const SMTP = [
+  'TPS_SMTP_HOST',
+  'TPS_SMTP_PORT',
+  'TPS_SMTP_TLS',
+  'TPS_SMTP_USER',
+  'TPS_SMTP_PASSWORD',
+  'TPS_SMTP_FROM',
+] as const;
+
 export const PROFILES = {
   // pnpm db:migrate, db:rollback and db:drop, and the db-admin tests. The
   // roles script sets every role's password, so it needs them all, and the
@@ -59,8 +78,27 @@ export const PROFILES = {
   // Database tests in the db project: the test database only, as the app
   // roles, with migrator for fixtures. No superuser.
   'database-tests': [...CONNECTION, 'TPS_TEST_DB_NAME', MIGRATOR_PASSWORD, ...APP_PASSWORDS],
-  // The API in `pnpm dev`: this worktree's database as app_api, on its port.
-  api: [...CONNECTION, 'TPS_DB_NAME', 'TPS_DB_APP_API_PASSWORD', 'TPS_API_PORT'],
+  // The API in `pnpm dev`: this worktree's database as app_api, and as
+  // app_auth for the auth module, on its port, behind the Vite dev servers'
+  // proxies on this machine. Mail goes to Mailpit.
+  api: [
+    ...CONNECTION,
+    'TPS_DB_NAME',
+    'TPS_DB_APP_API_PASSWORD',
+    'TPS_DB_APP_AUTH_PASSWORD',
+    'TPS_API_PORT',
+    'TPS_API_TRUST_PROXY',
+    'TPS_AUTH_SECRET_FILE',
+    CONSOLE_ORIGIN,
+    'TPS_PORTAL_ORIGIN',
+    ...SMTP,
+  ],
+  // pnpm db:seed: this worktree's database as migrator. The seed checks the
+  // database against the own-database list.
+  seed: [...CONNECTION, 'TPS_DB_NAME', MIGRATOR_PASSWORD, 'TPS_SEED_PASSWORD_FILE', OWN_DATABASES],
+  // pnpm tenant:create: this worktree's database as app_worker. The first
+  // invitation links to the console and goes to Mailpit.
+  operator: [...CONNECTION, 'TPS_DB_NAME', 'TPS_DB_APP_WORKER_PASSWORD', CONSOLE_ORIGIN, ...SMTP],
 } as const satisfies Record<string, readonly string[]>;
 
 export type Profile = keyof typeof PROFILES;
@@ -117,16 +155,45 @@ function publishedPort(found: ComposeService, serviceName: string, target: numbe
   return port;
 }
 
+/** Where a worktree keeps its auth secret and seed password. */
+export function secretsFolder(database: string): string {
+  return join(homedir(), '.tps', 'dev', database);
+}
+
 /** Every development setting for this worktree, before overrides. */
 export function developmentValues(
   config: ComposeConfig,
-  names: { database: string; testDatabase: string; ports: { api: number } },
+  names: {
+    database: string;
+    testDatabase: string;
+    ports: { api: number; console: number; portal: number };
+  },
+  secrets: string,
 ): Record<string, string> {
   const postgres = service(config, 'postgres');
   const postgresPort = publishedPort(postgres, 'postgres', 5432);
+  const mailpit = service(config, 'mailpit');
+  const smtpPort = publishedPort(mailpit, 'mailpit', 1025);
+  // user:password, the one login Mailpit accepts.
+  const smtpLogin = environmentValue(mailpit, 'mailpit', 'MP_SMTP_AUTH');
+  const separator = smtpLogin.indexOf(':');
+  if (separator < 1) throw new Error('The mailpit service must set MP_SMTP_AUTH as user:password.');
   const values: Record<string, string> = {
     TPS_DEV: '1',
     TPS_API_PORT: String(names.ports.api),
+    // The Vite dev servers' proxies run on this machine.
+    TPS_API_TRUST_PROXY: '127.0.0.1,::1',
+    TPS_CONSOLE_ORIGIN: `http://console.localhost:${String(names.ports.console)}`,
+    TPS_PORTAL_ORIGIN: `http://portal.localhost:${String(names.ports.portal)}`,
+    TPS_AUTH_SECRET_FILE: join(secrets, 'auth_secret'),
+    TPS_SEED_PASSWORD_FILE: join(secrets, 'seed_password'),
+    TPS_SMTP_HOST: smtpPort.host_ip ?? '127.0.0.1',
+    TPS_SMTP_PORT: smtpPort.published ?? '',
+    // Mailpit on this machine. The API accepts none only for a loopback host.
+    TPS_SMTP_TLS: 'none',
+    TPS_SMTP_USER: smtpLogin.slice(0, separator),
+    TPS_SMTP_PASSWORD: smtpLogin.slice(separator + 1),
+    TPS_SMTP_FROM: 'no-reply@example.org',
     TPS_DB_HOST: postgresPort.host_ip ?? '127.0.0.1',
     TPS_DB_PORT: postgresPort.published ?? '',
     TPS_DB_NAME: names.database,
@@ -146,6 +213,33 @@ export function isLoopbackHost(host: string): boolean {
   return isIPv4(host) && host.startsWith('127.');
 }
 
+/** The inherited environment without any TPS_ variable, in any letter case. */
+export function withoutOurVariables(
+  inherited: Readonly<Record<string, string | undefined>>,
+): Record<string, string> {
+  const env: Record<string, string> = {};
+  for (const [key, value] of Object.entries(inherited)) {
+    if (value !== undefined && !key.toUpperCase().startsWith('TPS_')) env[key] = value;
+  }
+  return env;
+}
+
+/**
+ * The environment for a Vite dev server: the inherited one without any
+ * TPS_ variable, plus the address its proxy sends `/api` to. Only the
+ * app's vite.config.ts reads that, and no `envPrefix` exposes it, so nothing
+ * a developer has set can reach a bundle.
+ */
+export function viteEnvironment(
+  inherited: Readonly<Record<string, string | undefined>>,
+  apiPort: number,
+): Record<string, string> {
+  return {
+    ...withoutOurVariables(inherited),
+    TPS_API_ORIGIN: `http://127.0.0.1:${String(apiPort)}`,
+  };
+}
+
 /**
  * The environment for a command: the inherited one without any TPS_
  * variable, plus exactly the profile's variables. Throws if the database
@@ -158,10 +252,7 @@ export function profileEnvironment(
   inherited: Readonly<Record<string, string | undefined>>,
   ownDatabases: readonly string[],
 ): Record<string, string> {
-  const env: Record<string, string> = {};
-  for (const [key, value] of Object.entries(inherited)) {
-    if (value !== undefined && !key.toUpperCase().startsWith('TPS_')) env[key] = value;
-  }
+  const env = withoutOurVariables(inherited);
   for (const key of PROFILES[profile]) {
     if (key === OWN_DATABASES) {
       env[key] = ownDatabases.join(',');
@@ -189,16 +280,30 @@ function isProfile(name: string): name is Profile {
   return Object.hasOwn(PROFILES, name);
 }
 
+/** Make a random secret at `path` unless one is there, readable by this user only. */
+export function ensureSecretFile(path: string): void {
+  if (existsSync(path)) return;
+  mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+  writeFileSync(path, randomBytes(32).toString('base64url'), { mode: 0o600, flag: 'wx' });
+}
+
 /** The environment for a command run with `profile` in this worktree. */
 export function developmentEnvironment(profile: Profile): Record<string, string> {
   const names = currentDevNames();
-  return profileEnvironment(
+  const values = developmentValues(readComposeConfig(), names, secretsFolder(names.database));
+  const env = profileEnvironment(
     profile,
-    developmentValues(readComposeConfig(), names),
+    values,
     [existsSync(ENV_FILE) ? parseEnv(readFileSync(ENV_FILE, 'utf8')) : {}, process.env],
     process.env,
     [names.database, names.testDatabase],
   );
+  // Only this worktree's own files are made; a path set in .env must exist.
+  for (const key of SECRET_FILES) {
+    const path = env[key];
+    if (path !== undefined && path === values[key]) ensureSecretFile(path);
+  }
+  return env;
 }
 
 function main(argv: readonly string[]): number {
