@@ -1,6 +1,6 @@
 # ADR 0014: Client-side routing for the console and portal
 
-- **Status:** accepted
+- **Status:** accepted; proposed amendment in [ADR 0018](0018-scroll-restoration.md)
 - **Date:** 2026-09-28
 - **Deciders:** Aaron Gardner
 

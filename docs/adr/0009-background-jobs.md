@@ -1,6 +1,6 @@
 # ADR 0009: Background jobs
 
-- **Status:** accepted
+- **Status:** accepted; proposed amendment in [ADR 0020](0020-release-emails-without-a-worker.md)
 - **Date:** 2026-09-27
 - **Deciders:** Aaron Gardner
 
