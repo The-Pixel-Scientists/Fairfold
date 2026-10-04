@@ -48,3 +48,82 @@ export const charityNumber = z.string().refine((value) => value.startsWith('GB-'
 
 export type { ZodType };
 export { zod, schema, object, unknown, mini };
+
+declare const metadata: { description: string };
+declare const additionalProperties: boolean;
+declare const key: string;
+
+// ruleid: tps-contracts-meta-claims-no-checks
+export const uuidLookAlike = z.string().meta({ format: 'uuid' });
+
+// ruleid: tps-contracts-meta-claims-no-checks
+export const patterned = z.string().meta({ description: 'A code', pattern: '^[A-Z]+$' });
+
+// ruleid: tps-contracts-meta-claims-no-checks
+export const typed = z.string().meta({ type: 'integer' });
+
+// ruleid: tps-contracts-meta-claims-no-checks
+export const quoted = z.string().meta({ 'id': 'Named' });
+
+// ruleid: tps-contracts-meta-claims-no-checks
+export const closedLookAlike = z.record(z.string(), z.string()).meta({ additionalProperties: false });
+
+// ruleid: tps-contracts-meta-claims-no-checks
+export const keyedLookAlike = z.record(z.string(), z.string()).meta({ propertyNames: { enum: ['a'] } });
+
+// ruleid: tps-contracts-meta-claims-no-checks
+export const enumLookAlike = z.string().meta({ enum: ['draft', 'submitted'] });
+
+// ruleid: tps-contracts-meta-claims-no-checks
+export const constLookAlike = z.string().meta({ const: 'draft' });
+
+// ruleid: tps-contracts-meta-claims-no-checks
+export const unionLookAlike = z.string().meta({ anyOf: [{ type: 'string' }] });
+
+// ruleid: tps-contracts-meta-claims-no-checks
+export const referenced = z.string().meta({ $ref: '#/$defs/Strict' });
+
+// ruleid: tps-contracts-meta-claims-no-checks
+export const quotedRef = z.string().meta({ '$ref': '#/$defs/Strict' });
+
+// ruleid: tps-contracts-meta-claims-no-checks
+export const shorthand = z.record(z.string(), z.string()).meta({ additionalProperties });
+
+// ruleid: tps-contracts-meta-claims-no-checks
+export const computed = z.string().meta({ [key]: false });
+
+// ruleid: tps-contracts-meta-claims-no-checks
+export const lookAlikeKey = z.string().meta({ 'descriptions': 'A note' });
+
+// ruleid: tps-contracts-meta-claims-no-checks
+export const spread = z.string().meta({ ...metadata });
+
+// ruleid: tps-contracts-meta-claims-no-checks
+export const fromVariable = z.string().meta(metadata);
+
+// ruleid: tps-contracts-meta-claims-no-checks
+export const registered = z.string().register(z.globalRegistry, { format: 'date' });
+
+// ruleid: tps-contracts-meta-claims-no-checks
+export const registeredSpread = z.string().register(z.globalRegistry, { ...metadata });
+
+// ruleid: tps-contracts-meta-claims-no-checks
+export const registeredVariable = z.string().register(z.globalRegistry, metadata);
+
+// ruleid: tps-contracts-meta-claims-no-checks
+z.globalRegistry.add(described, { description: 'Added outside the schema' });
+
+// ruleid: tps-contracts-meta-claims-no-checks
+export const otherEmail = z.string().meta({ format: 'email' });
+
+// ok: tps-contracts-meta-claims-no-checks
+export const described = z.string().meta({ description: 'The programme name' });
+
+// ok: tps-contracts-meta-claims-no-checks
+export const documented = z.string().meta({ title: 'Name', 'description': 'The programme name', examples: ['Arts'], deprecated: true });
+
+// ok: tps-contracts-meta-claims-no-checks
+export const registeredDescription = z.string().register(z.globalRegistry, { description: 'A note' });
+
+// ruleid: tps-contracts-meta-claims-no-checks
+export const emailSchema = z.string().trim().toLowerCase().pipe(z.email()).meta({ format: 'email' });

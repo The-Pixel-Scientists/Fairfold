@@ -1,0 +1,40 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# The metadata rule from response-schemas.yaml, for the one file it skips.
+# emailSchema's format mark is allowed here and nowhere else: its Zod schema
+# checks the address, and the mark tells the OpenAPI document and the URL rule
+# that the value is an email address (ADR 0004).
+
+rules:
+  - id: tps-auth-schemas-meta-claims-no-checks
+    languages: [typescript]
+    severity: ERROR
+    message: >-
+      Contract metadata may set only description, title, examples and
+      deprecated, written in place, so it never claims a check the Zod schema
+      does not make. Only emailSchema marks a format (ADR 0004).
+    patterns:
+      - pattern-either:
+          - patterns:
+              - pattern-either:
+                  - pattern: '$SCHEMA.meta({..., $KEY: $VALUE, ...})'
+                  - pattern: '$SCHEMA.register($REGISTRY, {..., $KEY: $VALUE, ...})'
+              - metavariable-regex:
+                  metavariable: $KEY
+                  regex: ^(?!['"]?(description|title|examples|deprecated)['"]?$)
+          - pattern: '$SCHEMA.meta({..., ...$REST, ...})'
+          - pattern: '$SCHEMA.register($REGISTRY, {..., ...$REST, ...})'
+          - patterns:
+              - pattern-either:
+                  - pattern: $SCHEMA.meta($ARGUMENT)
+                  - pattern: $SCHEMA.register($REGISTRY, $ARGUMENT)
+              - pattern-not: '$SCHEMA.meta({...})'
+              - pattern-not: '$SCHEMA.register($REGISTRY, {...})'
+          - patterns:
+              - pattern: z.globalRegistry
+              - pattern-not-inside: '$SCHEMA.register(z.globalRegistry, {...})'
+      - pattern-not-inside: |
+          export const emailSchema = $ZOD.meta({ format: 'email' });
+    paths:
+      include:
+        - /packages/domain/src/auth/schemas.ts

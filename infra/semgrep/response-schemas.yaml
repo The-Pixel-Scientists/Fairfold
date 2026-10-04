@@ -57,3 +57,43 @@ rules:
       exclude:
         - /packages/domain/src/api/answers/
         - '*.test.ts'
+
+  # The route rules read a contract's JSON Schema, so metadata that sets any
+  # schema keyword (format, additionalProperties, enum, $ref and the rest)
+  # would claim a check the Zod schema does not make. Metadata may only
+  # describe. emailSchema's format mark is the one exception: its Zod schema
+  # checks the address, and email-schema-meta.yaml allows it in its own file.
+  - id: tps-contracts-meta-claims-no-checks
+    languages: [typescript]
+    severity: ERROR
+    message: >-
+      Contract metadata may set only description, title, examples and
+      deprecated, written in place, so it never claims a check the Zod schema
+      does not make. Use Zod's own checks (ADR 0004).
+    patterns:
+      - pattern-either:
+          - patterns:
+              - pattern-either:
+                  - pattern: '$SCHEMA.meta({..., $KEY: $VALUE, ...})'
+                  - pattern: '$SCHEMA.register($REGISTRY, {..., $KEY: $VALUE, ...})'
+              - metavariable-regex:
+                  metavariable: $KEY
+                  regex: ^(?!['"]?(description|title|examples|deprecated)['"]?$)
+          - pattern: '$SCHEMA.meta({..., ...$REST, ...})'
+          - pattern: '$SCHEMA.register($REGISTRY, {..., ...$REST, ...})'
+          - patterns:
+              - pattern-either:
+                  - pattern: $SCHEMA.meta($ARGUMENT)
+                  - pattern: $SCHEMA.register($REGISTRY, $ARGUMENT)
+              - pattern-not: '$SCHEMA.meta({...})'
+              - pattern-not: '$SCHEMA.register($REGISTRY, {...})'
+          - patterns:
+              - pattern: z.globalRegistry
+              - pattern-not-inside: '$SCHEMA.register(z.globalRegistry, {...})'
+    paths:
+      include:
+        - /packages/domain/src/
+        - /modules/*/src/contracts/
+      exclude:
+        - /packages/domain/src/auth/schemas.ts
+        - '*.test.ts'
