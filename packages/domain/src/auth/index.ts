@@ -5,6 +5,7 @@
 import '../jitless/index.ts';
 
 export { authEventCodes, type AuthEventCode } from './events.ts';
+export { acceptInvitation } from './invitation-routes.ts';
 export { confirmTotp, enrolTotp, stepUp, verifyTotp } from './mfa-routes.ts';
 export {
   authRoutes,
