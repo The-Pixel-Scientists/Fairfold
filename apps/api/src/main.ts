@@ -32,7 +32,21 @@ async function main(): Promise<void> {
 
   const logger = createLogger({ level: config.logLevel });
   const database = openDatabase(config.database, logger);
-  const app = await buildApp({ logger, checkDatabase: () => database.check() });
+  let app;
+  try {
+    app = await buildApp({
+      logger,
+      checkDatabase: () => database.check(),
+      inTenant: database.inTenant,
+      trustProxy: config.trustProxy,
+    });
+  } catch (error) {
+    // A route that cannot be served safely stops the API here, naming the route.
+    logger.fatal({ err: error }, 'The API could not be built');
+    await database.close();
+    process.exitCode = 1;
+    return;
+  }
 
   let stopping = false;
   const stop = (signal: string): void => {
