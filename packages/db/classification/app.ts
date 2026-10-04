@@ -4,6 +4,8 @@
 // internal; a tenant's slug, name and theme are public, since its public
 // pages show them (ADR 0019). A membership's user_id links the tenant to a
 // person's account, so it is personal, like party.person.user_id (ADR 0017).
+// Audit events hold ids, codes and public or internal values only (ADR 0003,
+// D12), and are kept under the tenant's audit rule, at least 12 months.
 
 import type { ClassificationRegistry, FieldClassification } from '../classification.ts';
 
@@ -18,6 +20,10 @@ const publicField: FieldClassification = {
 const personal: FieldClassification = {
   sensitivity: 'personal',
   retention: { kind: 'tenant_lifetime' },
+};
+const audit: FieldClassification = {
+  sensitivity: 'internal',
+  retention: { kind: 'tenant_policy', policy: 'audit', minimumDays: 365 },
 };
 
 export const app: ClassificationRegistry = {
@@ -69,5 +75,28 @@ export const app: ClassificationRegistry = {
     author_id: internal,
     diff: internal,
     created_at: internal,
+  },
+  'app.retention_policy': {
+    tenant_id: internal,
+    id: internal,
+    policy: internal,
+    days: internal,
+    created_at: internal,
+    created_by: internal,
+    updated_at: internal,
+    updated_by: internal,
+  },
+  'app.audit_event': {
+    tenant_id: audit,
+    id: audit,
+    occurred_at: audit,
+    retain_until: audit,
+    request_id: audit,
+    actor_kind: audit,
+    actor_id: audit,
+    action: audit,
+    entity_type: audit,
+    entity_id: audit,
+    changes: audit,
   },
 };
