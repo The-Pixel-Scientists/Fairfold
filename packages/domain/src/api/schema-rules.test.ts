@@ -5,7 +5,14 @@ import { z } from 'zod';
 
 import { idSchema } from '../id.ts';
 import { slugSchema } from '../platform/tenant.ts';
-import { paramProblems, requestProblems, responseProblems } from './schema-rules.ts';
+import {
+  isRawBody,
+  paramProblems,
+  rawBodyProblems,
+  requestProblems,
+  responseProblems,
+  type RawBody,
+} from './schema-rules.ts';
 
 const PATH = '/console/programmes/:programmeId';
 
@@ -200,5 +207,31 @@ describe('responseProblems', () => {
     ]) {
       expect(responseProblems('200', schema)).not.toEqual([]);
     }
+  });
+});
+
+describe('rawBodyProblems', () => {
+  it('passes a 200 in listed content types', () => {
+    expect(rawBodyProblems('200', { raw: ['text/css'] })).toEqual([]);
+    expect(rawBodyProblems('200', { raw: ['image/png', 'image/webp'] })).toEqual([]);
+  });
+
+  it('refuses another status, an unlisted or repeated type, and extra keys', () => {
+    expect(rawBodyProblems('204', { raw: ['text/css'] })).not.toEqual([]);
+    for (const body of [
+      { raw: [] },
+      { raw: ['text/html'] },
+      { raw: ['image/png', 'image/png'] },
+      { raw: 'text/css' },
+      { raw: ['text/css'], charset: 'utf-8' },
+    ]) {
+      expect(rawBodyProblems('200', body as unknown as RawBody)).not.toEqual([]);
+    }
+  });
+
+  it('tells a raw body from a schema or no body', () => {
+    expect(isRawBody({ raw: ['text/css'] })).toBe(true);
+    expect(isRawBody(z.object({ raw: z.string() }))).toBe(false);
+    expect(isRawBody(null)).toBe(false);
   });
 });
