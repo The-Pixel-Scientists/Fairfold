@@ -1,19 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { productName } from '@pixel-scientists/domain/platform';
 
 import { App } from './App.tsx';
 
-beforeEach(() => {
-  vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
-});
-
 afterEach(() => {
-  cleanup();
-  vi.restoreAllMocks();
   window.history.replaceState(null, '', '/');
   document.title = '';
 });

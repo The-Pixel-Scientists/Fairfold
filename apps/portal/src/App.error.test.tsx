@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { productName } from '@pixel-scientists/domain/platform';
@@ -18,13 +18,11 @@ vi.mock('./pages/HowApplyingWorksPage.tsx', () => {
 });
 
 beforeEach(() => {
-  vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
   // React logs the error the page boundary catches.
   vi.spyOn(console, 'error').mockImplementation(() => undefined);
 });
 
 afterEach(() => {
-  cleanup();
   vi.restoreAllMocks();
   window.history.replaceState(null, '', '/');
   document.title = '';

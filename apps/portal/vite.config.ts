@@ -6,8 +6,11 @@ import { defineConfig } from 'vite';
 
 // The portal is served as portal.localhost in development (ADR 0005), so the
 // dev and preview servers accept that host name and any other *.localhost.
+// cspNonce puts a placeholder on the <style> elements Vite writes into
+// index.html; the web server swaps in a fresh nonce on each response (ADR 0006).
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  html: { cspNonce: 'TPS_CSP_NONCE' },
   server: { allowedHosts: ['.localhost'] },
   preview: { allowedHosts: ['.localhost'] },
 });

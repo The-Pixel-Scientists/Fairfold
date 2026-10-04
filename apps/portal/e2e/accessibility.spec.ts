@@ -5,12 +5,10 @@
 // width, at 320 px wide, and at 200% zoom, which a browser lays out as a
 // 640 px wide window at twice the pixel density.
 
-// The callbacks passed to page.evaluate run in the browser, so they use DOM types.
-/// <reference lib="dom" />
-
 import { AxeBuilder } from '@axe-core/playwright';
-import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
+
+import { expect, test } from '../../../scripts/e2e/fixtures.ts';
 
 const widths = [
   { name: 'desktop width', viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1 },
@@ -77,7 +75,7 @@ for (const width of widths) {
     });
 
     test('@a11y the page that failed to load has no axe violations', async ({ page }) => {
-      await page.route('**/HowApplyingWorksPage.tsx*', (route) => route.abort());
+      await page.route('**/HowApplyingWorksPage*', (route) => route.abort());
       await page.goto('/');
       await page.getByRole('link', { name: 'Read how applying works' }).click();
       await expect(

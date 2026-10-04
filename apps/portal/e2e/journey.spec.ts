@@ -4,14 +4,16 @@
 // focus and announcements on route changes, back and forward, reflow at 320 px
 // and 200% zoom, text spacing, visible focus and what loads over the network.
 
-// The callbacks passed to page.evaluate run in the browser, so they use DOM types.
-/// <reference lib="dom" />
-
-import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { productName } from '@pixel-scientists/domain/platform';
 
+import { expect, test } from '../../../scripts/e2e/fixtures.ts';
+
 const SUFFIX = `– ${productName}`;
+
+/** The text spacing that WCAG 1.4.12 says a person must be able to apply without losing content. */
+const TEXT_SPACING =
+  '* { line-height: 1.5 !important; letter-spacing: 0.12em !important; word-spacing: 0.16em !important; } p { margin-bottom: 2em !important; }';
 
 /** The text of the polite live region that announces page changes. */
 function announcement(page: Page) {
@@ -202,7 +204,8 @@ test.describe('moving between pages', () => {
   });
 });
 
-const HOW_APPLYING_WORKS_CODE = '**/HowApplyingWorksPage.tsx*';
+// Matches the page's module in development and its chunk in a production build.
+const HOW_APPLYING_WORKS_CODE = '**/HowApplyingWorksPage*';
 
 test.describe('a page that is slow or fails to load', () => {
   test('shows and announces that the page is loading, then moves to it', async ({ page }) => {
@@ -300,10 +303,12 @@ test.describe('small screens, zoom and text spacing', () => {
     for (const path of ['/', '/how-applying-works']) {
       await page.goto(path);
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-      await page.addStyleTag({
-        content:
-          '* { line-height: 1.5 !important; letter-spacing: 0.12em !important; word-spacing: 0.16em !important; } p { margin-bottom: 2em !important; }',
-      });
+      // A constructed stylesheet: the page's Content Security Policy blocks a <style> element.
+      await page.evaluate((css) => {
+        const sheet = new CSSStyleSheet();
+        sheet.replaceSync(css);
+        document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+      }, TEXT_SPACING);
 
       expect(await horizontalOverflow(page), path).toBeLessThanOrEqual(0);
       const clipped = await page.evaluate(() =>
