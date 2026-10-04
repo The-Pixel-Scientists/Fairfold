@@ -1,60 +1,111 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { productName } from '@pixel-scientists/domain/platform';
-import { AppShell, Link, Router, cx } from '@pixel-scientists/ui';
-import type { RouteDefinition } from '@pixel-scientists/ui';
+import { AppShell, NotFoundPage, Router, SessionProvider } from '@pixel-scientists/ui';
+import type { PageDefinition, RouteDefinition } from '@pixel-scientists/ui';
 import type { ReactNode } from 'react';
 
-/** Component gallery: development builds only. The production build drops it. */
-const developmentRoutes: readonly RouteDefinition[] = import.meta.env.DEV
-  ? [
-      {
-        path: '/dev/components',
-        title: 'Component gallery',
-        load: () => import('./pages/ComponentGalleryPage.tsx'),
-      },
-    ]
-  : [];
+import { endSession, loadSession } from './api.ts';
+import CheckEmailPage from './auth/CheckEmailPage.tsx';
+import CompleteSignUpPage from './auth/CompleteSignUpPage.tsx';
+import EnterCodePage from './auth/EnterCodePage.tsx';
+import ForgotPasswordPage from './auth/ForgotPasswordPage.tsx';
+import ForgotPasswordSentPage from './auth/ForgotPasswordSentPage.tsx';
+import ResetPasswordPage from './auth/ResetPasswordPage.tsx';
+import { Screen } from './auth/Screen.tsx';
+import SetUpAuthenticatorPage from './auth/SetUpAuthenticatorPage.tsx';
+import SignedOutPage from './auth/SignedOutPage.tsx';
+import SignInPage from './auth/SignInPage.tsx';
+import SignUpPage from './auth/SignUpPage.tsx';
+import { productName, titleSuffix } from './product.ts';
+import { TenantProvider, tenantSlugOf } from './tenant.ts';
 
-export const routes: readonly RouteDefinition[] = [
-  { path: '/', title: 'Programmes', load: () => import('./pages/ProgrammesPage.tsx') },
-  ...developmentRoutes,
+/**
+ * Pages outside any funder's address. The first segment of each path must be
+ * in `reservedSlugs`, or a funder could take the slug and shadow the page.
+ */
+export const topLevelRoutes: readonly RouteDefinition[] = [
+  { path: '/', title: "Use your funder's link", load: () => import('./pages/NoFunderPage.tsx') },
+  // The component gallery is for development builds only. The production build drops it.
+  ...(import.meta.env.DEV
+    ? [
+        {
+          path: '/dev/components',
+          title: 'Component gallery',
+          load: () => import('./pages/ComponentGalleryPage.tsx'),
+        },
+      ]
+    : []),
 ];
 
-const navigationLinkClassName = cx(
-  'flex min-h-control items-center rounded-md px-control-x text-body text-ink no-underline',
-  'hover:bg-sunken hover:text-ink',
-  'aria-[current=page]:bg-accent-soft aria-[current=page]:font-semibold aria-[current=page]:text-accent',
-  'aria-[current=page]:underline aria-[current=page]:decoration-2 aria-[current=page]:underline-offset-4',
-);
+/** Pages under `/<slug>/`, which the router sees without the slug. */
+export const tenantRoutes: readonly RouteDefinition[] = [
+  { path: '/', title: 'Programmes', load: () => import('./pages/ProgrammesPage.tsx') },
+  { path: '/sign-in', title: 'Sign in', component: SignInPage },
+  { path: '/sign-up', title: 'Create your account', component: SignUpPage },
+  { path: '/sign-up/check-email', title: 'Check your email', component: CheckEmailPage },
+  { path: '/sign-up/complete', title: 'Set your password', component: CompleteSignUpPage },
+  { path: '/forgot-password', title: 'Reset your password', component: ForgotPasswordPage },
+  {
+    path: '/forgot-password/sent',
+    title: 'Check your email',
+    component: ForgotPasswordSentPage,
+  },
+  { path: '/reset-password', title: 'Choose a new password', component: ResetPasswordPage },
+  { path: '/signed-out', title: 'You have signed out', component: SignedOutPage },
+  {
+    path: '/set-up-authenticator',
+    title: 'Set up your authenticator app',
+    component: SetUpAuthenticatorPage,
+  },
+  { path: '/enter-code', title: 'Enter your code', component: EnterCodePage },
+];
 
-function ConsoleNavigation() {
+function TenantNotFound() {
   return (
-    <ul className="flex flex-wrap gap-1 md:flex-col">
-      <li>
-        <Link to="/" className={navigationLinkClassName}>
-          Programmes
-        </Link>
-      </li>
-      {import.meta.env.DEV && (
-        <li>
-          <Link to="/dev/components" className={navigationLinkClassName}>
-            Component gallery
-          </Link>
-        </li>
-      )}
-    </ul>
+    <Screen kind="member">
+      <NotFoundPage />
+    </Screen>
   );
 }
 
-function ConsoleLayout({ children }: { children: ReactNode }) {
+const tenantNotFound: PageDefinition = { title: 'Page not found', component: TenantNotFound };
+
+function TopLayout({ children }: { children: ReactNode }) {
   return (
-    <AppShell productName={productName} areaName="Staff console" navigation={<ConsoleNavigation />}>
+    <AppShell productName={productName} areaName="Staff console">
       {children}
     </AppShell>
   );
 }
 
+function TenantLayout({ children }: { children: ReactNode }) {
+  return (
+    <SessionProvider load={loadSession} signOut={endSession}>
+      {children}
+    </SessionProvider>
+  );
+}
+
+/**
+ * The first segment of the address picks the app: a funder's slug opens that
+ * funder's console, with the router under `/<slug>`; anything else is one of
+ * the few pages outside a funder. A page load keeps one slug, and switching
+ * funder opens the new address afresh.
+ */
 export function App() {
-  return <Router routes={routes} layout={ConsoleLayout} titleSuffix={`${productName} console`} />;
+  const slug = tenantSlugOf(window.location.pathname);
+  if (slug === null) {
+    return <Router routes={topLevelRoutes} layout={TopLayout} titleSuffix={titleSuffix} />;
+  }
+  return (
+    <TenantProvider value={slug}>
+      <Router
+        routes={tenantRoutes}
+        notFound={tenantNotFound}
+        basePath={`/${slug}`}
+        layout={TenantLayout}
+        titleSuffix={titleSuffix}
+      />
+    </TenantProvider>
+  );
 }

@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import { ProblemError } from '@pixel-scientists/domain/api';
 import {
+  AuthenticatorKey,
   Button,
+  Dialog,
   EmptyState,
   ErrorSummary,
   FormField,
@@ -9,6 +12,7 @@ import {
   Link,
   LoadingState,
   PageHeading,
+  StepUpDialog,
   Textarea,
   buttonClassName,
 } from '@pixel-scientists/ui';
@@ -82,6 +86,60 @@ function ExampleForm() {
   );
 }
 
+/** The dialogs, each opened by a button, so the focus and keyboard behaviour can be tried by hand. */
+function DialogExamples() {
+  const [plain, setPlain] = useState(false);
+  const [stepUp, setStepUp] = useState(false);
+
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      <Button
+        onClick={() => {
+          setPlain(true);
+        }}
+      >
+        Open dialog
+      </Button>
+      <Button
+        onClick={() => {
+          setStepUp(true);
+        }}
+      >
+        Open step-up dialog
+      </Button>
+      <Dialog
+        open={plain}
+        onOpenChange={setPlain}
+        title="Switch funder"
+        description="Choose the funder to work for. You will be taken to its console."
+        actions={
+          <>
+            <Button
+              onClick={() => {
+                setPlain(false);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button variant="primary" data-autofocus>
+              Switch to Eastmere Trust
+            </Button>
+          </>
+        }
+      />
+      <StepUpDialog
+        open={stepUp}
+        onOpenChange={setStepUp}
+        onConfirm={() =>
+          Promise.reject(
+            new ProblemError(401, 'Your password or code is not right. Check them and try again.'),
+          )
+        }
+      />
+    </div>
+  );
+}
+
 /**
  * Every shared component in its main states, for checking them by eye and
  * with axe in a real browser. Development builds only.
@@ -102,7 +160,7 @@ export default function ComponentGalleryPage() {
           <Button variant="quiet">Cancel changes</Button>
           <Button disabled>Release decisions</Button>
           <Link to="/" className={buttonClassName('secondary')}>
-            Go to programmes
+            Go to the start page
           </Link>
         </div>
       </Section>
@@ -144,6 +202,17 @@ export default function ComponentGalleryPage() {
           Share the programme link to start receiving applications.
         </EmptyState>
         <LoadingState label="Loading applications" className="rounded-lg bg-surface" />
+      </Section>
+
+      <Section title="Dialogs">
+        <DialogExamples />
+      </Section>
+
+      <Section title="Authenticator set-up key">
+        <AuthenticatorKey
+          secret="JBSWY3DPEHPK3PXP"
+          uri="otpauth://totp/Example:ada@example.org?secret=JBSWY3DPEHPK3PXP&issuer=Example"
+        />
       </Section>
 
       <Section title="Links between pages">
