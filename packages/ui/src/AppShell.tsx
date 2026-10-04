@@ -82,7 +82,7 @@ export function AppShell({
             )}
             {areaName && <span className="text-body text-muted">{areaName}</span>}
           </p>
-          {actions && <div className="flex items-center gap-2">{actions}</div>}
+          {actions && <div className="flex flex-wrap items-center gap-x-3 gap-y-2">{actions}</div>}
         </header>
         {hasNavigation && (
           <nav

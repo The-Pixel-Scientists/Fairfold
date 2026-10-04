@@ -11,6 +11,7 @@ const base = [
   'rounded-md border px-control-x text-body font-medium no-underline',
   'transition-colors duration-(--motion-fast) ease-standard',
   'disabled:cursor-not-allowed disabled:opacity-60',
+  'aria-disabled:cursor-not-allowed aria-disabled:opacity-60',
 ].join(' ');
 
 const variants: Record<ButtonVariant, string> = {

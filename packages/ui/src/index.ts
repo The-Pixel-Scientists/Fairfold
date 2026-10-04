@@ -26,4 +26,7 @@ export type { PageHeadingProps } from './PageHeading.tsx';
 export { SkipLink } from './SkipLink.tsx';
 export type { SkipLinkProps } from './SkipLink.tsx';
 export { cx } from './cx.ts';
+export * from './auth/index.ts';
+export * from './dialog/index.ts';
+export * from './session/index.ts';
 export * from './router/index.ts';
