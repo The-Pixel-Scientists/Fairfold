@@ -7,8 +7,12 @@
 // - PUBLIC holds no right on any schema, table, view, sequence or column,
 //   beyond PUBLIC_RIGHTS, and no app role holds TRUNCATE, REFERENCES or
 //   TRIGGER.
-// - No function is SECURITY DEFINER or executable by PUBLIC, and the app
-//   roles can execute exactly the functions in EXECUTABLE_BY.
+// - No function is executable by PUBLIC, and the app roles can execute
+//   exactly the functions in EXECUTABLE_BY.
+// - A function is SECURITY DEFINER only if DEFINER_FUNCTIONS approves it.
+//   Each approved one pins search_path to pg_catalog, pg_temp and belongs
+//   to its owner role, which owns nothing else and holds exactly the rights
+//   and policies listed (ADR 0003, "Approved definer functions").
 //
 // For the app roles and the database:
 // - The roles match the roles script (findRoleProblems in
@@ -35,13 +39,59 @@ import { findRoleProblems } from '../scripts/roles.ts';
 import { APP_ROLES, type AppRole } from './connect.ts';
 
 /** The functions that app roles may execute, and by whom. */
-export const EXECUTABLE_BY: ReadonlyMap<string, readonly AppRole[]> = new Map([
+export const EXECUTABLE_BY: ReadonlyMap<string, readonly AppRole[]> = new Map<
+  string,
+  readonly AppRole[]
+>([
   // Every tenant policy calls it, whichever role runs the query.
   ['app.current_tenant_id()', APP_ROLES],
+  // How the API learns about a session, without any grant in schema auth.
+  ['auth.session_context(bytea)', ['app_api']],
 ]);
 
+interface DefinerFunction {
+  readonly owner: string;
+  /** Every right the owner holds, as "<privilege> on <object>". */
+  readonly rights: readonly string[];
+  /** Every policy that names the owner, as "<table> policy <name>". */
+  readonly policies: readonly string[];
+}
+
+/** The approved SECURITY DEFINER functions (ADR 0003), by signature. */
+export const DEFINER_FUNCTIONS: ReadonlyMap<string, DefinerFunction> = new Map([
+  [
+    'auth.session_context(bytea)',
+    {
+      owner: 'owner_auth_session_context',
+      rights: [
+        'USAGE on schema auth',
+        ...['id', 'status'].map((column) => `SELECT on column auth.user.${column}`),
+        ...[
+          'token_hash',
+          'user_id',
+          'active_tenant_id',
+          'app',
+          'mfa_state',
+          'expires_at',
+          'created_at',
+          'last_seen_at',
+          'reauthenticated_at',
+          'revoked_at',
+        ].map((column) => `SELECT on column auth.session.${column}`),
+      ],
+      policies: [
+        'auth.session policy session_context_select',
+        'auth.user policy session_context_select',
+      ],
+    },
+  ],
+]);
+
+/** The pinned search_path of every approved definer function, as pg_proc stores it. */
+const DEFINER_CONFIG = 'search_path=pg_catalog, pg_temp';
+
 /** The append-only audit tables, whose occurred_at and retain_until the database sets. */
-export const AUDIT_TABLES: readonly string[] = ['app.audit_event'];
+export const AUDIT_TABLES: readonly string[] = ['app.audit_event', 'auth.audit_event'];
 
 /** Rights PUBLIC may hold, as "<privilege> on <object>", each with its reason. */
 export const PUBLIC_RIGHTS: ReadonlyMap<string, string> = new Map([
@@ -90,6 +140,8 @@ const DEFAULT_ACL_OBJECTS: Readonly<Record<string, string>> = {
 interface FunctionRow {
   signature: string;
   definer: boolean;
+  owner: string;
+  config: string[];
   public_execute: boolean;
   executable_by: string[];
 }
@@ -104,6 +156,7 @@ export async function findPrivilegeProblems(
   problems.push(...(await appRoleGrantProblems(client)));
   problems.push(...(await defaultPrivilegeProblems(client)));
   problems.push(...(await functionProblems(client)));
+  problems.push(...(await definerOwnerProblems(client)));
   problems.push(...(await auditTableProblems(client)));
 
   const publications = await client.query<{ name: string }>(
@@ -165,13 +218,35 @@ async function privilegeProblems(client: pg.ClientBase): Promise<string[]> {
  * PostgreSQL's own.
  */
 async function appRoleGrantProblems(client: pg.ClientBase): Promise<string[]> {
-  const { rows } = await client.query<{
-    role: string;
-    schema: string | null;
-    object: string;
-    privilege: string;
-    grantable: boolean;
-  }>(
+  const problems: string[] = [];
+  for (const { role, schema, object, privilege, grantable } of await heldRights(
+    client,
+    APP_ROLES,
+  )) {
+    const right = `${privilege} on ${object}`;
+    if (grantable) problems.push(`Role ${role} holds ${right} with grant option.`);
+    const own = OWN_SCHEMAS.get(role);
+    if (own && schema !== null && schema !== own.schema && !own.outside.includes(right)) {
+      problems.push(`Role ${role} holds ${right}, outside its own schema ${own.schema}.`);
+    }
+  }
+  return problems;
+}
+
+interface HeldRight {
+  role: string;
+  schema: string | null;
+  object: string;
+  privilege: string;
+  grantable: boolean;
+}
+
+/**
+ * The rights `roles` hold in every schema, including PostgreSQL's own, and
+ * on the database, leaving out an owner's rights on what it owns.
+ */
+async function heldRights(client: pg.ClientBase, roles: readonly string[]): Promise<HeldRight[]> {
+  const { rows } = await client.query<HeldRight>(
     `SELECT r.rolname AS role, o.schema, o.object, a.privilege_type AS privilege,
             a.is_grantable AS grantable
        FROM (
@@ -200,19 +275,75 @@ async function appRoleGrantProblems(client: pg.ClientBase): Promise<string[]> {
        ) o
       CROSS JOIN LATERAL pg_catalog.aclexplode(o.acl) a
        JOIN pg_catalog.pg_roles r ON r.oid = a.grantee
-      WHERE r.rolname = ANY ($1::text[])
+      WHERE r.rolname = ANY ($1::text[]) AND a.grantor <> a.grantee
       ORDER BY 1, 3, 4`,
-    [APP_ROLES],
+    [roles],
   );
+  return rows;
+}
+
+/**
+ * Each approved definer function's owner: it owns that function and nothing
+ * else in this database, and holds exactly its listed rights and policies.
+ * findRoleProblems() checks the owner role's attributes and memberships.
+ */
+async function definerOwnerProblems(client: pg.ClientBase): Promise<string[]> {
+  const owners = [...DEFINER_FUNCTIONS.values()].map((approved) => approved.owner);
+  const owned = await client.query<{ role: string; object: string }>(
+    `SELECT r.rolname AS role,
+            pg_catalog.pg_describe_object(d.classid, d.objid, d.objsubid) AS object
+       FROM pg_catalog.pg_shdepend d
+       JOIN pg_catalog.pg_roles r ON r.oid = d.refobjid
+      WHERE d.refclassid = 'pg_catalog.pg_authid'::pg_catalog.regclass
+        AND d.deptype = 'o'
+        AND d.dbid IN (0, (SELECT oid FROM pg_catalog.pg_database
+                            WHERE datname = pg_catalog.current_database()))
+        AND r.rolname = ANY ($1::text[])`,
+    [owners],
+  );
+  const policies = await client.query<{ role: string; policy: string }>(
+    `SELECT r.rolname AS role,
+            n.nspname || '.' || c.relname || ' policy ' || p.polname AS policy
+       FROM pg_catalog.pg_policy p
+       JOIN pg_catalog.pg_class c ON c.oid = p.polrelid
+       JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+       JOIN pg_catalog.pg_roles r ON r.oid = ANY (p.polroles)
+      WHERE r.rolname = ANY ($1::text[])`,
+    [owners],
+  );
+  const rights = await heldRights(client, owners);
 
   const problems: string[] = [];
-  for (const { role, schema, object, privilege, grantable } of rows) {
-    const right = `${privilege} on ${object}`;
-    if (grantable) problems.push(`Role ${role} holds ${right} with grant option.`);
-    const own = OWN_SCHEMAS.get(role);
-    if (own && schema !== null && schema !== own.schema && !own.outside.includes(right)) {
-      problems.push(`Role ${role} holds ${right}, outside its own schema ${own.schema}.`);
+  const compare = (owner: string, kind: string, actual: string[], expected: readonly string[]) => {
+    for (const item of actual.filter((entry) => !expected.includes(entry))) {
+      problems.push(`Function owner ${owner} ${kind} ${item}, which is not approved.`);
     }
+    for (const item of expected.filter((entry) => !actual.includes(entry))) {
+      problems.push(`Function owner ${owner} lacks ${item}, which DEFINER_FUNCTIONS lists.`);
+    }
+  };
+  for (const [signature, approved] of DEFINER_FUNCTIONS) {
+    const { owner } = approved;
+    const mine = <T extends { role: string }>(rows: T[]) =>
+      rows.filter((row) => row.role === owner);
+    compare(
+      owner,
+      'owns',
+      mine(owned.rows).map((row) => row.object),
+      [`function ${signature}`],
+    );
+    compare(
+      owner,
+      'holds',
+      mine(rights).map((row) => `${row.privilege} on ${row.object}`),
+      approved.rights,
+    );
+    compare(
+      owner,
+      'is named in',
+      mine(policies.rows).map((row) => row.policy),
+      approved.policies,
+    );
   }
   return problems;
 }
@@ -323,24 +454,33 @@ async function roleProblems(client: pg.ClientBase, excepted: readonly string[]):
  * sets. privilegeProblems() already reports TRUNCATE, REFERENCES and TRIGGER.
  */
 async function auditTableProblems(client: pg.ClientBase): Promise<string[]> {
+  // Tables are found through the catalogue, not by casting their names, so
+  // a role without USAGE on a table's schema can still run this.
   const { rows } = await client.query<{ problem: string }>(
-    `SELECT pg_catalog.format('Audit table %s does not exist.', t.name) AS problem
-       FROM pg_catalog.unnest($1::text[]) AS t(name)
-      WHERE pg_catalog.to_regclass(t.name) IS NULL
+    `WITH t AS (
+       SELECT l.name, c.oid
+         FROM pg_catalog.unnest($1::text[]) AS l(name)
+         LEFT JOIN (pg_catalog.pg_class c
+                    JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace)
+           ON n.nspname || '.' || c.relname = l.name AND c.relkind = 'r'
+     )
+     SELECT pg_catalog.format('Audit table %s does not exist.', t.name) AS problem
+       FROM t
+      WHERE t.oid IS NULL
      UNION ALL
      SELECT pg_catalog.format('Role %s holds %s on the audit table %s.', r.name, p.privilege, t.name)
-       FROM pg_catalog.unnest($1::text[]) AS t(name)
+       FROM t
       CROSS JOIN pg_catalog.unnest($2::text[]) AS r(name)
       CROSS JOIN (VALUES ('UPDATE'), ('DELETE')) AS p(privilege)
-      WHERE pg_catalog.to_regclass(t.name) IS NOT NULL
+      WHERE t.oid IS NOT NULL
         AND CASE p.privilege
-              WHEN 'UPDATE' THEN pg_catalog.has_any_column_privilege(r.name, t.name::regclass, 'UPDATE')
-              ELSE pg_catalog.has_table_privilege(r.name, t.name::regclass, 'DELETE') END
+              WHEN 'UPDATE' THEN pg_catalog.has_any_column_privilege(r.name, t.oid, 'UPDATE')
+              ELSE pg_catalog.has_table_privilege(r.name, t.oid, 'DELETE') END
      UNION ALL
      SELECT pg_catalog.format('Role %s can insert %s.%s, which the database sets.',
                               r.name, t.name, a.attname)
-       FROM pg_catalog.unnest($1::text[]) AS t(name)
-       JOIN pg_catalog.pg_attribute a ON a.attrelid = pg_catalog.to_regclass(t.name)
+       FROM t
+       JOIN pg_catalog.pg_attribute a ON a.attrelid = t.oid
       CROSS JOIN pg_catalog.unnest($2::text[]) AS r(name)
       WHERE a.attname IN ('occurred_at', 'retain_until') AND NOT a.attisdropped
         AND pg_catalog.has_column_privilege(r.name, a.attrelid, a.attnum, 'INSERT')`,
@@ -354,7 +494,8 @@ async function functionProblems(client: pg.ClientBase): Promise<string[]> {
   const functions = await client.query<FunctionRow>(
     `SELECT n.nspname || '.' || p.proname
               || '(' || pg_catalog.oidvectortypes(p.proargtypes) || ')' AS signature,
-            p.prosecdef AS definer,
+            p.prosecdef AS definer, p.proowner::pg_catalog.regrole::text AS owner,
+            COALESCE(p.proconfig, '{}') AS config,
             EXISTS (
               SELECT FROM pg_catalog.aclexplode(
                 COALESCE(p.proacl, pg_catalog.acldefault('f', p.proowner))) a
@@ -375,8 +516,16 @@ async function functionProblems(client: pg.ClientBase): Promise<string[]> {
   const problems: string[] = [];
   for (const row of functions.rows) {
     const { signature } = row;
-    if (row.definer) {
-      problems.push(`${signature} is SECURITY DEFINER, and no definer function is approved yet.`);
+    const approved = DEFINER_FUNCTIONS.get(signature);
+    if (row.definer && !approved) {
+      problems.push(`${signature} is SECURITY DEFINER and is not an approved definer function.`);
+    }
+    if (approved && !row.definer) problems.push(`${signature} is not SECURITY DEFINER.`);
+    if (approved && row.owner !== approved.owner) {
+      problems.push(`${signature} is owned by ${row.owner}, not ${approved.owner}.`);
+    }
+    if (approved && row.config.join('; ') !== DEFINER_CONFIG) {
+      problems.push(`${signature} does not set only ${DEFINER_CONFIG}.`);
     }
     if (row.public_execute) problems.push(`PUBLIC can execute ${signature}.`);
     const actual = [...row.executable_by].sort().join(', ') || 'no app role';
@@ -385,9 +534,14 @@ async function functionProblems(client: pg.ClientBase): Promise<string[]> {
       problems.push(`${signature} is executable by ${actual}; EXECUTABLE_BY allows ${expected}.`);
     }
   }
-  for (const signature of EXECUTABLE_BY.keys()) {
-    if (!functions.rows.some((row) => row.signature === signature)) {
-      problems.push(`${signature} is listed in EXECUTABLE_BY but does not exist.`);
+  for (const [list, signatures] of [
+    ['EXECUTABLE_BY', EXECUTABLE_BY.keys()],
+    ['DEFINER_FUNCTIONS', DEFINER_FUNCTIONS.keys()],
+  ] as const) {
+    for (const signature of signatures) {
+      if (!functions.rows.some((row) => row.signature === signature)) {
+        problems.push(`${signature} is listed in ${list} but does not exist.`);
+      }
     }
   }
   return problems;

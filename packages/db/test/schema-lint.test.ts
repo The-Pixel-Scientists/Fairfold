@@ -201,7 +201,7 @@ describe('schema lint', () => {
         'PUBLIC holds SELECT on app.lint_good.',
         'PUBLIC holds UPDATE on column app.lint_good.created_at.',
         'PUBLIC holds USAGE on app.lint_sequence.',
-        'app.lint_definer() is SECURITY DEFINER, and no definer function is approved yet.',
+        'app.lint_definer() is SECURITY DEFINER and is not an approved definer function.',
         'PUBLIC can execute app.lint_definer().',
         `app.lint_definer() is executable by ${allRoles}; EXECUTABLE_BY allows no app role.`,
         'PUBLIC can execute migrations.lint_open().',

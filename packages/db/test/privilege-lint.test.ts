@@ -2,9 +2,9 @@
 //
 // The rights checks that ADR 0003 rule 4 and its role table add to the
 // schema lint: grant options, rights outside a role's own schema, default
-// privileges, schema grants to PUBLIC and rights on the audit tables. The
-// schema-lint test covers the rest, and runs these against the migrated
-// database.
+// privileges, schema grants to PUBLIC, rights on the audit tables, and the
+// approved definer functions and their owners. The schema-lint test covers
+// the rest, and runs these against the migrated database.
 
 import { describe, expect, it } from 'vitest';
 
@@ -60,6 +60,36 @@ describe('privilege lint', () => {
         'Role app_api can insert app.audit_event.retain_until, which the database sets.',
         'Role app_worker holds DELETE on the audit table app.audit_event.',
         'Role app_worker can insert app.audit_event.occurred_at, which the database sets.',
+      ].sort(),
+    );
+  });
+
+  it('reports a definer function without its pinned search_path, and an owner with unlisted rights, objects or policies', async () => {
+    const owner = 'Function owner owner_auth_session_context';
+    const problems = await asMigratorRolledBack(async (client) => {
+      await client.query(`
+        GRANT CREATE ON SCHEMA auth TO owner_auth_session_context;
+        SET LOCAL ROLE owner_auth_session_context;
+        ALTER FUNCTION auth.session_context(bytea) RESET search_path;
+        CREATE FUNCTION auth.lint_owned() RETURNS integer LANGUAGE sql RETURN 1;
+        REVOKE EXECUTE ON FUNCTION auth.lint_owned() FROM PUBLIC;
+        RESET ROLE;
+        GRANT SELECT (id) ON auth.account TO owner_auth_session_context;
+        REVOKE SELECT (status) ON auth."user" FROM owner_auth_session_context;
+        CREATE POLICY lint_extra ON auth.account FOR SELECT TO owner_auth_session_context
+          USING (true);
+      `);
+      return findPrivilegeProblems(client, [...EXCEPTED_SCHEMAS.keys()]);
+    });
+
+    expect(problems.sort()).toEqual(
+      [
+        'auth.session_context(bytea) does not set only search_path=pg_catalog, pg_temp.',
+        `${owner} owns function auth.lint_owned(), which is not approved.`,
+        `${owner} holds CREATE on schema auth, which is not approved.`,
+        `${owner} holds SELECT on column auth.account.id, which is not approved.`,
+        `${owner} lacks SELECT on column auth.user.status, which DEFINER_FUNCTIONS lists.`,
+        `${owner} is named in auth.account policy lint_extra, which is not approved.`,
       ].sort(),
     );
   });
