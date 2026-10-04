@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fairfold: open-source tools for funders, foundations and charities</title>
+<meta name="description" content="Fairfold is a suite of open-source tools for funders, foundations and charities, made by The Pixel Scientists. Our manifesto and timeline.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+@font-face {
+  font-family: "Atkinson Hyperlegible Next";
+  src: url("fonts/atkinson-hyperlegible-next-latin.woff2") format("woff2");
+  font-weight: 200 800;
+  font-display: swap;
+}
+:root {
+  --ink: #111111;
+  --muted: #555555;
+  --rule: #dddddd;
+  --paper: #ffffff;
+  --step: 1.5rem;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --ink: #f2f2f2; --muted: #b3b3b3; --rule: #3a3a3a; --paper: #111111; }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 400 1.0625rem/1.6 "Atkinson Hyperlegible Next", system-ui, sans-serif;
+}
+a { color: inherit; text-underline-offset: 0.18em; }
+a:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; border-radius: 2px; }
+.wrap { max-width: 46rem; margin: 0 auto; padding: 0 1.25rem; }
+.skip { position: absolute; left: -999px; }
+.skip:focus { left: 1rem; top: 1rem; background: var(--paper); padding: 0.5rem 0.75rem; }
+
+header { padding: 2.5rem 0 1rem; }
+.brand { display: inline-flex; align-items: center; gap: 0.75rem; text-decoration: none; }
+.brand svg { height: 2.25rem; width: auto; }
+.brand span { font-weight: 650; font-size: 1.75rem; letter-spacing: -0.01em; }
+nav ul { list-style: none; margin: 1.25rem 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.25rem 1.5rem; }
+
+h1 { font-size: clamp(1.9rem, 5vw, 2.6rem); line-height: 1.15; letter-spacing: -0.015em; margin: 3rem 0 1rem; font-weight: 700; }
+h2 { font-size: 1.5rem; margin: 0 0 1.25rem; font-weight: 700; }
+h3 { font-size: 1.0625rem; margin: 0 0 0.25rem; font-weight: 700; }
+p { margin: 0 0 1rem; }
+.lede { font-size: 1.25rem; color: var(--muted); }
+.status { display: inline-block; border: 1.5px solid var(--ink); border-radius: 999px; padding: 0.15rem 0.75rem; font-size: 0.95rem; margin: 0.5rem 0 0; }
+section { border-top: 1px solid var(--rule); padding: 3rem 0 2rem; margin-top: 3rem; }
+.mantra { font-size: 1.25rem; font-weight: 650; margin-bottom: 2rem; }
+
+.principles { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--step); }
+.principles li { padding-left: 1rem; border-left: 3px solid var(--ink); }
+.principles p { margin: 0; color: var(--muted); }
+
+/* Timeline: a line with one marker per stop. Filled is where we are now. */
+.timeline { list-style: none; margin: 0; padding: 0; position: relative; }
+.timeline::before { content: ""; position: absolute; left: 0.5625rem; top: 0.6rem; bottom: 0.6rem; width: 2px; background: var(--ink); }
+.timeline li { position: relative; padding: 0 0 1.75rem 2.5rem; }
+.timeline li:last-child { padding-bottom: 0; }
+.timeline li::before {
+  content: ""; position: absolute; left: 0; top: 0.3rem; width: 1.25rem; height: 1.25rem;
+  border: 2px solid var(--ink); border-radius: 50%; background: var(--paper);
+}
+.timeline li[aria-current]::before { background: var(--ink); }
+.when { display: block; font-size: 0.875rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.timeline p { margin: 0.15rem 0 0; color: var(--muted); }
+.now { font-size: 0.8125rem; font-weight: 700; border: 1.5px solid var(--ink); border-radius: 999px; padding: 0 0.5rem; margin-left: 0.5rem; vertical-align: 0.1em; color: var(--ink); }
+.note { font-size: 0.95rem; color: var(--muted); margin-top: 2rem; }
+
+footer { border-top: 1px solid var(--rule); margin-top: 3rem; padding: 2rem 0 3rem; font-size: 0.95rem; color: var(--muted); }
+footer p { margin: 0 0 0.5rem; }
+
+@media (min-width: 64rem) {
+  /* On wide screens the timeline runs left to right, wider than the text column. */
+  .timeline {
+    display: grid; grid-template-columns: repeat(7, 1fr); gap: 1.25rem;
+    width: min(70rem, calc(100vw - 2.5rem));
+    margin-inline: calc((100% - min(70rem, calc(100vw - 2.5rem))) / 2);
+  }
+  .timeline::before { left: 0.6rem; right: 0.6rem; top: 0.9rem; bottom: auto; width: auto; height: 2px; }
+  .timeline li { padding: 2.75rem 0 0; }
+  .timeline li::before { top: 0.3rem; left: 0; }
+  .timeline h3 { font-size: 0.98rem; line-height: 1.3; }
+  .timeline p { font-size: 0.875rem; line-height: 1.45; }
+  .now { display: inline-block; margin: 0.35rem 0 0; }
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to the content</a>
+<div class="wrap">
+<header>
+  <a class="brand" href="./" aria-label="Fairfold home">
+    <svg viewBox="-0.4 -0.4 10 5.8" aria-hidden="true" focusable="false"><path fill="currentColor" d="M0 0 L3.5 0 L3.66 1 L1 1 L1 2 L3.07 2 L3.23 3 L1 3 L1 5 L0 5 Z"/><path fill="currentColor" fill-rule="evenodd" d="M4.65 0 H8.75 A0.45 0.45 0 0 1 9.2 0.45 V4.55 A0.45 0.45 0 0 1 8.75 5 H5.45 A0.45 0.45 0 0 1 5 4.55 L4.2 0.45 A0.45 0.45 0 0 1 4.65 0 Z M6.15 1 L8.25 1 L8.25 1.6 L6.75 1.6 L6.75 2.2 L7.8 2.2 L7.8 2.8 L6.75 2.8 L6.75 4 L6.15 4 Z"/></svg>
+    <span>Fairfold</span>
+  </a>
+  <nav aria-label="On this page">
+    <ul>
+      <li><a href="#manifesto">Manifesto</a></li>
+      <li><a href="#timeline">Timeline</a></li>
+      <li><a href="https://github.com/The-Pixel-Scientists/Fairfold">Code on GitHub</a></li>
+    </ul>
+  </nav>
+</header>
+
+<main id="main">
+  <h1>Open-source tools for funders, foundations and charities</h1>
+  <p class="lede">Each tool stands on its own and runs on one shared platform. Fairfold Grants comes first, and every tool is planned to launch in 2027.</p>
+  <p class="status">In development. Not yet ready for real data.</p>
+
+  <section id="manifesto" aria-labelledby="manifesto-title">
+    <h2 id="manifesto-title">Manifesto</h2>
+    <p class="mantra">Substance is style. People, not programs.</p>
+    <ul class="principles">
+      <li>
+        <h3>The software is a gift. The value is the service.</h3>
+        <p>Every tool is open source and nothing is held back. Self-hosters get everything the managed service has. When you want help running it, you work with the people who built it.</p>
+      </li>
+      <li>
+        <h3>Your team first.</h3>
+        <p>We design from the bottom up, starting with the people who do the work every day. Your team shapes its own programmes, forms and stages, without waiting for a developer.</p>
+      </li>
+      <li>
+        <h3>People decide.</h3>
+        <p>Fairfold never rejects an application, awards a grant or makes a payment on its own. A named person does, and the record shows who.</p>
+      </li>
+      <li>
+        <h3>Applicants hear when you are ready.</h3>
+        <p>Recording a decision and telling the applicant are separate steps, so nobody learns an outcome early.</p>
+      </li>
+      <li>
+        <h3>Your data, whenever and wherever. No tie-in.</h3>
+        <p>Take your data out whenever you like, in open formats including the 360Giving Data Standard. Run Fairfold where you choose, on your own servers or with UK and EU providers. It runs on standard PostgreSQL, with no feature tied to one cloud.</p>
+      </li>
+      <li>
+        <h3>One tool or many.</h3>
+        <p>Use a single tool, or switch on several. They share one record of the organisations and people you work with, so you enter each fact once.</p>
+      </li>
+      <li>
+        <h3>Safe by design.</h3>
+        <p>The database itself keeps each organisation's records apart, and everything that matters goes in an audit log.</p>
+      </li>
+      <li>
+        <h3>Built for everyone.</h3>
+        <p>Every screen works with a keyboard and a screen reader and meets WCAG 2.2 AA.</p>
+      </li>
+      <li>
+        <h3>Honest about where we are.</h3>
+        <p>We say what works and what does not yet, and we publish our plans. Real data waits for an independent penetration test and accessibility audit.</p>
+      </li>
+    </ul>
+  </section>
+
+  <section id="timeline" aria-labelledby="timeline-title">
+    <h2 id="timeline-title">Timeline</h2>
+    <ol class="timeline">
+      <li aria-current="step">
+        <span class="when">Oct 2026</span>
+        <h3>A full funding round <span class="now">Now</span></h3>
+        <p>Fairfold Grants from set-up to release and export, on synthetic data.</p>
+      </li>
+      <li>
+        <span class="when">Nov to Dec 2026</span>
+        <h3>The shared platform</h3>
+        <p>Workflow, documents and e-signature, notifications with consent, permissions and search.</p>
+      </li>
+      <li>
+        <span class="when">Early 2027</span>
+        <h3>Independent testing</h3>
+        <p>A penetration test, Cyber Essentials Plus and an accessibility audit before any real data.</p>
+      </li>
+      <li>
+        <span class="when">Mar 2027</span>
+        <h3>First live round</h3>
+        <p>Grants goes live, with CRM, Due Diligence, Forms, Data Protection and Reporting.</p>
+      </li>
+      <li>
+        <span class="when">Jun 2027</span>
+        <h3>Running the money</h3>
+        <p>Payments, Impact, Governance, Communications, Integrations and more programme types.</p>
+      </li>
+      <li>
+        <span class="when">Sep 2027</span>
+        <h3>Beyond grants</h3>
+        <p>Activities, Fund Accounting, Recruitment, Volunteers, the Field App and the Bid Manager.</p>
+      </li>
+      <li>
+        <span class="when">Dec 2027</span>
+        <h3>Every tool launched</h3>
+        <p>Fundraising, Case Management, Membership, the Assistant, the Funding Map and the Organisation Profile.</p>
+      </li>
+    </ol>
+    <p class="note">These are plans, and dates can move. The <a href="https://github.com/The-Pixel-Scientists/Fairfold#the-fairfold-suite">repository</a> says what each tool will do.</p>
+  </section>
+</main>
+
+<footer>
+  <p>Fairfold is made by <a href="https://thepixelscientists.com">The Pixel Scientists</a>. Get in touch at <a href="mailto:info@thepixelscientists.com">info@thepixelscientists.com</a>.</p>
+  <p>Code is AGPL-3.0-or-later and documentation is CC BY 4.0. Set in Atkinson Hyperlegible Next (SIL Open Font Licence).</p>
+</footer>
+</div>
+</body>
+</html>
