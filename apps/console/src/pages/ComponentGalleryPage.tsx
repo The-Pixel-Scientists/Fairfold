@@ -22,6 +22,15 @@ import type { ErrorSummaryItem } from '@pixel-scientists/ui';
 import { useState } from 'react';
 import type { ReactNode, SubmitEvent } from 'react';
 
+import {
+  AnswerExample,
+  ConditionalExample,
+  EligibilityExample,
+  EmptyQuestionsExample,
+  ProblemQuestionsExample,
+  SaveStatusExample,
+} from './FormExamples.tsx';
+
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div className="flex flex-col gap-3">
@@ -225,6 +234,30 @@ export default function ComponentGalleryPage() {
 
       <Section title="Error summary">
         <ExampleForm />
+      </Section>
+
+      <Section title="Questions of every type">
+        <EmptyQuestionsExample />
+      </Section>
+
+      <Section title="Questions with problems">
+        <ProblemQuestionsExample />
+      </Section>
+
+      <Section title="Questions that come and go">
+        <ConditionalExample />
+      </Section>
+
+      <Section title="Answers that stop an applicant">
+        <EligibilityExample />
+      </Section>
+
+      <Section title="Answers to read">
+        <AnswerExample />
+      </Section>
+
+      <Section title="Save status">
+        <SaveStatusExample />
       </Section>
 
       <Section title="Empty and loading states">
