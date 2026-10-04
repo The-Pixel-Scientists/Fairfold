@@ -8,10 +8,14 @@ export { AppShell, MAIN_CONTENT_ID } from './AppShell.tsx';
 export type { AppShellProps } from './AppShell.tsx';
 export { Button, buttonClassName } from './Button.tsx';
 export type { ButtonProps, ButtonVariant } from './Button.tsx';
+export { CheckboxGroup } from './CheckboxGroup.tsx';
+export type { CheckboxGroupProps, CheckboxOption } from './CheckboxGroup.tsx';
 export { EmptyState } from './EmptyState.tsx';
 export type { EmptyStateProps } from './EmptyState.tsx';
 export { ErrorSummary } from './ErrorSummary.tsx';
 export type { ErrorSummaryItem, ErrorSummaryProps } from './ErrorSummary.tsx';
+export { FieldGroup } from './FieldGroup.tsx';
+export type { FieldGroupProps } from './FieldGroup.tsx';
 export { FormField, Input, Select, Textarea, useFormFieldControl } from './FormField.tsx';
 export type {
   FormFieldControlProps,
@@ -31,6 +35,7 @@ export type { SkipLinkProps } from './SkipLink.tsx';
 export { cx } from './cx.ts';
 export * from './auth/index.ts';
 export * from './dialog/index.ts';
+export * from './forms/index.ts';
 export * from './session/index.ts';
 export * from './router/index.ts';
 export * from './theme/index.ts';
