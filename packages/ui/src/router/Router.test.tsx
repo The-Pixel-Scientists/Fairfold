@@ -5,8 +5,8 @@ import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { Link, Router } from './index.ts';
-import type { PageModule, RouteDefinition } from './index.ts';
+import { InvalidAppPathError, Link, Router, useLocation } from './index.ts';
+import type { PageModule, RouteDefinition, SearchSchema } from './index.ts';
 import {
   Application,
   Home,
@@ -39,6 +39,30 @@ describe('Router: first page load', () => {
     renderRouter('/applications/42');
     expect(screen.getByRole('heading', { level: 1, name: 'Application 42' })).toBeTruthy();
     expect(document.title).toBe('Application 42 – Fairfold Grants console');
+  });
+
+  it('does not match a path whose parameters fail their check, so no title is built from them', () => {
+    renderRouter('/applications/%3Cb%3Ehi%3C%2Fb%3E');
+    expect(screen.getByRole('heading', { level: 1, name: 'Page not found' })).toBeTruthy();
+    expect(document.title).toBe('Page not found – Fairfold Grants console');
+    expect(document.title).not.toContain('<b>');
+  });
+
+  it('gives the page and the title only the parameters the schema accepted', () => {
+    const schema: SearchSchema<{ id: string }> = {
+      safeParse: () => ({ success: true, data: { id: 'checked' } }),
+    };
+    const checked: RouteDefinition[] = [
+      {
+        path: '/applications/:id',
+        params: schema,
+        title: (params) => `Application ${params['id'] ?? ''}`,
+        component: Application,
+      },
+    ];
+    renderRouter('/applications/raw', <Router routes={checked} />);
+    expect(screen.getByRole('heading', { level: 1, name: 'Application checked' })).toBeTruthy();
+    expect(document.title).toBe('Application checked');
   });
 
   it('uses the title alone when there is no suffix', () => {
@@ -539,6 +563,32 @@ describe('Router: base path', () => {
   it('treats an address outside the base path as not found', () => {
     renderWithBase('/other/');
     expect(screen.getByRole('heading', { level: 1, name: 'Page not found' })).toBeTruthy();
+  });
+});
+
+describe('Router: location', () => {
+  it('gives a page the address inside the app, without the base path', () => {
+    function Where() {
+      const { pathname, search, hash } = useLocation();
+      return <h1>{`${pathname}${search}${hash}`}</h1>;
+    }
+    renderRouter(
+      '/northfield/where?a=1#b',
+      <Router
+        routes={[{ path: '/where', title: 'Where', component: Where }]}
+        basePath="/northfield"
+      />,
+    );
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('/where?a=1#b');
+  });
+});
+
+describe('Router: base path checks', () => {
+  it('refuses a base path that is not plain segments', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    expect(() => renderRouter('/', <Router routes={routes} basePath="/a b" />)).toThrow(
+      InvalidAppPathError,
+    );
   });
 });
 

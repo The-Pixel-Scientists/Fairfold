@@ -98,10 +98,21 @@ export function Filters() {
   );
 }
 
+/** Application ids are numbers, so anything else is no application. */
+export const applicationParams: SearchSchema<{ id: string }> = {
+  safeParse(input) {
+    const id = (input as Record<string, string>)['id'];
+    return id !== undefined && /^[0-9]+$/.test(id)
+      ? { success: true, data: { id } }
+      : { success: false, error: 'Not an application id' };
+  },
+};
+
 export const routes: readonly RouteDefinition[] = [
   { path: '/', title: 'Programmes', component: Home },
   {
     path: '/applications/:id',
+    params: applicationParams,
     title: (params) => `Application ${params['id'] ?? ''}`,
     component: Application,
   },

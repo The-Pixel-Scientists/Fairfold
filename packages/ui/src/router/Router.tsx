@@ -142,9 +142,13 @@ function resolvePage(
   let found: { route: RouteDefinition; params: Params } | null = null;
   if (state.inBase) {
     for (const route of routes) {
-      const params = matchPath(route.path, state.location.pathname);
-      if (params) {
-        found = { route, params };
+      const matched = matchPath(route.path, state.location.pathname);
+      if (!matched) continue;
+      const checked = route.params
+        ? route.params.safeParse(matched)
+        : { success: true, data: matched };
+      if (checked.success) {
+        found = { route, params: checked.data };
         break;
       }
     }

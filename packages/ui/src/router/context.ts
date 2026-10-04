@@ -14,12 +14,29 @@ export type RoutePage =
   | { load: () => Promise<PageModule>; component?: never }
   | { component: ComponentType; load?: never };
 
+/**
+ * A page title that comes from the address can put anyone's words in the
+ * document title, so a title function needs a `params` schema, and gets only
+ * what the schema accepted.
+ */
+type RouteTitle =
+  | {
+      /** The page title. It becomes the document title. */
+      title: string;
+      /** Checks the path parameters. A route whose parameters fail does not match. */
+      params?: SearchSchema<Params>;
+    }
+  | {
+      /** The page title, built from the checked path parameters. */
+      title: (params: Params) => string;
+      params: SearchSchema<Params>;
+    };
+
 export type RouteDefinition = {
   /** A path pattern such as `/applications/:id`. */
   path: string;
-  /** The page title, or a function of the path parameters. It becomes the document title. */
-  title: string | ((params: Params) => string);
-} & RoutePage;
+} & RouteTitle &
+  RoutePage;
 
 /** A page the router shows on its own: for an unknown address, or when a page fails to load. */
 export type PageDefinition = { title: string } & RoutePage;
@@ -67,7 +84,12 @@ export function useNavigate(): NavigateFunction {
   return useRouterContext('useNavigate').navigate;
 }
 
-/** The parameters of the matched route, such as `id` for `/applications/:id`. */
+/** The address inside the app: the path after the base path, the search string and the hash. */
+export function useLocation(): RouterLocation {
+  return useRouterContext('useLocation').location;
+}
+
+/** The parameters of the matched route, such as `id` for `/applications/:id`, as its `params` schema accepted them. */
 export function useParams(): Params {
   return useRouterContext('useParams').params;
 }
