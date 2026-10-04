@@ -69,6 +69,15 @@
       "reason": "The SPDX list of licence exception identifiers, used by spdx-expression-parse in this licence check. A data file, used only in development and CI; it never ships.",
       "approver": "Aaron Gardner",
       "date": "2026-09-28"
+    },
+    {
+      "package": "argparse",
+      "version": "2.0.1",
+      "licence": "Python-2.0",
+      "scope": "development",
+      "reason": "Command-line parsing in js-yaml, through cosmiconfig in kysely-codegen, which generates the database types. Used only in development and CI; it never ships.",
+      "approver": "Aaron Gardner",
+      "date": "2026-10-04"
     }
   ]
 }
