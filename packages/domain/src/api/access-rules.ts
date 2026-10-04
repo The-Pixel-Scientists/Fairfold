@@ -4,8 +4,8 @@
 //   - console and portal routes need a permission of their own module and
 //     app, a scope rule of that app which the permission uses, and
 //     `stepUp: true` for changes under a step-up permission;
-//   - auth and public routes have neither, and auth routes state the session
-//     they need.
+//   - auth and public routes have neither, and auth routes belong to the
+//     platform module and state the session they need.
 // The fields are read as unknown: a cast or plain JavaScript can get past
 // the types.
 
@@ -66,6 +66,9 @@ export function accessProblems(route: AccessFields): string[] {
     problems.push(`A ${audience} route has no permission or scope.`);
   }
   if (stepUp !== undefined) problems.push('Only console and portal routes can need step-up.');
+  if (audience === 'auth' && module !== 'platform') {
+    problems.push('An auth route belongs to the platform module.');
+  }
   if (audience === 'auth' && !authSessions.some((value) => value === session)) {
     problems.push(`An auth route states the session it needs: ${authSessions.join(', ')}.`);
   }

@@ -1,6 +1,6 @@
 # Architecture rules
 
-These ten rules apply to every change to PixelGrant. They come from the
+These ten rules apply to every change to Fairfold. They come from the
 [V1 development plan](V1-PLAN.md#rules-the-team-must-hold-to) and the
 [architecture decision records](adr/). A change that would break one of them
 needs an ADR that names the exception and the guards that make it safe. There

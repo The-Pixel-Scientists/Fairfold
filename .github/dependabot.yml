@@ -61,7 +61,7 @@ updates:
         update-types: ['version-update:semver-major']
       # Built locally from infra/docker, whose base image the docker entry
       # above keeps up to date. It is on no registry for Dependabot to check.
-      - dependency-name: pixelgrant-dev-postgres
+      - dependency-name: tps-dev-postgres
     groups:
       docker-compose:
         patterns: ['*']

@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import type { FastifyInstance } from 'fastify';
 import { format, resolveConfig } from 'prettier';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { suiteName } from '@pixel-scientists/domain/platform';
 
 import { buildApp } from './app.ts';
 import { createLogger } from './logger.ts';
@@ -48,7 +49,7 @@ describe('GET /openapi.json', () => {
     expect(response.statusCode).toBe(200);
     expect(response.headers['content-type']).toContain('application/json');
     expect(document.openapi).toBe('3.1.0');
-    expect(document.info.title).toBe('PixelGrant API');
+    expect(document.info.title).toBe(`${suiteName} API`);
     expect(Object.keys(document.paths).sort()).toEqual(['/health', '/health/ready']);
     expect(Object.keys(document.paths['/health/ready'] ?? {})).toEqual(['get']);
   });

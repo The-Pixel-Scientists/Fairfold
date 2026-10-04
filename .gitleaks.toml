@@ -9,7 +9,7 @@
 # a global allowlist's path matches, whatever its other conditions, so a
 # global allowlist would hide a real secret added to the file.
 
-title = "PixelGrant"
+title = "Fairfold Grants"
 
 [extend]
 useDefault = true

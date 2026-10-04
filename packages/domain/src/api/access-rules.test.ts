@@ -87,6 +87,7 @@ describe('accessProblems for auth and public routes', () => {
       { session: undefined },
       { stepUp: true },
       { stepUp: false },
+      { module: 'grants' },
     ]) {
       expect(problemsWith(change, auth)).not.toEqual([]);
     }

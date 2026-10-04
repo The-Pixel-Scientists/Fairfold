@@ -7,6 +7,11 @@
 // column is missing from the map, or the map names a column that does not
 // exist.
 
+import { app } from './classification/app.ts';
+import { auth } from './classification/auth.ts';
+import { grants } from './classification/grants.ts';
+import { party } from './classification/party.ts';
+
 /** How sensitive a field's values are, from least to most. */
 export const SENSITIVITIES = ['public', 'internal', 'personal', 'special_category'] as const;
 
@@ -37,7 +42,9 @@ export type RetentionRule =
    */
   | { readonly kind: 'tenant_policy'; readonly policy: string; readonly minimumDays: number }
   /** Kept while the tenant is a customer, and deleted when it leaves. */
-  | { readonly kind: 'tenant_lifetime' };
+  | { readonly kind: 'tenant_lifetime' }
+  /** Kept while the person's account exists, and deleted with it. */
+  | { readonly kind: 'account_lifetime' };
 
 export interface FieldClassification {
   readonly sensitivity: Sensitivity;
@@ -49,5 +56,17 @@ export type ClassificationRegistry = Readonly<
   Record<string, Readonly<Record<string, FieldClassification>>>
 >;
 
-/** Empty until the first tables arrive. */
-export const classification: ClassificationRegistry = {};
+/**
+ * Every schema's map, from its own file in classification/ (ADR 0016). A
+ * file may name only its own schema's tables, so no table is in two maps.
+ */
+export const classification: ClassificationRegistry = Object.fromEntries(
+  Object.entries({ app, auth, party, grants }).flatMap(([schema, tables]) =>
+    Object.entries(tables).map(([table, fields]) => {
+      if (!table.startsWith(`${schema}.`)) {
+        throw new Error(`classification/${schema}.ts names ${table}, outside its schema.`);
+      }
+      return [table, fields] as const;
+    }),
+  ),
+);

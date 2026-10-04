@@ -16,6 +16,8 @@ import {
 } from 'react';
 import type { ComponentType, ReactNode } from 'react';
 
+import { Button } from '../Button.tsx';
+import { Dialog } from '../dialog/index.ts';
 import { focusElement, scrollBehavior } from '../focus.ts';
 import { LoadingState } from '../LoadingState.tsx';
 import { RouterContext } from './context.ts';
@@ -58,7 +60,7 @@ export interface RouterProps {
    * Leave it out for an app served from the root.
    */
   basePath?: string;
-  /** Added after each page title in the document title, for example "PixelGrant console". */
+  /** Added after each page title in the document title, for example "Fairfold Grants console". */
   titleSuffix?: string;
   /**
    * The frame around the page, such as AppShell. Define it at module level.
@@ -142,9 +144,13 @@ function resolvePage(
   let found: { route: RouteDefinition; params: Params } | null = null;
   if (state.inBase) {
     for (const route of routes) {
-      const params = matchPath(route.path, state.location.pathname);
-      if (params) {
-        found = { route, params };
+      const matched = matchPath(route.path, state.location.pathname);
+      if (!matched) continue;
+      const checked = route.params
+        ? route.params.safeParse(matched)
+        : { success: true, data: matched };
+      if (checked.success) {
+        found = { route, params: checked.data };
         break;
       }
     }
@@ -180,6 +186,14 @@ function useAfterDelay(active: boolean, delay: number): boolean {
   return active && elapsed;
 }
 
+/** A way out of a page with unsaved changes that is waiting for the person's answer. */
+interface LeaveRequest {
+  /** What the page being left says is at risk. */
+  message: string;
+  /** Carries on to where the person was going. */
+  proceed: () => void;
+}
+
 /**
  * Show the page for the browser's address and keep it in step with the back
  * and forward buttons.
@@ -192,6 +206,9 @@ function useAfterDelay(active: boolean, delay: number): boolean {
  * fails to load gets the title, announcement and focus of the error page. The
  * first page load keeps the browser's own focus. Changing only the search
  * string or the hash does none of this, so filters keep focus where it is.
+ *
+ * A page with unsaved changes (useLeaveGuard) gets a dialog before it is left,
+ * whether by a link, the back and forward buttons or a redirect.
  */
 export function Router({
   routes,
@@ -219,6 +236,9 @@ export function Router({
   const guards = useRef(new Set<LeaveGuard>());
   const historyIndex = useRef(0);
   const ignoreNextPop = useRef(false);
+  /** Set while a back or forward the person has agreed to is replayed, so it is not asked about twice. */
+  const agreedPop = useRef(false);
+  const [leaving, setLeaving] = useState<LeaveRequest | null>(null);
   const scrollPositions = useRef(new Map<number, number>());
   const scrollOnArrival = useRef<number | null>(null);
   const current = useRef({ pathname: state.location.pathname, inBase: state.inBase });
@@ -250,10 +270,11 @@ export function Router({
     };
   }, []);
 
-  /** True when no guard is active, or the person agrees to leave. */
-  const confirmLeave = useCallback((): boolean => {
+  /** Carries on at once when no page is guarding against it, and otherwise once the person agrees to leave. */
+  const confirmLeave = useCallback((proceed: () => void) => {
     const [first] = guards.current;
-    return first === undefined || window.confirm(first.message);
+    if (first === undefined) proceed();
+    else setLeaving({ message: first.message, proceed });
   }, []);
 
   const showLocation = useCallback(
@@ -295,22 +316,25 @@ export function Router({
     (to, options) => {
       const { location: next, href } = resolveAppPath(base, to);
 
+      const go = () => {
+        const { pathname, search, hash } = window.location;
+        const replace = options?.replace === true || href === `${pathname}${search}${hash}`;
+        const index = replace ? historyIndex.current : historyIndex.current + 1;
+        const existing: unknown = window.history.state;
+        const entry = withHistoryIndex(existing, index);
+        scrollPositions.current.set(historyIndex.current, window.scrollY);
+        if (replace) window.history.replaceState(entry, '', href);
+        else window.history.pushState(entry, '', href);
+        historyIndex.current = index;
+        scrollOnArrival.current = null;
+        showLocation({ location: next, inBase: true });
+      };
+
       const here = current.current;
       const leavingPage =
         !here.inBase || canonicalPath(here.pathname) !== canonicalPath(next.pathname);
-      if (leavingPage && !confirmLeave()) return;
-
-      const { pathname, search, hash } = window.location;
-      const replace = options?.replace === true || href === `${pathname}${search}${hash}`;
-      const index = replace ? historyIndex.current : historyIndex.current + 1;
-      const existing: unknown = window.history.state;
-      const entry = withHistoryIndex(existing, index);
-      scrollPositions.current.set(historyIndex.current, window.scrollY);
-      if (replace) window.history.replaceState(entry, '', href);
-      else window.history.pushState(entry, '', href);
-      historyIndex.current = index;
-      scrollOnArrival.current = null;
-      showLocation({ location: next, inBase: true });
+      if (leavingPage) confirmLeave(go);
+      else go();
     },
     [base, confirmLeave, showLocation],
   );
@@ -328,21 +352,35 @@ export function Router({
         here.inBase !== next.inBase ||
         canonicalPath(here.pathname) !== canonicalPath(next.location.pathname);
       const index = readHistoryIndex(event.state);
-      if (leavingPage && !confirmLeave()) {
-        if (index !== null && index !== historyIndex.current) {
-          // The browser has already moved; step back to where the person was.
-          ignoreNextPop.current = true;
-          window.history.go(historyIndex.current - index);
-        }
+      const agreed = agreedPop.current;
+      agreedPop.current = false;
+
+      const arrive = () => {
+        // The window is still scrolled as the page being left had it.
+        scrollPositions.current.set(historyIndex.current, window.scrollY);
+        if (index !== null) historyIndex.current = index;
+        scrollOnArrival.current = leavingPage
+          ? (scrollPositions.current.get(historyIndex.current) ?? 0)
+          : null;
+        showLocation(next);
+      };
+
+      if (!leavingPage || agreed || guards.current.size === 0) {
+        arrive();
         return;
       }
-      // The window is still scrolled as the page being left had it.
-      scrollPositions.current.set(historyIndex.current, window.scrollY);
-      if (index !== null) historyIndex.current = index;
-      scrollOnArrival.current = leavingPage
-        ? (scrollPositions.current.get(historyIndex.current) ?? 0)
-        : null;
-      showLocation(next);
+      if (index === null || index === historyIndex.current) {
+        confirmLeave(arrive);
+        return;
+      }
+      // The browser has already moved; step back to where the person was, and ask.
+      const steps = index - historyIndex.current;
+      ignoreNextPop.current = true;
+      window.history.go(-steps);
+      confirmLeave(() => {
+        agreedPop.current = true;
+        window.history.go(steps);
+      });
     }
     window.addEventListener('popstate', handlePopState);
     return () => {
@@ -405,6 +443,36 @@ export function Router({
       <RouteAnnouncer
         message={showPending ? loadingMessage : state.announcement.text}
         messageId={announcementId}
+      />
+      <Dialog
+        open={leaving !== null}
+        onOpenChange={(open) => {
+          if (!open) setLeaving(null);
+        }}
+        title="Leave this page?"
+        description={leaving?.message}
+        actions={
+          <>
+            <Button
+              variant="danger"
+              onClick={() => {
+                setLeaving(null);
+                leaving?.proceed();
+              }}
+            >
+              Leave and lose changes
+            </Button>
+            <Button
+              variant="primary"
+              data-autofocus
+              onClick={() => {
+                setLeaving(null);
+              }}
+            >
+              Stay on this page
+            </Button>
+          </>
+        }
       />
     </RouterContext.Provider>
   );

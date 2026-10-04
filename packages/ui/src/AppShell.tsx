@@ -10,7 +10,7 @@ import { SkipLink } from './SkipLink.tsx';
 export const MAIN_CONTENT_ID = 'main-content';
 
 export interface AppShellProps {
-  /** Shown in the header, for example "PixelGrant". */
+  /** Shown in the header, for example "Fairfold Grants". */
   productName: string;
   /**
    * A path inside the app, such as `/`. When set, the product name links to it.
@@ -82,7 +82,7 @@ export function AppShell({
             )}
             {areaName && <span className="text-body text-muted">{areaName}</span>}
           </p>
-          {actions && <div className="flex items-center gap-2">{actions}</div>}
+          {actions && <div className="flex flex-wrap items-center gap-x-3 gap-y-2">{actions}</div>}
         </header>
         {hasNavigation && (
           <nav

@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { productName } from '@pixel-scientists/domain/platform';
 
 import { App } from './App.tsx';
 
@@ -17,13 +18,11 @@ vi.mock('./pages/HowApplyingWorksPage.tsx', () => {
 });
 
 beforeEach(() => {
-  vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
   // React logs the error the page boundary catches.
   vi.spyOn(console, 'error').mockImplementation(() => undefined);
 });
 
 afterEach(() => {
-  cleanup();
   vi.restoreAllMocks();
   window.history.replaceState(null, '', '/');
   document.title = '';
@@ -39,7 +38,7 @@ describe('a page that fails to load', () => {
       render(<App />);
       await screen.findByRole(
         'heading',
-        { level: 1, name: 'Apply for a grant' },
+        { level: 1, name: "Use your funder's link" },
         { timeout: LOAD_TIMEOUT },
       );
 
@@ -56,7 +55,7 @@ describe('a page that fails to load', () => {
         },
         { timeout: LOAD_TIMEOUT },
       );
-      expect(document.title).toBe('We could not load this page – PixelGrant');
+      expect(document.title).toBe(`We could not load this page – ${productName}`);
       expect(screen.getByRole('status').textContent).toBe('We could not load this page');
       expect(screen.getByRole('main').textContent).toMatch(
         /Check that you are online, then reload the page\. If it still does not load, try again in a few minutes\./,

@@ -11,11 +11,27 @@ import { scramSha256Verifier } from './scram.ts';
 import { isLocalDevelopment, readSecret, type Env } from './settings.ts';
 
 /** Bump together with the version in roles.sql and database-privileges.sql. */
-export const ROLES_SCRIPT_VERSION = '1';
+export const ROLES_SCRIPT_VERSION = '3';
 
 /** The login roles that roles.sql creates, in the order it creates them. */
 export const LOGIN_ROLES = ['migrator', 'app_api', 'app_worker', 'app_auth', 'app_queue'] as const;
 export type LoginRole = (typeof LOGIN_ROLES)[number];
+
+/**
+ * The NOLOGIN owner of each approved definer function (ADRs 0003 and 0019),
+ * in the order roles.sql creates them after the login roles. migrator is a
+ * member of each with SET but not INHERIT, and that is the only membership
+ * any of these roles holds (ADR 0023).
+ */
+export const OWNER_ROLES = [
+  'owner_auth_session_context',
+  'owner_auth_session_memberships',
+  'owner_app_public_tenant',
+  'owner_app_public_tenant_logo',
+  'owner_app_create_tenant',
+] as const;
+
+const ALL_ROLES: readonly string[] = [...LOGIN_ROLES, ...OWNER_ROLES];
 
 const ROLES_SQL = new URL('./roles.sql', import.meta.url);
 const DATABASE_PRIVILEGES_SQL = new URL('./database-privileges.sql', import.meta.url);
@@ -27,12 +43,12 @@ const DEVELOPMENT_PASSWORD = /not-a-secret$/;
 
 /** The environment variable that holds each role's password. */
 export function passwordVariable(role: LoginRole): string {
-  return `PIXELGRANT_DB_${role.toUpperCase()}_PASSWORD`;
+  return `TPS_DB_${role.toUpperCase()}_PASSWORD`;
 }
 
 /**
  * Read a role's password and check it may be used here: long enough, and a
- * known development password only in development (PIXELGRANT_DEV=1) against
+ * known development password only in development (TPS_DEV=1) against
  * a server on this machine, so it can never be set on a shared server.
  */
 export function readRolePassword(env: Env, role: LoginRole): string {
@@ -91,7 +107,7 @@ export async function applyRoleVerifiers(
   await quietLogging(client);
   for (const role of LOGIN_ROLES) {
     await client.query('SELECT pg_catalog.set_config($1, $2, false)', [
-      `pixelgrant.scram_verifier_${role}`,
+      `tps.scram_verifier_${role}`,
       verifiers[role],
     ]);
   }
@@ -100,7 +116,7 @@ export async function applyRoleVerifiers(
   await client.query(readFileSync(ROLES_SQL, 'utf8'));
 }
 
-/** Run database-privileges.sql as a superuser, connected to a PixelGrant database. */
+/** Run database-privileges.sql as a superuser, connected to a Fairfold Grants database. */
 export async function applyDatabasePrivileges(client: pg.ClientBase): Promise<void> {
   await client.query(readFileSync(DATABASE_PRIVILEGES_SQL, 'utf8'));
 }
@@ -114,7 +130,8 @@ interface RoleRow {
   rolreplication: boolean;
   rolbypassrls: boolean;
   version_comment: string | null;
-  has_membership: boolean;
+  has_other_membership: boolean;
+  migrator_can_set: boolean;
   has_settings: boolean;
 }
 
@@ -136,19 +153,29 @@ export async function findRoleProblems(client: pg.ClientBase): Promise<string[]>
             pg_catalog.shobj_description(r.oid, 'pg_authid') AS version_comment,
             EXISTS (
               SELECT FROM pg_catalog.pg_auth_members m
-              WHERE m.member = r.oid OR m.roleid = r.oid
-            ) AS has_membership,
+              JOIN pg_catalog.pg_roles granted ON granted.oid = m.roleid
+              JOIN pg_catalog.pg_roles grantee ON grantee.oid = m.member
+              WHERE (m.member = r.oid OR m.roleid = r.oid)
+                AND NOT (grantee.rolname = 'migrator' AND granted.rolname = ANY($2::text[])
+                         AND m.set_option AND NOT m.inherit_option AND NOT m.admin_option)
+            ) AS has_other_membership,
+            EXISTS (
+              SELECT FROM pg_catalog.pg_auth_members m
+              JOIN pg_catalog.pg_roles grantee ON grantee.oid = m.member
+              WHERE m.roleid = r.oid AND grantee.rolname = 'migrator'
+                AND m.set_option AND NOT m.inherit_option AND NOT m.admin_option
+            ) AS migrator_can_set,
             EXISTS (
               SELECT FROM pg_catalog.pg_db_role_setting s WHERE s.setrole = r.oid
             ) AS has_settings
        FROM pg_catalog.pg_roles r
       WHERE r.rolname = ANY($1::text[])`,
-    [LOGIN_ROLES],
+    [ALL_ROLES, OWNER_ROLES],
   );
 
   const problems: string[] = [];
-  const expectedComment = `pixelgrant-roles-version=${ROLES_SCRIPT_VERSION}`;
-  for (const role of LOGIN_ROLES) {
+  const expectedComment = `tps-roles-version=${ROLES_SCRIPT_VERSION}`;
+  for (const role of ALL_ROLES) {
     const row = rows.find((candidate) => candidate.rolname === role);
     if (!row) {
       problems.push(`role ${role} does not exist`);
@@ -157,14 +184,19 @@ export async function findRoleProblems(client: pg.ClientBase): Promise<string[]>
     if (row.version_comment !== expectedComment) {
       problems.push(`role ${role} was not set up by roles script version ${ROLES_SCRIPT_VERSION}`);
     }
-    if (!row.rolcanlogin) problems.push(`role ${role} cannot log in`);
+    const login = (LOGIN_ROLES as readonly string[]).includes(role);
+    if (login && !row.rolcanlogin) problems.push(`role ${role} cannot log in`);
+    if (!login && row.rolcanlogin) problems.push(`role ${role} can log in`);
     if (row.rolsuper) problems.push(`role ${role} is a superuser`);
     if (row.rolbypassrls) problems.push(`role ${role} bypasses row-level security`);
     if (row.rolcreaterole) problems.push(`role ${role} can create roles`);
     if (row.rolcreatedb) problems.push(`role ${role} can create databases`);
     if (row.rolreplication) problems.push(`role ${role} can start replication`);
-    if (row.has_membership) {
-      problems.push(`role ${role} is a member of, or has members in, another role`);
+    if (row.has_other_membership) {
+      problems.push(`role ${role} has a role membership the roles script does not grant`);
+    }
+    if (!login && !row.migrator_can_set) {
+      problems.push(`migrator is not a SET-only member of role ${role}`);
     }
     if (row.has_settings) problems.push(`role ${role} has its own settings`);
   }

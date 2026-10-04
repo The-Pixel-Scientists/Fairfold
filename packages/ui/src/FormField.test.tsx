@@ -1,12 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { cleanup, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
-import { FormField, Input, Textarea, useFormFieldControl } from './FormField.tsx';
-
-afterEach(cleanup);
+import { FormField, Input, Select, Textarea, useFormFieldControl } from './FormField.tsx';
 
 describe('FormField', () => {
   it('labels the control, so the label names it and clicking the label focuses it', async () => {
@@ -168,5 +166,25 @@ describe('FormField', () => {
     );
     await user.type(screen.getByRole('textbox', { name: 'Programme name' }), 'Small grants');
     expect(screen.getByRole<HTMLInputElement>('textbox').value).toBe('Small grants');
+  });
+});
+
+describe('Select', () => {
+  it('is named by its label, described by its hint and error, and chooses with the keyboard', async () => {
+    const user = userEvent.setup();
+    render(
+      <FormField label="Time zone" hint="Deadlines use it." error="Choose a time zone.">
+        <Select defaultValue="Europe/London">
+          <option>Europe/London</option>
+          <option>Europe/Paris</option>
+        </Select>
+      </FormField>,
+    );
+
+    const select = screen.getByRole<HTMLSelectElement>('combobox', { name: 'Time zone' });
+    expect(select.getAttribute('aria-invalid')).toBe('true');
+    expect(select.getAttribute('aria-describedby')?.split(' ')).toHaveLength(2);
+    await user.selectOptions(select, 'Europe/Paris');
+    expect(select.value).toBe('Europe/Paris');
   });
 });

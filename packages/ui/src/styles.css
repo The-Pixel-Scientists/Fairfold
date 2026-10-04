@@ -1,7 +1,9 @@
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+
 /*
  * Entry stylesheet for the console and portal. Import it once from each app:
  *
- *   import '@pixelgrant/ui/styles.css';
+ *   import '@pixel-scientists/ui/styles.css';
  *
  * It loads Tailwind, the design tokens and the base rules for focus and
  * reduced motion, and tells Tailwind to read the components in this package.

@@ -4,7 +4,7 @@
 // goes back or forward and then declines to leave a page with unsaved
 // changes, it knows how far to step to put them back.
 
-const INDEX_KEY = 'pixelgrantHistoryIndex';
+const INDEX_KEY = 'tpsHistoryIndex';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;

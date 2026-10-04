@@ -80,8 +80,8 @@ Isolation and naming:
   project name, with data in named volumes.
 - A script derives names from the worktree folder, lower-cased with every
   character outside `[a-z0-9_]` replaced by `_`: database
-  `pixelgrant_<worktree>` (for example `pixelgrant_2026_w40`), test database
-  `pixelgrant_<worktree>_test`, bucket `pixelgrant-<worktree>` (with hyphens,
+  `tps_<worktree>` (for example `tps_2026_w40`), test database
+  `tps_<worktree>_test`, bucket `tps-<worktree>` (with hyphens,
   as S3 requires), and a block of ports for the API, console and portal. Two
   worktrees never share any of them.
 - The console and portal are served as `console.localhost` and
@@ -97,7 +97,7 @@ Isolation and naming:
   shortened and given a hash of the full name, so two long names never
   collide.
 - `pnpm db:drop` refuses any database name that does not start with
-  `pixelgrant_`.
+  `tps_`.
 - The roles script from [ADR 0003](0003-query-builder-and-migrations.md)
   runs as superuser when the Postgres container is first created, and again
   before each migration run. Migrations never create or alter a role.
@@ -121,7 +121,7 @@ Credentials and seed data:
   127.0.0.1. `pnpm dev` and the seed command set it; release images and the
   services `pnpm stack` runs never do. There are no fallback values in code.
 - Seeding refuses to run without the development flag, or when the database
-  name does not start with `pixelgrant_`. Seed code and fixtures are not
+  name does not start with `tps_`. Seed code and fixtures are not
   copied into release images.
 
 Files:

@@ -1,8 +1,8 @@
 {
-  "name": "@pixelgrant/portal",
+  "name": "@pixel-scientists/portal",
   "version": "0.0.0",
   "private": true,
-  "description": "PixelGrant applicant portal",
+  "description": "Fairfold Grants applicant portal",
   "license": "AGPL-3.0-or-later",
   "type": "module",
   "scripts": {
@@ -11,8 +11,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@pixelgrant/domain": "workspace:*",
-    "@pixelgrant/ui": "workspace:*",
+    "@pixel-scientists/domain": "workspace:*",
+    "@pixel-scientists/ui": "workspace:*",
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },

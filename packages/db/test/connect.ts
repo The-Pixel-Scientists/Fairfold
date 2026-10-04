@@ -24,7 +24,7 @@ export function connectionSettings(role: LoginRole): {
 } {
   return {
     ...readServer(env),
-    database: readDatabaseName(env, 'PIXELGRANT_TEST_DB_NAME'),
+    database: readDatabaseName(env, 'TPS_TEST_DB_NAME'),
     user: role,
     password: readRolePassword(env, role),
   };
@@ -43,7 +43,7 @@ export function databaseSettings(
     role,
     password,
     maxConnections,
-    applicationName: 'pixelgrant-db-tests',
+    applicationName: 'tps-db-tests',
   };
 }
 

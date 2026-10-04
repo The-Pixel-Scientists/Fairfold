@@ -2,6 +2,8 @@
 //
 // Route contracts and the apps' API client: the `/api` subpath of the domain package.
 
+import '../jitless/index.ts';
+
 export {
   apiBasePath,
   call,
@@ -18,6 +20,14 @@ export {
   defineRoute,
   methods,
   type Audience,
+  type JsonRouteContract,
   type Method,
   type RouteContract,
 } from './route.ts';
+export {
+  isRawBody,
+  rawContentTypes,
+  type RawBody,
+  type RawContentType,
+  type ResponseBody,
+} from './schema-rules.ts';

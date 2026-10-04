@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import type { ClassificationRegistry } from '@pixelgrant/db/classification';
+import type { ClassificationRegistry } from '@pixel-scientists/db/classification';
 import { runInNewContext } from 'node:vm';
 
 import { describe, expect, it } from 'vitest';
@@ -24,7 +24,7 @@ describe('log lines', () => {
     const [line] = logs.lines();
     expect(line).toMatchObject({
       level: 'info',
-      service: 'pixelgrant-api',
+      service: 'tps-api',
       msg: 'Programme opened',
       programmeId: '0c7c3d1e-6c4e-4f4e-9d52-0e0a8d2c9a11',
     });

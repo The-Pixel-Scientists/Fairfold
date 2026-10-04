@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# What Semgrep skips. This file replaces Semgrep's own list, which also skips
+# every test/ and tests/ folder: tests are scanned like any other code. Only
+# installed packages and build output are left out.
+
+node_modules/
+dist/
+build/

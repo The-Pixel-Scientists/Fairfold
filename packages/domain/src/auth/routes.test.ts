@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import { checkRoute } from '../api/route.ts';
 import { authEventCodes } from './events.ts';
+import * as invitation from './invitation-routes.ts';
 import * as mfa from './mfa-routes.ts';
 import * as auth from './routes.ts';
 
@@ -15,9 +16,11 @@ describe('auth routes', () => {
   });
 
   it('are all listed in authRoutes', () => {
-    const exported = [...Object.values(auth), ...Object.values(mfa)].filter(
-      (value) => typeof value === 'object' && 'audience' in value,
-    );
+    const exported = [
+      ...Object.values(auth),
+      ...Object.values(mfa),
+      ...Object.values(invitation),
+    ].filter((value) => typeof value === 'object' && 'audience' in value);
     expect(new Set(exported)).toEqual(new Set(routes));
   });
 
@@ -42,6 +45,11 @@ describe('auth routes', () => {
       expect(Object.keys(route.body.shape)).toEqual(['token', 'password']);
       expect(route.session).toBe('none');
     }
+  });
+
+  it('accept an invitation with its token alone, from a complete session', () => {
+    expect(Object.keys(invitation.acceptInvitation.body.shape)).toEqual(['token']);
+    expect(invitation.acceptInvitation.session).toBe('complete');
   });
 
   it('switch tenant by membership id, never by tenant', () => {

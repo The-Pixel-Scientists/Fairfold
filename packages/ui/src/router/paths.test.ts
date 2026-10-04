@@ -98,9 +98,35 @@ describe('normalizeBasePath', () => {
     expect(normalizeBasePath('/console/')).toBe('/console');
   });
 
+  it('accepts one or more plain segments, such as a tenant slug', () => {
+    expect(normalizeBasePath('/northfield')).toBe('/northfield');
+    expect(normalizeBasePath('/a.b_c~d-9/console')).toBe('/a.b_c~d-9/console');
+  });
+
   it('refuses a base that is not an app path', () => {
     expect(() => normalizeBasePath('//evil.example')).toThrow(InvalidAppPathError);
     expect(() => normalizeBasePath('console')).toThrow(InvalidAppPathError);
+  });
+
+  it('refuses anything but plain segments, and never repeats it', () => {
+    const crafted = [
+      '/a b',
+      '/a?x=1',
+      '/a#x',
+      '/a%2fb',
+      '/a\b',
+      '/a//b',
+      '/a:b',
+      '/@evil',
+      '/..',
+      '/.',
+      '/a/../b',
+      '/%2e%2e',
+    ];
+    for (const base of crafted) {
+      expect(() => normalizeBasePath(base), base).toThrow(InvalidAppPathError);
+      expect(() => normalizeBasePath(base), base).not.toThrow('evil');
+    }
   });
 });
 
@@ -147,6 +173,13 @@ describe('searchToRecord', () => {
   it('drops keys that could reach an object prototype', () => {
     const record = searchToRecord('?__proto__=a&constructor=b&prototype=c&stage=review');
     expect(record).toEqual({ stage: 'review' });
-    expect(Object.getPrototypeOf(record)).toBe(Object.prototype);
+  });
+
+  it('returns a record with no prototype, so no key can shadow a method', () => {
+    const record = searchToRecord('?toString=a&hasOwnProperty=b&valueOf=c');
+    expect(Object.getPrototypeOf(record)).toBeNull();
+    expect(Object.entries(record)[0]).toEqual(['toString', 'a']);
+    expect(Object.keys(record)).toEqual(['toString', 'hasOwnProperty', 'valueOf']);
+    expect(Object.getPrototypeOf(searchToRecord(''))).toBeNull();
   });
 });

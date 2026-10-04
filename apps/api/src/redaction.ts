@@ -12,7 +12,7 @@
 //     censored, and `relationship` is not.
 //   - An error found in a logged object is described by serializeError().
 
-import { classification, type ClassificationRegistry } from '@pixelgrant/db/classification';
+import { classification, type ClassificationRegistry } from '@pixel-scientists/db/classification';
 
 import { Secret } from './config.ts';
 import { isError, serializeError } from './serialize-error.ts';

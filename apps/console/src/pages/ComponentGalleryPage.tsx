@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import { ProblemError } from '@pixel-scientists/domain/api';
 import {
+  AuthenticatorKey,
   Button,
+  Dialog,
   EmptyState,
   ErrorSummary,
   FormField,
@@ -9,12 +12,24 @@ import {
   Link,
   LoadingState,
   PageHeading,
+  RadioGroup,
+  Select,
+  StepUpDialog,
   Textarea,
   buttonClassName,
-} from '@pixelgrant/ui';
-import type { ErrorSummaryItem } from '@pixelgrant/ui';
+} from '@pixel-scientists/ui';
+import type { ErrorSummaryItem } from '@pixel-scientists/ui';
 import { useState } from 'react';
 import type { ReactNode, SubmitEvent } from 'react';
+
+import {
+  AnswerExample,
+  ConditionalExample,
+  EligibilityExample,
+  EmptyQuestionsExample,
+  ProblemQuestionsExample,
+  SaveStatusExample,
+} from './FormExamples.tsx';
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -28,6 +43,34 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 function fieldValue(data: FormData, name: string): string {
   const value = data.get(name);
   return typeof value === 'string' ? value.trim() : '';
+}
+
+/** A question with a few answers, and a list to choose from, so they can be tried by keyboard. */
+function ChoiceExamples() {
+  const [corners, setCorners] = useState('standard');
+  return (
+    <div className="flex max-w-xl flex-col gap-4">
+      <RadioGroup
+        legend="Corners"
+        name="corners"
+        value={corners}
+        onValueChange={setCorners}
+        hint="Changes how rounded buttons and panels look."
+        options={[
+          { value: 'standard', label: 'Standard', hint: 'Small rounded corners.' },
+          { value: 'rounded', label: 'Rounded', hint: 'Larger rounded corners.' },
+          { value: 'square', label: 'Square' },
+        ]}
+      />
+      <FormField label="Financial year starts in" hint="The month your financial year begins.">
+        <Select defaultValue="4">
+          <option value="1">January</option>
+          <option value="4">April</option>
+          <option value="10">October</option>
+        </Select>
+      </FormField>
+    </div>
+  );
 }
 
 /** A form that fails the way real ones do, so the error pattern can be tried by keyboard. */
@@ -82,6 +125,60 @@ function ExampleForm() {
   );
 }
 
+/** The dialogs, each opened by a button, so the focus and keyboard behaviour can be tried by hand. */
+function DialogExamples() {
+  const [plain, setPlain] = useState(false);
+  const [stepUp, setStepUp] = useState(false);
+
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      <Button
+        onClick={() => {
+          setPlain(true);
+        }}
+      >
+        Open dialog
+      </Button>
+      <Button
+        onClick={() => {
+          setStepUp(true);
+        }}
+      >
+        Open step-up dialog
+      </Button>
+      <Dialog
+        open={plain}
+        onOpenChange={setPlain}
+        title="Switch funder"
+        description="Choose the funder to work for. You will be taken to its console."
+        actions={
+          <>
+            <Button
+              onClick={() => {
+                setPlain(false);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button variant="primary" data-autofocus>
+              Switch to Eastmere Trust
+            </Button>
+          </>
+        }
+      />
+      <StepUpDialog
+        open={stepUp}
+        onOpenChange={setStepUp}
+        onConfirm={() =>
+          Promise.reject(
+            new ProblemError(401, 'Your password or code is not right. Check them and try again.'),
+          )
+        }
+      />
+    </div>
+  );
+}
+
 /**
  * Every shared component in its main states, for checking them by eye and
  * with axe in a real browser. Development builds only.
@@ -102,7 +199,7 @@ export default function ComponentGalleryPage() {
           <Button variant="quiet">Cancel changes</Button>
           <Button disabled>Release decisions</Button>
           <Link to="/" className={buttonClassName('secondary')}>
-            Go to programmes
+            Go to the start page
           </Link>
         </div>
       </Section>
@@ -131,8 +228,36 @@ export default function ComponentGalleryPage() {
         </div>
       </Section>
 
+      <Section title="Choices">
+        <ChoiceExamples />
+      </Section>
+
       <Section title="Error summary">
         <ExampleForm />
+      </Section>
+
+      <Section title="Questions of every type">
+        <EmptyQuestionsExample />
+      </Section>
+
+      <Section title="Questions with problems">
+        <ProblemQuestionsExample />
+      </Section>
+
+      <Section title="Questions that come and go">
+        <ConditionalExample />
+      </Section>
+
+      <Section title="Answers that stop an applicant">
+        <EligibilityExample />
+      </Section>
+
+      <Section title="Answers to read">
+        <AnswerExample />
+      </Section>
+
+      <Section title="Save status">
+        <SaveStatusExample />
       </Section>
 
       <Section title="Empty and loading states">
@@ -144,6 +269,17 @@ export default function ComponentGalleryPage() {
           Share the programme link to start receiving applications.
         </EmptyState>
         <LoadingState label="Loading applications" className="rounded-lg bg-surface" />
+      </Section>
+
+      <Section title="Dialogs">
+        <DialogExamples />
+      </Section>
+
+      <Section title="Authenticator set-up key">
+        <AuthenticatorKey
+          secret="JBSWY3DPEHPK3PXP"
+          uri="otpauth://totp/Example:ada@example.org?secret=JBSWY3DPEHPK3PXP&issuer=Example"
+        />
       </Section>
 
       <Section title="Links between pages">

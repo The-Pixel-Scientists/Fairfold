@@ -1,0 +1,19 @@
+{
+  "name": "@pixel-scientists/party",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Party core: organisations, people, the relationships between them, and consent",
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "exports": {
+    "./contracts": "./src/contracts/index.ts",
+    "./server": "./src/server/index.ts",
+    "./console": "./src/console/index.ts",
+    "./portal": "./src/portal/index.ts"
+  },
+  "dependencies": {
+    "@pixel-scientists/db": "workspace:*",
+    "@pixel-scientists/domain": "workspace:*",
+    "zod": "4.6.5"
+  }
+}

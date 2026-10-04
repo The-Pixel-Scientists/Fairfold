@@ -3,7 +3,7 @@
 // Pages, routes and helpers shared by the router's tests. Not exported from
 // the package.
 
-import { cleanup, render } from '@testing-library/react';
+import { render } from '@testing-library/react';
 import type { RenderResult } from '@testing-library/react';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
@@ -98,10 +98,21 @@ export function Filters() {
   );
 }
 
+/** Application ids are numbers, so anything else is no application. */
+export const applicationParams: SearchSchema<{ id: string }> = {
+  safeParse(input) {
+    const id = (input as Record<string, string>)['id'];
+    return id !== undefined && /^[0-9]+$/.test(id)
+      ? { success: true, data: { id } }
+      : { success: false, error: 'Not an application id' };
+  },
+};
+
 export const routes: readonly RouteDefinition[] = [
   { path: '/', title: 'Programmes', component: Home },
   {
     path: '/applications/:id',
+    params: applicationParams,
     title: (params) => `Application ${params['id'] ?? ''}`,
     component: Application,
   },
@@ -111,7 +122,7 @@ export const routes: readonly RouteDefinition[] = [
 
 export function renderRouter(path = '/', ui?: ReactNode): RenderResult {
   window.history.replaceState(null, '', path);
-  return render(ui ?? <Router routes={routes} titleSuffix="PixelGrant console" />);
+  return render(ui ?? <Router routes={routes} titleSuffix="Fairfold Grants console" />);
 }
 
 export function announcement(): string {
@@ -145,20 +156,19 @@ export function onCleanup(undo: () => void): void {
   cleanups.push(undo);
 }
 
-/** The spy on window.scrollTo, which jsdom does not implement. */
+/** The spy on window.scrollTo, which the set-up file stubs because jsdom does not implement it. */
 export function scrollTo(): MockInstance<typeof window.scrollTo> {
   if (!scrollToSpy) throw new Error('Call setUpRouterTests() at the top of the test file.');
   return scrollToSpy;
 }
 
-/** Call once at the top of a test file: stub scrolling, and reset the page between tests. */
+/** Call once at the top of a test file: spy on scrolling, and reset the page between tests. */
 export function setUpRouterTests(): void {
   beforeEach(() => {
-    scrollToSpy = vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
+    scrollToSpy = vi.spyOn(window, 'scrollTo');
   });
 
   afterEach(() => {
-    cleanup();
     for (const undo of cleanups.splice(0)) undo();
     vi.restoreAllMocks();
     window.history.replaceState(null, '', '/');

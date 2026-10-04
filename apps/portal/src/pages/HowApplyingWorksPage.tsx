@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { Link, PageHeading, buttonClassName } from '@pixelgrant/ui';
+import { Link, PageHeading, buttonClassName } from '@pixel-scientists/ui';
 
 import { HOME_PATH } from '../paths.ts';
 import { PageColumn } from '../PageColumn.tsx';
@@ -35,7 +35,7 @@ export default function HowApplyingWorksPage() {
           you begin, each grant will tell you how long it takes and what you need to have ready.
         </p>
       </div>
-      <ol className="flex flex-col gap-6">
+      <ol role="list" className="flex flex-col gap-6">
         {steps.map((step, index) => (
           <li
             key={step.title}

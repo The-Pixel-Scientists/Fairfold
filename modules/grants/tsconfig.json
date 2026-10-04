@@ -1,0 +1,12 @@
+// Contracts and server code (tsconfig.server.json), and contracts and screens (tsconfig.web.json), are checked separately.
+{
+  "files": [],
+  "references": [
+    {
+      "path": "./tsconfig.server.json"
+    },
+    {
+      "path": "./tsconfig.web.json"
+    }
+  ]
+}

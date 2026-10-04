@@ -1,18 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
+import { productName } from '@pixel-scientists/domain/platform';
 
 import { App } from './App.tsx';
-
-beforeEach(() => {
-  vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
-});
+import { sentencesIn } from './testing/render.tsx';
 
 afterEach(() => {
-  cleanup();
-  vi.restoreAllMocks();
   window.history.replaceState(null, '', '/');
   document.title = '';
 });
@@ -22,48 +18,42 @@ function openPortal(path = '/') {
   return render(<App />);
 }
 
-/** Each paragraph and heading in the main landmark, split into sentences. */
-function sentencesIn(main: HTMLElement): string[] {
-  return Array.from(main.querySelectorAll('h1, h2, p'))
-    .flatMap((block) => block.textContent.split(/(?<=[.?!])\s+/))
-    .map((sentence) => sentence.trim())
-    .filter((sentence) => sentence !== '');
-}
-
-describe('home page', () => {
+describe('the page outside a funder', () => {
   it('has one h1, a title that says where you are, and a main landmark', async () => {
     openPortal();
 
     expect(
-      await screen.findByRole('heading', { level: 1, name: 'Apply for a grant' }),
+      await screen.findByRole('heading', { level: 1, name: "Use your funder's link" }),
     ).toBeTruthy();
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
-    expect(document.title).toBe('Apply for a grant – PixelGrant');
-    expect(screen.getByRole('banner').textContent).toContain('PixelGrant');
+    expect(document.title).toBe("Use your funder's link – Fairfold Grants");
+    expect(screen.getByRole('banner').textContent).toContain(productName);
     expect(screen.getByRole('main').contains(screen.getByRole('heading', { level: 1 }))).toBe(true);
   });
 
-  it('says plainly that no grants are open and what to do next', async () => {
-    openPortal();
-
-    expect(
-      await screen.findByRole('heading', { level: 2, name: 'No grants are open yet' }),
-    ).toBeTruthy();
-    expect(screen.getByText(/You do not need to do anything now\./)).toBeTruthy();
-    expect(screen.getByRole('link', { name: 'Read how applying works' }).getAttribute('href')).toBe(
-      '/how-applying-works',
-    );
-  });
-
-  it('says what will happen, in the future tense, because applying is not built yet', async () => {
+  it('says what to open instead, and what to do without the link', async () => {
     openPortal();
     await screen.findByRole('heading', { level: 1 });
 
     expect(
       screen.getByText(
-        'When a grant opens, you will check that you can apply first. Then you will fill in your application at your own pace.',
+        `To apply for a grant, open the link your funder gave you. It ends with the funder's name, like ${window.location.host}/northfield.`,
       ),
     ).toBeTruthy();
+    expect(
+      screen.getByText('If you do not have the link, ask the funder to send it to you again.'),
+    ).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Read how applying works' }).getAttribute('href')).toBe(
+      '/how-applying-works',
+    );
+  });
+
+  it('offers no way to sign in, because nobody can here', async () => {
+    openPortal();
+    await screen.findByRole('heading', { level: 1 });
+
+    expect(screen.queryByRole('link', { name: 'Sign in' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Create an account' })).toBeNull();
   });
 
   it('has no navigation landmark, because each screen is one task', async () => {
@@ -76,7 +66,7 @@ describe('home page', () => {
     openPortal();
     await screen.findByRole('heading', { level: 1 });
 
-    const home = within(screen.getByRole('banner')).getByRole('link', { name: 'PixelGrant' });
+    const home = within(screen.getByRole('banner')).getByRole('link', { name: productName });
     expect(home.getAttribute('href')).toBe('/');
     expect(home.getAttribute('aria-current')).toBe('page');
   });
@@ -104,7 +94,7 @@ describe('moving between pages', () => {
   it('moves focus to the new heading and updates the title when you follow a link', async () => {
     const user = userEvent.setup();
     openPortal();
-    await screen.findByRole('heading', { level: 1, name: 'Apply for a grant' });
+    await screen.findByRole('heading', { level: 1, name: "Use your funder's link" });
 
     screen.getByRole('link', { name: 'Read how applying works' }).focus();
     await user.keyboard('{Enter}');
@@ -113,7 +103,7 @@ describe('moving between pages', () => {
     await waitFor(() => {
       expect(document.activeElement).toBe(heading);
     });
-    expect(document.title).toBe('How applying works – PixelGrant');
+    expect(document.title).toBe(`How applying works – ${productName}`);
     expect(window.location.pathname).toBe('/how-applying-works');
     expect(screen.getByRole('status').textContent).toBe('Navigated to How applying works');
   });
@@ -125,11 +115,14 @@ describe('moving between pages', () => {
 
     await user.click(screen.getByRole('link', { name: 'Back to the home page' }));
 
-    const heading = await screen.findByRole('heading', { level: 1, name: 'Apply for a grant' });
+    const heading = await screen.findByRole('heading', {
+      level: 1,
+      name: "Use your funder's link",
+    });
     await waitFor(() => {
       expect(document.activeElement).toBe(heading);
     });
-    expect(document.title).toBe('Apply for a grant – PixelGrant');
+    expect(document.title).toBe("Use your funder's link – Fairfold Grants");
   });
 
   it('goes home from the header link, with focus on the home heading', async () => {
@@ -137,21 +130,24 @@ describe('moving between pages', () => {
     openPortal('/how-applying-works');
     await screen.findByRole('heading', { level: 1, name: 'How applying works' });
 
-    await user.click(within(screen.getByRole('banner')).getByRole('link', { name: 'PixelGrant' }));
+    await user.click(within(screen.getByRole('banner')).getByRole('link', { name: productName }));
 
-    const heading = await screen.findByRole('heading', { level: 1, name: 'Apply for a grant' });
+    const heading = await screen.findByRole('heading', {
+      level: 1,
+      name: "Use your funder's link",
+    });
     await waitFor(() => {
       expect(document.activeElement).toBe(heading);
     });
-    expect(document.title).toBe('Apply for a grant – PixelGrant');
+    expect(document.title).toBe("Use your funder's link – Fairfold Grants");
     expect(window.location.pathname).toBe('/');
   });
 
   it('says so, and offers a way home, when the address matches nothing', async () => {
-    openPortal('/nothing/here');
+    openPortal('/Nothing/here');
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Page not found' })).toBeTruthy();
-    expect(document.title).toBe('Page not found – PixelGrant');
+    expect(document.title).toBe(`Page not found – ${productName}`);
     expect(screen.getByRole('link', { name: 'Go to the home page' }).getAttribute('href')).toBe(
       '/',
     );
@@ -195,7 +191,7 @@ describe('how applying works page', () => {
 });
 
 describe('plain English', () => {
-  it.each(['/', '/how-applying-works', '/nothing/here'])(
+  it.each(['/', '/how-applying-works', '/Nothing/here'])(
     'keeps every sentence on %s short, for a reading age of about 11',
     async (path) => {
       openPortal(path);

@@ -5,7 +5,7 @@
 // to every line written through `request.log`. What may appear in a line is
 // decided in redaction.ts, and how a request appears in request-serializer.ts.
 
-import type { ClassificationRegistry } from '@pixelgrant/db/classification';
+import type { ClassificationRegistry } from '@pixel-scientists/db/classification';
 import {
   pino,
   stdTimeFunctions,
@@ -46,7 +46,7 @@ export function createLogger(options: LoggerOptions): Logger {
   const logger = pino(
     {
       level: options.level,
-      base: { service: 'pixelgrant-api' },
+      base: { service: 'tps-api' },
       timestamp: stdTimeFunctions.isoTime,
       messageKey: 'msg',
       serializers,

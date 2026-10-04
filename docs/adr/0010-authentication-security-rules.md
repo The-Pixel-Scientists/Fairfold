@@ -51,7 +51,12 @@ Six of the rules below were real choices:
 
 ## Decision
 
-### Data and roles
+The rules are in two parts: part 1 covers accounts and sessions, and part 2
+covers SSO and outbound requests. Each part ends with its tests.
+
+### Part 1: Accounts and sessions
+
+#### Data and roles
 
 - Schema `auth` holds users, sessions, accounts, verification values,
   two-factor data, passkeys, SSO providers, used SAML assertion ids,
@@ -79,7 +84,7 @@ Six of the rules below were real choices:
 - Every `auth` column is classified with a retention rule. A session's IP
   address and User-Agent go with its row, at most 90 days after it ends.
 
-### Better Auth configuration
+#### Better Auth configuration
 
 - Only the routes on our allowlist are mounted; every other route is in
   `disabledPaths`. A test compares the mounted routes with the allowlist.
@@ -104,7 +109,7 @@ Six of the rules below were real choices:
 - A Semgrep rule bans importing `better-auth` outside `apps/api/src/auth`
   ([ADR 0002](0002-licence-and-dependency-policy.md)).
 
-### Secrets at rest
+#### Secrets at rest
 
 | Value | Stored as |
 | --- | --- |
@@ -158,7 +163,7 @@ Six of the rules below were real choices:
     and one code in two requests at once, and expect only the first use to
     succeed.
 
-### Accounts, memberships and invitations
+#### Accounts, memberships and invitations
 
 - Sign-up is email first. The person enters only an email address, and we
   email a single-use link. The link opens a page that changes nothing; its
@@ -185,7 +190,7 @@ Six of the rules below were real choices:
   once its address was proven. It never attaches to an account an IdP
   created.
 
-### Sessions
+#### Sessions
 
 | Setting | Staff and reviewers (console) | Applicants (portal) |
 | --- | --- | --- |
@@ -239,7 +244,7 @@ Six of the rules below were real choices:
   started sign-in. Emailed links (sign-up, a new email address, a password
   reset) open a page that changes nothing; its `POST` does the work.
 
-### Sign-in limits and passwords
+#### Sign-in limits and passwords
 
 This section is the documentation that ASVS 5.0 requirement V6.1.1 asks for:
 how these limits slow credential stuffing and password guessing, and why no
@@ -304,7 +309,72 @@ cookies. The cookie is classified.
   cost: passwords known from breaches are then accepted. Changing it is
   audited.
 
-### SSO
+#### Audit
+
+- `app_auth` writes each auth event to `auth.audit_event` in the same
+  transaction as the change it records, with `INSERT` and `SELECT` only. The
+  database sets `occurred_at` and `retain_until`, rows are kept 12 months,
+  and only the audit purge removes them
+  ([ADR 0003](0003-query-builder-and-migrations.md#audit-retention-the-exception-to-rule-4)).
+  Every column is classified.
+- When the user holds a membership in the event's tenant, the audit module
+  then copies the event to that tenant's `audit_event`, as ids and codes, as
+  `app_api` with the tenant from the acting or new session. The copy is keyed
+  by the auth event id, so a retry cannot duplicate it.
+- The auth transaction also writes a pending-copy row in `auth`, holding
+  only the auth event id and a timestamp, with no `tenant_id`. It is
+  classified, and deleted once the copy succeeds. The API, as `app_auth`,
+  exposes the age of the oldest pending row as a metric, and one older than
+  10 minutes raises an alert. The operator then runs the replay command in
+  `apps/api/src/auth`, which takes the tenant from the auth event
+  ([ADR 0003](0003-query-builder-and-migrations.md#tenant-context-and-queries),
+  source 5). Each replay is audited.
+- Events: sign-in succeeded or failed; signed out; rate limit reached;
+  account created or membership granted through SSO; password reset
+  requested or completed; password or email changed; MFA enrolled or
+  removed; MFA code failed; pending session discarded; backup code used;
+  backup codes regenerated; passkey added or removed; step-up
+  re-authentication; active tenant switched; SSO session created; SSO
+  response rejected, with a reason code; SSO provider or domain changed; SSO
+  domain conflict; invitation accepted; sessions revoked; account
+  deactivated; membership suspended or removed; secrets re-encrypted, with
+  the key version and count; audit copy replayed.
+- Passwords, codes, tokens, cookies, raw assertions and ID tokens are never
+  logged or audited. Typed identifiers, kept as set out under sign-in
+  limits, and client IP addresses are personal data, kept with their event
+  for 12 months.
+
+#### Tests
+
+Besides the tests named above, each rule in this part has at least one test,
+including:
+
+- Redirects: a `callbackURL`, `redirectTo` or `errorCallbackURL` on another
+  origin is refused, and a `RelayState` URL is never followed.
+- Sign-up (pre-hijacking): an attacker signs up with the victim's address
+  first, then the victim verifies, once directly and once after a
+  link-scanning `GET`. The `GET` changes nothing, and the account ends with
+  only the credential the victim set.
+- Sessions: each timeout; a portal session on a staff route; a staff
+  permission without completed MFA; a switch into a staff tenant without
+  MFA.
+- Hosts and origins: a portal-origin `POST` to a console route, and a body
+  that is not JSON, are refused; the same host on different ports counts as
+  one host; a spoofed `X-Forwarded-Host` does not change the app a request
+  resolves to.
+- Passwords: a "check pending" password found breached at the next sign-in
+  can be changed only after MFA or through a reset link.
+- Limits: a delay for an unknown identifier looks the same as for a known
+  one; passkey, SSO and reset work during a delay; attempts refused during a
+  delay do not count; failures from another client do not delay the owner on
+  a known device; a device cookie stops counting after a reset, deactivation
+  or "sign out everywhere"; a completed reset clears the counters and
+  delays; and a spoofed `X-Forwarded-For` does not change the address that is
+  counted.
+
+### Part 2: SSO and outbound requests
+
+#### SSO
 
 - An SSO identity is keyed by tenant, provider, issuer and subject, and
   grants membership only in the provider's tenant, with no role until a
@@ -353,7 +423,7 @@ cookies. The cookie is classified.
     response or IdP metadata document containing a DTD is refused before
     parsing. Single logout stays off.
 
-### Outbound requests
+#### Outbound requests
 
 These rules cover all outbound HTTP from the API and the worker, not only SSO.
 
@@ -381,44 +451,10 @@ These rules cover all outbound HTTP from the API and the worker, not only SSO.
   worker egress to metadata addresses and private ranges, except to the
   services they name.
 
-### Audit
+#### Tests
 
-- `app_auth` writes each auth event to `auth.audit_event` in the same
-  transaction as the change it records, with `INSERT` and `SELECT` only. The
-  database sets `occurred_at` and `retain_until`, rows are kept 12 months,
-  and only the audit purge removes them
-  ([ADR 0003](0003-query-builder-and-migrations.md#audit-retention-the-exception-to-rule-4)).
-  Every column is classified.
-- When the user holds a membership in the event's tenant, the audit module
-  then copies the event to that tenant's `audit_event`, as ids and codes, as
-  `app_api` with the tenant from the acting or new session. The copy is keyed
-  by the auth event id, so a retry cannot duplicate it.
-- The auth transaction also writes a pending-copy row in `auth`, holding
-  only the auth event id and a timestamp, with no `tenant_id`. It is
-  classified, and deleted once the copy succeeds. The API, as `app_auth`,
-  exposes the age of the oldest pending row as a metric, and one older than
-  10 minutes raises an alert. The operator then runs the replay command in
-  `apps/api/src/auth`, which takes the tenant from the auth event
-  ([ADR 0003](0003-query-builder-and-migrations.md#tenant-context-and-queries),
-  source 5). Each replay is audited.
-- Events: sign-in succeeded or failed; signed out; rate limit reached;
-  account created or membership granted through SSO; password reset
-  requested or completed; password or email changed; MFA enrolled or
-  removed; MFA code failed; pending session discarded; backup code used;
-  backup codes regenerated; passkey added or removed; step-up
-  re-authentication; active tenant switched; SSO session created; SSO
-  response rejected, with a reason code; SSO provider or domain changed; SSO
-  domain conflict; invitation accepted; sessions revoked; account
-  deactivated; membership suspended or removed; secrets re-encrypted, with
-  the key version and count; audit copy replayed.
-- Passwords, codes, tokens, cookies, raw assertions and ID tokens are never
-  logged or audited. Typed identifiers, kept as set out under sign-in
-  limits, and client IP addresses are personal data, kept with their event
-  for 12 months.
-
-### Tests
-
-Besides the tests named above, each rule has at least one test, including:
+Besides the tests named above, each rule in this part has at least one test,
+including:
 
 - SSO: wrapped, unsigned, replayed, expired and wrong-audience assertions; a
   wrong `Issuer`; a signature by a `KeyInfo` key that is not configured; a
@@ -433,8 +469,6 @@ Besides the tests named above, each rule has at least one test, including:
   a DNS token issued for another tenant, provider or domain; an SSO session
   switching tenant; step-up with a stale `auth_time` or `AuthnInstant`; and
   an invitation to an SSO-created account.
-- Redirects: a `callbackURL`, `redirectTo` or `errorCallbackURL` on another
-  origin is refused, and a `RelayState` URL is never followed.
 - Outbound: each endpoint in a discovery or metadata document (JWKS, token,
   userinfo, SAML metadata and SSO URLs) pointing at 169.254.169.254 or a
   loopback address, both pasted and fetched, directly and through a
@@ -442,26 +476,6 @@ Besides the tests named above, each rule has at least one test, including:
   NAT64, 6to4 and Teredo addresses; plain HTTP, a fourth redirect and an
   oversized body, through `fetch` and through `node:https`; and start-up
   with a proxy variable set.
-- Sign-up (pre-hijacking): an attacker signs up with the victim's address
-  first, then the victim verifies, once directly and once after a
-  link-scanning `GET`. The `GET` changes nothing, and the account ends with
-  only the credential the victim set.
-- Sessions: each timeout; a portal session on a staff route; a staff
-  permission without completed MFA; a switch into a staff tenant without
-  MFA.
-- Hosts and origins: a portal-origin `POST` to a console route, and a body
-  that is not JSON, are refused; the same host on different ports counts as
-  one host; a spoofed `X-Forwarded-Host` does not change the app a request
-  resolves to.
-- Passwords: a "check pending" password found breached at the next sign-in
-  can be changed only after MFA or through a reset link.
-- Limits: a delay for an unknown identifier looks the same as for a known
-  one; passkey, SSO and reset work during a delay; attempts refused during a
-  delay do not count; failures from another client do not delay the owner on
-  a known device; a device cookie stops counting after a reset, deactivation
-  or "sign out everywhere"; a completed reset clears the counters and
-  delays; and a spoofed `X-Forwarded-For` does not change the address that is
-  counted.
 
 ## Consequences
 

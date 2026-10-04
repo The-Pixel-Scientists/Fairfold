@@ -19,10 +19,10 @@ import { databaseSettings } from './connect.ts';
 const settings: DatabaseSettings = {
   host: '127.0.0.1',
   port: 5432,
-  database: 'pixelgrant',
+  database: 'tps',
   role: 'app_api',
   password: 'a-password-for-tests',
-  applicationName: 'pixelgrant-tests',
+  applicationName: 'tps-tests',
 };
 
 describe('poolConfig', () => {
@@ -30,10 +30,10 @@ describe('poolConfig', () => {
     expect(poolConfig(settings)).toEqual({
       host: '127.0.0.1',
       port: 5432,
-      database: 'pixelgrant',
+      database: 'tps',
       user: 'app_api',
       password: 'a-password-for-tests',
-      application_name: 'pixelgrant-tests',
+      application_name: 'tps-tests',
       max: 10,
       connectionTimeoutMillis: 10_000,
       query_timeout: 35_000,

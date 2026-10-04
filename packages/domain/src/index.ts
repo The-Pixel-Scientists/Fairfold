@@ -4,4 +4,6 @@
 // runs unchanged in the browser and on the server, so it may not use DOM or
 // Node.js APIs.
 
+import './jitless/index.ts';
+
 export { idSchema, type Id } from './id.ts';

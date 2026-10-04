@@ -4,7 +4,8 @@
 // with the route's contract, send it same-origin as JSON, and parse the
 // answer with the contract too. Every failure, before or after sending,
 // arrives as one ProblemError with words to show and fields to mark. A
-// redirect is a failure too: the API never sends one.
+// redirect is a failure too: the API never sends one. Routes that answer a
+// raw body, such as a stylesheet, are loaded by URL instead.
 
 import type { z } from 'zod';
 
@@ -15,7 +16,8 @@ import {
   type FieldProblem,
 } from '../platform/messages.ts';
 import { ProblemError, problemSchema } from './problem.ts';
-import type { RouteContract } from './route.ts';
+import type { JsonRouteContract, RouteContract } from './route.ts';
+import { isRawBody } from './schema-rules.ts';
 
 /** Each app's origin forwards this path to the API. */
 export const apiBasePath = '/api';
@@ -120,7 +122,7 @@ async function readJson(response: FetchResponse): Promise<unknown> {
   }
 }
 
-export async function call<const C extends RouteContract>(
+export async function call<const C extends JsonRouteContract>(
   route: C,
   input: CallInput<C>,
   options: CallOptions = {},
@@ -128,6 +130,9 @@ export async function call<const C extends RouteContract>(
   const basePath = options.basePath ?? apiBasePath;
   if (!BASE_PATH.test(basePath)) throw new TypeError('basePath must be a path, such as /api.');
   if (!ROUTE_PATH.test(route.path)) throw new TypeError('A route path starts with its audience.');
+  if (Object.values(route.responses).some(isRawBody)) {
+    throw new TypeError('call() reads JSON; load a route that answers a raw body by its URL.');
+  }
   const parts = input as { params?: unknown; query?: unknown; body?: unknown };
   const errors: FieldProblem[] = [];
   const params = parsePart('params', route.params, parts.params, errors);

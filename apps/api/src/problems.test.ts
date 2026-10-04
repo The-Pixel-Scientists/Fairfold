@@ -58,6 +58,9 @@ async function startServer() {
       errors: [{ field: 'body.answers.f_0a1b', message: 'Enter a date after 1 April 2027.' }],
     });
   });
+  routes.get('/refused-with-reason', () => {
+    throw new ApiError(404, undefined, { reason: 'module_off' });
+  });
   routes.get('/non-error', () => {
     // eslint-disable-next-line @typescript-eslint/only-throw-error -- the handler must cope with it
     throw 'plain string with a secret';
@@ -84,6 +87,19 @@ function problemOf(body: string): Problem {
 }
 
 describe('the error handler', () => {
+  it('uses the plain text for the status when an ApiError has none, and logs why, never sends it', async () => {
+    const { server, logs } = await startServer();
+    const response = await server.inject({ url: '/refused-with-reason' });
+
+    expect(response.statusCode).toBe(404);
+    expect(problemOf(response.body).detail).toBe('We could not find what you asked for.');
+    expect(response.body).not.toContain('module_off');
+    expect(logs.lines().find((line) => line.msg === 'The request was refused')).toMatchObject({
+      status: 404,
+      reason: 'module_off',
+    });
+  });
+
   it('hides an unexpected error, and logs it with the request id', async () => {
     const { server, logs } = await startServer();
     const response = await server.inject({ url: '/boom' });

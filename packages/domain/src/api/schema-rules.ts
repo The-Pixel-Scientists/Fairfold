@@ -11,7 +11,8 @@
 //     tenant, a slug is only the :slug of /public/tenants/ or /auth/tenants/,
 //     and no email address goes in a URL; path parameters are ids, or that
 //     slug;
-//   - responses hold no union of objects, lists and plain values.
+//   - responses hold no union of objects, lists and plain values;
+//   - a raw (non-JSON) body answers 200 in content types from a fixed list.
 
 import type { z } from 'zod';
 
@@ -123,6 +124,41 @@ export function paramProblems(names: readonly string[], schema: z.ZodType | unde
     if (!valid) {
       problems.push(`The path parameter :${name} must be required, and an id or the tenant slug.`);
     }
+  }
+  return problems;
+}
+
+/** The content types a raw body may have (S03-11). */
+export const rawContentTypes = ['text/css', 'image/png', 'image/webp'] as const;
+
+export type RawContentType = (typeof rawContentTypes)[number];
+
+/** A body that is not JSON, such as a stylesheet or an image, in one of the content types named. */
+export interface RawBody {
+  readonly raw: readonly RawContentType[];
+}
+
+export type ResponseBody = z.ZodType | null | RawBody;
+
+export function isRawBody(body: unknown): body is RawBody {
+  return typeof body === 'object' && body !== null && Object.hasOwn(body, 'raw');
+}
+
+/** Read as unknown: a cast or plain JavaScript can get past the types. */
+export function rawBodyProblems(status: string, body: RawBody): string[] {
+  const problems: string[] = [];
+  if (status !== '200') problems.push(`A raw body answers 200 only, not ${status}.`);
+  const types: unknown = body.raw;
+  const valid =
+    Object.keys(body).length === 1 &&
+    Array.isArray(types) &&
+    types.length > 0 &&
+    new Set(types).size === types.length &&
+    types.every((type) => rawContentTypes.some((allowed) => allowed === type));
+  if (!valid) {
+    problems.push(
+      `A raw body names one or more content types once each: ${rawContentTypes.join(', ')}.`,
+    );
   }
   return problems;
 }

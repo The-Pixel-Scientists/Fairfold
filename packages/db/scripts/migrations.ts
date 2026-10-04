@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
 // Feeds the hand-written SQL migrations in packages/db/migrations to Kysely's
-// Migrator (ADR 0003). Each migration is a folder named NNNN_description
-// holding up.sql and down.sql. The Migrator takes an advisory lock, runs a
+// Migrator (ADR 0003). Each migration is a folder named
+// NNNN_<schema>_<description>, naming the one schema it changes (ADR 0016),
+// and holds up.sql and down.sql. The Migrator takes an advisory lock, runs a
 // batch in one transaction and records history in the `migrations` schema.
 
 import { readdir, readFile } from 'node:fs/promises';
@@ -14,7 +15,10 @@ import { Migrator, type Migration, type MigrationProvider } from 'kysely/migrati
 
 export const MIGRATIONS_FOLDER = fileURLToPath(new URL('../migrations', import.meta.url));
 
-const MIGRATION_NAME = /^(\d{4})_[a-z0-9]+(?:_[a-z0-9]+)*$/;
+/** The schemas a migration may change: the platform's, then each module's (ADR 0016). */
+export const SCHEMAS = ['app', 'auth', 'party', 'grants'] as const;
+
+const MIGRATION_NAME = /^(\d{4})_([a-z0-9]+)_[a-z0-9]+(?:_[a-z0-9]+)*$/;
 
 /** Run one SQL file as written. Only reviewed migration files reach this. */
 function runSqlFile(db: Kysely<unknown>, text: string): Promise<unknown> {
@@ -42,17 +46,22 @@ export class SqlFolderMigrationProvider implements MigrationProvider {
     const numbers = new Map<string, string>();
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
-      const match = MIGRATION_NAME.exec(entry.name);
-      if (!match?.[1]) {
+      const [, number, schema] = MIGRATION_NAME.exec(entry.name) ?? [];
+      if (!number || !schema) {
         throw new Error(
-          `Migration folder ${entry.name} must be named NNNN_description, in lower case with underscores.`,
+          `Migration folder ${entry.name} must be named NNNN_<schema>_<description>, in lower case with underscores.`,
         );
       }
-      const clash = numbers.get(match[1]);
-      if (clash) {
-        throw new Error(`Migrations ${clash} and ${entry.name} share the number ${match[1]}.`);
+      if (!(SCHEMAS as readonly string[]).includes(schema)) {
+        throw new Error(
+          `Migration folder ${entry.name} names the unknown schema ${schema}. Use one of ${SCHEMAS.join(', ')}.`,
+        );
       }
-      numbers.set(match[1], entry.name);
+      const clash = numbers.get(number);
+      if (clash) {
+        throw new Error(`Migrations ${clash} and ${entry.name} share the number ${number}.`);
+      }
+      numbers.set(number, entry.name);
 
       const folder = join(this.#folder, entry.name);
       const up = await readRequired(folder, 'up.sql');

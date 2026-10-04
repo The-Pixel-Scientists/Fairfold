@@ -113,6 +113,13 @@ snapshot:
   nullable column on the application, set at submission. MVP1's review time
   goes to the grant loop instead.
 
+Note, 4 October 2026: this snapshot settles the need for a record of party
+details as submitted, one of the items due before Gate 1, so no separate
+ADR is written for it. The history of values this ADR leaves to the CRM is
+decided in [ADR 0025](0025-party-matching-merge-and-search.md): a
+party-owned, append-only `party.value_history` table that `crm` reads and
+never writes. This note changes no decision here.
+
 ### Classification, audit and erasure
 
 - Personal: person names, email, phone and account link; every consent row;

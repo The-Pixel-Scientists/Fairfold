@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { Button, PageHeading } from '@pixelgrant/ui';
-import type { PageDefinition } from '@pixelgrant/ui';
+import { Button, PageHeading } from '@pixel-scientists/ui';
+import type { PageDefinition } from '@pixel-scientists/ui';
 
 import { PageColumn } from '../PageColumn.tsx';
 

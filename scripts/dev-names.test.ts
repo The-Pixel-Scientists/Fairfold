@@ -15,8 +15,8 @@ describe('slugify', () => {
 describe('databaseNames', () => {
   it('follows the documented pattern', () => {
     expect(databaseNames('2026_w40')).toEqual({
-      database: 'pixelgrant_2026_w40',
-      testDatabase: 'pixelgrant_2026_w40_test',
+      database: 'tps_2026_w40',
+      testDatabase: 'tps_2026_w40_test',
     });
   });
 
@@ -25,7 +25,7 @@ describe('databaseNames', () => {
     const b = databaseNames(`${'a'.repeat(70)}_two`);
     for (const name of [a.database, a.testDatabase, b.database, b.testDatabase]) {
       expect(Buffer.byteLength(name)).toBeLessThanOrEqual(63);
-      expect(name.startsWith('pixelgrant_')).toBe(true);
+      expect(name.startsWith('tps_')).toBe(true);
     }
     expect(a.database).not.toBe(b.database);
     expect(a.testDatabase).not.toBe(b.testDatabase);
@@ -35,7 +35,7 @@ describe('databaseNames', () => {
 
 describe('fitName', () => {
   it('leaves short names alone', () => {
-    expect(fitName('pixelgrant_x', 63, '_')).toBe('pixelgrant_x');
+    expect(fitName('tps_x', 63, '_')).toBe('tps_x');
   });
 
   it('replaces the tail of a long name with a hash', () => {
@@ -47,12 +47,12 @@ describe('fitName', () => {
 
 describe('bucketName', () => {
   it('uses hyphens, as S3 requires', () => {
-    expect(bucketName('2026_w40')).toBe('pixelgrant-2026-w40');
+    expect(bucketName('2026_w40')).toBe('tps-2026-w40');
   });
 
   it('never ends in a hyphen, and keeps trimmed names distinct', () => {
     const trimmed = bucketName('feature_');
-    expect(trimmed).toMatch(/^pixelgrant-feature-[0-9a-f]{8}$/);
+    expect(trimmed).toMatch(/^tps-feature-[0-9a-f]{8}$/);
     expect(trimmed).not.toBe(bucketName('feature'));
   });
 
@@ -78,14 +78,27 @@ describe('devNames', () => {
     const names = devNames('2026-w40', ['PixelGrant']);
     expect(names).toMatchObject({
       worktree: '2026-w40',
-      database: 'pixelgrant_2026_w40',
-      testDatabase: 'pixelgrant_2026_w40_test',
-      bucket: 'pixelgrant-2026-w40',
+      database: 'tps_2026_w40',
+      testDatabase: 'tps_2026_w40_test',
+      bucket: 'tps-2026-w40',
+      stackProject: 'tps_stack_2026_w40',
     });
-    expect(names.ports.console).toBe(names.ports.api + 1);
-    expect(names.ports.portal).toBe(names.ports.api + 2);
-    expect(names.ports.api).toBeGreaterThanOrEqual(41000);
-    expect(names.ports.portal).toBeLessThan(49000);
+    const first = names.ports.api;
+    expect(names.ports).toEqual({
+      api: first,
+      console: first + 1,
+      portal: first + 2,
+      consoleBuild: first + 3,
+      portalBuild: first + 4,
+      galleryBuild: first + 5,
+      stackApi: first + 6,
+      stackConsole: first + 7,
+      stackPortal: first + 8,
+      stackMail: first + 9,
+    });
+    expect(first).toBeGreaterThanOrEqual(41000);
+    expect(first % 10).toBe(0);
+    expect(names.ports.stackMail).toBeLessThan(49000);
   });
 
   it('never gives two worktrees the same ports', () => {

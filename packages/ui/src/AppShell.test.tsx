@@ -1,16 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { cleanup, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { AppShell } from './AppShell.tsx';
 import { EmptyState } from './EmptyState.tsx';
 import { LoadingState } from './LoadingState.tsx';
 import { Router } from './router/index.ts';
-
-afterEach(cleanup);
 
 const navigation = (
   <ul>
@@ -26,12 +24,12 @@ const navigation = (
 describe('AppShell', () => {
   it('has a banner, a named navigation and a main landmark', () => {
     render(
-      <AppShell productName="PixelGrant" areaName="Staff console" navigation={navigation}>
+      <AppShell productName="Fairfold Grants" areaName="Staff console" navigation={navigation}>
         <h1>Programmes</h1>
       </AppShell>,
     );
 
-    expect(screen.getByRole('banner').textContent).toContain('PixelGrant');
+    expect(screen.getByRole('banner').textContent).toContain('Fairfold Grants');
     expect(screen.getByRole('banner').textContent).toContain('Staff console');
     expect(screen.getByRole('navigation', { name: 'Main' })).toBeTruthy();
     const main = screen.getByRole('main');
@@ -42,7 +40,7 @@ describe('AppShell', () => {
   it('makes the product name a link to the home path, through the router, when asked', () => {
     function Frame({ children }: { children: ReactNode }) {
       return (
-        <AppShell productName="PixelGrant" homeHref="/">
+        <AppShell productName="Fairfold Grants" homeHref="/">
           {children}
         </AppShell>
       );
@@ -56,7 +54,7 @@ describe('AppShell', () => {
       />,
     );
 
-    const link = screen.getByRole('link', { name: 'PixelGrant' });
+    const link = screen.getByRole('link', { name: 'Fairfold Grants' });
     expect(link.getAttribute('href')).toBe('/portal/');
     // As tall as a control (44px comfortable, 32px compact), not just a line of text.
     expect(link.className).toContain('inline-flex');
@@ -66,16 +64,16 @@ describe('AppShell', () => {
 
   it('shows the product name as plain text without homeHref', () => {
     render(
-      <AppShell productName="PixelGrant">
+      <AppShell productName="Fairfold Grants">
         <h1>Programmes</h1>
       </AppShell>,
     );
-    expect(screen.queryByRole('link', { name: 'PixelGrant' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Fairfold Grants' })).toBeNull();
   });
 
   it('names the navigation what you say', () => {
     render(
-      <AppShell productName="PixelGrant" navigation={navigation} navigationLabel="Programme">
+      <AppShell productName="Fairfold Grants" navigation={navigation} navigationLabel="Programme">
         <h1>Programmes</h1>
       </AppShell>,
     );
@@ -84,7 +82,7 @@ describe('AppShell', () => {
 
   it('has no navigation landmark when there is no navigation', () => {
     render(
-      <AppShell productName="PixelGrant">
+      <AppShell productName="Fairfold Grants">
         <h1>Programmes</h1>
       </AppShell>,
     );
@@ -94,7 +92,7 @@ describe('AppShell', () => {
   it('puts the skip link first, and it jumps past the navigation to the page', async () => {
     const user = userEvent.setup();
     render(
-      <AppShell productName="PixelGrant" navigation={navigation}>
+      <AppShell productName="Fairfold Grants" navigation={navigation}>
         <h1>Programmes</h1>
         <a href="/inside">Inside the page</a>
       </AppShell>,
@@ -112,7 +110,7 @@ describe('AppShell', () => {
     const user = userEvent.setup();
     render(
       <AppShell
-        productName="PixelGrant"
+        productName="Fairfold Grants"
         navigation={navigation}
         actions={<button type="button">Open account menu</button>}
       >
@@ -129,14 +127,14 @@ describe('AppShell', () => {
 
   it('sets the density for everything inside it', () => {
     const { container, rerender } = render(
-      <AppShell productName="PixelGrant">
+      <AppShell productName="Fairfold Grants">
         <h1>Programmes</h1>
       </AppShell>,
     );
     expect(container.querySelector('[data-density]')?.getAttribute('data-density')).toBe('compact');
 
     rerender(
-      <AppShell productName="PixelGrant" density="comfortable">
+      <AppShell productName="Fairfold Grants" density="comfortable">
         <h1>Programmes</h1>
       </AppShell>,
     );

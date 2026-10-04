@@ -1,0 +1,31 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# app_auth reads and writes the auth schema: accounts, credentials and
+# sessions. Only apps/api/src/auth may connect as it (ADRs 0003 and 0010).
+# Everywhere else, createDatabase() must name its role as a literal app_api
+# or app_worker in the object it is given, so a role from a variable, a
+# lookup, a helper's parameter or a spread object is refused, and so is
+# importing createDatabase under another name.
+
+rules:
+  - id: tps-app-auth-only-in-auth
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      Outside apps/api/src/auth, pass createDatabase() an object whose role is
+      the literal 'app_api' or 'app_worker'. Only the auth module may connect
+      as app_auth (ADRs 0003 and 0010).
+    pattern-either:
+      - patterns:
+          - pattern: createDatabase(...)
+          - pattern-not: 'createDatabase({..., role: "app_api", ...})'
+          - pattern-not: 'createDatabase({..., role: "app_worker", ...})'
+      # A spread can replace the role written before it.
+      - pattern: 'createDatabase({..., ...$REST, ...})'
+      - pattern-regex: \bcreateDatabase\s+as\b
+    paths:
+      exclude:
+        - /apps/api/src/auth/
+        # packages/db's own tests and tooling connect as each role in turn.
+        - /packages/db/test/
+        - /packages/db/scripts/

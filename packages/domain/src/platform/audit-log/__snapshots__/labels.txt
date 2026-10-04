@@ -1,0 +1,27 @@
+platform.tenant.created: Tenant created
+platform.tenant.updated: Tenant updated
+platform.theme.changed: Theme changed
+platform.module.switched_on: Module switched on
+platform.module.switched_off: Module switched off
+platform.invitation.sent: Invitation sent
+platform.invitation.revoked: Invitation revoked
+platform.membership.created: Membership created
+platform.membership.roles_changed: Membership roles changed
+platform.membership.suspended: Membership suspended
+platform.membership.reinstated: Membership reinstated
+platform.membership.removed: Membership removed
+platform.warehouse.exported: Warehouse exported
+platform.auth.account_created: Account created
+platform.auth.sign_in_succeeded: Sign-in succeeded
+platform.auth.sign_in_failed: Sign-in failed
+platform.auth.rate_limit_reached: Rate limit reached
+platform.auth.mfa_enrolled: MFA enrolled
+platform.auth.mfa_code_failed: MFA code failed
+platform.auth.pending_session_discarded: Pending session discarded
+platform.auth.step_up_completed: Step-up completed
+platform.auth.tenant_switched: Tenant switched
+platform.auth.signed_out: Signed out
+platform.auth.password_reset_requested: Password reset requested
+platform.auth.password_reset_completed: Password reset completed
+platform.auth.sessions_revoked: Sessions revoked
+platform.auth.invitation_accepted: Invitation accepted

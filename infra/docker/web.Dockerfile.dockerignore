@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# What web.Dockerfile may see: the workspace manifests, the shared TypeScript
+# settings, the console and portal with the packages they build from, and the
+# web server. Everything else, including .env files and node_modules, stays
+# out.
+
+*
+!package.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+!tsconfig.base.json
+!apps/*/package.json
+!packages/*/package.json
+!apps/console/
+!apps/portal/
+!packages/domain/src/
+!packages/ui/src/
+!scripts/web-server.ts
+**/node_modules
+**/dist
+**/e2e
+**/*.test.ts
+**/*.test.tsx
+# Never secrets, wherever they sit.
+**/.env*
+**/*.pem
+**/*.key

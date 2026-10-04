@@ -1,11 +1,19 @@
-// Code that runs on Node.js: the Vite config and Playwright tests.
+// Code that runs on Node.js: the Vite config and Playwright tests. The DOM library types the
+// callbacks that Playwright runs in the browser. Specs import their fixtures from scripts/e2e,
+// in the tooling project.
 // package.json keeps the project non-empty before its first source file exists, so `tsc -b` passes on an empty workspace.
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "node_modules/.cache/tsc/node",
     "tsBuildInfoFile": "node_modules/.cache/tsc/node/tsconfig.tsbuildinfo",
+    "lib": ["es2024", "dom", "dom.iterable"],
     "types": ["node"]
   },
-  "include": ["e2e", "*.ts", "package.json"]
+  "include": ["e2e", "*.ts", "package.json"],
+  "references": [
+    {
+      "path": "../../tsconfig.tooling.json"
+    }
+  ]
 }

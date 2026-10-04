@@ -2,6 +2,8 @@
 //
 // Platform contracts: the `/platform` subpath of the domain package.
 
+import '../jitless/index.ts';
+
 export {
   appSchema,
   apps,
@@ -21,6 +23,7 @@ export {
   type AuditAction,
   type PlatformAuditAction,
 } from './audit.ts';
+export { productName, suiteName } from './brand.ts';
 export {
   checkLogo,
   LOGO_MAX_BYTES,

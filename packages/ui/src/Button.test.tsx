@@ -1,12 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { cleanup, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { Button, buttonClassName } from './Button.tsx';
-
-afterEach(cleanup);
 
 describe('Button', () => {
   it('is a button that does not submit a form unless you ask', async () => {

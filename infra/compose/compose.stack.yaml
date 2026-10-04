@@ -1,0 +1,235 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# `pnpm stack` (ADR 0005): PostgreSQL, a one-off migrate job, and the release
+# images of the API, console and portal, run as a self-hosted install runs
+# them, with Mailpit to catch the email. Start it with `pnpm stack`, which
+# sets the project name, the ports, the secrets and the web network for this
+# worktree (scripts/stack.ts).
+#
+# Every secret is random, and Compose copies each one only into the
+# containers that use it, as a file under /run/secrets. The migrator and
+# superuser passwords reach the migrate job alone. Nothing here sets
+# TPS_DEV, so the API refuses development values.
+#
+# Networks: PostgreSQL and the migrate job sit on `database`, which has no
+# way out. The console and portal forward /api/ to the API over `web`, which
+# has no way out either and holds only those three, so the API trusts the
+# forwarding headers of `web`'s addresses alone. stack.ts makes `web` before
+# Compose starts, to learn its addresses. Only the API, console and portal
+# publish ports, on 127.0.0.1.
+
+# No container can gain privileges. Those without secrets also run
+# read-only: Compose cannot copy a secret into a read-only container.
+x-hardening: &hardening
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+
+x-read-only: &read-only
+  read_only: true
+  tmpfs: [/tmp]
+
+x-api-build: &api-build
+  context: ../..
+  dockerfile: infra/docker/api.Dockerfile
+
+x-database: &database
+  TPS_DB_HOST: postgres
+  TPS_DB_PORT: '5432'
+  TPS_DB_NAME: tps
+
+# For the node user of the release images.
+x-node-secret: &node-secret
+  uid: '1000'
+  gid: '1000'
+  mode: 0400
+
+x-web-healthcheck: &web-healthcheck
+  test:
+    - CMD
+    - node
+    - --eval
+    - "fetch('http://127.0.0.1:8080/').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+  interval: 2s
+  timeout: 5s
+  retries: 30
+
+x-web: &web
+  <<: [*hardening, *read-only]
+  # The image forwards /api/ to http://api:3000, which `web` resolves.
+  networks: [apps, web]
+  healthcheck: *web-healthcheck
+
+services:
+  postgres:
+    image: postgres:16.15-bookworm@sha256:efedf3595f1d6f415c08568ba171029bf54052e754cc9f030e3f2412b21f3d67
+    <<: *hardening
+    user: postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - source: postgres_password
+        uid: '999'
+        gid: '999'
+        mode: 0400
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks: [database]
+    healthcheck:
+      test: [CMD, pg_isready, --username=postgres, --dbname=postgres]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  # Runs the roles script as the superuser, creates the database owned by
+  # migrator, then applies every pending migration as migrator.
+  migrate:
+    build: *api-build
+    <<: *hardening
+    command: [node, packages/db/scripts/db.ts, prepare, up]
+    environment:
+      <<: *database
+      TPS_DB_SUPERUSER: postgres
+      TPS_DB_SUPERUSER_PASSWORD_FILE: /run/secrets/postgres_password
+      TPS_DB_MIGRATOR_PASSWORD_FILE: /run/secrets/migrator_password
+      TPS_DB_APP_API_PASSWORD_FILE: /run/secrets/app_api_password
+      TPS_DB_APP_WORKER_PASSWORD_FILE: /run/secrets/app_worker_password
+      TPS_DB_APP_AUTH_PASSWORD_FILE: /run/secrets/app_auth_password
+      TPS_DB_APP_QUEUE_PASSWORD_FILE: /run/secrets/app_queue_password
+    secrets:
+      - { source: postgres_password, <<: *node-secret }
+      - { source: migrator_password, <<: *node-secret }
+      - { source: app_api_password, <<: *node-secret }
+      - { source: app_worker_password, <<: *node-secret }
+      - { source: app_auth_password, <<: *node-secret }
+      - { source: app_queue_password, <<: *node-secret }
+    networks: [database]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    build: *api-build
+    <<: *hardening
+    environment:
+      <<: *database
+      TPS_API_HOST: 0.0.0.0
+      TPS_API_PORT: '3000'
+      # The console and portal containers, and nothing else (see Networks).
+      # Empty, which the API refuses, unless stack.ts found `web`.
+      TPS_API_TRUST_PROXY: ${TPS_STACK_WEB_SUBNETS:-}
+      TPS_CONSOLE_ORIGIN: http://console.localhost:${TPS_STACK_CONSOLE_PORT:?Run pnpm stack}
+      TPS_PORTAL_ORIGIN: http://portal.localhost:${TPS_STACK_PORTAL_PORT:?Run pnpm stack}
+      # Compose's internal network, which no other machine can reach.
+      TPS_DB_TLS: disable
+      TPS_DB_APP_API_PASSWORD_FILE: /run/secrets/app_api_password
+      TPS_DB_APP_AUTH_PASSWORD_FILE: /run/secrets/app_auth_password
+      TPS_AUTH_SECRET_FILE: /run/secrets/auth_secret
+      # Mailpit shares this container's network, so mail never leaves it.
+      TPS_SMTP_HOST: 127.0.0.1
+      TPS_SMTP_PORT: '1025'
+      TPS_SMTP_TLS: none
+      TPS_SMTP_FROM: no-reply@example.org
+    secrets:
+      - { source: app_api_password, <<: *node-secret }
+      - { source: app_auth_password, <<: *node-secret }
+      - { source: auth_secret, <<: *node-secret }
+    networks: [database, web, api]
+    ports:
+      - 127.0.0.1:${TPS_STACK_API_PORT:?Run pnpm stack}:3000
+      # Mailpit's inbox, published here because Mailpit uses this network.
+      - 127.0.0.1:${TPS_STACK_MAIL_PORT:?Run pnpm stack}:8025
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - --eval
+        - "fetch('http://127.0.0.1:3000/health/ready').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+      interval: 2s
+      timeout: 5s
+      retries: 30
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  # Catches every email the API sends. SMTP listens on the API's loopback
+  # address only; the inbox is at http://127.0.0.1:<stackMail port>.
+  mailpit:
+    image: axllent/mailpit:v1.31.2@sha256:74d609a42ec279aa63c6b4622a6fa9b5408d1ad5b1d76a1c4be40a265ce0863d
+    <<: [*hardening, *read-only]
+    network_mode: service:api
+    environment:
+      MP_SMTP_BIND_ADDR: 127.0.0.1:1025
+      MP_UI_BIND_ADDR: 0.0.0.0:8025
+
+  console:
+    <<: *web
+    build:
+      context: ../..
+      dockerfile: infra/docker/web.Dockerfile
+      args: { APP: console }
+    ports:
+      - 127.0.0.1:${TPS_STACK_CONSOLE_PORT:?Run pnpm stack}:8080
+
+  portal:
+    <<: *web
+    build:
+      context: ../..
+      dockerfile: infra/docker/web.Dockerfile
+      args: { APP: portal }
+    ports:
+      - 127.0.0.1:${TPS_STACK_PORTAL_PORT:?Run pnpm stack}:8080
+
+  # `pnpm stack seed` only: forwards a port on 127.0.0.1, which Docker
+  # picks, to PostgreSQL while the seed runs on this machine, then stops.
+  database-tunnel:
+    build: *api-build
+    <<: [*hardening, *read-only]
+    profiles: [seed]
+    command:
+      - node
+      - --eval
+      - >-
+        const net = require('node:net');
+        net.createServer((client) => {
+        const server = net.connect(5432, 'postgres');
+        client.on('error', () => server.destroy());
+        server.on('error', () => client.destroy());
+        client.pipe(server).pipe(client);
+        }).listen(5432);
+    networks: [database, tunnel]
+    ports:
+      - 127.0.0.1::5432
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+secrets:
+  postgres_password:
+    environment: TPS_STACK_POSTGRES_PASSWORD
+  migrator_password:
+    environment: TPS_STACK_MIGRATOR_PASSWORD
+  app_api_password:
+    environment: TPS_STACK_APP_API_PASSWORD
+  app_worker_password:
+    environment: TPS_STACK_APP_WORKER_PASSWORD
+  app_auth_password:
+    environment: TPS_STACK_APP_AUTH_PASSWORD
+  app_queue_password:
+    environment: TPS_STACK_APP_QUEUE_PASSWORD
+  auth_secret:
+    environment: TPS_STACK_AUTH_SECRET
+
+volumes:
+  postgres-data:
+
+networks:
+  database:
+    internal: true
+  web:
+    external: true
+    name: ${TPS_STACK_WEB_NETWORK:?Run pnpm stack}
+  # Published ports: the console's and portal's, the API's, and the tunnel's.
+  apps:
+  api:
+  tunnel:

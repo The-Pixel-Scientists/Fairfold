@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { cleanup, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -9,7 +9,6 @@ import type { ErrorSummaryItem } from './ErrorSummary.tsx';
 import { FormField, Input } from './FormField.tsx';
 
 afterEach(() => {
-  cleanup();
   window.history.replaceState(null, '', '/');
 });
 

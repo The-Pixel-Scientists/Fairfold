@@ -11,7 +11,7 @@ import { SqlFolderMigrationProvider } from './migrations.ts';
 let root: string;
 
 beforeEach(async () => {
-  root = await mkdtemp(join(tmpdir(), 'pixelgrant-migrations-'));
+  root = await mkdtemp(join(tmpdir(), 'tps-migrations-'));
 });
 
 afterEach(async () => {
@@ -33,12 +33,12 @@ describe('SqlFolderMigrationProvider', () => {
 
   it('returns one migration per folder, with up and down', async () => {
     await addMigration('0001_app_schema', { 'up.sql': 'SELECT 1;', 'down.sql': 'SELECT 2;' });
-    await addMigration('0002_tenant', { 'up.sql': 'SELECT 3;', 'down.sql': 'SELECT 4;' });
+    await addMigration('0002_party_core', { 'up.sql': 'SELECT 3;', 'down.sql': 'SELECT 4;' });
     await writeFile(join(root, 'README.md'), 'Notes are ignored.');
 
     const migrations = await new SqlFolderMigrationProvider(root).getMigrations();
 
-    expect(Object.keys(migrations).sort()).toEqual(['0001_app_schema', '0002_tenant']);
+    expect(Object.keys(migrations).sort()).toEqual(['0001_app_schema', '0002_party_core']);
     expect(Object.keys(migrations['0001_app_schema'] ?? {}).sort()).toEqual(['down', 'up']);
   });
 
@@ -54,20 +54,33 @@ describe('SqlFolderMigrationProvider', () => {
     await expect(new SqlFolderMigrationProvider(root).getMigrations()).rejects.toThrow('is empty');
   });
 
-  it('refuses a folder that is not named NNNN_description', async () => {
-    for (const name of ['1_app', '0001-app', '0001_App', '0001_']) {
+  it('refuses a folder that is not named NNNN_<schema>_<description>', async () => {
+    for (const name of [
+      '1_app_schema',
+      '0001-app-schema',
+      '0001_App_schema',
+      '0001_app',
+      '0001_app_',
+    ]) {
       await rm(root, { recursive: true, force: true });
       await mkdir(root);
       await addMigration(name, { 'up.sql': 'SELECT 1;', 'down.sql': 'SELECT 2;' });
       await expect(new SqlFolderMigrationProvider(root).getMigrations()).rejects.toThrow(
-        'must be named NNNN_description',
+        `Migration folder ${name} must be named NNNN_<schema>_<description>`,
       );
     }
   });
 
+  it('refuses a schema it does not know, naming the folder', async () => {
+    await addMigration('0003_billing_invoices', { 'up.sql': 'SELECT 1;', 'down.sql': 'SELECT 2;' });
+    await expect(new SqlFolderMigrationProvider(root).getMigrations()).rejects.toThrow(
+      'Migration folder 0003_billing_invoices names the unknown schema billing. Use one of app, auth, party, grants.',
+    );
+  });
+
   it('refuses two migrations with the same number', async () => {
     await addMigration('0001_app_schema', { 'up.sql': 'SELECT 1;', 'down.sql': 'SELECT 2;' });
-    await addMigration('0001_tenant', { 'up.sql': 'SELECT 3;', 'down.sql': 'SELECT 4;' });
+    await addMigration('0001_app_tenancy', { 'up.sql': 'SELECT 3;', 'down.sql': 'SELECT 4;' });
     await expect(new SqlFolderMigrationProvider(root).getMigrations()).rejects.toThrow(
       'share the number 0001',
     );

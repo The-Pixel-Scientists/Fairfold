@@ -4,13 +4,16 @@
 // focus and announcements on route changes, back and forward, reflow at 320 px
 // and 200% zoom, text spacing, visible focus and what loads over the network.
 
-// The callbacks passed to page.evaluate run in the browser, so they use DOM types.
-/// <reference lib="dom" />
-
-import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
+import { productName } from '@pixel-scientists/domain/platform';
 
-const SUFFIX = '– PixelGrant';
+import { expect, test } from '../../../scripts/e2e/fixtures.ts';
+
+const SUFFIX = `– ${productName}`;
+
+/** The text spacing that WCAG 1.4.12 says a person must be able to apply without losing content. */
+const TEXT_SPACING =
+  '* { line-height: 1.5 !important; letter-spacing: 0.12em !important; word-spacing: 0.16em !important; } p { margin-bottom: 2em !important; }';
 
 /** The text of the polite live region that announces page changes. */
 function announcement(page: Page) {
@@ -23,23 +26,22 @@ async function horizontalOverflow(page: Page): Promise<number> {
   );
 }
 
-test.describe('home page', () => {
-  test('has a title that says where you are, one h1 and plain words about what happens next', async ({
+test.describe('the page outside a funder', () => {
+  test('has a title that says where you are, one h1 and plain words about what to open instead', async ({
     page,
   }) => {
     await page.goto('/');
 
-    await expect(page).toHaveTitle(`Apply for a grant ${SUFFIX}`);
+    await expect(page).toHaveTitle(`Use your funder's link ${SUFFIX}`);
     await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
-    await expect(page.getByRole('heading', { level: 1, name: 'Apply for a grant' })).toBeVisible();
     await expect(
-      page.getByRole('heading', { level: 2, name: 'No grants are open yet' }),
+      page.getByRole('heading', { level: 1, name: "Use your funder's link" }),
     ).toBeVisible();
-    await expect(page.getByText('You do not need to do anything now.')).toBeVisible();
     await expect(
-      page.getByText(
-        'When a grant opens, you will check that you can apply first. Then you will fill in your application at your own pace.',
-      ),
+      page.getByText('To apply for a grant, open the link your funder gave you.'),
+    ).toBeVisible();
+    await expect(
+      page.getByText('If you do not have the link, ask the funder to send it to you again.'),
     ).toBeVisible();
     await expect(page.locator('html')).toHaveAttribute('lang', 'en-GB');
   });
@@ -47,14 +49,16 @@ test.describe('home page', () => {
   test('has a banner and a main landmark, and no navigation to wade through', async ({ page }) => {
     await page.goto('/');
 
-    await expect(page.getByRole('banner')).toContainText('PixelGrant');
+    await expect(page.getByRole('banner')).toContainText(productName);
     await expect(page.getByRole('main')).toBeVisible();
     await expect(page.getByRole('navigation')).toHaveCount(0);
   });
 
   test('leaves focus where the browser put it on the first load', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByRole('heading', { level: 1, name: 'Apply for a grant' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { level: 1, name: "Use your funder's link" }),
+    ).toBeVisible();
 
     expect(await page.evaluate(() => document.activeElement?.tagName)).toBe('BODY');
     await expect(announcement(page)).toHaveText('');
@@ -64,7 +68,9 @@ test.describe('home page', () => {
     page,
   }) => {
     await page.goto('/');
-    await expect(page.getByRole('heading', { level: 1, name: 'Apply for a grant' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { level: 1, name: "Use your funder's link" }),
+    ).toBeVisible();
 
     const sizes = await page.evaluate(() => ({
       heading: parseFloat(getComputedStyle(document.querySelector('h1') as Element).fontSize),
@@ -83,7 +89,9 @@ test.describe('skip link', () => {
     page,
   }) => {
     await page.goto('/');
-    await expect(page.getByRole('heading', { level: 1, name: 'Apply for a grant' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { level: 1, name: "Use your funder's link" }),
+    ).toBeVisible();
     const skipLink = page.getByRole('link', { name: 'Skip to main content' });
 
     await page.keyboard.press('Tab');
@@ -102,7 +110,9 @@ test.describe('skip link', () => {
 
   test('puts the next Tab on the first link in the page', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByRole('heading', { level: 1, name: 'Apply for a grant' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { level: 1, name: "Use your funder's link" }),
+    ).toBeVisible();
 
     await page.keyboard.press('Tab');
     await page.keyboard.press('Enter');
@@ -135,34 +145,40 @@ test.describe('moving between pages', () => {
 
     await page.getByRole('link', { name: 'Back to the home page' }).click();
 
-    await expect(page.getByRole('heading', { level: 1, name: 'Apply for a grant' })).toBeFocused();
-    await expect(page).toHaveTitle(`Apply for a grant ${SUFFIX}`);
+    await expect(
+      page.getByRole('heading', { level: 1, name: "Use your funder's link" }),
+    ).toBeFocused();
+    await expect(page).toHaveTitle(`Use your funder's link ${SUFFIX}`);
     await expect(page).toHaveURL(/\/$/);
   });
 
   test('shows the not found page for an unknown address, and a way home', async ({ page }) => {
-    await page.goto('/no-such-page');
+    await page.goto('/Not-Found');
 
     await expect(page.getByRole('heading', { level: 1, name: 'Page not found' })).toBeVisible();
     await expect(page).toHaveTitle(`Page not found ${SUFFIX}`);
 
     await page.getByRole('link', { name: 'Go to the home page' }).click();
-    await expect(page.getByRole('heading', { level: 1, name: 'Apply for a grant' })).toBeFocused();
-    await expect(announcement(page)).toHaveText('Navigated to Apply for a grant');
+    await expect(
+      page.getByRole('heading', { level: 1, name: "Use your funder's link" }),
+    ).toBeFocused();
+    await expect(announcement(page)).toHaveText("Navigated to Use your funder's link");
   });
 
   test('goes home from the product name in the header, with focus on the home heading', async ({
     page,
   }) => {
     await page.goto('/how-applying-works');
-    const home = page.getByRole('banner').getByRole('link', { name: 'PixelGrant' });
+    const home = page.getByRole('banner').getByRole('link', { name: productName });
     await expect(home).toHaveAttribute('href', '/');
     await expect(home).not.toHaveAttribute('aria-current');
 
     await home.click();
 
-    await expect(page.getByRole('heading', { level: 1, name: 'Apply for a grant' })).toBeFocused();
-    await expect(page).toHaveTitle(`Apply for a grant ${SUFFIX}`);
+    await expect(
+      page.getByRole('heading', { level: 1, name: "Use your funder's link" }),
+    ).toBeFocused();
+    await expect(page).toHaveTitle(`Use your funder's link ${SUFFIX}`);
     await expect(page).toHaveURL(/\/$/);
     await expect(home).toHaveAttribute('aria-current', 'page');
   });
@@ -177,9 +193,11 @@ test.describe('moving between pages', () => {
     await page.goBack();
 
     await expect(page).toHaveURL(/\/$/);
-    await expect(page.getByRole('heading', { level: 1, name: 'Apply for a grant' })).toBeFocused();
-    await expect(page).toHaveTitle(`Apply for a grant ${SUFFIX}`);
-    await expect(announcement(page)).toHaveText('Navigated to Apply for a grant');
+    await expect(
+      page.getByRole('heading', { level: 1, name: "Use your funder's link" }),
+    ).toBeFocused();
+    await expect(page).toHaveTitle(`Use your funder's link ${SUFFIX}`);
+    await expect(announcement(page)).toHaveText("Navigated to Use your funder's link");
 
     await page.goForward();
 
@@ -196,12 +214,15 @@ test.describe('moving between pages', () => {
 
     await page.getByRole('link', { name: 'Back to the home page' }).click();
 
-    await expect(page.getByRole('heading', { level: 1, name: 'Apply for a grant' })).toBeFocused();
+    await expect(
+      page.getByRole('heading', { level: 1, name: "Use your funder's link" }),
+    ).toBeFocused();
     expect(await page.evaluate(() => window.scrollY)).toBe(0);
   });
 });
 
-const HOW_APPLYING_WORKS_CODE = '**/HowApplyingWorksPage.tsx*';
+// Matches the page's module in development and its chunk in a production build.
+const HOW_APPLYING_WORKS_CODE = '**/HowApplyingWorksPage*';
 
 test.describe('a page that is slow or fails to load', () => {
   test('shows and announces that the page is loading, then moves to it', async ({ page }) => {
@@ -273,7 +294,7 @@ test.describe('how applying works page', () => {
 test.describe('small screens, zoom and text spacing', () => {
   test('does not scroll sideways at 320 px wide', async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 640 });
-    for (const path of ['/', '/how-applying-works', '/no-such-page']) {
+    for (const path of ['/', '/how-applying-works', '/Not-Found']) {
       await page.goto(path);
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
       expect(await horizontalOverflow(page), path).toBeLessThanOrEqual(0);
@@ -284,7 +305,7 @@ test.describe('small screens, zoom and text spacing', () => {
     test.use({ viewport: { width: 640, height: 400 }, deviceScaleFactor: 2 });
 
     test('does not scroll sideways, and keeps the text readable', async ({ page }) => {
-      for (const path of ['/', '/how-applying-works', '/no-such-page']) {
+      for (const path of ['/', '/how-applying-works', '/Not-Found']) {
         await page.goto(path);
         await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
         expect(await horizontalOverflow(page), path).toBeLessThanOrEqual(0);
@@ -299,10 +320,12 @@ test.describe('small screens, zoom and text spacing', () => {
     for (const path of ['/', '/how-applying-works']) {
       await page.goto(path);
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-      await page.addStyleTag({
-        content:
-          '* { line-height: 1.5 !important; letter-spacing: 0.12em !important; word-spacing: 0.16em !important; } p { margin-bottom: 2em !important; }',
-      });
+      // A constructed stylesheet: the page's Content Security Policy blocks a <style> element.
+      await page.evaluate((css) => {
+        const sheet = new CSSStyleSheet();
+        sheet.replaceSync(css);
+        document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+      }, TEXT_SPACING);
 
       expect(await horizontalOverflow(page), path).toBeLessThanOrEqual(0);
       const clipped = await page.evaluate(() =>
@@ -320,10 +343,12 @@ test.describe('keyboard and touch', () => {
     page,
   }) => {
     await page.goto('/');
-    await expect(page.getByRole('heading', { level: 1, name: 'Apply for a grant' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { level: 1, name: "Use your funder's link" }),
+    ).toBeVisible();
 
     await page.keyboard.press('Tab');
-    for (const name of ['PixelGrant', 'Read how applying works']) {
+    for (const name of [productName, 'Read how applying works']) {
       await page.keyboard.press('Tab');
       const link = page.getByRole('link', { name });
       await expect(link).toBeFocused();
@@ -340,7 +365,7 @@ test.describe('keyboard and touch', () => {
     await page.goto('/');
     const box = await page
       .getByRole('banner')
-      .getByRole('link', { name: 'PixelGrant' })
+      .getByRole('link', { name: productName })
       .boundingBox();
     expect(box?.height).toBeGreaterThanOrEqual(24);
   });
@@ -348,7 +373,7 @@ test.describe('keyboard and touch', () => {
   test('makes every link in the page at least 44 pixels tall, for thumbs and unsteady hands', async ({
     page,
   }) => {
-    for (const path of ['/', '/how-applying-works', '/no-such-page']) {
+    for (const path of ['/', '/how-applying-works', '/Not-Found']) {
       await page.goto(path);
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
 
@@ -371,7 +396,9 @@ test.describe('reduced motion', () => {
   test('stops every transition when the person asks for reduced motion', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/');
-    await expect(page.getByRole('heading', { level: 1, name: 'Apply for a grant' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { level: 1, name: "Use your funder's link" }),
+    ).toBeVisible();
 
     const transition = await page
       .getByRole('link', { name: 'Read how applying works' })
@@ -391,7 +418,9 @@ test.describe('network', () => {
     });
 
     await page.goto('/');
-    await expect(page.getByRole('heading', { level: 1, name: 'Apply for a grant' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { level: 1, name: "Use your funder's link" }),
+    ).toBeVisible();
     await page.getByRole('link', { name: 'Read how applying works' }).click();
     await expect(page.getByRole('heading', { level: 1, name: 'How applying works' })).toBeFocused();
 
@@ -405,7 +434,7 @@ test.describe('without JavaScript', () => {
   test('says what to do, in a page with a heading and a main landmark', async ({ page }) => {
     await page.goto('/');
 
-    await expect(page).toHaveTitle('PixelGrant');
+    await expect(page).toHaveTitle(productName);
     await expect(
       page.getByRole('heading', { level: 1, name: 'Turn on JavaScript to apply' }),
     ).toBeVisible();

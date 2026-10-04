@@ -1,6 +1,6 @@
 # ADR 0008: Standalone or Twenty for the relationship layer
 
-- **Status:** accepted
+- **Status:** accepted; proposed partial supersession in [ADR 0017](0017-bespoke-crm-party-core.md)
 - **Date:** 2026-09-27
 - **Deciders:** Aaron Gardner
 

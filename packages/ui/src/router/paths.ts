@@ -74,13 +74,19 @@ export function resolveAppPath(
   };
 }
 
+/** One or more segments of plain characters: no empty segment, no percent-encoding, no query or hash. */
+const BASE_PATH = /^(?:\/[A-Za-z0-9._~-]+)+$/;
+
 /**
  * Read an optional base path: empty for an app served from the root, or
- * something like `/console` when one host serves both apps. No trailing slash.
+ * something like `/northfield` (a tenant's slug) or `/console` when one host
+ * serves both apps. No trailing slash. Anything but plain segments, and any
+ * dot segment, throws InvalidAppPathError.
  */
 export function normalizeBasePath(basePath: string): string {
   const trimmed = basePath.replace(/\/+$/, '');
   if (trimmed === '') return '';
+  if (!BASE_PATH.test(trimmed)) throw new InvalidAppPathError(REFUSED);
   return assertAppPath(trimmed);
 }
 
@@ -120,21 +126,17 @@ const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
 /**
  * Turn a search string into a record for a schema: one value stays a string,
- * a key that repeats becomes an array of strings. `__proto__`, `constructor`
- * and `prototype` are dropped.
+ * a key that repeats becomes an array of strings. The record has no
+ * prototype, so a key such as `toString` cannot shadow a method, and
+ * `__proto__`, `constructor` and `prototype` are dropped as well.
  */
 export function searchToRecord(search: string): Record<string, string | string[]> {
-  const values = new Map<string, string[]>();
+  const record = Object.create(null) as Record<string, string | string[]>;
   for (const [key, value] of new URLSearchParams(search)) {
     if (UNSAFE_KEYS.has(key)) continue;
-    const list = values.get(key);
-    if (list) list.push(value);
-    else values.set(key, [value]);
+    const existing = record[key];
+    if (existing === undefined) record[key] = value;
+    else record[key] = Array.isArray(existing) ? [...existing, value] : [existing, value];
   }
-  return Object.fromEntries(
-    [...values].map(([key, list]) => [
-      key,
-      list.length === 1 && list[0] !== undefined ? list[0] : list,
-    ]),
-  );
+  return record;
 }

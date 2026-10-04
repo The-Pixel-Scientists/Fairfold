@@ -2,16 +2,18 @@
 //
 // The first release's auth routes (ADR 0010): email-first sign-up, password
 // sign-in and reset, sign-out, the session and switching tenant, with the
-// MFA routes from mfa-routes.ts. They have no permission or scope: each
-// states the session it needs instead. Requests that start a sign-up or a
-// password reset answer the same way whether or not the address has an
-// account, and emailed links carry a token that only a POST spends.
+// MFA routes from mfa-routes.ts and accepting an invitation from
+// invitation-routes.ts. They have no permission or scope: each states the
+// session it needs instead. Requests that start a sign-up or a password
+// reset answer the same way whether or not the address has an account, and
+// emailed links carry a token that only a POST spends.
 
 import { z } from 'zod';
 
 import { defineRoute } from '../api/route.ts';
 import { idSchema } from '../id.ts';
 import { slugSchema } from '../platform/tenant.ts';
+import { acceptInvitation } from './invitation-routes.ts';
 import { confirmTotp, enrolTotp, stepUp, verifyTotp } from './mfa-routes.ts';
 import {
   currentPasswordSchema,
@@ -120,4 +122,5 @@ export const authRoutes = {
   switchTenant,
   requestPasswordReset,
   completePasswordReset,
+  acceptInvitation,
 } as const;

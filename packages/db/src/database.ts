@@ -41,7 +41,7 @@ export interface DatabaseSettings {
   readonly database: string;
   readonly role: ClientRole;
   readonly password: string;
-  /** Shown in pg_stat_activity, such as `pixelgrant-api`. */
+  /** Shown in pg_stat_activity, such as `tps-api`. */
   readonly applicationName: string;
   /** Required unless the server is on this machine. */
   readonly tls?: DatabaseTls;

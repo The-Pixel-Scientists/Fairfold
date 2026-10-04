@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import { catalogueParams, messages } from '@pixel-scientists/domain/platform';
 import { validatorCompiler } from 'fastify-type-provider-zod';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
@@ -106,15 +107,28 @@ describe('fieldProblems', () => {
     ]);
   });
 
-  it('passes on the message of a custom check written in the domain package', () => {
+  it('passes on the message of a custom check only if it came from the catalogue', () => {
     const schema = z.object({
-      closes: z
-        .string()
-        .refine((value) => value > '2027-04-01', 'Enter a date after 1 April 2027.'),
+      closes: z.string().superRefine((value, context) => {
+        if (value < '2027-04-01') {
+          context.addIssue({
+            code: 'custom',
+            message: messages.brandColourContrast('#1f4bb8'),
+            params: catalogueParams,
+          });
+        }
+      }),
+      opens: z.string().refine((value) => value > 'a', 'Not jo@example.org again.'),
     });
-    expect(messagesFor(schema, { closes: '2026-01-01' })).toEqual([
-      'Enter a date after 1 April 2027.',
+    expect(problemsFor(schema, { closes: '2026-01-01', opens: 'a' })).toEqual([
+      { field: 'body.closes', message: messages.brandColourContrast('#1f4bb8') },
+      { field: 'body.opens', message: messages.notValid },
     ]);
+  });
+
+  it('takes the words of a fixed catalogue message, from any schema', () => {
+    const schema = z.object({ email: z.email({ error: messages.email }) });
+    expect(messagesFor(schema, { email: 'nope' })).toEqual([messages.email]);
   });
 
   it('uses a general message for any other kind of failure', () => {

@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 rules:
-  - id: pixelgrant-no-dangerously-set-inner-html
+  - id: tps-no-dangerously-set-inner-html
     languages: [typescript, javascript]
     severity: ERROR
     message: >-

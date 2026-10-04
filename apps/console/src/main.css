@@ -1,4 +1,6 @@
-@import '@pixelgrant/ui/styles.css';
+/* SPDX-License-Identifier: AGPL-3.0-or-later */
+
+@import '@pixel-scientists/ui/styles.css';
 
 /* Tell Tailwind to read the console's own components as well. */
 @source '.';

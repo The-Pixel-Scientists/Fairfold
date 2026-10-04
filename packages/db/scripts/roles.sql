@@ -1,29 +1,33 @@
 -- SPDX-License-Identifier: AGPL-3.0-or-later
 --
--- PixelGrant database roles, version 1 (ADR 0003), part 1 of 2: the roles.
+-- Fairfold Grants database roles, version 3 (ADR 0003), part 1 of 2: the roles.
 --
--- Creates the login roles and resets their attributes, memberships, settings
--- and passwords. Roles belong to the whole server, so this runs as a
--- superuser connected to the maintenance database (postgres). Part 2,
--- database-privileges.sql, then runs in each PixelGrant database. Both are
--- safe to run any number of times. They run when the server is first created
--- and again before every migration run; migrations never create or alter a
--- role.
+-- Creates the login roles and the function-owner roles, and resets their
+-- attributes, memberships, settings and passwords. Roles belong to the
+-- whole server, so this runs as a superuser connected to the maintenance
+-- database (postgres). Part 2, database-privileges.sql, then runs in each
+-- Fairfold Grants database. Both are safe to run any number of times. They run
+-- when the server is first created and again before every migration run;
+-- migrations never create or alter a role.
 --
 -- Passwords never reach this file or the server in clear. Before running it,
 -- the caller computes a SCRAM-SHA-256 verifier for each role's password and
 -- sets it as a session setting:
---   pixelgrant.scram_verifier_migrator
---   pixelgrant.scram_verifier_app_api
---   pixelgrant.scram_verifier_app_worker
---   pixelgrant.scram_verifier_app_auth
---   pixelgrant.scram_verifier_app_queue
+--   tps.scram_verifier_migrator
+--   tps.scram_verifier_app_api
+--   tps.scram_verifier_app_worker
+--   tps.scram_verifier_app_auth
+--   tps.scram_verifier_app_queue
 -- The script clears them before it commits. The callers are
 -- packages/db/scripts/roles.ts (Node.js) and
 -- infra/compose/postgres/initdb/10-roles.sh (psql, on the first start).
 --
--- Function-owner roles (ADR 0003, "Approved definer functions") are added
--- here, with a new version number, in the change that adds their function.
+-- Each approved definer function (ADR 0003, "Approved definer functions",
+-- and ADR 0019) has its own NOLOGIN owner role, listed below, which owns
+-- that function and nothing else. A new owner role comes with a new version
+-- number. The one membership any role holds is migrator's in each owner,
+-- with SET but not INHERIT: migrator can hand a function to its owner, or
+-- replace it as that owner, but never holds the owner's rights (ADR 0023).
 --
 -- Known limitation: this needs a true superuser, which managed services such
 -- as Cloud SQL do not provide; see S01-02 and ADR 0012.
@@ -43,7 +47,16 @@ LOCK TABLE pg_catalog.pg_authid IN SHARE ROW EXCLUSIVE MODE;
 
 DO $roles$
 DECLARE
-  roles_version CONSTANT text := '1';
+  roles_version CONSTANT text := '3';
+  login_roles CONSTANT text[] := ARRAY['migrator', 'app_api', 'app_worker', 'app_auth', 'app_queue'];
+  owner_roles CONSTANT text[] := ARRAY[
+    'owner_auth_session_context',     -- auth.session_context()
+    'owner_auth_session_memberships', -- auth.session_memberships()
+    'owner_app_public_tenant',        -- app.public_tenant()
+    'owner_app_public_tenant_logo',   -- app.public_tenant_logo()
+    'owner_app_create_tenant'         -- app.create_tenant()
+  ];
+  is_login boolean;
   role_name text;
   role_verifier text;
   verifier_parts text[];
@@ -54,15 +67,19 @@ BEGIN
     RAISE EXCEPTION 'Run the roles script as a superuser.';
   END IF;
 
-  FOREACH role_name IN ARRAY ARRAY['migrator', 'app_api', 'app_worker', 'app_auth', 'app_queue']
+  FOREACH role_name IN ARRAY login_roles || owner_roles
   LOOP
-    -- A verifier in PostgreSQL's stored format: at least 4096 iterations, a
-    -- salt of at least 16 bytes, and 32-byte stored and server keys.
-    role_verifier := current_setting('pixelgrant.scram_verifier_' || role_name, true);
-    verifier_parts := regexp_match(role_verifier,
-      '^SCRAM-SHA-256\$([0-9]{4,9}):[A-Za-z0-9+/]{22,}={0,2}\$[A-Za-z0-9+/]{43}=:[A-Za-z0-9+/]{43}=$');
-    IF verifier_parts IS NULL OR verifier_parts[1]::integer < 4096 THEN
-      RAISE EXCEPTION 'Set a SCRAM-SHA-256 verifier with at least 4096 iterations for role % before running the roles script.', role_name;
+    is_login := role_name = ANY (login_roles);
+
+    IF is_login THEN
+      -- A verifier in PostgreSQL's stored format: at least 4096 iterations, a
+      -- salt of at least 16 bytes, and 32-byte stored and server keys.
+      role_verifier := current_setting('tps.scram_verifier_' || role_name, true);
+      verifier_parts := regexp_match(role_verifier,
+        '^SCRAM-SHA-256\$([0-9]{4,9}):[A-Za-z0-9+/]{22,}={0,2}\$[A-Za-z0-9+/]{43}=:[A-Za-z0-9+/]{43}=$');
+      IF verifier_parts IS NULL OR verifier_parts[1]::integer < 4096 THEN
+        RAISE EXCEPTION 'Set a SCRAM-SHA-256 verifier with at least 4096 iterations for role % before running the roles script.', role_name;
+      END IF;
     END IF;
 
     IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = role_name) THEN
@@ -71,11 +88,12 @@ BEGIN
 
     -- Every attribute is set explicitly, so a role changed by hand is reset.
     EXECUTE format(
-      'ALTER ROLE %I WITH LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE INHERIT '
+      'ALTER ROLE %I WITH %s NOSUPERUSER NOCREATEDB NOCREATEROLE INHERIT '
         'NOREPLICATION NOBYPASSRLS CONNECTION LIMIT -1 VALID UNTIL %L',
-      role_name, 'infinity');
+      role_name, CASE WHEN is_login THEN 'LOGIN' ELSE 'NOLOGIN' END, 'infinity');
 
     -- The role belongs to no other role, and no other role belongs to it.
+    -- migrator's memberships in the owners are granted again below.
     FOR membership IN
       SELECT granted.rolname AS granted_role, member.rolname AS member_role, grantor.rolname AS grantor_role
       FROM pg_catalog.pg_auth_members m
@@ -105,7 +123,13 @@ BEGIN
 
     -- The migrate job, API and worker read this at start-up and refuse to
     -- run against roles from another version of this script.
-    EXECUTE format('COMMENT ON ROLE %I IS %L', role_name, 'pixelgrant-roles-version=' || roles_version);
+    EXECUTE format('COMMENT ON ROLE %I IS %L', role_name, 'tps-roles-version=' || roles_version);
+
+    -- A function owner never logs in, so it has no password at all.
+    IF NOT is_login THEN
+      EXECUTE format('ALTER ROLE %I PASSWORD NULL', role_name);
+      CONTINUE;
+    END IF;
 
     -- The password statement runs on its own, and a failure is reported
     -- without the statement text, so the verifier never reaches an error
@@ -123,13 +147,18 @@ BEGIN
       RAISE EXCEPTION 'The password for role % was not stored as the verifier given.', role_name;
     END IF;
   END LOOP;
+
+  FOREACH role_name IN ARRAY owner_roles
+  LOOP
+    EXECUTE format('GRANT %I TO migrator WITH ADMIN FALSE, INHERIT FALSE, SET TRUE', role_name);
+  END LOOP;
 END
 $roles$;
 
-RESET pixelgrant.scram_verifier_migrator;
-RESET pixelgrant.scram_verifier_app_api;
-RESET pixelgrant.scram_verifier_app_worker;
-RESET pixelgrant.scram_verifier_app_auth;
-RESET pixelgrant.scram_verifier_app_queue;
+RESET tps.scram_verifier_migrator;
+RESET tps.scram_verifier_app_api;
+RESET tps.scram_verifier_app_worker;
+RESET tps.scram_verifier_app_auth;
+RESET tps.scram_verifier_app_queue;
 
 COMMIT;

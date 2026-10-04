@@ -20,7 +20,9 @@ describe('schema lint', () => {
       sensitivity: 'internal',
       retention: { kind: 'tenant_lifetime' },
     } as const;
+    // The migrated tables keep their own classification.
     const registry: ClassificationRegistry = {
+      ...classification,
       'app.lint_good': {
         id: tenantLifetime,
         tenant_id: tenantLifetime,
@@ -32,7 +34,13 @@ describe('schema lint', () => {
           retention: { kind: 'tenant_policy', policy: ' ', minimumDays: 1.5 },
         },
       },
-      'app.lint_policies': { id: tenantLifetime, tenant_id: tenantLifetime, note: tenantLifetime },
+      'app.lint_policies': {
+        id: tenantLifetime,
+        tenant_id: tenantLifetime,
+        note: tenantLifetime,
+        good_id: tenantLifetime,
+        parent_id: tenantLifetime,
+      },
       'app.lint_gone': {
         note: { sensitivity: 'personal', retention: { kind: 'tenant_lifetime' } },
       },
@@ -55,12 +63,34 @@ describe('schema lint', () => {
           created_at timestamptz NOT NULL,
           "constructor" text,
           "toString" text,
-          "__proto__" text
+          "__proto__" text,
+          UNIQUE (tenant_id, id)
         );
         SELECT app.enable_tenant_rls('app.lint_good');
 
+        -- No app role may insert or delete (rule 4). INSERT is denied as it
+        -- should be; each restrictive DELETE policy falls short.
+        CREATE POLICY deny_insert ON app.lint_good AS RESTRICTIVE FOR INSERT
+          TO app_api, app_worker, app_queue, app_auth WITH CHECK (false);
+        CREATE POLICY some_roles ON app.lint_good AS RESTRICTIVE FOR DELETE
+          TO app_api, app_worker USING (false);
+        CREATE POLICY not_false ON app.lint_good AS RESTRICTIVE FOR DELETE
+          TO app_api, app_worker, app_queue, app_auth USING (tenant_id IS NULL);
+
         -- Every command has a policy, but three are wrong; a fourth comes below.
-        CREATE TABLE app.lint_policies (id uuid PRIMARY KEY, tenant_id uuid NOT NULL, note text);
+        -- Only the first foreign key matches tenant_id to tenant_id (rule 6).
+        CREATE TABLE app.lint_policies (
+          id uuid PRIMARY KEY,
+          tenant_id uuid NOT NULL,
+          note text,
+          good_id uuid,
+          parent_id uuid,
+          UNIQUE (tenant_id, id),
+          FOREIGN KEY (tenant_id, good_id) REFERENCES app.lint_good (tenant_id, id),
+          CONSTRAINT lint_swapped FOREIGN KEY (good_id, tenant_id)
+            REFERENCES app.lint_good (tenant_id, id),
+          CONSTRAINT lint_no_tenant FOREIGN KEY (parent_id) REFERENCES app.lint_good (id)
+        );
         ALTER TABLE app.lint_policies ENABLE ROW LEVEL SECURITY;
         ALTER TABLE app.lint_policies FORCE ROW LEVEL SECURITY;
         CREATE POLICY widened ON app.lint_policies FOR SELECT
@@ -72,6 +102,15 @@ describe('schema lint', () => {
           USING (tenant_id = app.current_tenant_id() AND note IS NOT NULL);
         CREATE POLICY never ON app.lint_policies AS RESTRICTIVE FOR DELETE TO app_api, app_worker
           USING (false);
+
+        -- So rule 4 has nothing to say about these three.
+        GRANT SELECT, INSERT, UPDATE, DELETE ON app.lint_bare, app.lint_for_all, app.lint_policies
+          TO app_api;
+
+        -- Rule 5: the tenant comes from another setting.
+        CREATE OR REPLACE FUNCTION app.current_tenant_id() RETURNS uuid
+          LANGUAGE sql STABLE PARALLEL SAFE
+          RETURN NULLIF(pg_catalog.current_setting('app.tenant', true), '')::uuid;
 
         CREATE VIEW app.lint_view AS SELECT id FROM app.lint_good;
         CREATE VIEW app.lint_invoker_view WITH (security_invoker = on)
@@ -137,6 +176,12 @@ describe('schema lint', () => {
         'app.lint_for_all.id names an empty retention policy.',
         'app.lint_for_all.id has a minimum of 1.5 days, not a whole number above 0.',
         'app.lint_for_all.tenant_id is not classified in classification.ts.',
+        'app.lint_bare has no UNIQUE (tenant_id, id) constraint.',
+        'app.lint_for_all has no UNIQUE (tenant_id, id) constraint.',
+        'app.lint_good grants DELETE to no app role, and has no restrictive DELETE policy with USING (false) for every app role.',
+        'app.lint_policies foreign key lint_no_tenant does not match its tenant_id to app.lint_good.tenant_id.',
+        'app.lint_policies foreign key lint_swapped does not match its tenant_id to app.lint_good.tenant_id.',
+        'app.current_tenant_id() is not defined as CURRENT_TENANT_ID_DEFINITION (ADR 0003, row-level security rule 5).',
         'app.lint_good.created_at keeps values for 0 days, not a whole number above 0.',
         'app.lint_good.created_at counts its retention from id, which is not a date column of app.lint_good.',
         'app.lint_good.__proto__ is not classified in classification.ts.',
@@ -156,7 +201,7 @@ describe('schema lint', () => {
         'PUBLIC holds SELECT on app.lint_good.',
         'PUBLIC holds UPDATE on column app.lint_good.created_at.',
         'PUBLIC holds USAGE on app.lint_sequence.',
-        'app.lint_definer() is SECURITY DEFINER, and no definer function is approved yet.',
+        'app.lint_definer() is SECURITY DEFINER and is not an approved definer function.',
         'PUBLIC can execute app.lint_definer().',
         `app.lint_definer() is executable by ${allRoles}; EXECUTABLE_BY allows no app role.`,
         'PUBLIC can execute migrations.lint_open().',
@@ -191,5 +236,11 @@ describe('hasTenantTerm', () => {
     ['another function', '(tenant_id = app.other_tenant_id())'],
   ])('refuses %s', (_, expression) => {
     expect(hasTenantTerm(expression)).toBe(false);
+  });
+
+  it('looks for the term given, for a table keyed by its own id', () => {
+    const idTerm = '(id = app.current_tenant_id())';
+    expect(hasTenantTerm(`(${idTerm} AND (a > 1))`, idTerm)).toBe(true);
+    expect(hasTenantTerm(idTerm)).toBe(false);
   });
 });

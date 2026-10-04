@@ -3,7 +3,7 @@
 # Libraries that only one part of the code base may import.
 
 rules:
-  - id: pixelgrant-database-imports-only-in-db
+  - id: tps-database-imports-only-in-db
     languages: [typescript, javascript]
     severity: ERROR
     message: >-
@@ -29,7 +29,7 @@ rules:
       exclude:
         - /packages/db/
 
-  - id: pixelgrant-better-auth-only-in-auth
+  - id: tps-better-auth-only-in-auth
     languages: [typescript, javascript]
     severity: ERROR
     message: >-
@@ -53,12 +53,12 @@ rules:
       exclude:
         - /apps/api/src/auth/
 
-  - id: pixelgrant-radix-only-in-ui
+  - id: tps-radix-only-in-ui
     languages: [typescript, javascript]
     severity: ERROR
     message: >-
       Only packages/ui may import Radix. Use the wrapped component from
-      @pixelgrant/ui (ADR 0006).
+      @pixel-scientists/ui (ADR 0006).
     patterns:
       - pattern-either:
           - pattern: import "$MODULE"
@@ -77,3 +77,28 @@ rules:
     paths:
       exclude:
         - /packages/ui/
+
+  - id: tps-nodemailer-only-in-email
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      Only apps/api/src/email may import nodemailer. Send mail through the
+      sender it exports, so every message goes through one checked path.
+    patterns:
+      - pattern-either:
+          - pattern: import "$MODULE"
+          - pattern: import $X from "$MODULE"
+          - pattern: import * as $X from "$MODULE"
+          - pattern: import {...} from "$MODULE"
+          - pattern: import type $X from "$MODULE"
+          - pattern: import type {...} from "$MODULE"
+          - pattern: export {...} from "$MODULE"
+          - pattern: export * from "$MODULE"
+          - pattern: import("$MODULE")
+          - pattern: require("$MODULE")
+      - metavariable-regex:
+          metavariable: $MODULE
+          regex: ^['"]?(nodemailer|nodemailer/.+)['"]?$
+    paths:
+      exclude:
+        - /apps/api/src/email/

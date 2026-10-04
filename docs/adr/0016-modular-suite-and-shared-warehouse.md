@@ -6,7 +6,7 @@
 
 ## Context
 
-On 2 October 2026 Aaron set out PixelGrant as the first module of a suite of
+On 2 October 2026 Aaron set out Fairfold Grants as the first module of a suite of
 tools for foundations, sharing one warehouse:
 
 - grants, the V1 scope;
@@ -104,8 +104,8 @@ One repository:
   classification map stays where rule 5 names it.
 
 A module imports only the platform packages and other modules' published
-contracts: `@pixelgrant/<module>/contracts` from anywhere, and
-`@pixelgrant/<module>/server` from server code only. Lint rules enforce this
+contracts: `@pixel-scientists/<module>/contracts` from anywhere, and
+`@pixel-scientists/<module>/server` from server code only. Lint rules enforce this
 per entry point, and each module's database types are generated per schema,
 so a query on another module's tables does not compile.
 
@@ -135,7 +135,7 @@ then need their own history.
 ### Calls and events
 
 - One API request is one tenant transaction. A module calls another through
-  `@pixelgrant/<module>/server` inside that transaction, so the whole request
+  `@pixel-scientists/<module>/server` inside that transaction, so the whole request
   commits or rolls back together.
 - An event is a versioned, past-tense fact such as
   `grants.decision_released.v1`. Its Zod schema is in the publisher's

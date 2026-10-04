@@ -1,11 +1,13 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
 # Checks for every pull request and every push to main (ADRs 0001 and 0002):
-# typecheck, lint, formatting and unit tests; licences; pnpm audit; Semgrep;
-# gitleaks; Trivy; and SBOMs from Syft. Every night, `pnpm check` runs on
-# Windows, and the licence check, pnpm audit and Trivy run again, so a new
-# advisory against an unchanged lockfile is caught. The database, end-to-end
-# and accessibility jobs arrive with S01-07.
+# typecheck, lint, formatting and unit tests; migrations and database tests
+# on PostgreSQL 16; end-to-end and axe tests against the dev servers and
+# production builds; the stack's release images, with the same tests run
+# against them; licences; pnpm audit; Semgrep; gitleaks; Trivy; and SBOMs
+# from Syft. Every night, `pnpm check` runs on Windows, and the licence
+# check, pnpm audit and Trivy run again, so a new advisory against an
+# unchanged lockfile is caught.
 #
 # Hardening: actions are pinned by commit SHA and images by digest; every
 # downloaded tool is checked against a committed SHA-256, and against its
@@ -40,10 +42,13 @@ env:
   SYFT_VERSION: 1.52.0
   TRIVY_VERSION: 0.74.0
   SEMGREP_IMAGE: semgrep/semgrep:1.177.0@sha256:acaac22ffc7b7cc5926de0751b223bce0b2491c33d18422fa72f632c78d81198
-  # Rules Semgrep loaded on 2026-09-28: 321 in all, 7 of them ours. Raise
+  # The browsers for @playwright/test 1.63.0. The e2e job's container names
+  # the same image, as a job container cannot read this.
+  PLAYWRIGHT_IMAGE: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
+  # Rules Semgrep loaded on 2026-10-04: 333 in all, 18 of them ours. Raise
   # these when rules are added; lower them only with a reason in review.
   SEMGREP_MINIMUM_RULES: 300
-  SEMGREP_PROJECT_RULES: 7
+  SEMGREP_PROJECT_RULES: 18
   GITHUB_OIDC_ISSUER: https://token.actions.githubusercontent.com
 
 jobs:
@@ -86,6 +91,136 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Run pnpm check
         run: pnpm check
+
+  database:
+    name: Migrations and database tests
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - name: Enable pnpm through Corepack
+        run: corepack enable
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Start PostgreSQL 16 from the development Compose file
+        run: docker compose --file infra/compose/compose.dev.yaml up --detach --wait postgres
+      - name: Migrate up, down and up again, as migrator
+        run: pnpm db:migrate && pnpm db:rollback && pnpm db:migrate
+      - name: Run the roles, schema lint, tenant and round-trip tests
+        run: pnpm test:db
+
+  e2e:
+    name: End-to-end and accessibility tests
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
+      options: --ipc=host
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - name: Enable pnpm through Corepack
+        run: corepack enable
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Run the specs against the dev servers, production builds and gallery build
+        run: pnpm test:e2e
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: failure()
+        with:
+          name: e2e-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
+  stack:
+    name: Stack in containers, with end-to-end and accessibility tests
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - name: Enable pnpm through Corepack
+        run: corepack enable
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build the release images, migrate, and wait for /health/ready
+        run: pnpm stack
+      # The journey and @api specs sign in as the seed's staff.
+      - name: Fill the stack with synthetic data
+        if: hashFiles('packages/db/seed/seed.ts') != ''
+        run: pnpm stack seed
+      # Every spec, the @api specs and the journey project included, with the
+      # stack's Mailpit and its secrets folder, for the seed password, at hand.
+      - name: Run the specs against the stack
+        run: >-
+          docker run --rm --network host --ipc host
+          --volume "$PWD:$PWD" --workdir "$PWD"
+          --volume "$HOME/.tps:/root/.tps:ro"
+          --env CI --env TPS_E2E_STACK=1
+          "$PLAYWRIGHT_IMAGE"
+          node node_modules/@playwright/test/cli.js test
+      - name: Install cosign
+        run: |
+          bash .github/scripts/fetch-tool.sh \
+            "https://github.com/sigstore/cosign/releases/download/v${COSIGN_VERSION}/cosign-linux-amd64" \
+            "$RUNNER_TEMP/tools"
+          chmod +x "$RUNNER_TEMP/tools/cosign-linux-amd64"
+      - name: Install Trivy and verify its signature
+        working-directory: ${{ runner.temp }}/tools
+        run: |
+          archive="trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          bash "$GITHUB_WORKSPACE/.github/scripts/fetch-tool.sh" \
+            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/${archive}" .
+          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 --retry 3 \
+            --output "${archive}.sigstore.json" \
+            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/${archive}.sigstore.json"
+          ./cosign-linux-amd64 verify-blob "$archive" \
+            --bundle "${archive}.sigstore.json" \
+            --certificate-identity "https://github.com/aquasecurity/trivy/.github/workflows/reusable-release.yaml@refs/tags/v${TRIVY_VERSION}" \
+            --certificate-oidc-issuer "$GITHUB_OIDC_ISSUER"
+          tar -xzf "$archive" trivy
+      # A finding with no fixed package yet cannot be acted on, so it is left
+      # out; one with a fix fails the build until the image is rebuilt on it.
+      - name: Scan the release images
+        run: |
+          project=$(node scripts/dev-names.ts | jq --raw-output .stackProject)
+          for service in api console portal; do
+            "$RUNNER_TEMP/tools/trivy" image --quiet --cache-dir "$RUNNER_TEMP/trivy-cache" \
+              --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 \
+              "${project}-${service}:latest"
+          done
+      - name: Show the stack's logs
+        if: failure()
+        run: pnpm stack logs
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: failure()
+        with:
+          name: stack-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
 
   licences:
     name: Licences
@@ -285,10 +420,10 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/sbom"
           "$RUNNER_TEMP/tools/syft" scan dir:. --quiet \
-            --source-name pixelgrant --source-version "$GITHUB_SHA" \
+            --source-name pixel-scientists-workspace --source-version "$GITHUB_SHA" \
             --output "syft-json=$RUNNER_TEMP/syft.json" \
-            --output "spdx-json=$RUNNER_TEMP/sbom/pixelgrant.spdx.json" \
-            --output "cyclonedx-json=$RUNNER_TEMP/sbom/pixelgrant.cdx.json"
+            --output "spdx-json=$RUNNER_TEMP/sbom/pixel-scientists-workspace.spdx.json" \
+            --output "cyclonedx-json=$RUNNER_TEMP/sbom/pixel-scientists-workspace.cdx.json"
       - name: Check the SBOM lists the whole lockfile
         env:
           LICENCE_CHECK_DEPENDENCIES: ${{ needs.licences.outputs.dependencies }}
