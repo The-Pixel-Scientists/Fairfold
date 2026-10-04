@@ -3,14 +3,27 @@
 // The API's one database connection pool, as the `app_api` role, through the
 // client in packages/db. Only packages/db imports a database driver.
 
-import { createDatabase } from '@pixel-scientists/db';
+import { createDatabase, withTenant, type TenantId } from '@pixel-scientists/db';
 import type { FastifyBaseLogger } from 'fastify';
 
 import type { Config } from './config.ts';
 
+/**
+ * The transaction a request runs in, with its tenant set. A module types it to
+ * its own schema with `tx.$extendTables<...>()` (ADR 0016).
+ */
+export type TenantTransaction = Parameters<Parameters<typeof withTenant<unknown, unknown>>[2]>[0];
+
+/** Runs `work` in one transaction for `tenant`, which commits if `work` resolves. */
+export type InTenant = <T>(
+  tenant: TenantId,
+  work: (tx: TenantTransaction) => Promise<T>,
+) => Promise<T>;
+
 export interface ApiDatabase {
   /** Resolves if the database answers a trivial query, and rejects if it does not. */
   check(): Promise<void>;
+  inTenant: InTenant;
   /** Closes the pool. */
   close(): Promise<void>;
 }
@@ -34,6 +47,7 @@ export function openDatabase(settings: Config['database'], log: FastifyBaseLogge
       // No tenant is set: the readiness probe reads no tenant data.
       await db.selectNoFrom((eb) => eb.lit(1).as('ok')).execute();
     },
+    inTenant: (tenant, work) => withTenant(db, tenant, work),
     close: () => db.destroy(),
   };
 }
