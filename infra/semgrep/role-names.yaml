@@ -1,0 +1,46 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Roles are bundles of permissions, held as data in
+# packages/domain/src/platform/roles.ts (ADR 0016). Code checks a
+# permission, never a role name, so changing what a role may do is a change
+# to that table alone. tenant_admin and programme_manager are only ever role
+# names. reviewer and applicant are also form audiences, so a comparison
+# with them counts only when the other side mentions a role.
+
+rules:
+  - id: tps-no-role-name-checks
+    languages: [typescript]
+    severity: ERROR
+    message: >-
+      Check a permission with permissionsFor(), not a role name. Roles are
+      data in packages/domain/src/platform/roles.ts (ADR 0016).
+    pattern-either:
+      - patterns:
+          - pattern-either: &comparisons
+            - pattern: $A === $ROLE
+            - pattern: $ROLE === $A
+            - pattern: $A !== $ROLE
+            - pattern: $ROLE !== $A
+            - pattern: $A == $ROLE
+            - pattern: $ROLE == $A
+            - pattern: $A != $ROLE
+            - pattern: $ROLE != $A
+            - pattern: $A.includes($ROLE)
+            - pattern: $A.has($ROLE)
+            - pattern: $A.indexOf($ROLE)
+            - pattern: |
+                switch ($A) { case $ROLE: ... }
+          - metavariable-regex:
+              metavariable: $ROLE
+              regex: ^['"`](tenant_admin|programme_manager)['"`]$
+      - patterns:
+          - pattern-either: *comparisons
+          - metavariable-regex:
+              metavariable: $ROLE
+              regex: ^['"`](reviewer|applicant)['"`]$
+          - metavariable-regex:
+              metavariable: $A
+              regex: (?i).*role
+    paths:
+      exclude:
+        - /packages/domain/src/platform/roles.ts
