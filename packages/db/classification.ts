@@ -42,7 +42,9 @@ export type RetentionRule =
    */
   | { readonly kind: 'tenant_policy'; readonly policy: string; readonly minimumDays: number }
   /** Kept while the tenant is a customer, and deleted when it leaves. */
-  | { readonly kind: 'tenant_lifetime' };
+  | { readonly kind: 'tenant_lifetime' }
+  /** Kept while the person's account exists, and deleted with it. */
+  | { readonly kind: 'account_lifetime' };
 
 export interface FieldClassification {
   readonly sensitivity: Sensitivity;

@@ -43,7 +43,26 @@ import { APP_ROLES } from './connect.ts';
 import { findPrivilegeProblems, NON_SYSTEM_SCHEMA } from './privilege-lint.ts';
 
 /** Tables in an application schema without tenant_id, each with its reason. */
-export const NON_TENANT_TABLES: ReadonlyMap<string, string> = new Map();
+export const NON_TENANT_TABLES: ReadonlyMap<string, string> = new Map(
+  (
+    [
+      [
+        'auth.user',
+        'An account belongs to one person and may hold memberships in several tenants.',
+      ],
+      ['auth.session', 'A session belongs to an account; its active tenant grants nothing alone.'],
+      ['auth.account', 'Credential accounts have no tenant; SSO identities add one later.'],
+      ['auth.verification', 'Emailed links come before any tenant is known.'],
+      ['auth.two_factor', 'MFA belongs to the account, whatever the tenant.'],
+      ['auth.rate_limit', 'Sign-in limits count identifiers and addresses, not tenants.'],
+      ['auth.audit_event', 'Some auth events have no tenant, such as a failed sign-in.'],
+      ['auth.audit_copy_pending', 'It holds only an auth event id and a time.'],
+    ] as const
+  ).map(([table, reason]) => [
+    table,
+    `${reason} On ADR 0003's allowlist: only app_auth and the function owners have grants.`,
+  ]),
+);
 
 /** Tenant tables whose own id is the tenant, each with its reason. */
 export const TENANT_KEYED_BY_ID: ReadonlyMap<string, string> = new Map([
