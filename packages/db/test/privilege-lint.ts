@@ -47,6 +47,13 @@ export const EXECUTABLE_BY: ReadonlyMap<string, readonly AppRole[]> = new Map<
   ['app.current_tenant_id()', APP_ROLES],
   // How the API learns about a session, without any grant in schema auth.
   ['auth.session_context(bytea)', ['app_api']],
+  // A session's memberships, for switching tenant (ADR 0019).
+  ['auth.session_memberships(bytea)', ['app_api']],
+  // Public tenant pages and sign-in, with no tenant set (ADR 0019).
+  ['app.public_tenant(text)', ['app_api', 'app_auth']],
+  ['app.public_tenant_logo(text)', ['app_api']],
+  // The operator command alone (ADR 0019).
+  ['app.create_tenant(text, text)', ['app_worker']],
 ]);
 
 interface DefinerFunction {
@@ -85,6 +92,86 @@ export const DEFINER_FUNCTIONS: ReadonlyMap<string, DefinerFunction> = new Map([
       ],
     },
   ],
+  [
+    'auth.session_memberships(bytea)',
+    {
+      owner: 'owner_auth_session_memberships',
+      rights: [
+        'USAGE on schema app',
+        'USAGE on schema auth',
+        ...['id', 'status'].map((column) => `SELECT on column auth.user.${column}`),
+        ...[
+          'token_hash',
+          'user_id',
+          'app',
+          'mfa_state',
+          'expires_at',
+          'created_at',
+          'last_seen_at',
+          'revoked_at',
+        ].map((column) => `SELECT on column auth.session.${column}`),
+        ...['id', 'tenant_id', 'user_id', 'roles', 'status'].map(
+          (column) => `SELECT on column app.membership.${column}`,
+        ),
+        ...['id', 'slug', 'name', 'status'].map(
+          (column) => `SELECT on column app.tenant.${column}`,
+        ),
+      ],
+      policies: [
+        'app.membership policy session_memberships_select',
+        'app.tenant policy session_memberships_select',
+        'auth.session policy session_memberships_select',
+        'auth.user policy session_memberships_select',
+      ],
+    },
+  ],
+  [
+    'app.public_tenant(text)',
+    {
+      owner: 'owner_app_public_tenant',
+      rights: [
+        'USAGE on schema app',
+        ...['id', 'slug', 'name', 'status'].map(
+          (column) => `SELECT on column app.tenant.${column}`,
+        ),
+        ...['tenant_id', 'brand_colour', 'preset', 'logo_type'].map(
+          (column) => `SELECT on column app.tenant_theme.${column}`,
+        ),
+      ],
+      policies: [
+        'app.tenant policy public_tenant_select',
+        'app.tenant_theme policy public_tenant_select',
+      ],
+    },
+  ],
+  [
+    'app.public_tenant_logo(text)',
+    {
+      owner: 'owner_app_public_tenant_logo',
+      rights: [
+        'USAGE on schema app',
+        ...['id', 'slug', 'status'].map((column) => `SELECT on column app.tenant.${column}`),
+        ...['tenant_id', 'logo', 'logo_type'].map(
+          (column) => `SELECT on column app.tenant_theme.${column}`,
+        ),
+      ],
+      policies: [
+        'app.tenant policy public_tenant_logo_select',
+        'app.tenant_theme policy public_tenant_logo_select',
+      ],
+    },
+  ],
+  [
+    'app.create_tenant(text, text)',
+    {
+      owner: 'owner_app_create_tenant',
+      rights: [
+        'USAGE on schema app',
+        ...['id', 'slug', 'name'].map((column) => `INSERT on column app.tenant.${column}`),
+      ],
+      policies: ['app.tenant policy create_tenant_insert'],
+    },
+  ],
 ]);
 
 /** The pinned search_path of every approved definer function, as pg_proc stores it. */
@@ -111,7 +198,11 @@ export const OWN_SCHEMAS: ReadonlyMap<string, { schema: string; outside: readonl
       'app_auth',
       {
         schema: 'auth',
-        outside: ['USAGE on schema app', 'EXECUTE on function app.current_tenant_id()'],
+        outside: [
+          'USAGE on schema app',
+          'EXECUTE on function app.current_tenant_id()',
+          'EXECUTE on function app.public_tenant(text)',
+        ],
       },
     ],
     [
@@ -326,11 +417,12 @@ async function definerOwnerProblems(client: pg.ClientBase): Promise<string[]> {
     const { owner } = approved;
     const mine = <T extends { role: string }>(rows: T[]) =>
       rows.filter((row) => row.role === owner);
+    // pg_describe_object prints a function's arguments without spaces.
     compare(
       owner,
       'owns',
       mine(owned.rows).map((row) => row.object),
-      [`function ${signature}`],
+      [`function ${signature.replaceAll(', ', ',')}`],
     );
     compare(
       owner,

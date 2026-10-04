@@ -14,7 +14,9 @@
 //   INSERT, UPDATE and DELETE.
 // - Every permissive policy has the expressions its command needs (UPDATE
 //   needs WITH CHECK too). On a tenant table, each of them is TENANT_TERM or
-//   has it as a top-level AND term, so no OR can widen it.
+//   has it as a top-level AND term, so no OR can widen it, unless it names
+//   only an approved definer function's owner and DEFINER_FUNCTIONS lists it
+//   for that owner (ADR 0019).
 // - A command that no app role may run on a table has a restrictive policy
 //   for it, applying to every app role, that is USING (false), or WITH
 //   CHECK (false) for INSERT (ADR 0003 rule 4).
@@ -40,7 +42,7 @@ import type pg from 'pg';
 
 import type { ClassificationRegistry, FieldClassification } from '../classification.ts';
 import { APP_ROLES } from './connect.ts';
-import { findPrivilegeProblems, NON_SYSTEM_SCHEMA } from './privilege-lint.ts';
+import { DEFINER_FUNCTIONS, findPrivilegeProblems, NON_SYSTEM_SCHEMA } from './privilege-lint.ts';
 
 /** Tables in an application schema without tenant_id, each with its reason. */
 export const NON_TENANT_TABLES: ReadonlyMap<string, string> = new Map(
@@ -95,6 +97,13 @@ export const EXCEPTED_SCHEMAS: ReadonlyMap<string, string> = new Map([
     "Kysely's migration history, which only migrator uses. The lint checks that no app role can use the schema, and checks its grants and functions like any other.",
   ],
 ]);
+
+/** Each approved definer function owner's policies, as "<table> policy <name>", to its owner. */
+const OWNER_POLICIES: ReadonlyMap<string, string> = new Map(
+  [...DEFINER_FUNCTIONS.values()].flatMap(({ owner, policies }) =>
+    policies.map((policy) => [policy, owner] as const),
+  ),
+);
 
 /** The tenant term for a table whose tenant is in `column`, as pg_get_expr prints it. */
 function tenantTerm(column: string): string {
@@ -405,12 +414,15 @@ function foreignKeyProblems(constraints: ConstraintRow[], tenantTables: Set<stri
 
 /**
  * A permissive policy must have the expressions its command needs, and on a
- * tenant table each must keep the tenant term at its top level. Restrictive
- * policies only narrow what permissive ones allow, so any content is safe.
+ * tenant table each must keep the tenant term at its top level, unless it is
+ * an approved owner's policy naming that owner alone. Restrictive policies
+ * only narrow what permissive ones allow, so any content is safe.
  */
 function policyProblems(table: string, policy: PolicyRow, tenantTable: boolean): string[] {
   if (!policy.permissive) return [];
   const label = `${table} policy ${policy.name} (${COMMANDS[policy.command] ?? policy.command} to ${policy.roles.join(', ')})`;
+  const owner = OWNER_POLICIES.get(`${table} policy ${policy.name}`);
+  const ownerOnly = owner !== undefined && policy.roles.join() === owner;
   const term = tenantTerm(tenantColumn(table));
   const problems: string[] = [];
   for (const clause of CLAUSES[policy.command] ?? []) {
@@ -418,7 +430,7 @@ function policyProblems(table: string, policy: PolicyRow, tenantTable: boolean):
     const clauseName = clause === 'using' ? 'USING' : 'WITH CHECK';
     if (expression === null) {
       problems.push(`${label} has no ${clauseName} expression.`);
-    } else if (tenantTable && !hasTenantTerm(expression, term)) {
+    } else if (tenantTable && !ownerOnly && !hasTenantTerm(expression, term)) {
       problems.push(
         `${label} does not have ${term} as its ${clauseName} expression or a top-level AND term of it.`,
       );
