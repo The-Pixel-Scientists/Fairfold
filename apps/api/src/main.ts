@@ -10,6 +10,7 @@ import { buildApp } from './app.ts';
 import { ConfigError, loadConfig, type Config } from './config.ts';
 import { openDatabase } from './database.ts';
 import { createLogger } from './logger.ts';
+import { composeModules } from './modules.ts';
 
 function readConfig(): Config | undefined {
   try {
@@ -38,6 +39,7 @@ async function main(): Promise<void> {
       logger,
       checkDatabase: () => database.check(),
       inTenant: database.inTenant,
+      ...composeModules(),
       trustProxy: config.trustProxy,
     });
   } catch (error) {

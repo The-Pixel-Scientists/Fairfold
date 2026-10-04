@@ -74,8 +74,14 @@ It checks permissions, never role names, in this order:
    context, and commits with it. A handler has no other way to the database
    and does not check access itself.
 
-A module registers its scope rule resolvers by id (`buildApp({ resolvers })`);
-the platform supplies `tenant`. Refusals are logged with a reason code and are
+A handler records audit events only through its context: `context.audit.record()`
+for a state change and `context.audit.read()` for a sensitive read, both bound to
+the request's transaction and the acting membership.
+
+`src/modules.ts` composes each module's routes and scope rule resolvers
+(`composeModules()`, which `main.ts` passes to `buildApp({ routes, resolvers })`)
+and passes in any platform dependency a module declares. A module never imports
+from this app. The platform supplies the `tenant` rule. Refusals are logged with a reason code and are
 not audited. `test/support.ts` has the helpers a route test uses: a stand-in
 auth module, test sessions, and `expectLooksMissing()`, which proves another
 user's object in the same tenant answers as a missing one.
