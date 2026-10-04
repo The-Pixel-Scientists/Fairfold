@@ -9,7 +9,7 @@
 [LICENSE](../../LICENSE) holds the AGPL-3.0 text, [LICENSE-docs](../../LICENSE-docs)
 holds CC BY 4.0 and [NOTICE](../../NOTICE) says the software is under
 "version 3". That wording does not say whether later versions apply. The
-strategy paper, *PixelGrant: The Gift and the Service*, sets AGPL-3.0 for the
+strategy paper, *Fairfold Grants: The Gift and the Service*, sets AGPL-3.0 for the
 platform, CC BY 4.0 for documentation, the data model and the evidence pack,
 and a permissive licence for the plugin API so funders can write private
 plugins.

@@ -6,7 +6,7 @@
 
 ## Context
 
-PixelGrant is one TypeScript monorepo with three apps (`api`, `console`,
+Fairfold is one TypeScript monorepo with three apps (`api`, `console`,
 `portal`) and four packages (`domain`, `db`, `ui`, `config`), as set out in
 the [technical baseline](../V1-PLAN.md#technical-baseline). The toolchain must
 behave the same on a Windows laptop, on Linux CI runners and in the containers

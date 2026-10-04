@@ -1,4 +1,4 @@
-# PixelGrant: V1 Development Plan
+# Fairfold Grants: V1 Development Plan
 
 Aaron Gardner, 26 September 2026
 
@@ -6,7 +6,7 @@ Aaron Gardner, 26 September 2026
 
 V1 lets a design-partner funder run one real funding round end to end, from opening a programme to releasing decisions, on a secure, compliant core. It is delivered in 12 two-week sprints (about 24 weeks) and ends at Gate 1, before any live applicant data is accepted.
 
-The product vision, compliance framework and architecture principles are in the companion strategy doc, *PixelGrant: The Gift and the Service*. This plan assumes those decisions stand.
+The product vision, compliance framework and architecture principles are in the companion strategy doc, *Fairfold Grants: The Gift and the Service*. This plan assumes those decisions stand.
 
 **V1 delivers:**
 

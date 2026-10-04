@@ -66,13 +66,13 @@ One repository holds the platform and every tool, as a pnpm workspace
 
 | Path | Package | What it is |
 | --- | --- | --- |
-| [`apps/api`](apps/api) | `@pixelgrant/api` | The API server and background jobs (Fastify) |
-| [`apps/console`](apps/console) | `@pixelgrant/console` | The staff and reviewer console (React) |
-| [`apps/portal`](apps/portal) | `@pixelgrant/portal` | The applicant portal (React) |
-| [`packages/domain`](packages/domain) | `@pixelgrant/domain` | Shared contracts: domain types, validation schemas and the route contracts every app is built on |
-| [`packages/db`](packages/db) | `@pixelgrant/db` | Database schema, SQL migrations, row-level security, tenant context and the field classification map |
-| [`packages/ui`](packages/ui) | `@pixelgrant/ui` | Accessible components, design tokens and the router shared by the console and portal |
-| [`packages/config`](packages/config) | `@pixelgrant/config` | The programme configuration schema and its validators |
+| [`apps/api`](apps/api) | `@pixel-scientists/api` | The API server and background jobs (Fastify) |
+| [`apps/console`](apps/console) | `@pixel-scientists/console` | The staff and reviewer console (React) |
+| [`apps/portal`](apps/portal) | `@pixel-scientists/portal` | The applicant portal (React) |
+| [`packages/domain`](packages/domain) | `@pixel-scientists/domain` | Shared contracts: domain types, validation schemas and the route contracts every app is built on |
+| [`packages/db`](packages/db) | `@pixel-scientists/db` | Database schema, SQL migrations, row-level security, tenant context and the field classification map |
+| [`packages/ui`](packages/ui) | `@pixel-scientists/ui` | Accessible components, design tokens and the router shared by the console and portal |
+| [`packages/config`](packages/config) | `@pixel-scientists/config` | The programme configuration schema and its validators |
 | [`modules`](modules) | | One folder per tool, plus the shared record (`party`); the planned tools are placeholders |
 | [`infra`](infra) | | Docker Compose services, container images and Semgrep rules |
 | [`scripts`](scripts) | | Development, test and licence-check tooling |
