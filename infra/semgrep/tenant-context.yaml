@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# withTenant() in packages/db/src/tenant-context.ts is the one place that sets
+# the tenant for a transaction (ADR 0003). Other code that names the setting,
+# or sets any setting (set_config, or an update of the pg_settings view),
+# could set it to a tenant the session does not belong to. PostgreSQL
+# ignores the case of these names and reads U&"..." as an identifier spelt
+# in escapes, so this rule ignores case and refuses U& quoting. Migrations
+# are SQL, which this rule does not read.
+
+rules:
+  - id: tps-tenant-setting-only-in-tenant-context
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      Only withTenant() in packages/db/src/tenant-context.ts may name
+      app.tenant_id, call set_config or use pg_settings, and no code may quote
+      with U&. Run tenant queries through withTenant() (ADR 0003).
+    pattern: '"=~/(?i)\bapp[\s\x22]*\.[\s\x22]*tenant_id\b|\bset_config\b|\bpg_settings\b|\bu&[\x22\x27]/"'
+    paths:
+      exclude:
+        - /packages/db/src/tenant-context.ts
+        # Tests of the tenant context and its policies set the value directly.
+        - /packages/db/test/
+        # Passes the roles' SCRAM verifiers to roles.sql as settings.
+        - /packages/db/scripts/roles.ts
