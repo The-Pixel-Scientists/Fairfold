@@ -1,0 +1,20 @@
+# Vulnerabilities accepted for a time, each approved and dated (ADR 0002),
+# for development dependencies only: the Trivy job also scans production
+# dependencies without this file. Trivy stops ignoring an entry on its
+# expired_at date, and CI's audit job fails from that date, so it is looked
+# at again. Every GHSA in pnpm-workspace.yaml's auditConfig is listed here.
+vulnerabilities:
+  - id: CVE-2026-93687
+    paths:
+      - pnpm-lock.yaml
+    expired_at: 2026-11-03
+    statement: &braces >-
+      braces (GHSA-vfj7-8cjw-p6xm), high, no fixed release. Development only,
+      through kysely-codegen and micromatch, which parse this repository's own
+      glob patterns, never untrusted input. Approved by Aaron Gardner on
+      4 October 2026.
+  - id: GHSA-vfj7-8cjw-p6xm
+    paths:
+      - pnpm-lock.yaml
+    expired_at: 2026-11-03
+    statement: *braces

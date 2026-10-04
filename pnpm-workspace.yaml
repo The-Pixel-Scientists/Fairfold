@@ -37,3 +37,14 @@ engineStrict: true
 
 # Run package scripts in pnpm's POSIX shell on every platform.
 shellEmulator: true
+
+# Advisories accepted for a time, each approved and dated (ADR 0002). The
+# same entries, with their expiry, are in .trivyignore.yaml; CI's audit job
+# fails once one expires, so it is looked at again.
+# - GHSA-vfj7-8cjw-p6xm (CVE-2026-93687), braces, high, no fixed release.
+#   Development only, through kysely-codegen and micromatch, which parse this
+#   repository's own glob patterns, never untrusted input. Approved by Aaron
+#   Gardner on 4 October 2026, until 3 November 2026.
+auditConfig:
+  ignoreGhsas:
+    - GHSA-vfj7-8cjw-p6xm
