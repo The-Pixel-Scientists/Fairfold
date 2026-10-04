@@ -2,6 +2,54 @@
 
 Aaron Gardner, 26 September 2026
 
+## October 2026 update
+
+3 October 2026. This note records what changed after the plan below was written. Where it differs from the plan, this note applies. The product is now called Fairfold Grants, the first tool in the Fairfold suite. The rest of this plan still says Fairfold Grants.
+
+### The first milestone moves up
+
+Milestone M3, a full funding round on synthetic data, is now due at the end of October 2026. It was due at the end of sprint 10. It runs on the local stack (the whole platform in containers on one machine, started with `pnpm stack`), not in staging. Gate 1 compliance (penetration test, Cyber Essentials Plus, DPIA, data processing agreements and audits) stays a separate track and is not part of this milestone. Live applicant data still waits for Gate 1.
+
+### What the milestone includes, and what waits
+
+The round runs from programme set-up to released decisions and data export. By epic:
+
+| Epic | Included in the October milestone | Waits until after it |
+| --- | --- | --- |
+| E1 Platform | Automated checks in CI (database, browser journeys, accessibility); `pnpm dev`; `pnpm stack` | Staging on Google Cloud; Helm chart |
+| E2 Identity | Email-first sign-up, passwords, authenticator-app codes for staff, session timeouts, signing in again before release, roles, switching tenant; invitations if time allows | SSO, passkeys, backup codes, password reset, changing email, breached-password check, remembered devices, MFA for applicants |
+| E3 Governance | Audit events for changes, decisions, permission changes and sensitive reads; the audit log screen; every database column classified | Retention deletion, subject access requests, erasure, classification per tenant, audit search and export |
+| E4 Set-up | Programmes, rounds, stages, rubrics, email templates and their change history | Export and import of configuration |
+| E5 Forms | Every field type except file upload; sections, conditions, required answers, word limits, eligibility questions, fields hidden from reviewers; preview; locked versions | File upload |
+| E6 Portal | Programmes after sign-in, eligibility, autosave, review page, submit, withdraw, status | Browsing before sign-in, messaging, manual accessibility audit |
+| E7 Triage | Eligibility results, filtered list, detail with history, moving applications to the next stage in bulk | Saved views, owners, labels, notes, messages |
+| E8 Assessment | All of it: pools, manual and automatic assignment, conflicts, blind review, scoring, score spread | Nothing |
+| E9 Decisions | Single and bulk decisions, private until released, release emails from templates, preview | Test send, reminders |
+| E10 Data out | 360Giving export; warehouse snapshot, one file that loads into any PostgreSQL | CSV of saved views, board packs, scheduled and incremental feeds, BigQuery |
+| E11 Design | Components, accessibility checks in CI, tenant theming (logo, brand colour, preset) | External accessibility audit (Gate 1) |
+| E12 Operability | Self-hosting quickstart | Backups, runbooks, dashboards |
+| Suite | Party core, a per-tenant switch for Grants, the shared warehouse's agreed shape | CRM, direct charitable activities (DCA), finance |
+
+### The suite and the party core
+
+Fairfold Grants is the first tool in a suite that shares one warehouse. Each tool is a module with its own schema and published contracts, in one repository and one deployment. Every deployment includes every module.
+
+The party core is now in V1: organisations, people, the relationships between them, and consent. It is the first part of the suite's own CRM, and the one record of each organisation and person that every module uses. Grants keeps applicants' organisations and contacts there. The rest of the CRM comes after the October milestone, and the suite builds it rather than adopting Twenty. These decisions are proposed until accepted:
+
+- [ADR 0016](adr/0016-modular-suite-and-shared-warehouse.md), proposed: the modular suite and shared warehouse.
+- [ADR 0017](adr/0017-bespoke-crm-party-core.md), proposed: the party core.
+- [ADR 0019](adr/0019-tenant-addresses-public-pages-and-theming.md), proposed: tenant addresses, public pages and theming.
+- [ADR 0020](adr/0020-release-emails-without-a-worker.md), proposed: release emails sent by the API, without a worker.
+
+### Known debt
+
+The October milestone does not meet two items in the definition of done below. Both are known debt, to clear before staging and Gate 1:
+
+- Acceptance criteria pass in staging. The milestone runs on the local stack.
+- A second engineer approves the work. One maintainer reviews it.
+
+Until then, the October build is a demonstration on synthetic data. It is not ready for a real applicant.
+
 ## Scope and success
 
 V1 lets a design-partner funder run one real funding round end to end, from opening a programme to releasing decisions, on a secure, compliant core. It is delivered in 12 two-week sprints (about 24 weeks) and ends at Gate 1, before any live applicant data is accepted.
@@ -37,7 +85,7 @@ These are deliberately deferred to Phase 2 or later. Requests for them during V1
 
 - Grant agreements, e-signature, payment schedules and finance exports.
 - Monitoring reports, follow-up forms and closeout.
-- Organisation and contact CRM layer beyond the applicant's own profile.
+- Organisation and contact CRM layer beyond the applicant's own profile. The party core is now in V1; see the [October 2026 update](#october-2026-update).
 - Companies House and Charity Commission lookups, sanctions screening and fraud controls.
 - Plugin API (V1 keeps internal extension points clean so the API can be published in Phase 2).
 - AI features of any kind.
@@ -221,6 +269,8 @@ Twelve epics. Each is done only when its acceptance criteria pass in staging and
 - Admin guide and self-hosting hardening guide published in `docs/`.
 
 ## Delivery schedule
+
+This is the original schedule. The [October 2026 update](#october-2026-update) moves milestone M3 earlier and changes what it includes.
 
 Twelve two-week sprints with four milestones. Security and governance come first so every later feature is built on them, not retrofitted.
 
