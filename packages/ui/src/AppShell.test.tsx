@@ -1,16 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { cleanup, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { AppShell } from './AppShell.tsx';
 import { EmptyState } from './EmptyState.tsx';
 import { LoadingState } from './LoadingState.tsx';
 import { Router } from './router/index.ts';
-
-afterEach(cleanup);
 
 const navigation = (
   <ul>

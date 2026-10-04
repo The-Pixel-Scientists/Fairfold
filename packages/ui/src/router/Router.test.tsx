@@ -103,9 +103,6 @@ describe('Router: moving to another page', () => {
       writable: true,
       value: (query: string) => ({ matches: query.includes('prefers-reduced-motion: reduce') }),
     });
-    onCleanup(() => {
-      Reflect.deleteProperty(window, 'matchMedia');
-    });
     const user = userEvent.setup();
     renderRouter('/');
 
