@@ -12,6 +12,7 @@
     "./portal": "./src/portal/index.ts"
   },
   "dependencies": {
+    "@pixel-scientists/db": "workspace:*",
     "@pixel-scientists/domain": "workspace:*",
     "zod": "4.6.5"
   }

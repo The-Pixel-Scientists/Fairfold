@@ -16,6 +16,8 @@
 !packages/db/scripts/
 !packages/db/src/
 !packages/domain/src/
+!modules/*/package.json
+!modules/*/src/
 **/*.test.ts
 # Never secrets, wherever they sit.
 **/.env*

@@ -217,6 +217,9 @@ importers:
       '@pixel-scientists/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@pixel-scientists/party':
+        specifier: workspace:*
+        version: link:../../modules/party
       better-auth:
         specifier: 1.7.6
         version: 1.7.6(pg@8.23.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(vitest@5.0.1(@types/node@24.13.6)(jsdom@30.1.1(@noble/hashes@2.4.0))(vite@8.3.1(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)))
@@ -361,6 +364,9 @@ importers:
 
   modules/party:
     dependencies:
+      '@pixel-scientists/db':
+        specifier: workspace:*
+        version: link:../../packages/db
       '@pixel-scientists/domain':
         specifier: workspace:*
         version: link:../../packages/domain

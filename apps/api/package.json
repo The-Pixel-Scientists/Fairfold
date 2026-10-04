@@ -13,6 +13,7 @@
     "@fastify/swagger": "9.9.0",
     "@pixel-scientists/db": "workspace:*",
     "@pixel-scientists/domain": "workspace:*",
+    "@pixel-scientists/party": "workspace:*",
     "better-auth": "1.7.6",
     "fastify": "5.12.5",
     "fastify-type-provider-zod": "7.0.0",
