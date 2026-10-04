@@ -2,8 +2,9 @@
 //
 // The rights checks that ADR 0003 rule 4 and its role table add to the
 // schema lint: grant options, rights outside a role's own schema, default
-// privileges and schema grants to PUBLIC. The schema-lint test covers the
-// rest, and runs these against the migrated database.
+// privileges, schema grants to PUBLIC and rights on the audit tables. The
+// schema-lint test covers the rest, and runs these against the migrated
+// database.
 
 import { describe, expect, it } from 'vitest';
 
@@ -38,6 +39,27 @@ describe('privilege lint', () => {
         'PUBLIC holds USAGE on schema app.',
         'Default privileges for role migrator in schema app grant SELECT on new tables to app_worker.',
         'Default privileges for role migrator in schema app grant EXECUTE on new functions to PUBLIC.',
+      ].sort(),
+    );
+  });
+
+  it('reports rights on an audit table beyond INSERT and SELECT, and INSERT on the columns the database sets', async () => {
+    const problems = await asMigratorRolledBack(async (client) => {
+      await client.query(`
+        GRANT UPDATE (changes) ON app.audit_event TO app_api;
+        GRANT DELETE, INSERT (occurred_at) ON app.audit_event TO app_worker;
+        GRANT INSERT ON app.audit_event TO app_api;
+      `);
+      return findPrivilegeProblems(client, [...EXCEPTED_SCHEMAS.keys()]);
+    });
+
+    expect(problems.sort()).toEqual(
+      [
+        'Role app_api holds UPDATE on the audit table app.audit_event.',
+        'Role app_api can insert app.audit_event.occurred_at, which the database sets.',
+        'Role app_api can insert app.audit_event.retain_until, which the database sets.',
+        'Role app_worker holds DELETE on the audit table app.audit_event.',
+        'Role app_worker can insert app.audit_event.occurred_at, which the database sets.',
       ].sort(),
     );
   });

@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// Migration 0002's checks copy lists and limits from the platform contracts
-// in packages/domain (S02-01). This reads each check back from the database
-// and compares it with the list it copies, so neither can change alone.
+// The checks in migrations 0002 and 0003 copy lists, patterns and limits
+// from the platform contracts in packages/domain (S02-01). This reads each
+// check back from the database and compares it with what it copies, so
+// neither can change alone.
 
 import {
+  auditActionPattern,
   LOGO_MAX_BYTES,
   logoTypes,
   presets,
@@ -39,7 +41,7 @@ function literals(check: string): string[] {
   );
 }
 
-describe('the checks in migration 0002', () => {
+describe('the checks in migrations 0002 and 0003', () => {
   it.each([
     ['membership roles', 'membership_roles_check', Object.keys(roles)],
     ['switchable modules', 'tenant_module_module_check', switchableModuleIds],
@@ -47,6 +49,7 @@ describe('the checks in migration 0002', () => {
     ['logo types', 'tenant_theme_logo_type_check', logoTypes],
     ['reserved slugs', 'tenant_slug_not_reserved', reservedSlugs],
     ['slug pattern', 'tenant_slug_format', [slugPattern.source]],
+    ['audit action pattern', 'audit_event_action_check', [auditActionPattern.source]],
   ])('allow exactly the %s in the domain package', (_, check, expected) => {
     expect(literals(check).sort()).toEqual([...expected].sort());
   });

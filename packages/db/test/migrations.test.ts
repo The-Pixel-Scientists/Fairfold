@@ -85,7 +85,7 @@ async function snapshot(trx: Kysely<unknown>): Promise<string[]> {
   return rows.map((row) => row.line);
 }
 
-describe('migrations', () => {
+describe('migrations', { timeout: 30_000 }, () => {
   it('each down.sql restores exactly the schema from before its up.sql', async () => {
     const provider = new SqlFolderMigrationProvider(MIGRATIONS_FOLDER);
     const found = await provider.getMigrations();

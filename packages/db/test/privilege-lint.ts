@@ -24,6 +24,8 @@
 // - No default privileges grant anything to a role other than the objects'
 //   owner, so nothing a migration creates starts with a grant.
 // - There is no publication: logical replication ignores row-level security.
+// - On each of AUDIT_TABLES, app roles hold no right but INSERT and SELECT,
+//   and cannot insert occurred_at or retain_until (ADR 0003, "Checks").
 //
 // It reads only catalogues that PUBLIC can read, so any role can run it.
 
@@ -37,6 +39,9 @@ export const EXECUTABLE_BY: ReadonlyMap<string, readonly AppRole[]> = new Map([
   // Every tenant policy calls it, whichever role runs the query.
   ['app.current_tenant_id()', APP_ROLES],
 ]);
+
+/** The append-only audit tables, whose occurred_at and retain_until the database sets. */
+export const AUDIT_TABLES: readonly string[] = ['app.audit_event'];
 
 /** Rights PUBLIC may hold, as "<privilege> on <object>", each with its reason. */
 export const PUBLIC_RIGHTS: ReadonlyMap<string, string> = new Map([
@@ -99,6 +104,7 @@ export async function findPrivilegeProblems(
   problems.push(...(await appRoleGrantProblems(client)));
   problems.push(...(await defaultPrivilegeProblems(client)));
   problems.push(...(await functionProblems(client)));
+  problems.push(...(await auditTableProblems(client)));
 
   const publications = await client.query<{ name: string }>(
     'SELECT pubname AS name FROM pg_catalog.pg_publication ORDER BY 1',
@@ -310,6 +316,37 @@ async function roleProblems(client: pg.ClientBase, excepted: readonly string[]):
     );
   }
   return problems;
+}
+
+/**
+ * UPDATE or DELETE on AUDIT_TABLES, and INSERT on the columns the database
+ * sets. privilegeProblems() already reports TRUNCATE, REFERENCES and TRIGGER.
+ */
+async function auditTableProblems(client: pg.ClientBase): Promise<string[]> {
+  const { rows } = await client.query<{ problem: string }>(
+    `SELECT pg_catalog.format('Audit table %s does not exist.', t.name) AS problem
+       FROM pg_catalog.unnest($1::text[]) AS t(name)
+      WHERE pg_catalog.to_regclass(t.name) IS NULL
+     UNION ALL
+     SELECT pg_catalog.format('Role %s holds %s on the audit table %s.', r.name, p.privilege, t.name)
+       FROM pg_catalog.unnest($1::text[]) AS t(name)
+      CROSS JOIN pg_catalog.unnest($2::text[]) AS r(name)
+      CROSS JOIN (VALUES ('UPDATE'), ('DELETE')) AS p(privilege)
+      WHERE pg_catalog.to_regclass(t.name) IS NOT NULL
+        AND CASE p.privilege
+              WHEN 'UPDATE' THEN pg_catalog.has_any_column_privilege(r.name, t.name::regclass, 'UPDATE')
+              ELSE pg_catalog.has_table_privilege(r.name, t.name::regclass, 'DELETE') END
+     UNION ALL
+     SELECT pg_catalog.format('Role %s can insert %s.%s, which the database sets.',
+                              r.name, t.name, a.attname)
+       FROM pg_catalog.unnest($1::text[]) AS t(name)
+       JOIN pg_catalog.pg_attribute a ON a.attrelid = pg_catalog.to_regclass(t.name)
+      CROSS JOIN pg_catalog.unnest($2::text[]) AS r(name)
+      WHERE a.attname IN ('occurred_at', 'retain_until') AND NOT a.attisdropped
+        AND pg_catalog.has_column_privilege(r.name, a.attrelid, a.attnum, 'INSERT')`,
+    [AUDIT_TABLES, APP_ROLES],
+  );
+  return rows.map((row) => row.problem);
 }
 
 /** Functions in every schema but PostgreSQL's own, excepted ones included. */
