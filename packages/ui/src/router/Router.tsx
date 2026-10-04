@@ -58,7 +58,7 @@ export interface RouterProps {
    * Leave it out for an app served from the root.
    */
   basePath?: string;
-  /** Added after each page title in the document title, for example "PixelGrant console". */
+  /** Added after each page title in the document title, for example "Fairfold Grants console". */
   titleSuffix?: string;
   /**
    * The frame around the page, such as AppShell. Define it at module level.

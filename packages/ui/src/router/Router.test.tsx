@@ -25,7 +25,7 @@ describe('Router: first page load', () => {
   it('shows the matching page and sets the document title', () => {
     renderRouter('/');
     expect(screen.getByRole('heading', { level: 1, name: 'Programmes' })).toBeTruthy();
-    expect(document.title).toBe('Programmes – PixelGrant console');
+    expect(document.title).toBe('Programmes – Fairfold Grants console');
   });
 
   it('keeps the browser focus, does not scroll and announces nothing', () => {
@@ -38,7 +38,7 @@ describe('Router: first page load', () => {
   it('reads parameters and builds the title from them', () => {
     renderRouter('/applications/42');
     expect(screen.getByRole('heading', { level: 1, name: 'Application 42' })).toBeTruthy();
-    expect(document.title).toBe('Application 42 – PixelGrant console');
+    expect(document.title).toBe('Application 42 – Fairfold Grants console');
   });
 
   it('uses the title alone when there is no suffix', () => {
@@ -78,7 +78,7 @@ describe('Router: moving to another page', () => {
     expect(window.location.pathname).toBe('/applications/42');
     expect(document.activeElement).toBe(heading);
     expect(heading.getAttribute('tabindex')).toBe('-1');
-    expect(document.title).toBe('Application 42 – PixelGrant console');
+    expect(document.title).toBe('Application 42 – Fairfold Grants console');
     expect(scrollTo()).toHaveBeenCalledWith({ top: 0, left: 0, behavior: 'auto' });
     expect(announcement()).toBe('Navigated to Application 42');
   });
@@ -123,7 +123,7 @@ describe('Router: moving to another page', () => {
 
     const heading = await screen.findByRole('heading', { level: 1, name: 'Page not found' });
     expect(document.activeElement).toBe(heading);
-    expect(document.title).toBe('Page not found – PixelGrant console');
+    expect(document.title).toBe('Page not found – Fairfold Grants console');
     expect(announcement()).toBe('Navigated to Page not found');
     expect(screen.getByRole('link', { name: 'Go to the home page' })).toBeTruthy();
   });
@@ -131,7 +131,7 @@ describe('Router: moving to another page', () => {
   it('shows the not-found page when the first address matches nothing', () => {
     renderRouter('/nothing/here');
     expect(screen.getByRole('heading', { level: 1, name: 'Page not found' })).toBeTruthy();
-    expect(document.title).toBe('Page not found – PixelGrant console');
+    expect(document.title).toBe('Page not found – Fairfold Grants console');
     expect(document.activeElement).toBe(document.body);
   });
 
@@ -336,7 +336,7 @@ describe('Router: moving to another page', () => {
         load: () => Promise.reject(new Error('Failed to fetch module')),
       },
     ];
-    renderRouter('/', <Router routes={broken} titleSuffix="PixelGrant console" />);
+    renderRouter('/', <Router routes={broken} titleSuffix="Fairfold Grants console" />);
 
     const heading = await screen.findByRole('heading', {
       level: 1,
@@ -346,7 +346,7 @@ describe('Router: moving to another page', () => {
     await waitFor(() => {
       expect(document.activeElement).toBe(heading);
     });
-    expect(document.title).toBe('This page did not load – PixelGrant console');
+    expect(document.title).toBe('This page did not load – Fairfold Grants console');
     expect(announcement()).toBe('This page did not load');
   });
 
@@ -424,14 +424,14 @@ describe('Router: back and forward', () => {
       expect(activeHeading()).toBe('Programmes');
     });
     expect(window.location.pathname).toBe('/');
-    expect(document.title).toBe('Programmes – PixelGrant console');
+    expect(document.title).toBe('Programmes – Fairfold Grants console');
     expect(announcement()).toBe('Navigated to Programmes');
 
     window.history.forward();
     await waitFor(() => {
       expect(activeHeading()).toBe('Application 42');
     });
-    expect(document.title).toBe('Application 42 – PixelGrant console');
+    expect(document.title).toBe('Application 42 – Fairfold Grants console');
   });
 
   it('puts the person back where they were scrolled, and takes focus without scrolling', async () => {
@@ -523,7 +523,7 @@ describe('Router: base path', () => {
   function renderWithBase(path: string) {
     return renderRouter(
       path,
-      <Router routes={routes} basePath="/console/" titleSuffix="PixelGrant" />,
+      <Router routes={routes} basePath="/console/" titleSuffix="Fairfold Grants" />,
     );
   }
 

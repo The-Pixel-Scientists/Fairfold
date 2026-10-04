@@ -111,7 +111,7 @@ export const routes: readonly RouteDefinition[] = [
 
 export function renderRouter(path = '/', ui?: ReactNode): RenderResult {
   window.history.replaceState(null, '', path);
-  return render(ui ?? <Router routes={routes} titleSuffix="PixelGrant console" />);
+  return render(ui ?? <Router routes={routes} titleSuffix="Fairfold Grants console" />);
 }
 
 export function announcement(): string {

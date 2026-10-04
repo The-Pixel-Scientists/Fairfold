@@ -10,7 +10,7 @@ import { SkipLink } from './SkipLink.tsx';
 export const MAIN_CONTENT_ID = 'main-content';
 
 export interface AppShellProps {
-  /** Shown in the header, for example "PixelGrant". */
+  /** Shown in the header, for example "Fairfold Grants". */
   productName: string;
   /**
    * A path inside the app, such as `/`. When set, the product name links to it.
