@@ -7,13 +7,19 @@
 // In every application schema (any schema but PostgreSQL's own and
 // EXCEPTED_SCHEMAS):
 // - Every table has a tenant_id uuid NOT NULL column, unless it is on
-//   NON_TENANT_TABLES.
+//   NON_TENANT_TABLES. A table on TENANT_KEYED_BY_ID is its own tenant, and
+//   its id takes tenant_id's place in every check below.
 // - Every table has row-level security enabled and forced, and at least one
 //   policy, never FOR ALL. A tenant table has a policy for each of SELECT,
 //   INSERT, UPDATE and DELETE.
 // - Every permissive policy has the expressions its command needs (UPDATE
 //   needs WITH CHECK too). On a tenant table, each of them is TENANT_TERM or
 //   has it as a top-level AND term, so no OR can widen it.
+// - A command that no app role may run on a table has a restrictive policy
+//   for it, applying to every app role, that is USING (false), or WITH
+//   CHECK (false) for INSERT (ADR 0003 rule 4).
+// - A tenant table has UNIQUE (tenant_id, id), and every foreign key from
+//   one tenant table to another matches tenant_id to tenant_id (rule 6).
 // - Every column is in classification.ts, the map names no column that does
 //   not exist, and each retention rule makes sense.
 // - Views use security_invoker. There are no materialized views or foreign
@@ -21,7 +27,8 @@
 //
 // In every schema but PostgreSQL's own, there is no user-defined operator,
 // which could stand in for a built-in one, and no rewrite rule on a table,
-// since rules run with the table owner's rights.
+// since rules run with the table owner's rights. app.current_tenant_id(),
+// which every tenant policy calls, is exactly CURRENT_TENANT_ID_DEFINITION.
 //
 // It reads only catalogues that PUBLIC can read, so any role can run it. The
 // schema-lint test runs it as each app role. It first sets the client's
@@ -32,10 +39,35 @@
 import type pg from 'pg';
 
 import type { ClassificationRegistry, FieldClassification } from '../classification.ts';
+import { APP_ROLES } from './connect.ts';
 import { findPrivilegeProblems, NON_SYSTEM_SCHEMA } from './privilege-lint.ts';
 
 /** Tables in an application schema without tenant_id, each with its reason. */
 export const NON_TENANT_TABLES: ReadonlyMap<string, string> = new Map();
+
+/** Tenant tables whose own id is the tenant, each with its reason. */
+export const TENANT_KEYED_BY_ID: ReadonlyMap<string, string> = new Map([
+  [
+    'app.tenant',
+    'Each row is a tenant, so its policies use id = app.current_tenant_id() (ADR 0003).',
+  ],
+]);
+
+/** The column that holds a tenant table's tenant. */
+export function tenantColumn(table: string): string {
+  return TENANT_KEYED_BY_ID.has(table) ? 'id' : 'tenant_id';
+}
+
+/**
+ * app.current_tenant_id() as pg_get_functiondef prints it with search_path
+ * set to pg_catalog alone (ADR 0003, row-level security rule 5).
+ */
+export const CURRENT_TENANT_ID_DEFINITION = `CREATE OR REPLACE FUNCTION app.current_tenant_id()
+ RETURNS uuid
+ LANGUAGE sql
+ STABLE PARALLEL SAFE
+RETURN (NULLIF(current_setting('app.tenant_id'::text, true), ''::text))::uuid
+`;
 
 /** Schemas the table, policy and classification checks skip, each with its reason. */
 export const EXCEPTED_SCHEMAS: ReadonlyMap<string, string> = new Map([
@@ -45,8 +77,12 @@ export const EXCEPTED_SCHEMAS: ReadonlyMap<string, string> = new Map([
   ],
 ]);
 
-/** The tenant term as pg_get_expr prints it. */
-export const TENANT_TERM = '(tenant_id = app.current_tenant_id())';
+/** The tenant term for a table whose tenant is in `column`, as pg_get_expr prints it. */
+function tenantTerm(column: string): string {
+  return `(${column} = app.current_tenant_id())`;
+}
+
+export const TENANT_TERM = tenantTerm('tenant_id');
 
 const COMMANDS: Readonly<Record<string, string>> = {
   r: 'SELECT',
@@ -99,6 +135,25 @@ interface PolicyRow {
   with_check: string | null;
 }
 
+/** A primary key (p), unique constraint (u) or foreign key (f), with columns in key order. */
+interface ConstraintRow {
+  table: string;
+  name: string;
+  kind: string;
+  columns: string[];
+  referenced: string | null;
+  referenced_columns: string[];
+}
+
+/** What one table's checks need besides the table itself. */
+interface TableFacts {
+  policies: PolicyRow[];
+  columns: ColumnRow[];
+  constraints: ConstraintRow[];
+  /** The commands, as polcmd letters, that no app role may run. */
+  ungranted: string[];
+}
+
 export async function findSchemaProblems(
   client: pg.ClientBase,
   registry: ClassificationRegistry,
@@ -141,8 +196,48 @@ export async function findSchemaProblems(
       ORDER BY 1, 2`,
     [excepted],
   );
+  const constraints = await client.query<ConstraintRow>(
+    `SELECT n.nspname || '.' || c.relname AS table, o.conname AS name, o.contype AS kind,
+            ARRAY(SELECT a.attname::text
+                    FROM pg_catalog.unnest(o.conkey) WITH ORDINALITY AS k(attnum, position)
+                    JOIN pg_catalog.pg_attribute a
+                      ON a.attrelid = o.conrelid AND a.attnum = k.attnum
+                   ORDER BY k.position) AS columns,
+            fn.nspname || '.' || fc.relname AS referenced,
+            ARRAY(SELECT a.attname::text
+                    FROM pg_catalog.unnest(o.confkey) WITH ORDINALITY AS k(attnum, position)
+                    JOIN pg_catalog.pg_attribute a
+                      ON a.attrelid = o.confrelid AND a.attnum = k.attnum
+                   ORDER BY k.position) AS referenced_columns
+       FROM pg_catalog.pg_constraint o
+       JOIN pg_catalog.pg_class c ON c.oid = o.conrelid
+       JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+       LEFT JOIN pg_catalog.pg_class fc ON fc.oid = o.confrelid
+       LEFT JOIN pg_catalog.pg_namespace fn ON fn.oid = fc.relnamespace
+      WHERE ${APPLICATION_SCHEMA} AND o.contype IN ('p', 'u', 'f')
+      ORDER BY 1, 2`,
+    [excepted],
+  );
+  // Commands for which no app role holds the right on the table or any column.
+  const ungranted = await client.query<{ table: string; command: string }>(
+    `SELECT n.nspname || '.' || c.relname AS table, m.command
+       FROM pg_catalog.pg_class c
+       JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+      CROSS JOIN (VALUES ('r', 'SELECT'), ('a', 'INSERT'), ('w', 'UPDATE'), ('d', 'DELETE'))
+              AS m(command, privilege)
+      WHERE ${APPLICATION_SCHEMA} AND c.relkind IN ('r', 'p')
+        AND NOT EXISTS (
+          SELECT FROM pg_catalog.unnest($2::text[]) AS r(name)
+           WHERE CASE m.command
+                   WHEN 'd' THEN pg_catalog.has_table_privilege(r.name, c.oid, 'DELETE')
+                   ELSE pg_catalog.has_any_column_privilege(r.name, c.oid, m.privilege)
+                 END)
+      ORDER BY 1, 2`,
+    [excepted, APP_ROLES],
+  );
 
   const problems: string[] = [];
+  const tenantTables = new Set<string>();
   for (const relation of relations.rows) {
     const { name } = relation;
     if (relation.kind === 'm') {
@@ -154,16 +249,29 @@ export async function findSchemaProblems(
         problems.push(`${name} is a view without security_invoker.`);
       }
     } else {
+      if (!NON_TENANT_TABLES.has(name)) tenantTables.add(name);
       problems.push(
-        ...tableProblems(
-          relation,
-          policies.rows.filter((row) => row.table === name),
-          columns.rows.filter((row) => row.table === name),
-        ),
+        ...tableProblems(relation, {
+          policies: policies.rows.filter((row) => row.table === name),
+          columns: columns.rows.filter((row) => row.table === name),
+          constraints: constraints.rows.filter((row) => row.table === name),
+          ungranted: ungranted.rows.filter((row) => row.table === name).map((row) => row.command),
+        }),
       );
     }
   }
+  problems.push(...foreignKeyProblems(constraints.rows, tenantTables));
   problems.push(...classificationProblems(registry, columns.rows));
+
+  const tenantFunction = await client.query<{ definition: string | null }>(
+    `SELECT pg_catalog.pg_get_functiondef(p) AS definition
+       FROM pg_catalog.to_regprocedure('app.current_tenant_id()') AS p`,
+  );
+  if (tenantFunction.rows[0]?.definition !== CURRENT_TENANT_ID_DEFINITION) {
+    problems.push(
+      'app.current_tenant_id() is not defined as CURRENT_TENANT_ID_DEFINITION (ADR 0003, row-level security rule 5).',
+    );
+  }
 
   const operators = await client.query<{ operator: string }>(
     `SELECT o.oid::pg_catalog.regoperator::text AS operator
@@ -195,12 +303,9 @@ export async function findSchemaProblems(
   return problems.sort();
 }
 
-function tableProblems(
-  relation: RelationRow,
-  policies: PolicyRow[],
-  columns: ColumnRow[],
-): string[] {
+function tableProblems(relation: RelationRow, facts: TableFacts): string[] {
   const { name } = relation;
+  const { policies, columns } = facts;
   const tenantTable = !NON_TENANT_TABLES.has(name);
   const commands = policies.map((policy) => policy.command);
   const problems: string[] = [];
@@ -210,20 +315,70 @@ function tableProblems(
   if (commands.includes('*')) {
     problems.push(`${name} has a FOR ALL policy. Write one policy per command.`);
   }
+  for (const command of facts.ungranted) {
+    if (!policies.some((policy) => deniesEveryAppRole(policy, command))) {
+      const verb = COMMANDS[command] ?? command;
+      const clause = command === 'a' ? 'WITH CHECK' : 'USING';
+      problems.push(
+        `${name} grants ${verb} to no app role, and has no restrictive ${verb} policy with ${clause} (false) for every app role.`,
+      );
+    }
+  }
   for (const policy of policies) problems.push(...policyProblems(name, policy, tenantTable));
   if (!tenantTable) return problems;
 
-  const tenantId = columns.find((column) => column.column === 'tenant_id');
-  if (tenantId?.type !== 'uuid' || !tenantId.not_null) {
+  const column = tenantColumn(name);
+  const tenant = columns.find((row) => row.column === column);
+  if (tenant?.type !== 'uuid' || !tenant.not_null) {
     problems.push(
-      `${name} has no tenant_id uuid NOT NULL column and is not on the list of non-tenant tables.`,
+      `${name} has no ${column} uuid NOT NULL column and is not on the list of non-tenant tables.`,
     );
+  }
+  const keys = facts.constraints.filter((key) => key.kind !== 'f');
+  if (
+    column === 'tenant_id' &&
+    !keys.some((key) => [...key.columns].sort().join(',') === 'id,tenant_id')
+  ) {
+    problems.push(`${name} has no UNIQUE (tenant_id, id) constraint.`);
   }
   if (commands.length > 0) {
     for (const command of ['r', 'a', 'w', 'd']) {
       if (!commands.includes(command)) {
         problems.push(`${name} has no policy for ${COMMANDS[command] ?? command}.`);
       }
+    }
+  }
+  return problems;
+}
+
+/**
+ * Whether `policy` is ADR 0003 rule 4's denial of `command`: restrictive,
+ * false, and applying to every app role.
+ */
+function deniesEveryAppRole(policy: PolicyRow, command: string): boolean {
+  const expression = command === 'a' ? policy.with_check : policy.using;
+  const { roles } = policy;
+  return (
+    !policy.permissive &&
+    policy.command === command &&
+    expression === 'false' &&
+    (roles.includes('public') || APP_ROLES.every((role) => roles.includes(role)))
+  );
+}
+
+/** Every foreign key from one tenant table to another matches their tenant columns. */
+function foreignKeyProblems(constraints: ConstraintRow[], tenantTables: Set<string>): string[] {
+  const problems: string[] = [];
+  for (const key of constraints) {
+    if (key.kind !== 'f' || !key.referenced) continue;
+    if (!tenantTables.has(key.table) || !tenantTables.has(key.referenced)) continue;
+    const from = tenantColumn(key.table);
+    const to = tenantColumn(key.referenced);
+    const position = key.columns.indexOf(from);
+    if (position === -1 || key.referenced_columns[position] !== to) {
+      problems.push(
+        `${key.table} foreign key ${key.name} does not match its ${from} to ${key.referenced}.${to}.`,
+      );
     }
   }
   return problems;
@@ -237,15 +392,16 @@ function tableProblems(
 function policyProblems(table: string, policy: PolicyRow, tenantTable: boolean): string[] {
   if (!policy.permissive) return [];
   const label = `${table} policy ${policy.name} (${COMMANDS[policy.command] ?? policy.command} to ${policy.roles.join(', ')})`;
+  const term = tenantTerm(tenantColumn(table));
   const problems: string[] = [];
   for (const clause of CLAUSES[policy.command] ?? []) {
     const expression = policy[clause];
     const clauseName = clause === 'using' ? 'USING' : 'WITH CHECK';
     if (expression === null) {
       problems.push(`${label} has no ${clauseName} expression.`);
-    } else if (tenantTable && !hasTenantTerm(expression)) {
+    } else if (tenantTable && !hasTenantTerm(expression, term)) {
       problems.push(
-        `${label} does not have ${TENANT_TERM} as its ${clauseName} expression or a top-level AND term of it.`,
+        `${label} does not have ${term} as its ${clauseName} expression or a top-level AND term of it.`,
       );
     }
   }
@@ -257,10 +413,10 @@ function policyProblems(table: string, policy: PolicyRow, tenantTable: boolean):
  * it as a top-level AND term. pg_get_expr prints `a AND b AND c` as
  * `(a AND b AND c)`, with every comparison in its own parentheses.
  */
-export function hasTenantTerm(expression: string): boolean {
-  if (expression === TENANT_TERM) return true;
+export function hasTenantTerm(expression: string, term = TENANT_TERM): boolean {
+  if (expression === term) return true;
   if (!expression.startsWith('(') || !expression.endsWith(')')) return false;
-  return splitTopLevel(expression.slice(1, -1), ' AND ').includes(TENANT_TERM);
+  return splitTopLevel(expression.slice(1, -1), ' AND ').includes(term);
 }
 
 /** Split `text` at each `separator` outside parentheses and quotes. */
