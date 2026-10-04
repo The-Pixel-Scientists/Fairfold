@@ -1,6 +1,6 @@
 -- SPDX-License-Identifier: AGPL-3.0-or-later
 --
--- Fairfold Grants database roles, version 2 (ADR 0003), part 1 of 2: the roles.
+-- Fairfold Grants database roles, version 3 (ADR 0003), part 1 of 2: the roles.
 --
 -- Creates the login roles and the function-owner roles, and resets their
 -- attributes, memberships, settings and passwords. Roles belong to the
@@ -47,13 +47,14 @@ LOCK TABLE pg_catalog.pg_authid IN SHARE ROW EXCLUSIVE MODE;
 
 DO $roles$
 DECLARE
-  roles_version CONSTANT text := '2';
+  roles_version CONSTANT text := '3';
   login_roles CONSTANT text[] := ARRAY['migrator', 'app_api', 'app_worker', 'app_auth', 'app_queue'];
   owner_roles CONSTANT text[] := ARRAY[
-    'owner_auth_session_context',   -- auth.session_context()
-    'owner_app_public_tenant',      -- app.public_tenant()
-    'owner_app_public_tenant_logo', -- app.public_tenant_logo()
-    'owner_app_create_tenant'       -- app.create_tenant()
+    'owner_auth_session_context',     -- auth.session_context()
+    'owner_auth_session_memberships', -- auth.session_memberships()
+    'owner_app_public_tenant',        -- app.public_tenant()
+    'owner_app_public_tenant_logo',   -- app.public_tenant_logo()
+    'owner_app_create_tenant'         -- app.create_tenant()
   ];
   is_login boolean;
   role_name text;

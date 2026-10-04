@@ -1,6 +1,6 @@
 -- SPDX-License-Identifier: AGPL-3.0-or-later
 --
--- Fairfold Grants database roles, version 2 (ADR 0003), part 2 of 2: the rights
+-- Fairfold Grants database roles, version 3 (ADR 0003), part 2 of 2: the rights
 -- PUBLIC holds in one database.
 --
 -- Run as a superuser, connected to a Fairfold Grants database, after roles.sql.
