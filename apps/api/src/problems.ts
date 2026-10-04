@@ -7,14 +7,16 @@
 // What a response never holds: a stack trace, the message of an unexpected
 // error, a submitted value, a constraint name or any other database detail.
 // The text comes from this file, from an ApiError thrown on purpose, or from
-// a custom check in the domain package. Everything else gets the generic
+// the domain package's message catalogue. Everything else gets the generic
 // text for its status.
 
 import { STATUS_CODES } from 'node:http';
 
+import { problemSchema, type Problem } from '@pixel-scientists/domain/api';
+import { messages } from '@pixel-scientists/domain/platform';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { z } from 'zod';
 
+import { setResponseHeaders } from './headers.ts';
 import { SafeError } from './serialize-error.ts';
 import {
   fieldProblems,
@@ -25,23 +27,7 @@ import {
 
 export const PROBLEM_CONTENT_TYPE = 'application/problem+json; charset=utf-8';
 
-export const fieldProblemSchema = z.object({
-  /** Where the problem is, such as `body.answers.f_0a1b`, `query.page` or `params.id`. */
-  field: z.string(),
-  message: z.string(),
-}) satisfies z.ZodType<FieldProblem>;
-
-export const problemSchema = z.object({
-  type: z.literal('about:blank'),
-  title: z.string(),
-  status: z.number().int(),
-  detail: z.string(),
-  /** Quote this when asking for help. */
-  requestId: z.string(),
-  errors: z.array(fieldProblemSchema).optional(),
-});
-
-export type Problem = z.infer<typeof problemSchema>;
+export { problemSchema, type Problem };
 
 /**
  * An error whose text is safe to show and to log. Throw it for a failure the
@@ -52,24 +38,28 @@ export class ApiError extends SafeError {
   readonly status: number;
   readonly detail: string;
   readonly errors: readonly FieldProblem[];
+  /** Why a request was refused, as a code for the log. Never sent. */
+  readonly reason: string | undefined;
 
+  /** With no `detail`, the plain text for the status. */
   constructor(
     status: number,
-    detail: string,
-    options: { errors?: readonly FieldProblem[]; cause?: unknown } = {},
+    detail?: string,
+    options: { errors?: readonly FieldProblem[]; cause?: unknown; reason?: string } = {},
   ) {
-    super(detail, options.cause === undefined ? undefined : { cause: options.cause });
+    const text = detail ?? detailFor(status, undefined);
+    super(text, options.cause === undefined ? undefined : { cause: options.cause });
     this.name = 'ApiError';
     this.status = status;
-    this.detail = detail;
+    this.detail = text;
     this.errors = options.errors ?? [];
+    this.reason = options.reason;
   }
 }
 
 const SERVER_ERROR_DETAIL =
   'Something went wrong on our side. Try again in a few minutes. If it keeps happening, give support the request id.';
 
-const VALIDATION_DETAIL = 'Some fields are not valid. Fix the fields listed and try again.';
 const NOT_FOUND_DETAIL = 'We could not find what you asked for.';
 
 /** Plain English for each status. A 404 reads the same whether or not the thing exists. */
@@ -116,6 +106,7 @@ interface Failure {
   errors: readonly FieldProblem[];
   /** Whether the error was unexpected, so it needs a log line with its stack. */
   unexpected: boolean;
+  reason?: string;
 }
 
 function statusOf(error: object): number | undefined {
@@ -132,6 +123,7 @@ function describe(error: unknown): Failure {
       detail: error.detail,
       errors: error.errors.slice(0, MAX_FIELD_PROBLEMS),
       unexpected: error.status >= 500,
+      ...(error.reason === undefined ? {} : { reason: error.reason }),
     };
   }
   if (typeof error !== 'object' || error === null) {
@@ -144,7 +136,7 @@ function describe(error: unknown): Failure {
     const context = (error as { validationContext?: unknown }).validationContext;
     return {
       status: 400,
-      detail: VALIDATION_DETAIL,
+      detail: messages.fixFields,
       errors: fieldProblems(
         validation as ValidationEntry[],
         typeof context === 'string' ? context : undefined,
@@ -179,9 +171,9 @@ export function sendProblem(
     ...(errors.length > 0 ? { errors: [...errors] } : {}),
   };
   // Sent as text, so a response schema declared on the route cannot reshape it.
+  setResponseHeaders(request, reply);
   return reply
     .code(status)
-    .header('x-request-id', request.id)
     .header('content-type', PROBLEM_CONTENT_TYPE)
     .send(JSON.stringify(problem));
 }
@@ -192,7 +184,13 @@ export function handleError(error: unknown, request: FastifyRequest, reply: Fast
   if (failure.unexpected) {
     request.log.error({ err: error }, 'The request failed');
   } else {
-    request.log.info({ status: failure.status }, 'The request was refused');
+    request.log.info(
+      {
+        status: failure.status,
+        ...(failure.reason === undefined ? {} : { reason: failure.reason }),
+      },
+      'The request was refused',
+    );
   }
   if (reply.raw.headersSent) {
     // Too late to change the response; the connection ends as it is.
