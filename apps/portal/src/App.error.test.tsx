@@ -3,6 +3,7 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { productName } from '@pixel-scientists/domain/platform';
 
 import { App } from './App.tsx';
 
@@ -56,7 +57,7 @@ describe('a page that fails to load', () => {
         },
         { timeout: LOAD_TIMEOUT },
       );
-      expect(document.title).toBe('We could not load this page – PixelGrant');
+      expect(document.title).toBe(`We could not load this page – ${productName}`);
       expect(screen.getByRole('status').textContent).toBe('We could not load this page');
       expect(screen.getByRole('main').textContent).toMatch(
         /Check that you are online, then reload the page\. If it still does not load, try again in a few minutes\./,

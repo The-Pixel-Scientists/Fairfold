@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { AppShell, Router } from '@pixelgrant/ui';
-import type { RouteDefinition } from '@pixelgrant/ui';
+import { productName } from '@pixel-scientists/domain/platform';
+import { AppShell, Router } from '@pixel-scientists/ui';
+import type { RouteDefinition } from '@pixel-scientists/ui';
 import type { ReactNode } from 'react';
 
 import { pageLoadErrorPage } from './pages/PageLoadErrorPage.tsx';
@@ -24,7 +25,7 @@ const routes: readonly RouteDefinition[] = [
 function PortalLayout({ children }: { children: ReactNode }) {
   return (
     <AppShell
-      productName="PixelGrant"
+      productName={productName}
       homeHref={HOME_PATH}
       areaName="Applications"
       density="comfortable"
@@ -40,7 +41,7 @@ export function App() {
       routes={routes}
       layout={PortalLayout}
       errorPage={pageLoadErrorPage}
-      titleSuffix="PixelGrant"
+      titleSuffix={productName}
     />
   );
 }

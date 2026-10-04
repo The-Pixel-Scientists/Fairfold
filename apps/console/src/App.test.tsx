@@ -3,6 +3,7 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { productName } from '@pixel-scientists/domain/platform';
 
 import { App } from './App.tsx';
 
@@ -27,8 +28,8 @@ describe('console', () => {
     openConsole();
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Programmes' })).toBeTruthy();
-    expect(document.title).toBe('Programmes – PixelGrant console');
-    expect(screen.getByRole('banner').textContent).toContain('PixelGrant');
+    expect(document.title).toBe(`Programmes – ${productName} console`);
+    expect(screen.getByRole('banner').textContent).toContain(productName);
     expect(screen.getByRole('navigation', { name: 'Main' })).toBeTruthy();
     expect(screen.getByRole('main').contains(screen.getByRole('heading', { level: 1 }))).toBe(true);
   });
@@ -84,7 +85,7 @@ describe('console', () => {
     await waitFor(() => {
       expect(document.activeElement).toBe(heading);
     });
-    expect(document.title).toBe('Component gallery – PixelGrant console');
+    expect(document.title).toBe(`Component gallery – ${productName} console`);
     expect(window.location.pathname).toBe('/dev/components');
   });
 
@@ -92,7 +93,7 @@ describe('console', () => {
     openConsole('/nothing/here');
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Page not found' })).toBeTruthy();
-    expect(document.title).toBe('Page not found – PixelGrant console');
+    expect(document.title).toBe(`Page not found – ${productName} console`);
     expect(screen.getByRole('link', { name: 'Go to the home page' }).getAttribute('href')).toBe(
       '/',
     );

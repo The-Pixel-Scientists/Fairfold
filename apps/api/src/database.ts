@@ -3,7 +3,7 @@
 // The API's one database connection pool, as the `app_api` role, through the
 // client in packages/db. Only packages/db imports a database driver.
 
-import { createDatabase } from '@pixelgrant/db';
+import { createDatabase } from '@pixel-scientists/db';
 import type { FastifyBaseLogger } from 'fastify';
 
 import type { Config } from './config.ts';
@@ -22,7 +22,7 @@ export function openDatabase(settings: Config['database'], log: FastifyBaseLogge
     database: settings.database,
     role: 'app_api',
     password: settings.password.reveal(),
-    applicationName: 'pixelgrant-api',
+    applicationName: 'tps-api',
     tls: settings.tls,
     // Problems that no request is waiting for, such as an idle connection that fails.
     log: (message, error) => {

@@ -3,7 +3,7 @@
 # Libraries that only one part of the code base may import.
 
 rules:
-  - id: pixelgrant-database-imports-only-in-db
+  - id: tps-database-imports-only-in-db
     languages: [typescript, javascript]
     severity: ERROR
     message: >-
@@ -29,7 +29,7 @@ rules:
       exclude:
         - /packages/db/
 
-  - id: pixelgrant-better-auth-only-in-auth
+  - id: tps-better-auth-only-in-auth
     languages: [typescript, javascript]
     severity: ERROR
     message: >-
@@ -53,12 +53,12 @@ rules:
       exclude:
         - /apps/api/src/auth/
 
-  - id: pixelgrant-radix-only-in-ui
+  - id: tps-radix-only-in-ui
     languages: [typescript, javascript]
     severity: ERROR
     message: >-
       Only packages/ui may import Radix. Use the wrapped component from
-      @pixelgrant/ui (ADR 0006).
+      @pixel-scientists/ui (ADR 0006).
     patterns:
       - pattern-either:
           - pattern: import "$MODULE"

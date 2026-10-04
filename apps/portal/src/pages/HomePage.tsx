@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { EmptyState, Link, PageHeading, buttonClassName } from '@pixelgrant/ui';
+import { EmptyState, Link, PageHeading, buttonClassName } from '@pixel-scientists/ui';
 
 import { PageColumn } from '../PageColumn.tsx';
 import { HOW_APPLYING_WORKS_PATH } from '../paths.ts';

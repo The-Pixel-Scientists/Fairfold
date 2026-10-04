@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import type { ClassificationRegistry } from '@pixelgrant/db/classification';
+import type { ClassificationRegistry } from '@pixel-scientists/db/classification';
 import { describe, expect, it } from 'vitest';
 
 import { Secret } from './config.ts';

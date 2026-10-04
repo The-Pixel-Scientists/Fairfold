@@ -211,10 +211,10 @@ importers:
       '@fastify/swagger':
         specifier: 9.9.0
         version: 9.9.0
-      '@pixelgrant/db':
+      '@pixel-scientists/db':
         specifier: workspace:*
         version: link:../../packages/db
-      '@pixelgrant/domain':
+      '@pixel-scientists/domain':
         specifier: workspace:*
         version: link:../../packages/domain
       fastify:
@@ -242,10 +242,10 @@ importers:
 
   apps/console:
     dependencies:
-      '@pixelgrant/domain':
+      '@pixel-scientists/domain':
         specifier: workspace:*
         version: link:../../packages/domain
-      '@pixelgrant/ui':
+      '@pixel-scientists/ui':
         specifier: workspace:*
         version: link:../../packages/ui
       react:
@@ -294,10 +294,10 @@ importers:
 
   apps/portal:
     dependencies:
-      '@pixelgrant/domain':
+      '@pixel-scientists/domain':
         specifier: workspace:*
         version: link:../../packages/domain
-      '@pixelgrant/ui':
+      '@pixel-scientists/ui':
         specifier: workspace:*
         version: link:../../packages/ui
       react:

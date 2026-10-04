@@ -11,8 +11,8 @@ import {
   PageHeading,
   Textarea,
   buttonClassName,
-} from '@pixelgrant/ui';
-import type { ErrorSummaryItem } from '@pixelgrant/ui';
+} from '@pixel-scientists/ui';
+import type { ErrorSummaryItem } from '@pixel-scientists/ui';
 import { useState } from 'react';
 import type { ReactNode, SubmitEvent } from 'react';
 

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { EmptyState, PageHeading } from '@pixelgrant/ui';
+import { EmptyState, PageHeading } from '@pixel-scientists/ui';
 
 /** The console's first page. Programme set-up has not been built, so the list is always empty. */
 export default function ProgrammesPage() {

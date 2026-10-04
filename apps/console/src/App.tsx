@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { AppShell, Link, Router, cx } from '@pixelgrant/ui';
-import type { RouteDefinition } from '@pixelgrant/ui';
+import { productName } from '@pixel-scientists/domain/platform';
+import { AppShell, Link, Router, cx } from '@pixel-scientists/ui';
+import type { RouteDefinition } from '@pixel-scientists/ui';
 import type { ReactNode } from 'react';
 
 /** Component gallery: development builds only. The production build drops it. */
@@ -48,12 +49,12 @@ function ConsoleNavigation() {
 
 function ConsoleLayout({ children }: { children: ReactNode }) {
   return (
-    <AppShell productName="PixelGrant" areaName="Staff console" navigation={<ConsoleNavigation />}>
+    <AppShell productName={productName} areaName="Staff console" navigation={<ConsoleNavigation />}>
       {children}
     </AppShell>
   );
 }
 
 export function App() {
-  return <Router routes={routes} layout={ConsoleLayout} titleSuffix="PixelGrant console" />;
+  return <Router routes={routes} layout={ConsoleLayout} titleSuffix={`${productName} console`} />;
 }

@@ -1,4 +1,4 @@
-@import '@pixelgrant/ui/styles.css';
+@import '@pixel-scientists/ui/styles.css';
 
 /* Tell Tailwind to read the portal's own components as well. */
 @source '.';

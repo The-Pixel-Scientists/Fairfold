@@ -9,8 +9,9 @@
 
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
+import { productName } from '@pixel-scientists/domain/platform';
 
-const SUFFIX = '– PixelGrant console';
+const SUFFIX = `– ${productName} console`;
 
 /** The text of the polite live region that announces page changes. */
 function announcement(page: Page) {
@@ -36,7 +37,7 @@ test.describe('programmes page', () => {
   test('has a banner, a main navigation and a main landmark', async ({ page }) => {
     await page.goto('/');
 
-    await expect(page.getByRole('banner')).toContainText('PixelGrant');
+    await expect(page.getByRole('banner')).toContainText(productName);
     await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible();
     await expect(page.getByRole('main')).toBeVisible();
     const current = page.getByRole('link', { name: 'Programmes' });

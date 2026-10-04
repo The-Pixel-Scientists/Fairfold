@@ -9,8 +9,9 @@
 
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
+import { productName } from '@pixel-scientists/domain/platform';
 
-const SUFFIX = '– PixelGrant';
+const SUFFIX = `– ${productName}`;
 
 /** The text of the polite live region that announces page changes. */
 function announcement(page: Page) {
@@ -47,7 +48,7 @@ test.describe('home page', () => {
   test('has a banner and a main landmark, and no navigation to wade through', async ({ page }) => {
     await page.goto('/');
 
-    await expect(page.getByRole('banner')).toContainText('PixelGrant');
+    await expect(page.getByRole('banner')).toContainText(productName);
     await expect(page.getByRole('main')).toBeVisible();
     await expect(page.getByRole('navigation')).toHaveCount(0);
   });
@@ -155,7 +156,7 @@ test.describe('moving between pages', () => {
     page,
   }) => {
     await page.goto('/how-applying-works');
-    const home = page.getByRole('banner').getByRole('link', { name: 'PixelGrant' });
+    const home = page.getByRole('banner').getByRole('link', { name: productName });
     await expect(home).toHaveAttribute('href', '/');
     await expect(home).not.toHaveAttribute('aria-current');
 
@@ -323,7 +324,7 @@ test.describe('keyboard and touch', () => {
     await expect(page.getByRole('heading', { level: 1, name: 'Apply for a grant' })).toBeVisible();
 
     await page.keyboard.press('Tab');
-    for (const name of ['PixelGrant', 'Read how applying works']) {
+    for (const name of [productName, 'Read how applying works']) {
       await page.keyboard.press('Tab');
       const link = page.getByRole('link', { name });
       await expect(link).toBeFocused();
@@ -340,7 +341,7 @@ test.describe('keyboard and touch', () => {
     await page.goto('/');
     const box = await page
       .getByRole('banner')
-      .getByRole('link', { name: 'PixelGrant' })
+      .getByRole('link', { name: productName })
       .boundingBox();
     expect(box?.height).toBeGreaterThanOrEqual(24);
   });
@@ -405,7 +406,7 @@ test.describe('without JavaScript', () => {
   test('says what to do, in a page with a heading and a main landmark', async ({ page }) => {
     await page.goto('/');
 
-    await expect(page).toHaveTitle('PixelGrant');
+    await expect(page).toHaveTitle(productName);
     await expect(
       page.getByRole('heading', { level: 1, name: 'Turn on JavaScript to apply' }),
     ).toBeVisible();

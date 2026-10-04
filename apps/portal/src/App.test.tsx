@@ -3,6 +3,7 @@
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { productName } from '@pixel-scientists/domain/platform';
 
 import { App } from './App.tsx';
 
@@ -38,8 +39,8 @@ describe('home page', () => {
       await screen.findByRole('heading', { level: 1, name: 'Apply for a grant' }),
     ).toBeTruthy();
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
-    expect(document.title).toBe('Apply for a grant – PixelGrant');
-    expect(screen.getByRole('banner').textContent).toContain('PixelGrant');
+    expect(document.title).toBe(`Apply for a grant – ${productName}`);
+    expect(screen.getByRole('banner').textContent).toContain(productName);
     expect(screen.getByRole('main').contains(screen.getByRole('heading', { level: 1 }))).toBe(true);
   });
 
@@ -76,7 +77,7 @@ describe('home page', () => {
     openPortal();
     await screen.findByRole('heading', { level: 1 });
 
-    const home = within(screen.getByRole('banner')).getByRole('link', { name: 'PixelGrant' });
+    const home = within(screen.getByRole('banner')).getByRole('link', { name: productName });
     expect(home.getAttribute('href')).toBe('/');
     expect(home.getAttribute('aria-current')).toBe('page');
   });
@@ -113,7 +114,7 @@ describe('moving between pages', () => {
     await waitFor(() => {
       expect(document.activeElement).toBe(heading);
     });
-    expect(document.title).toBe('How applying works – PixelGrant');
+    expect(document.title).toBe(`How applying works – ${productName}`);
     expect(window.location.pathname).toBe('/how-applying-works');
     expect(screen.getByRole('status').textContent).toBe('Navigated to How applying works');
   });
@@ -129,7 +130,7 @@ describe('moving between pages', () => {
     await waitFor(() => {
       expect(document.activeElement).toBe(heading);
     });
-    expect(document.title).toBe('Apply for a grant – PixelGrant');
+    expect(document.title).toBe(`Apply for a grant – ${productName}`);
   });
 
   it('goes home from the header link, with focus on the home heading', async () => {
@@ -137,13 +138,13 @@ describe('moving between pages', () => {
     openPortal('/how-applying-works');
     await screen.findByRole('heading', { level: 1, name: 'How applying works' });
 
-    await user.click(within(screen.getByRole('banner')).getByRole('link', { name: 'PixelGrant' }));
+    await user.click(within(screen.getByRole('banner')).getByRole('link', { name: productName }));
 
     const heading = await screen.findByRole('heading', { level: 1, name: 'Apply for a grant' });
     await waitFor(() => {
       expect(document.activeElement).toBe(heading);
     });
-    expect(document.title).toBe('Apply for a grant – PixelGrant');
+    expect(document.title).toBe(`Apply for a grant – ${productName}`);
     expect(window.location.pathname).toBe('/');
   });
 
@@ -151,7 +152,7 @@ describe('moving between pages', () => {
     openPortal('/nothing/here');
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Page not found' })).toBeTruthy();
-    expect(document.title).toBe('Page not found – PixelGrant');
+    expect(document.title).toBe(`Page not found – ${productName}`);
     expect(screen.getByRole('link', { name: 'Go to the home page' }).getAttribute('href')).toBe(
       '/',
     );

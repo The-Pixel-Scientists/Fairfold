@@ -1,8 +1,8 @@
 {
-  "name": "@pixelgrant/api",
+  "name": "@pixel-scientists/api",
   "version": "0.0.0",
   "private": true,
-  "description": "PixelGrant API server and background jobs",
+  "description": "Fairfold Grants API server and background jobs",
   "license": "AGPL-3.0-or-later",
   "type": "module",
   "scripts": {
@@ -11,8 +11,8 @@
   },
   "dependencies": {
     "@fastify/swagger": "9.9.0",
-    "@pixelgrant/db": "workspace:*",
-    "@pixelgrant/domain": "workspace:*",
+    "@pixel-scientists/db": "workspace:*",
+    "@pixel-scientists/domain": "workspace:*",
     "fastify": "5.12.5",
     "fastify-type-provider-zod": "7.0.0",
     "pino": "10.3.1",

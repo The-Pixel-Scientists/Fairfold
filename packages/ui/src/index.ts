@@ -2,7 +2,7 @@
 //
 // The component library shared by the console and the portal. Apps import
 // from here and never from Radix directly (ADR 0006). Import the stylesheet
-// once per app: `@pixelgrant/ui/styles.css`.
+// once per app: `@pixel-scientists/ui/styles.css`.
 
 export { AppShell, MAIN_CONTENT_ID } from './AppShell.tsx';
 export type { AppShellProps } from './AppShell.tsx';
