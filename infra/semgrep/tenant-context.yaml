@@ -24,3 +24,43 @@ rules:
         - /packages/db/test/
         # Passes the roles' SCRAM verifiers to roles.sql as settings.
         - /packages/db/scripts/roles.ts
+
+  # A TenantId is trusted to come from a session, a checked job or the
+  # tenant fan-out. Only tenant-context.ts may make one; everything else
+  # calls its constructors. Tests make their own ids.
+  - id: tps-tenant-id-only-from-tenant-context
+    languages: [typescript]
+    severity: ERROR
+    message: >-
+      Only packages/db/src/tenant-context.ts may turn a value into a
+      TenantId. Take the tenant from the session or from withTenant()'s
+      callers, never from a cast (ADR 0003).
+    pattern-either:
+      - pattern: $X as TenantId
+      # An angle-bracket cast, or the type imported under another name.
+      - pattern-regex: <\s*TenantId\s*>|\bTenantId\s+as\s+\w
+    paths:
+      exclude:
+        - /packages/db/src/tenant-context.ts
+        - /packages/db/test/
+        - /apps/api/test/
+        - '*.test.ts'
+
+  # Tenant creation runs as app_worker through app.create_tenant() and is
+  # the operator's alone (ADR 0019): createTenant() in packages/db/src and
+  # the command in apps/api/src/operator/.
+  - id: tps-create-tenant-only-in-operator
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      Only packages/db/src and apps/api/src/operator/ may call
+      createTenant() or app.create_tenant(). Tenants are created by the
+      operator command, pnpm tenant:create (ADR 0019).
+    pattern-either:
+      - pattern-regex: \bcreateTenant\b
+      - pattern: '"=~/(?i)\bapp[\s\x22]*\.[\s\x22]*create_tenant\b/"'
+    paths:
+      exclude:
+        - /packages/db/src/
+        - /packages/db/test/
+        - /apps/api/src/operator/

@@ -36,3 +36,43 @@ sql`SELECT app.current_tenant_id() AS tenant`;
 
 // ok: tps-tenant-setting-only-in-tenant-context
 export const column = 'tenant_id';
+
+declare type TenantId = string & { readonly brand: true };
+declare const value: string;
+// ruleid: tps-create-tenant-only-in-operator
+import { createTenant } from '@pixel-scientists/db';
+
+// ruleid: tps-tenant-id-only-from-tenant-context
+export const cast = value as TenantId;
+
+// ruleid: tps-tenant-id-only-from-tenant-context
+export const doubleCast = value as unknown as TenantId;
+
+// ruleid: tps-tenant-id-only-from-tenant-context
+export const angled = <TenantId>value;
+
+// ruleid: tps-tenant-id-only-from-tenant-context
+export type { TenantId as Tenant };
+
+// ok: tps-tenant-id-only-from-tenant-context
+export function takes(tenant: TenantId): string {
+  return tenant;
+}
+
+// ruleid: tps-create-tenant-only-in-operator
+await createTenant({ slug: 'northfield', name: 'Northfield Community Trust' });
+
+// ruleid: tps-create-tenant-only-in-operator
+export const helpers = { make: createTenant };
+
+// ruleid: tps-create-tenant-only-in-operator
+sql`SELECT app.create_tenant(${'northfield'}, ${'Northfield'})`;
+
+// ruleid: tps-create-tenant-only-in-operator
+sql`SELECT "APP"."CREATE_TENANT"(${'northfield'}, ${'Northfield'})`;
+
+// ok: tps-create-tenant-only-in-operator
+sql`SELECT app.public_tenant(${'northfield'})`;
+
+// ok: tps-create-tenant-only-in-operator
+export const role = 'owner_app_create_tenant';
