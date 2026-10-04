@@ -2,6 +2,7 @@
 
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { StrictMode } from 'react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -100,10 +101,12 @@ describe('Router: moving to another page', () => {
 
     const heading = await screen.findByRole('heading', { level: 1, name: 'Application 42' });
     expect(window.location.pathname).toBe('/applications/42');
-    expect(document.activeElement).toBe(heading);
+    await waitFor(() => {
+      expect(document.activeElement).toBe(heading);
+      expect(document.title).toBe('Application 42 – Fairfold Grants console');
+      expect(scrollTo()).toHaveBeenCalledWith({ top: 0, left: 0, behavior: 'auto' });
+    });
     expect(heading.getAttribute('tabindex')).toBe('-1');
-    expect(document.title).toBe('Application 42 – Fairfold Grants console');
-    expect(scrollTo()).toHaveBeenCalledWith({ top: 0, left: 0, behavior: 'auto' });
     expect(announcement()).toBe('Navigated to Application 42');
   });
 
@@ -116,7 +119,9 @@ describe('Router: moving to another page', () => {
     await user.keyboard('{Enter}');
 
     const heading = await screen.findByRole('heading', { level: 1, name: 'Application 42' });
-    expect(document.activeElement).toBe(heading);
+    await waitFor(() => {
+      expect(document.activeElement).toBe(heading);
+    });
     expect(window.location.pathname).toBe('/applications/42');
     expect(announcement()).toBe('Navigated to Application 42');
   });
@@ -133,7 +138,9 @@ describe('Router: moving to another page', () => {
     await user.click(screen.getByRole('link', { name: 'Open application 42' }));
 
     await screen.findByRole('heading', { level: 1, name: 'Application 42' });
-    expect(scrollTo()).toHaveBeenCalledWith({ top: 0, left: 0, behavior: 'instant' });
+    await waitFor(() => {
+      expect(scrollTo()).toHaveBeenCalledWith({ top: 0, left: 0, behavior: 'instant' });
+    });
   });
 
   it('shows the not-found page for an unknown path, with the same behaviour', async () => {
@@ -143,8 +150,10 @@ describe('Router: moving to another page', () => {
     await user.click(screen.getByRole('link', { name: 'Open a missing page' }));
 
     const heading = await screen.findByRole('heading', { level: 1, name: 'Page not found' });
-    expect(document.activeElement).toBe(heading);
-    expect(document.title).toBe('Page not found – Fairfold Grants console');
+    await waitFor(() => {
+      expect(document.activeElement).toBe(heading);
+      expect(document.title).toBe('Page not found – Fairfold Grants console');
+    });
     expect(announcement()).toBe('Navigated to Page not found');
     expect(screen.getByRole('link', { name: 'Go to the home page' })).toBeTruthy();
   });
@@ -179,7 +188,9 @@ describe('Router: moving to another page', () => {
     await user.click(screen.getByRole('link', { name: 'Open application 42' }));
 
     const heading = await screen.findByRole('heading', { level: 1, name: 'Plain heading' });
-    expect(document.activeElement).toBe(heading);
+    await waitFor(() => {
+      expect(document.activeElement).toBe(heading);
+    });
     expect(heading.getAttribute('tabindex')).toBe('-1');
   });
 
@@ -268,8 +279,8 @@ describe('Router: moving to another page', () => {
     const heading = await screen.findByRole('heading', { level: 1, name: 'Application 42' });
     await waitFor(() => {
       expect(document.activeElement).toBe(heading);
+      expect(document.title).toBe('Application 42');
     });
-    expect(document.title).toBe('Application 42');
     expect(document.querySelector('[aria-busy="true"]')).toBeNull();
   });
 
@@ -294,14 +305,16 @@ describe('Router: moving to another page', () => {
     });
     await waitFor(() => {
       expect(document.activeElement).toBe(heading);
+      expect(document.title).toBe('This page did not load');
     });
     expect(screen.getByRole('button', { name: 'Reload page' })).toBeTruthy();
-    expect(document.title).toBe('This page did not load');
     expect(announcement()).toBe('This page did not load');
 
     window.history.back();
     expect(await screen.findByRole('heading', { level: 1, name: 'Programmes' })).toBeTruthy();
-    expect(document.title).toBe('Programmes');
+    await waitFor(() => {
+      expect(document.title).toBe('Programmes');
+    });
   });
 
   it('retries a page that failed to load the next time the person goes there', async () => {
@@ -366,8 +379,8 @@ describe('Router: moving to another page', () => {
 
     await waitFor(() => {
       expect(document.activeElement).toBe(heading);
+      expect(document.title).toBe('This page did not load – Fairfold Grants console');
     });
-    expect(document.title).toBe('This page did not load – Fairfold Grants console');
     expect(announcement()).toBe('This page did not load');
   });
 
@@ -394,8 +407,8 @@ describe('Router: moving to another page', () => {
 
     await waitFor(() => {
       expect(document.activeElement).toBe(heading);
+      expect(document.title).toBe('We could not open this page');
     });
-    expect(document.title).toBe('We could not open this page');
     expect(screen.queryByText(/administrator/)).toBeNull();
   });
 
@@ -537,6 +550,160 @@ describe('Router: search string and hash', () => {
 
     expect(document.activeElement).toBe(button);
     expect(announcement()).toBe('');
+  });
+});
+
+/** The messages put into the live region from now on, in order, however they arrive. */
+function watchLiveRegion(): string[] {
+  const region = document.querySelector('[aria-live="polite"]');
+  if (!region) throw new Error('The router has no live region.');
+  const heard: string[] = [];
+  const observer = new MutationObserver((records) => {
+    for (const record of records) {
+      if (record.type === 'characterData') heard.push(record.target.textContent ?? '');
+      for (const node of record.addedNodes) heard.push(node.textContent ?? '');
+    }
+  });
+  observer.observe(region, { childList: true, subtree: true, characterData: true });
+  onCleanup(() => {
+    observer.disconnect();
+  });
+  return heard;
+}
+
+/** Long enough for a late second message to show: past the router's slow-load delay. */
+function waitForQuiet(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 500));
+}
+
+describe('Router: one announcement for each change of page', () => {
+  it('puts one message in the live region for a link, and none after it', async () => {
+    const user = userEvent.setup();
+    renderRouter('/');
+    const heard = watchLiveRegion();
+
+    await user.click(screen.getByRole('link', { name: 'Open application 42' }));
+    await screen.findByRole('heading', { level: 1, name: 'Application 42' });
+    await waitForQuiet();
+
+    expect(heard).toEqual(['Navigated to Application 42']);
+    expect(document.querySelectorAll('[aria-live="polite"] span')).toHaveLength(1);
+  });
+
+  it('does the same under StrictMode, whose effects run twice, and focuses the heading once', async () => {
+    const user = userEvent.setup();
+    renderRouter(
+      '/',
+      <StrictMode>
+        <Router routes={routes} titleSuffix="Fairfold Grants console" />
+      </StrictMode>,
+    );
+    const heard = watchLiveRegion();
+    const focus = vi.spyOn(HTMLElement.prototype, 'focus');
+
+    await user.click(screen.getByRole('link', { name: 'Open application 42' }));
+    const heading = await screen.findByRole('heading', { level: 1, name: 'Application 42' });
+    await waitForQuiet();
+
+    expect(heard).toEqual(['Navigated to Application 42']);
+    expect(focus.mock.contexts.filter((element) => element === heading)).toHaveLength(1);
+  });
+
+  it('moves a slow page from "Loading" to one "Navigated to" message', async () => {
+    let finish: (module: PageModule) => void = () => undefined;
+    const slow: RouteDefinition[] = [
+      { path: '/', title: 'Programmes', component: Home },
+      {
+        path: '/applications/:id',
+        title: 'Application 42',
+        load: () =>
+          new Promise<PageModule>((resolve) => {
+            finish = resolve;
+          }),
+      },
+    ];
+    const user = userEvent.setup();
+    renderRouter('/', <Router routes={slow} />);
+    const heard = watchLiveRegion();
+
+    await user.click(screen.getByRole('link', { name: 'Open application 42' }));
+    await waitFor(() => {
+      expect(announcement()).toBe('Loading Application 42…');
+    });
+    finish({ default: Application });
+    await screen.findByRole('heading', { level: 1, name: 'Application 42' });
+    await waitForQuiet();
+
+    expect(heard).toEqual(['Loading Application 42…', 'Navigated to Application 42']);
+    expect(document.querySelectorAll('[aria-live="polite"] span')).toHaveLength(1);
+  });
+
+  it('ends on the error message alone when a slow page fails to load', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    let fail: (error: Error) => void = () => undefined;
+    const failing: RouteDefinition[] = [
+      { path: '/', title: 'Programmes', component: Home },
+      {
+        path: '/applications/:id',
+        title: 'Application 42',
+        load: () =>
+          new Promise<PageModule>((_resolve, reject) => {
+            fail = reject;
+          }),
+      },
+    ];
+    const user = userEvent.setup();
+    renderRouter('/', <Router routes={failing} />);
+
+    await user.click(screen.getByRole('link', { name: 'Open application 42' }));
+    await waitFor(() => {
+      expect(announcement()).toBe('Loading Application 42…');
+    });
+    fail(new Error('Failed to fetch module'));
+    await screen.findByRole('heading', { level: 1, name: 'This page did not load' });
+    await waitForQuiet();
+
+    expect(announcement()).toBe('This page did not load');
+    expect(document.querySelectorAll('[aria-live="polite"] span')).toHaveLength(1);
+  });
+
+  it('puts one message in the live region for each back and forward', async () => {
+    const user = userEvent.setup();
+    renderRouter('/');
+    await user.click(screen.getByRole('link', { name: 'Open application 42' }));
+    await screen.findByRole('heading', { level: 1, name: 'Application 42' });
+    const heard = watchLiveRegion();
+
+    window.history.back();
+    await waitFor(() => {
+      expect(activeHeading()).toBe('Programmes');
+    });
+    await waitForQuiet();
+    window.history.forward();
+    await waitFor(() => {
+      expect(activeHeading()).toBe('Application 42');
+    });
+    await waitForQuiet();
+
+    expect(heard).toEqual(['Navigated to Programmes', 'Navigated to Application 42']);
+  });
+
+  it('puts nothing in the live region for a change of search string or hash', async () => {
+    const user = userEvent.setup();
+    renderRouter('/filters');
+    const heard = watchLiveRegion();
+
+    await user.click(screen.getByRole('button', { name: 'Filter by review' }));
+    await waitFor(() => {
+      expect(window.location.search).toBe('?stage=review&owner=a&owner=b');
+    });
+    await user.click(screen.getByRole('button', { name: 'Jump to history' }));
+    await waitFor(() => {
+      expect(window.location.hash).toBe('#history');
+    });
+    await waitForQuiet();
+
+    expect(heard).toEqual([]);
   });
 });
 
