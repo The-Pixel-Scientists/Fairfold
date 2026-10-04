@@ -24,7 +24,7 @@ const PORT_BLOCKS = 800;
 /**
  * The ports in a block, in order: `pnpm dev` serves the API, console and
  * portal; Playwright serves its production builds and the gallery build;
- * `pnpm stack` publishes its API, console and portal.
+ * `pnpm stack` publishes its API, console, portal and Mailpit's inbox.
  */
 const PORT_NAMES = [
   'api',
@@ -36,6 +36,7 @@ const PORT_NAMES = [
   'stackApi',
   'stackConsole',
   'stackPortal',
+  'stackMail',
 ] as const;
 export type PortName = (typeof PORT_NAMES)[number];
 

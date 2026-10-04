@@ -94,10 +94,11 @@ describe('devNames', () => {
       stackApi: first + 6,
       stackConsole: first + 7,
       stackPortal: first + 8,
+      stackMail: first + 9,
     });
     expect(first).toBeGreaterThanOrEqual(41000);
     expect(first % 10).toBe(0);
-    expect(names.ports.stackPortal).toBeLessThan(49000);
+    expect(names.ports.stackMail).toBeLessThan(49000);
   });
 
   it('never gives two worktrees the same ports', () => {

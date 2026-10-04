@@ -2,15 +2,21 @@
 #
 # `pnpm stack` (ADR 0005): PostgreSQL, a one-off migrate job, and the release
 # images of the API, console and portal, run as a self-hosted install runs
-# them. Start it with `pnpm stack`, which sets the project name, the ports
-# and the secrets for this worktree (scripts/stack.ts).
+# them, with Mailpit to catch the email. Start it with `pnpm stack`, which
+# sets the project name, the ports, the secrets and the web network for this
+# worktree (scripts/stack.ts).
 #
 # Every secret is random, and Compose copies each one only into the
 # containers that use it, as a file under /run/secrets. The migrator and
 # superuser passwords reach the migrate job alone. Nothing here sets
-# TPS_DEV, so the API refuses development values. PostgreSQL and the
-# migrate job sit on an internal network with no way out; only the API,
-# console and portal publish ports, on 127.0.0.1.
+# TPS_DEV, so the API refuses development values.
+#
+# Networks: PostgreSQL and the migrate job sit on `database`, which has no
+# way out. The console and portal forward /api/ to the API over `web`, which
+# has no way out either and holds only those three, so the API trusts the
+# forwarding headers of `web`'s addresses alone. stack.ts makes `web` before
+# Compose starts, to learn its addresses. Only the API, console and portal
+# publish ports, on 127.0.0.1.
 
 # No container can gain privileges. Those without secrets also run
 # read-only: Compose cannot copy a secret into a read-only container.
@@ -46,6 +52,12 @@ x-web-healthcheck: &web-healthcheck
   interval: 2s
   timeout: 5s
   retries: 30
+
+x-web: &web
+  <<: [*hardening, *read-only]
+  # The image forwards /api/ to http://api:3000, which `web` resolves.
+  networks: [apps, web]
+  healthcheck: *web-healthcheck
 
 services:
   postgres:
@@ -103,14 +115,30 @@ services:
       <<: *database
       TPS_API_HOST: 0.0.0.0
       TPS_API_PORT: '3000'
+      # The console and portal containers, and nothing else (see Networks).
+      # Empty, which the API refuses, unless stack.ts found `web`.
+      TPS_API_TRUST_PROXY: ${TPS_STACK_WEB_SUBNETS:-}
+      TPS_CONSOLE_ORIGIN: http://console.localhost:${TPS_STACK_CONSOLE_PORT:?Run pnpm stack}
+      TPS_PORTAL_ORIGIN: http://portal.localhost:${TPS_STACK_PORTAL_PORT:?Run pnpm stack}
       # Compose's internal network, which no other machine can reach.
       TPS_DB_TLS: disable
       TPS_DB_APP_API_PASSWORD_FILE: /run/secrets/app_api_password
+      TPS_DB_APP_AUTH_PASSWORD_FILE: /run/secrets/app_auth_password
+      TPS_AUTH_SECRET_FILE: /run/secrets/auth_secret
+      # Mailpit shares this container's network, so mail never leaves it.
+      TPS_SMTP_HOST: 127.0.0.1
+      TPS_SMTP_PORT: '1025'
+      TPS_SMTP_TLS: none
+      TPS_SMTP_FROM: no-reply@example.org
     secrets:
       - { source: app_api_password, <<: *node-secret }
-    networks: [database, apps]
+      - { source: app_auth_password, <<: *node-secret }
+      - { source: auth_secret, <<: *node-secret }
+    networks: [database, web, api]
     ports:
       - 127.0.0.1:${TPS_STACK_API_PORT:?Run pnpm stack}:3000
+      # Mailpit's inbox, published here because Mailpit uses this network.
+      - 127.0.0.1:${TPS_STACK_MAIL_PORT:?Run pnpm stack}:8025
     healthcheck:
       test:
         - CMD
@@ -124,27 +152,57 @@ services:
       migrate:
         condition: service_completed_successfully
 
+  # Catches every email the API sends. SMTP listens on the API's loopback
+  # address only; the inbox is at http://127.0.0.1:<stackMail port>.
+  mailpit:
+    image: axllent/mailpit:v1.31.2@sha256:74d609a42ec279aa63c6b4622a6fa9b5408d1ad5b1d76a1c4be40a265ce0863d
+    <<: [*hardening, *read-only]
+    network_mode: service:api
+    environment:
+      MP_SMTP_BIND_ADDR: 127.0.0.1:1025
+      MP_UI_BIND_ADDR: 0.0.0.0:8025
+
   console:
+    <<: *web
     build:
       context: ../..
       dockerfile: infra/docker/web.Dockerfile
       args: { APP: console }
-    <<: [*hardening, *read-only]
-    networks: [apps]
     ports:
       - 127.0.0.1:${TPS_STACK_CONSOLE_PORT:?Run pnpm stack}:8080
-    healthcheck: *web-healthcheck
 
   portal:
+    <<: *web
     build:
       context: ../..
       dockerfile: infra/docker/web.Dockerfile
       args: { APP: portal }
-    <<: [*hardening, *read-only]
-    networks: [apps]
     ports:
       - 127.0.0.1:${TPS_STACK_PORTAL_PORT:?Run pnpm stack}:8080
-    healthcheck: *web-healthcheck
+
+  # `pnpm stack seed` only: forwards a port on 127.0.0.1, which Docker
+  # picks, to PostgreSQL while the seed runs on this machine, then stops.
+  database-tunnel:
+    build: *api-build
+    <<: [*hardening, *read-only]
+    profiles: [seed]
+    command:
+      - node
+      - --eval
+      - >-
+        const net = require('node:net');
+        net.createServer((client) => {
+        const server = net.connect(5432, 'postgres');
+        client.on('error', () => server.destroy());
+        server.on('error', () => client.destroy());
+        client.pipe(server).pipe(client);
+        }).listen(5432);
+    networks: [database, tunnel]
+    ports:
+      - 127.0.0.1::5432
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 secrets:
   postgres_password:
@@ -159,6 +217,8 @@ secrets:
     environment: TPS_STACK_APP_AUTH_PASSWORD
   app_queue_password:
     environment: TPS_STACK_APP_QUEUE_PASSWORD
+  auth_secret:
+    environment: TPS_STACK_AUTH_SECRET
 
 volumes:
   postgres-data:
@@ -166,4 +226,10 @@ volumes:
 networks:
   database:
     internal: true
+  web:
+    external: true
+    name: ${TPS_STACK_WEB_NETWORK:?Run pnpm stack}
+  # Published ports: the console's and portal's, the API's, and the tunnel's.
   apps:
+  api:
+  tunnel:

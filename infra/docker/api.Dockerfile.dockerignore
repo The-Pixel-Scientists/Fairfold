@@ -11,6 +11,7 @@
 !packages/*/package.json
 !apps/api/src/
 !packages/db/classification.ts
+!packages/db/classification/
 !packages/db/migrations/
 !packages/db/scripts/
 !packages/db/src/
