@@ -111,10 +111,16 @@ export interface SentRequest {
   body: unknown;
 }
 
+/** The reads every page of a funder's console makes: its name and look, and the stylesheet that look names. */
+const PUBLIC_TENANT = /^GET \/public\/tenants\/([a-z0-9-]+)(\/theme\.css)?$/;
+
 /**
  * Answers every request to `/api` from the handlers, keyed like
  * `GET /auth/session`. A request with no handler gets a 404, and shows up in
- * the list this returns, which holds every request sent so far.
+ * the list this returns, which holds every request sent so far. The reads of
+ * the funder's name and look, which every page makes, are the exception: they
+ * are answered with the standard look, and left out of the list, unless a
+ * handler gives its own answer.
  */
 export async function stubApi(
   page: Page,
@@ -126,6 +132,22 @@ export async function stubApi(
     async (route) => {
       const request = route.request();
       const key = `${request.method()} ${new URL(request.url()).pathname.replace(/^\/api/, '')}`;
+      const look = PUBLIC_TENANT.exec(key);
+      if (handlers[key] === undefined && look !== null) {
+        const [, slug = '', stylesheet] = look;
+        const name = [northfield, eastmere].find(({ tenant }) => tenant.slug === slug)?.tenant.name;
+        await (stylesheet === undefined
+          ? route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: JSON.stringify({
+                name: name ?? slug,
+                theme: { brandColour: '#1f4bb8', preset: 'standard', hasLogo: false },
+              }),
+            })
+          : route.fulfill({ status: 200, contentType: 'text/css', body: '' }));
+        return;
+      }
       const body: unknown = request.postData() === null ? undefined : request.postDataJSON();
       sent.push({ key, body });
       const handler = handlers[key];

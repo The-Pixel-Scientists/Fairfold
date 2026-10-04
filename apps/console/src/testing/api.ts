@@ -103,10 +103,27 @@ export const signedOut = problem(401, 'You are not signed in.');
 
 type Handler = Reply | ((body: unknown) => Reply);
 
+/** The reads every page of a funder's console makes: its name and look, and its stylesheet and logo when they change. */
+const PUBLIC_TENANT = /^GET \/public\/tenants\/([a-z0-9-]+)(\/theme\.css|\/logo)?$/;
+
+/** A funder with the standard look and no logo, which is what a test about something else gets. */
+function standardLook(slug: string): Reply {
+  const name = [northfield, eastmere].find(({ tenant }) => tenant.slug === slug)?.tenant.name;
+  return {
+    status: 200,
+    body: {
+      name: name ?? slug,
+      theme: { brandColour: '#1f4bb8', preset: 'standard', hasLogo: false },
+    },
+  };
+}
+
 /**
  * Answers `fetch` for the keys given, such as `GET /auth/session`, and fails
  * the test on any other request, so nothing is sent that a test did not
- * expect. Returns what was sent.
+ * expect. The reads of the funder's name and look, which every page makes,
+ * are answered with the standard look and left out of what was sent, unless
+ * the test gives its own answer. Returns what was sent.
  */
 export function stubApi(handlers: Record<string, Handler>): SentRequest[] {
   const sent: SentRequest[] = [];
@@ -115,17 +132,24 @@ export function stubApi(handlers: Record<string, Handler>): SentRequest[] {
     vi.fn((url: string, init: RequestInit) => {
       const key = `${init.method ?? 'GET'} ${url.replace(/^\/api/, '')}`;
       const body: unknown = typeof init.body === 'string' ? JSON.parse(init.body) : undefined;
-      sent.push({ key, body });
       const handler = handlers[key];
+      const [, slug, asset] = PUBLIC_TENANT.exec(key) ?? [];
+      if (handler === undefined && slug !== undefined) {
+        return Promise.resolve(
+          replyWith(asset === undefined ? standardLook(slug) : { status: 200 }),
+        );
+      }
+      sent.push({ key, body });
       if (handler === undefined) return Promise.reject(new Error(`Unexpected request: ${key}`));
-      const reply = typeof handler === 'function' ? handler(body) : handler;
-      return Promise.resolve(
-        new Response(reply.body === undefined ? null : JSON.stringify(reply.body), {
-          status: reply.status,
-          headers: { 'content-type': 'application/json', ...reply.headers },
-        }),
-      );
+      return Promise.resolve(replyWith(typeof handler === 'function' ? handler(body) : handler));
     }),
   );
   return sent;
+}
+
+function replyWith(reply: Reply): Response {
+  return new Response(reply.body === undefined ? null : JSON.stringify(reply.body), {
+    status: reply.status,
+    headers: { 'content-type': 'application/json', ...reply.headers },
+  });
 }

@@ -37,14 +37,14 @@ describe('sending people to sign in', () => {
 
   it('shows that it is checking the session first', async () => {
     let finish: () => void = () => undefined;
-    vi.stubGlobal(
-      'fetch',
-      () =>
-        new Promise<Response>((resolve) => {
-          finish = () => {
-            resolve(new Response(JSON.stringify(consoleSession()), { status: 200 }));
-          };
-        }),
+    vi.stubGlobal('fetch', (url: string) =>
+      url === '/api/auth/session'
+        ? new Promise<Response>((resolve) => {
+            finish = () => {
+              resolve(new Response(JSON.stringify(consoleSession()), { status: 200 }));
+            };
+          })
+        : Promise.reject(new Error('Not needed here.')),
     );
     openConsole('/northfield/');
 

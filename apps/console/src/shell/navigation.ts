@@ -14,6 +14,7 @@ export interface NavigationItem {
 
 export const navigationItems: readonly NavigationItem[] = [
   { to: '/', label: 'Programmes', permission: 'grants.programmes.manage' },
+  { to: '/settings', label: 'Settings', permission: 'platform.settings.manage' },
 ];
 
 /** The items this session may use. The server still checks every request. */

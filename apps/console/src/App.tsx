@@ -16,6 +16,7 @@ import SetUpAuthenticatorPage from './auth/SetUpAuthenticatorPage.tsx';
 import SignedOutPage from './auth/SignedOutPage.tsx';
 import SignInPage from './auth/SignInPage.tsx';
 import SignUpPage from './auth/SignUpPage.tsx';
+import { TenantLook } from './platform/settings/look.tsx';
 import { productName, titleSuffix } from './product.ts';
 import { TenantProvider, tenantSlugOf } from './tenant.ts';
 
@@ -40,6 +41,21 @@ export const topLevelRoutes: readonly RouteDefinition[] = [
 /** Pages under `/<slug>/`, which the router sees without the slug. */
 export const tenantRoutes: readonly RouteDefinition[] = [
   { path: '/', title: 'Programmes', load: () => import('./pages/ProgrammesPage.tsx') },
+  {
+    path: '/settings',
+    title: 'General settings',
+    load: () => import('./platform/settings/GeneralPage.tsx'),
+  },
+  {
+    path: '/settings/look',
+    title: 'Look and logo',
+    load: () => import('./platform/settings/LookPage.tsx'),
+  },
+  {
+    path: '/settings/modules',
+    title: 'Modules',
+    load: () => import('./platform/settings/ModulesPage.tsx'),
+  },
   { path: '/sign-in', title: 'Sign in', component: SignInPage },
   { path: '/sign-up', title: 'Create your account', component: SignUpPage },
   { path: '/sign-up/check-email', title: 'Check your email', component: CheckEmailPage },
@@ -80,9 +96,11 @@ function TopLayout({ children }: { children: ReactNode }) {
 
 function TenantLayout({ children }: { children: ReactNode }) {
   return (
-    <SessionProvider load={loadSession} signOut={endSession}>
-      {children}
-    </SessionProvider>
+    <TenantLook>
+      <SessionProvider load={loadSession} signOut={endSession}>
+        {children}
+      </SessionProvider>
+    </TenantLook>
   );
 }
 
