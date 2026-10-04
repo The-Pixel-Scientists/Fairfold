@@ -45,10 +45,10 @@ env:
   # The browsers for @playwright/test 1.63.0. The e2e job's container names
   # the same image, as a job container cannot read this.
   PLAYWRIGHT_IMAGE: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
-  # Rules Semgrep loaded on 2026-10-03: 328 in all, 13 of them ours. Raise
+  # Rules Semgrep loaded on 2026-10-04: 333 in all, 18 of them ours. Raise
   # these when rules are added; lower them only with a reason in review.
   SEMGREP_MINIMUM_RULES: 300
-  SEMGREP_PROJECT_RULES: 13
+  SEMGREP_PROJECT_RULES: 18
   GITHUB_OIDC_ISSUER: https://token.actions.githubusercontent.com
 
 jobs:
@@ -166,10 +166,17 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Build the release images, migrate, and wait for /health/ready
         run: pnpm stack
+      # The journey and @api specs sign in as the seed's staff.
+      - name: Fill the stack with synthetic data
+        if: hashFiles('packages/db/seed/seed.ts') != ''
+        run: pnpm stack seed
+      # Every spec, the @api specs and the journey project included, with the
+      # stack's Mailpit and its secrets folder, for the seed password, at hand.
       - name: Run the specs against the stack
         run: >-
           docker run --rm --network host --ipc host
           --volume "$PWD:$PWD" --workdir "$PWD"
+          --volume "$HOME/.tps:/root/.tps:ro"
           --env CI --env TPS_E2E_STACK=1
           "$PLAYWRIGHT_IMAGE"
           node node_modules/@playwright/test/cli.js test
