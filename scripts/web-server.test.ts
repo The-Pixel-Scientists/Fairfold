@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { request, type IncomingHttpHeaders, type Server } from 'node:http';
+import { createServer, request, type IncomingHttpHeaders, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { createWebServer, NONCE_PLACEHOLDER } from './web-server.ts';
+import { apiOrigin, createWebServer, isApiRequest, NONCE_PLACEHOLDER } from './web-server.ts';
 
 const PAGE = `<!doctype html><html><head><meta property="csp-nonce" nonce="${NONCE_PLACEHOLDER}" /><script type="module" nonce="${NONCE_PLACEHOLDER}" src="/assets/app-1a2b.js"></script></head><body></body></html>`;
 
@@ -171,5 +171,205 @@ describe('createWebServer', () => {
 
   it('refuses to start without a built index.html', () => {
     expect(() => createWebServer(folder)).toThrow('has no index.html. Build the app first.');
+  });
+});
+
+describe('isApiRequest', () => {
+  it('takes /api and paths under /api/, as sent and once resolved', () => {
+    for (const url of [
+      '/api',
+      '/api/',
+      '/api/auth/session',
+      '/api/programmes?page=2',
+      '/api?x=1',
+    ]) {
+      expect(isApiRequest(url), url).toBe(true);
+    }
+    for (const url of [
+      '/',
+      '/apis',
+      '/api-docs',
+      '/health',
+      '/health/ready',
+      '/openapi.json',
+      '/api/../health',
+      '/api/%2e%2e/health',
+      '/api/%2E%2E/openapi.json',
+      '/console/api/x',
+      '//api/x',
+      'http://localhost/api/x',
+    ]) {
+      expect(isApiRequest(url), url).toBe(false);
+    }
+  });
+});
+
+describe('apiOrigin', () => {
+  it('takes only a plain HTTP origin', () => {
+    expect(apiOrigin('http://api:3000').href).toBe('http://api:3000/');
+    for (const value of [
+      'https://api:3000',
+      'http://api:3000/api',
+      'http://user:secret@api:3000',
+      'http://api:3000/?x=1',
+      'file:///etc/passwd',
+    ]) {
+      expect(() => apiOrigin(value), value).toThrow('--api must be an origin');
+    }
+  });
+});
+
+describe('createWebServer with an API', () => {
+  interface Received {
+    method: string;
+    url: string;
+    headers: IncomingHttpHeaders;
+    body: string;
+  }
+  const received: Received[] = [];
+  let api: Server;
+  let proxy: Server;
+
+  async function listen(server: Server): Promise<number> {
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    return (server.address() as AddressInfo).port;
+  }
+
+  beforeAll(async () => {
+    api = createServer((incoming, response) => {
+      const chunks: Buffer[] = [];
+      incoming.on('data', (chunk: Buffer) => chunks.push(chunk));
+      incoming.on('end', () => {
+        received.push({
+          method: incoming.method ?? '',
+          url: incoming.url ?? '',
+          headers: incoming.headers,
+          body: Buffer.concat(chunks).toString('utf8'),
+        });
+        response.writeHead(201, {
+          'content-type': 'application/json',
+          'content-security-policy': "default-src 'none'; frame-ancestors 'none'",
+          'set-cookie': ['a=1; HttpOnly', 'b=2; HttpOnly'],
+        });
+        response.end('{"ok":true}');
+      });
+    });
+    const apiPort = await listen(api);
+    proxy = createWebServer(join(folder, 'dist'), apiOrigin(`http://127.0.0.1:${String(apiPort)}`));
+    await listen(proxy);
+  });
+
+  afterAll(async () => {
+    await new Promise((resolve) => proxy.close(resolve));
+    await new Promise((resolve) => api.close(resolve));
+  });
+
+  function send(
+    server: Server,
+    path: string,
+    options: { method?: string; headers?: Record<string, string>; body?: string } = {},
+  ): Promise<Answer> {
+    return new Promise((resolve, reject) => {
+      const outgoing = request(
+        {
+          host: '127.0.0.1',
+          port: (server.address() as AddressInfo).port,
+          path,
+          method: options.method ?? 'GET',
+          headers: options.headers,
+        },
+        (response) => {
+          const chunks: Buffer[] = [];
+          response.on('data', (chunk: Buffer) => chunks.push(chunk));
+          response.on('end', () => {
+            resolve({
+              status: response.statusCode ?? 0,
+              headers: response.headers,
+              body: Buffer.concat(chunks).toString('utf8'),
+            });
+          });
+        },
+      );
+      outgoing.on('error', reject);
+      outgoing.end(options.body);
+    });
+  }
+
+  it('passes a request under /api/ to the API unchanged, with its own forwarding headers', async () => {
+    received.length = 0;
+    const answer = await send(proxy, '/api/auth/tenants/northfield/sign-in?next=%2Fhome', {
+      method: 'POST',
+      headers: {
+        Host: 'console.localhost:41231',
+        Origin: 'http://console.localhost:41231',
+        'Content-Type': 'application/json',
+        Cookie: 'session=abc',
+        'X-Forwarded-For': '203.0.113.9',
+        'X-Forwarded-Host': 'portal.localhost',
+        'X-Forwarded-Proto': 'https',
+        'X-Forwarded-Port': '443',
+        Forwarded: 'for=203.0.113.9;host=portal.localhost',
+        Connection: 'keep-alive, X-Hop',
+        'X-Hop': 'for this connection only',
+      },
+      body: '{"email":"a@example.org"}',
+    });
+
+    expect(answer).toMatchObject({ status: 201, body: '{"ok":true}' });
+    expect(answer.headers['set-cookie']).toEqual(['a=1; HttpOnly', 'b=2; HttpOnly']);
+    expect(answer.headers['content-security-policy']).toBe(
+      "default-src 'none'; frame-ancestors 'none'",
+    );
+    expect(answer.headers['x-content-type-options']).toBe('nosniff');
+
+    expect(received).toHaveLength(1);
+    const [seen] = received;
+    expect(seen).toMatchObject({
+      method: 'POST',
+      url: '/api/auth/tenants/northfield/sign-in?next=%2Fhome',
+      body: '{"email":"a@example.org"}',
+    });
+    expect(seen?.headers).toMatchObject({
+      host: 'console.localhost:41231',
+      origin: 'http://console.localhost:41231',
+      'content-type': 'application/json',
+      cookie: 'session=abc',
+      'x-forwarded-for': '127.0.0.1',
+      'x-forwarded-host': 'console.localhost:41231',
+      'x-forwarded-proto': 'http',
+    });
+    for (const name of ['x-forwarded-port', 'forwarded', 'x-hop']) {
+      expect(seen?.headers[name], name).toBeUndefined();
+    }
+  });
+
+  it('keeps the probes, the OpenAPI document and the pages away from the API', async () => {
+    received.length = 0;
+    for (const path of ['/health', '/health/ready', '/api/../health', '/apis', '/programmes']) {
+      const answer = await send(proxy, path);
+      expect(answer.status, path).toBe(200);
+      expect(answer.body, path).toContain('<!doctype html>');
+    }
+    expect((await send(proxy, '/openapi.json')).status).toBe(404);
+    expect(received).toEqual([]);
+  });
+
+  it('answers 502 with the security headers when the API does not answer', async () => {
+    const closed = createServer();
+    const closedPort = await listen(closed);
+    await new Promise((resolve) => closed.close(resolve));
+    const down = createWebServer(
+      join(folder, 'dist'),
+      apiOrigin(`http://127.0.0.1:${String(closedPort)}`),
+    );
+    await listen(down);
+    try {
+      const answer = await send(down, '/api/health');
+      expect(answer.status).toBe(502);
+      expect(answer.headers['x-content-type-options']).toBe('nosniff');
+      expect(answer.headers['content-security-policy']).toContain("default-src 'self'");
+    } finally {
+      await new Promise((resolve) => down.close(resolve));
+    }
   });
 });
