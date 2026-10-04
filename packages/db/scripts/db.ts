@@ -14,7 +14,7 @@
 //   drop     As the superuser: drop this worktree's database. Development
 //            only.
 //
-//   --test   Use PIXELGRANT_TEST_DB_NAME instead of PIXELGRANT_DB_NAME.
+//   --test   Use TPS_TEST_DB_NAME instead of TPS_DB_NAME.
 //
 // Settings come from the environment (settings.ts). In development,
 // `pnpm db:migrate`, `pnpm db:rollback` and `pnpm db:drop` supply them.
@@ -42,7 +42,7 @@ import {
 } from './settings.ts';
 
 /** `pnpm db:drop` refuses any other database (ADR 0005). */
-const DROPPABLE_PREFIX = 'pixelgrant_';
+const DROPPABLE_PREFIX = 'tps_';
 
 type Step = 'prepare' | 'up' | 'down' | 'drop';
 const STEPS: readonly Step[] = ['prepare', 'up', 'down', 'drop'];
@@ -74,9 +74,9 @@ async function withSuperuser<T>(
   const client = new pg.Client({
     ...readServer(env),
     database,
-    user: readSetting(env, 'PIXELGRANT_DB_SUPERUSER'),
-    password: readSecret(env, 'PIXELGRANT_DB_SUPERUSER_PASSWORD'),
-    application_name: 'pixelgrant-db-scripts',
+    user: readSetting(env, 'TPS_DB_SUPERUSER'),
+    password: readSecret(env, 'TPS_DB_SUPERUSER_PASSWORD'),
+    application_name: 'tps-db-scripts',
   });
   await client.connect();
   try {
@@ -112,14 +112,14 @@ export async function prepareDatabase(env: Env, database: string): Promise<void>
 /**
  * `pnpm db:drop` may drop only this worktree's own databases, on this
  * machine, in development (ADR 0005). scripts/dev-env.ts lists them in
- * PIXELGRANT_DEV_DATABASES from the worktree's folder name, and nothing can
+ * TPS_DEV_DATABASES from the worktree's folder name, and nothing can
  * override that list.
  */
 export function checkDroppable(env: Env, database: string): void {
-  if (env['PIXELGRANT_DEV'] !== '1') {
-    throw new Error('db drop runs only in development (PIXELGRANT_DEV=1).');
+  if (env['TPS_DEV'] !== '1') {
+    throw new Error('db drop runs only in development (TPS_DEV=1).');
   }
-  const host = readSetting(env, 'PIXELGRANT_DB_HOST');
+  const host = readSetting(env, 'TPS_DB_HOST');
   if (!isLoopbackHost(host)) {
     throw new Error(`Refusing to drop a database on ${host}: db drop works only on this machine.`);
   }
@@ -128,7 +128,7 @@ export function checkDroppable(env: Env, database: string): void {
       `Refusing to drop ${database}: its name does not start with ${DROPPABLE_PREFIX}.`,
     );
   }
-  const own = (env['PIXELGRANT_DEV_DATABASES'] ?? '').split(',').filter(Boolean);
+  const own = (env['TPS_DEV_DATABASES'] ?? '').split(',').filter(Boolean);
   if (!own.includes(database)) {
     throw new Error(`Refusing to drop ${database}: it is not this worktree's database.`);
   }
@@ -151,8 +151,8 @@ export async function migrateDatabase(
     ...readServer(env),
     database,
     user: 'migrator',
-    password: readSecret(env, 'PIXELGRANT_DB_MIGRATOR_PASSWORD'),
-    application_name: 'pixelgrant-migrate',
+    password: readSecret(env, 'TPS_DB_MIGRATOR_PASSWORD'),
+    application_name: 'tps-migrate',
     max: 1,
   });
   const db = new Kysely<unknown>({ dialect: new PostgresDialect({ pool }) });
@@ -184,7 +184,7 @@ export async function migrateDatabase(
 
 async function main(argv: readonly string[], env: Env): Promise<void> {
   const { steps, test } = parseArguments(argv);
-  const database = readDatabaseName(env, test ? 'PIXELGRANT_TEST_DB_NAME' : 'PIXELGRANT_DB_NAME');
+  const database = readDatabaseName(env, test ? 'TPS_TEST_DB_NAME' : 'TPS_DB_NAME');
   for (const step of steps) {
     if (step === 'prepare') await prepareDatabase(env, database);
     else if (step === 'drop') await dropDatabase(env, database);

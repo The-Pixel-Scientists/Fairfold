@@ -44,11 +44,11 @@ describe('readSecret', () => {
 
 describe('readDatabaseName', () => {
   it('accepts a generated database name', () => {
-    expect(readDatabaseName({ DB: 'pixelgrant_2026_w40' }, 'DB')).toBe('pixelgrant_2026_w40');
+    expect(readDatabaseName({ DB: 'tps_2026_w40' }, 'DB')).toBe('tps_2026_w40');
   });
 
   it('refuses names that would need quoting', () => {
-    for (const name of ['Pixelgrant', 'pixel-grant', '1pixelgrant', 'a"; DROP', 'x'.repeat(64)]) {
+    for (const name of ['Tps', 'tps-dev', '1tps', 'a"; DROP', 'x'.repeat(64)]) {
       expect(() => readDatabaseName({ DB: name }, 'DB')).toThrow('DB must be');
     }
   });
@@ -62,16 +62,16 @@ describe('readDatabaseName', () => {
 
 describe('readServer', () => {
   it('reads the host and port', () => {
-    expect(readServer({ PIXELGRANT_DB_HOST: '127.0.0.1', PIXELGRANT_DB_PORT: '55432' })).toEqual({
+    expect(readServer({ TPS_DB_HOST: '127.0.0.1', TPS_DB_PORT: '55432' })).toEqual({
       host: '127.0.0.1',
       port: 55432,
     });
   });
 
   it('refuses a port that is not a number', () => {
-    expect(() =>
-      readServer({ PIXELGRANT_DB_HOST: '127.0.0.1', PIXELGRANT_DB_PORT: 'postgres' }),
-    ).toThrow('PIXELGRANT_DB_PORT must be');
+    expect(() => readServer({ TPS_DB_HOST: '127.0.0.1', TPS_DB_PORT: 'postgres' })).toThrow(
+      'TPS_DB_PORT must be',
+    );
   });
 });
 
@@ -101,13 +101,9 @@ describe('isLoopbackHost', () => {
 
 describe('isLocalDevelopment', () => {
   it('needs both the development flag and a server on this machine', () => {
-    expect(isLocalDevelopment({ PIXELGRANT_DEV: '1', PIXELGRANT_DB_HOST: '127.0.0.1' })).toBe(true);
-    expect(isLocalDevelopment({ PIXELGRANT_DEV: '1', PIXELGRANT_DB_HOST: 'db.example.org' })).toBe(
-      false,
-    );
-    expect(isLocalDevelopment({ PIXELGRANT_DEV: '1' })).toBe(false);
-    expect(isLocalDevelopment({ PIXELGRANT_DEV: '0', PIXELGRANT_DB_HOST: '127.0.0.1' })).toBe(
-      false,
-    );
+    expect(isLocalDevelopment({ TPS_DEV: '1', TPS_DB_HOST: '127.0.0.1' })).toBe(true);
+    expect(isLocalDevelopment({ TPS_DEV: '1', TPS_DB_HOST: 'db.example.org' })).toBe(false);
+    expect(isLocalDevelopment({ TPS_DEV: '1' })).toBe(false);
+    expect(isLocalDevelopment({ TPS_DEV: '0', TPS_DB_HOST: '127.0.0.1' })).toBe(false);
   });
 });

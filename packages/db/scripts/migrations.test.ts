@@ -11,7 +11,7 @@ import { SqlFolderMigrationProvider } from './migrations.ts';
 let root: string;
 
 beforeEach(async () => {
-  root = await mkdtemp(join(tmpdir(), 'pixelgrant-migrations-'));
+  root = await mkdtemp(join(tmpdir(), 'tps-migrations-'));
 });
 
 afterEach(async () => {
