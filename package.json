@@ -17,6 +17,8 @@
     }
   },
   "scripts": {
+    "dev": "node scripts/dev.ts",
+    "stack": "node scripts/stack.ts",
     "check": "pnpm run typecheck && pnpm run lint && pnpm run format:check && pnpm run test:unit",
     "typecheck": "tsc -b",
     "lint": "eslint --max-warnings 0 .",
@@ -27,6 +29,7 @@
     "test:db": "node scripts/test.ts --db-only",
     "test:e2e": "playwright test --pass-with-no-tests",
     "test:a11y": "playwright test --grep @a11y --pass-with-no-tests",
+    "test:stack": "TPS_E2E_STACK=1 playwright test",
     "check:licences": "node scripts/check-licences.ts",
     "db:migrate": "node scripts/dev-env.ts database-admin node packages/db/scripts/db.ts prepare up",
     "db:rollback": "node scripts/dev-env.ts database-admin node packages/db/scripts/db.ts prepare down",
