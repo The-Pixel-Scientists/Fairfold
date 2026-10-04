@@ -9,6 +9,7 @@ const entries = {
   '.': () => import('../index.ts'),
   api: () => import('../api/index.ts'),
   auth: () => import('../auth/index.ts'),
+  forms: () => import('../forms/index.ts'),
   platform: () => import('../platform/index.ts'),
 };
 
