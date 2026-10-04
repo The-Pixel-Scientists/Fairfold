@@ -7,14 +7,14 @@ part of the platform, so it is always on.
 
 ## What belongs to this module
 
-| What | Where |
-| --- | --- |
-| Database schema | `party` |
-| Migrations | `packages/db/migrations/NNNN_party_<description>/` |
-| Field classification | `packages/db/classification/party.ts` |
-| Generated database types | `packages/db/src/generated/party.ts` |
-| Code | `modules/party/src/` |
-| Guides | `modules/party/docs/` |
+| What                     | Where                                              |
+| ------------------------ | -------------------------------------------------- |
+| Database schema          | `party`                                            |
+| Migrations               | `packages/db/migrations/NNNN_party_<description>/` |
+| Field classification     | `packages/db/classification/party.ts`              |
+| Generated database types | `packages/db/src/generated/party.ts`               |
+| Code                     | `modules/party/src/`                               |
+| Guides                   | `modules/party/docs/`                              |
 
 Its database work stays in `packages/db`, so one migration runner, one
 catalogue test and one classification map cover every module. The runner
@@ -27,12 +27,12 @@ contracts.
 
 ## Entry points
 
-| Import | Holds | May import |
-| --- | --- | --- |
-| `@pixel-scientists/party/contracts` | Data and route contracts and events, safe for the browser | `zod`, `@pixel-scientists/domain`, other modules' contracts |
-| `@pixel-scientists/party/server` | Routes and services. `src/server/index.ts` is the in-process contract other modules call | Its own contracts, `@pixel-scientists/db` and the generated types for the `party` schema only, `@pixel-scientists/domain`, other modules' contracts and server |
-| `@pixel-scientists/party/console` | Staff and reviewer screens | Its own contracts, other modules' contracts, `@pixel-scientists/ui`, `@pixel-scientists/domain`, React |
-| `@pixel-scientists/party/portal` | Applicant screens | Its own contracts, other modules' contracts, `@pixel-scientists/ui`, `@pixel-scientists/domain`, React |
+| Import                        | Holds                                                                                    | May import                                                                                                                                         |
+| ----------------------------- | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@pixel-scientists/party/contracts` | Data and route contracts and events, safe for the browser                                | `zod`, `@pixel-scientists/domain`, other modules' contracts                                                                                              |
+| `@pixel-scientists/party/server`    | Routes and services. `src/server/index.ts` is the in-process contract other modules call | Its own contracts, `@pixel-scientists/db` and the generated types for the `party` schema only, `@pixel-scientists/domain`, other modules' contracts and server |
+| `@pixel-scientists/party/console`   | Staff and reviewer screens                                                               | Its own contracts, other modules' contracts, `@pixel-scientists/ui`, `@pixel-scientists/domain`, React                                                         |
+| `@pixel-scientists/party/portal`    | Applicant screens                                                                        | Its own contracts, other modules' contracts, `@pixel-scientists/ui`, `@pixel-scientists/domain`, React                                                         |
 
 `eslint.config.js` enforces these rules, so `pnpm check` fails on any other
 import, whether static, dynamic or through `require()`, and on a relative
