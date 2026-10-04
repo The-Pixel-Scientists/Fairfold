@@ -65,6 +65,8 @@ export const messages = {
   slugFormat:
     'Enter 3 to 40 lower case letters, numbers and single hyphens, starting with a letter.',
   slugReserved: 'This address is reserved. Choose another.',
+  tenantNameHidden: 'Remove line breaks and hidden characters from the name.',
+  tenantNameVisible: 'Enter a name that includes at least one letter or number.',
   brandColourFormat: 'Enter the colour as a hex code, like #1f4bb8.',
   brandColourContrast: (suggestion: string) =>
     `This colour is too light to read on the page or behind white text. Use ${suggestion} or a darker colour.`,
