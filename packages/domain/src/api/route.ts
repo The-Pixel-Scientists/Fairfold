@@ -15,7 +15,14 @@ import type { z } from 'zod';
 import type { Permission, ScopeRule } from '../platform/access.ts';
 import { moduleIds, type ModuleId } from '../platform/modules.ts';
 import { accessProblems, type AuthSession } from './access-rules.ts';
-import { paramProblems, requestProblems, responseProblems } from './schema-rules.ts';
+import {
+  isRawBody,
+  paramProblems,
+  rawBodyProblems,
+  requestProblems,
+  responseProblems,
+  type ResponseBody,
+} from './schema-rules.ts';
 
 /** Who calls a route. Paths start with it: `/console/…`, `/portal/…`, `/public/…`, `/auth/…`. */
 export const audiences = ['console', 'portal', 'public', 'auth'] as const;
@@ -36,8 +43,12 @@ interface RouteBase {
   readonly params?: z.ZodType;
   readonly query?: z.ZodType;
   readonly body?: z.ZodType;
-  /** Success responses by status; `null` means no body. Errors are always problem details. */
-  readonly responses: Readonly<Record<number, z.ZodType | null>>;
+  /**
+   * Success responses by status; `null` means no body, and `{ raw: [...] }` a
+   * body that is not JSON, in the content types named. Errors are always
+   * problem details.
+   */
+  readonly responses: Readonly<Record<number, ResponseBody>>;
 }
 
 /** A signed-in route: a permission held in the active tenant, and the records it may reach. */
@@ -51,6 +62,7 @@ interface MemberRoute extends RouteBase {
 
 interface AuthRoute extends RouteBase {
   readonly audience: 'auth';
+  readonly module: 'platform';
   readonly permission: null;
   readonly scope: null;
   readonly session: AuthSession;
@@ -63,6 +75,11 @@ interface PublicRoute extends RouteBase {
 }
 
 export type RouteContract = MemberRoute | AuthRoute | PublicRoute;
+
+/** A route whose every response is JSON or empty: the only kind call() takes. */
+export type JsonRouteContract = RouteContract & {
+  readonly responses: Readonly<Record<number, z.ZodType | null>>;
+};
 
 const LITERAL_SEGMENT = /^[a-z0-9]+(?:[-.][a-z0-9]+)*$/;
 const PARAM_SEGMENT = /^:[a-z][A-Za-z0-9]*$/;
@@ -97,7 +114,17 @@ export function checkRoute(route: RouteContract): string[] {
 
   const responses = Object.entries(route.responses);
   if (responses.length === 0) problems.push('The route needs at least one success response.');
-  for (const [status, schema] of responses) problems.push(...responseProblems(status, schema));
+  for (const [status, body] of responses) {
+    if (!isRawBody(body)) {
+      problems.push(...responseProblems(status, body));
+      continue;
+    }
+    problems.push(...rawBodyProblems(status, body));
+    // S10-01 widens this to console downloads.
+    if (route.method !== 'GET' || route.audience !== 'public') {
+      problems.push('Only a public GET route answers a raw body.');
+    }
+  }
   return problems;
 }
 

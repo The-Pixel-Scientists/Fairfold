@@ -7,7 +7,7 @@ import { idSchema } from '../id.ts';
 import { messages } from '../platform/messages.ts';
 import { call, type Fetch } from './call.ts';
 import { ProblemError } from './problem.ts';
-import { defineRoute, type RouteContract } from './route.ts';
+import { defineRoute, type JsonRouteContract } from './route.ts';
 
 const ID = '0b7c4a1e-5d2f-4c8e-9a3b-6f1d2e4c8a90';
 
@@ -107,9 +107,17 @@ describe('call', () => {
   it('refuses a route whose path does not start with its audience', async () => {
     const fetch = answering(204);
     for (const path of ['/health', '//evil.example/auth/sign-out', 'auth/sign-out', '/api/auth']) {
-      const route = { ...signOut, path } as RouteContract;
+      const route = { ...signOut, path } as JsonRouteContract;
       await expect(call(route, {}, { fetch })).rejects.toThrow(TypeError);
     }
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('refuses a route that answers a raw body, before sending anything', async () => {
+    const fetch = answering(200, {});
+    const stylesheet = { ...signOut, method: 'GET', responses: { 200: { raw: ['text/css'] } } };
+    // @ts-expect-error call() takes only routes that answer JSON or nothing.
+    await expect(call(stylesheet, {}, { fetch })).rejects.toThrow(TypeError);
     expect(fetch).not.toHaveBeenCalled();
   });
 
@@ -129,11 +137,11 @@ describe('call', () => {
       ...signOut,
       path: '/auth/things/:thingId',
       params: z.strictObject({ thingId: z.string() }),
-    } as RouteContract;
+    } as JsonRouteContract;
     const looseQuery = {
       ...signOut,
       query: z.strictObject({ filter: z.strictObject({ stage: z.string() }) }),
-    } as RouteContract;
+    } as JsonRouteContract;
     const fetch = answering(204);
     for (const thingId of ['', '.', '..']) {
       const error = await failure(call(looseParams, { params: { thingId } } as never, { fetch }));
