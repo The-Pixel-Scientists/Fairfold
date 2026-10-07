@@ -5,8 +5,9 @@
  *
  *   import '@pixel-scientists/ui/styles.css';
  *
- * It loads Tailwind, the design tokens and the base rules for focus and
- * reduced motion, and tells Tailwind to read the components in this package.
+ * It loads Tailwind, the design tokens, the typeface and the base rules for
+ * focus, colour scheme and reduced motion, and tells Tailwind to read the
+ * components in this package.
  */
 
 @import 'tailwindcss';
@@ -15,14 +16,39 @@
 @source '.';
 @source not './**/*.test.{ts,tsx}';
 
+/* dark: styles apply under a dark scheme (public/scheme.js), not only the device's setting. */
+@custom-variant dark (&:where([data-scheme='dark'], [data-scheme='dark'] *));
+
+/*
+ * Atkinson Hyperlegible Next, by the Braille Institute, under the SIL Open
+ * Font License 1.1 (fonts/OFL.txt, ADR 0045). One variable file for every
+ * weight, Latin only; other letters fall back to the system's font.
+ */
+@font-face {
+  font-family: 'Atkinson Hyperlegible Next';
+  src: url('./fonts/atkinson-hyperlegible-next-latin.woff2') format('woff2');
+  font-weight: 200 800;
+  font-style: normal;
+  font-display: swap;
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
 @layer base {
   :root {
     color-scheme: light;
   }
 
+  /* Native controls, scroll bars and form fields follow the scheme too. */
+  :root[data-scheme='dark'] {
+    color-scheme: dark;
+  }
+
   html {
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
+    background-color: var(--color-canvas);
   }
 
   body {
@@ -30,6 +56,25 @@
     color: var(--color-ink);
     font-size: var(--density-body-size);
     line-height: var(--density-body-leading);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-optical-sizing: auto;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  ::selection {
+    background-color: color-mix(in srgb, var(--color-focus) 28%, transparent);
+    color: var(--color-ink);
   }
 
   /* One visible focus ring everywhere, at least 3:1 against the page. */
@@ -48,12 +93,15 @@
     color: var(--color-accent);
     text-decoration-line: underline;
     text-decoration-thickness: 1px;
-    text-underline-offset: 0.2em;
+    text-underline-offset: 0.22em;
+    text-decoration-color: color-mix(in srgb, currentColor 45%, transparent);
+    transition: text-decoration-color var(--motion-fast) var(--ease-standard);
   }
 
   a:hover {
     color: var(--color-accent-hover);
     text-decoration-thickness: 2px;
+    text-decoration-color: currentColor;
   }
 }
 
