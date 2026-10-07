@@ -4,6 +4,9 @@
 
 import type { RouteDefinition } from '@pixel-scientists/ui';
 
+export const formPath = '/programmes/community-grants/spring-2027/form';
+export const formPreviewPath = `${formPath}/preview`;
+
 export const setupRoutes: readonly RouteDefinition[] = [
   {
     path: '/programmes',
@@ -25,9 +28,10 @@ export const setupRoutes: readonly RouteDefinition[] = [
     title: 'Spring 2027 rubric',
     load: () => import('./Rubric.tsx'),
   },
+  { path: formPath, title: 'Spring 2027 form builder', load: () => import('./FormBuilder.tsx') },
   {
-    path: '/programmes/community-grants/spring-2027/form',
-    title: 'Spring 2027 form builder',
-    load: () => import('./FormBuilder.tsx'),
+    path: formPreviewPath,
+    title: 'Spring 2027 form preview',
+    load: () => import('./FormPreview.tsx'),
   },
 ];

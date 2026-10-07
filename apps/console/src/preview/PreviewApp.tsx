@@ -4,18 +4,28 @@
 // development builds only. They use the real components and a fixed
 // synthetic story (story.ts), and are the designs the screens are built to.
 
-import { AppShell, Button, Link, PageHeading, Router, useLocation } from '@pixel-scientists/ui';
+import {
+  AppShell,
+  Button,
+  Link,
+  PageHeading,
+  Router,
+  useLocation,
+  useNavigate,
+} from '@pixel-scientists/ui';
 import type { RouteDefinition } from '@pixel-scientists/ui';
 import type { ReactNode } from 'react';
 
+import { AuthFrame } from '../auth/AuthFrame.tsx';
 import { productName, titleSuffix } from '../product.ts';
 import { navLinkClassName } from '../shell/navLink.ts';
+import { accountRoutes, signedOutPath } from './account/routes.ts';
 import { decideRoutes } from './decide/routes.ts';
 import { insightRoutes } from './insight/routes.ts';
 import { isReviewerPath } from './review/reviewerPath.ts';
 import { reviewRoutes } from './review/routes.ts';
 import { settingsRoutes } from './settings/routes.ts';
-import { setupRoutes } from './setup/routes.ts';
+import { formPreviewPath, setupRoutes } from './setup/routes.ts';
 import { funder, reviewer, staff } from './story.ts';
 
 /** The console's navigation once every Grants screen is built. */
@@ -41,13 +51,30 @@ const previews: readonly RouteDefinition[] = [
   ...decideRoutes,
   ...insightRoutes,
   ...settingsRoutes,
+  ...accountRoutes,
 ];
 
 /** Routes with a parameter stand in for many pages, so the index leaves them out. */
 const indexed = previews.filter(({ path }) => !path.includes(':'));
 
+/**
+ * Two pages stand outside the staff shell: the signed-out screen, in the frame
+ * of the console's sign-in screens, and the form as applicants see it. A static
+ * host adds a trailing slash, so it is ignored.
+ */
 function PreviewShell({ children }: { children: ReactNode }) {
-  const reviewing = isReviewerPath(useLocation().pathname);
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
+  const path = pathname.replace(/\/+$/, '');
+  if (path === signedOutPath) return <AuthFrame>{children}</AuthFrame>;
+  if (path === formPreviewPath) {
+    return (
+      <AppShell productName={productName} areaName="Form preview" density="comfortable">
+        {children}
+      </AppShell>
+    );
+  }
+  const reviewing = isReviewerPath(pathname);
   return (
     <AppShell
       productName={productName}
@@ -68,7 +95,14 @@ function PreviewShell({ children }: { children: ReactNode }) {
         <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-body">
           <span className="font-medium text-ink">{funder.name}</span>
           <span className="text-muted">{reviewing ? reviewer.email : staff.email}</span>
-          <Button variant="quiet">Sign out</Button>
+          <Button
+            variant="quiet"
+            onClick={() => {
+              navigate(signedOutPath);
+            }}
+          >
+            Sign out
+          </Button>
         </p>
       }
     >

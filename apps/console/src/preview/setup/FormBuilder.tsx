@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { Button, cx, PageHeader, Tag } from '@pixel-scientists/ui';
+import { Button, buttonClassName, cx, Link, PageHeader, Tag } from '@pixel-scientists/ui';
 import { useEffect, useRef, useState } from 'react';
 
 import { receivedSoFar, today } from './data.ts';
@@ -15,6 +15,7 @@ import {
 import type { FormQuestion, FormSection } from './formData.ts';
 import { QuestionEditor } from './QuestionEditor.tsx';
 import { QuestionPreview } from './QuestionPreview.tsx';
+import { formPreviewPath } from './routes.ts';
 
 /** A button that selects one of a set, marked by a sheet behind it, heavier text and a bar at its start. */
 const selectable = cx(
@@ -277,7 +278,9 @@ export default function FormBuilder() {
         }
         actions={
           <>
-            <Button>Preview form</Button>
+            <Link to={formPreviewPath} target="_blank" className={buttonClassName()}>
+              Preview form<span className="sr-only"> (opens in a new tab)</span>
+            </Link>
             <Button variant="primary" aria-disabled={changes === 0} onClick={publish}>
               Publish changes
             </Button>
