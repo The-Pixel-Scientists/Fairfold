@@ -9,8 +9,13 @@ import { describe, expect, it } from 'vitest';
 
 const tokensCss = readFileSync(join(import.meta.dirname, 'tokens.css'), 'utf8');
 const stylesCss = readFileSync(join(import.meta.dirname, 'styles.css'), 'utf8');
+const schemeJs = readFileSync(join(import.meta.dirname, 'public', 'scheme.js'), 'utf8');
 
-/** Every `--color-name: #rrggbb;` declaration in the tokens file. */
+const DARK_SELECTOR = ":root[data-scheme='dark']";
+const lightCss = tokensCss.slice(0, tokensCss.indexOf(DARK_SELECTOR));
+const darkCss = tokensCss.slice(tokensCss.indexOf(DARK_SELECTOR));
+
+/** Every `--color-name: #rrggbb;` declaration in a stretch of the tokens file. */
 function readColours(css: string): Map<string, string> {
   const colours = new Map<string, string>();
   for (const match of css.matchAll(/--color-([a-z-]+):\s*(#[0-9a-f]{6})\s*;/gi)) {
@@ -20,7 +25,7 @@ function readColours(css: string): Map<string, string> {
   return colours;
 }
 
-const colours = readColours(tokensCss);
+const schemes = { light: readColours(lightCss), dark: readColours(darkCss) };
 
 function channel(value: number): number {
   const scaled = value / 255;
@@ -42,9 +47,9 @@ function contrast(foreground: string, background: string): number {
   return ((lighter ?? 0) + 0.05) / ((darker ?? 0) + 0.05);
 }
 
-function colour(name: string): string {
-  const value = colours.get(name);
-  if (value === undefined) throw new Error(`There is no --color-${name} token.`);
+function colour(scheme: keyof typeof schemes, name: string): string {
+  const value = schemes[scheme].get(name);
+  if (value === undefined) throw new Error(`There is no ${scheme} --color-${name} token.`);
   return value;
 }
 
@@ -52,7 +57,7 @@ const surfaces = ['canvas', 'surface', 'sunken'];
 
 /** Text and the surfaces it appears on: 4.5:1 (WCAG 1.4.3). */
 const textPairs: [foreground: string, backgrounds: string[]][] = [
-  ['ink', [...surfaces, 'accent-soft', 'danger-soft', 'success-soft', 'warning-soft']],
+  ['ink', [...surfaces, 'accent-soft', 'danger-soft', 'success-soft', 'warning-soft', 'info-soft']],
   ['muted', [...surfaces, 'accent-soft']],
   ['accent', [...surfaces, 'accent-soft']],
   ['on-accent', ['accent', 'accent-hover']],
@@ -60,12 +65,16 @@ const textPairs: [foreground: string, backgrounds: string[]][] = [
   ['on-danger', ['danger', 'danger-hover']],
   ['success', ['surface', 'success-soft']],
   ['warning', ['surface', 'warning-soft']],
+  ['info', ['surface', 'info-soft']],
 ];
 
 /** Borders, the focus ring and filled controls against what surrounds them: 3:1 (WCAG 1.4.11). */
 const uiPairs: [foreground: string, backgrounds: string[]][] = [
   ['edge', surfaces],
-  ['focus', [...surfaces, 'accent-soft', 'danger-soft', 'success-soft', 'warning-soft']],
+  [
+    'focus',
+    [...surfaces, 'accent-soft', 'danger-soft', 'success-soft', 'warning-soft', 'info-soft'],
+  ],
   ['accent', surfaces],
   ['danger', surfaces],
 ];
@@ -73,25 +82,38 @@ const uiPairs: [foreground: string, backgrounds: string[]][] = [
 /** Colours that are decoration only, so they need no contrast of their own. */
 const decorative = new Set(['divider']);
 
+const pairs = (list: typeof textPairs) =>
+  (['light', 'dark'] as const).flatMap((scheme) =>
+    list.flatMap(([fg, bgs]) => bgs.map((bg) => [scheme, fg, bg] as const)),
+  );
+
 describe('colour tokens', () => {
   it('reads every colour as a six-digit hex value', () => {
     // The theme resets the colour namespace with `--color-*: initial`, which the pattern skips.
     const declared = [...tokensCss.matchAll(/--color-([a-z-]+):/g)].map((match) => match[1]);
-    expect(declared.length).toBeGreaterThan(10);
-    expect([...colours.keys()].sort()).toEqual([...declared].sort());
+    expect(declared.length).toBeGreaterThan(20);
+    expect([...schemes.light.keys(), ...schemes.dark.keys()].sort()).toEqual([...declared].sort());
   });
 
-  it.each(textPairs.flatMap(([fg, bgs]) => bgs.map((bg) => [fg, bg] as const)))(
-    'text colour %s on %s has a contrast ratio of at least 4.5:1',
-    (foreground, background) => {
-      expect(contrast(colour(foreground), colour(background))).toBeGreaterThanOrEqual(4.5);
+  it('gives every colour a value in each scheme', () => {
+    expect([...schemes.dark.keys()].sort()).toEqual([...schemes.light.keys()].sort());
+  });
+
+  it.each(pairs(textPairs))(
+    '%s: text colour %s on %s has a contrast ratio of at least 4.5:1',
+    (scheme, foreground, background) => {
+      expect(
+        contrast(colour(scheme, foreground), colour(scheme, background)),
+      ).toBeGreaterThanOrEqual(4.5);
     },
   );
 
-  it.each(uiPairs.flatMap(([fg, bgs]) => bgs.map((bg) => [fg, bg] as const)))(
-    'interface colour %s on %s has a contrast ratio of at least 3:1',
-    (foreground, background) => {
-      expect(contrast(colour(foreground), colour(background))).toBeGreaterThanOrEqual(3);
+  it.each(pairs(uiPairs))(
+    '%s: interface colour %s on %s has a contrast ratio of at least 3:1',
+    (scheme, foreground, background) => {
+      expect(
+        contrast(colour(scheme, foreground), colour(scheme, background)),
+      ).toBeGreaterThanOrEqual(3);
     },
   );
 
@@ -101,7 +123,7 @@ describe('colour tokens', () => {
       checked.add(foreground);
       for (const background of backgrounds) checked.add(background);
     }
-    for (const name of colours.keys()) {
+    for (const name of schemes.light.keys()) {
       if (!decorative.has(name)) expect(checked, `--color-${name} is not checked`).toContain(name);
     }
   });
@@ -110,6 +132,17 @@ describe('colour tokens', () => {
     expect(contrast('#000000', '#ffffff')).toBeCloseTo(21, 5);
     expect(contrast('#777777', '#ffffff')).toBeCloseTo(4.48, 2);
     expect(contrast('#ffffff', '#ffffff')).toBeCloseTo(1, 5);
+  });
+});
+
+describe('colour schemes', () => {
+  it('gives the dark tokens and the dark colour scheme the same selector', () => {
+    expect(stylesCss).toContain(`${DARK_SELECTOR} {\n    color-scheme: dark;`);
+  });
+
+  it('keeps the start-up script and the switch on the same storage key and attribute', () => {
+    expect(schemeJs).toContain("getItem('colour-scheme')");
+    expect(schemeJs).toContain('document.documentElement.dataset.scheme');
   });
 });
 

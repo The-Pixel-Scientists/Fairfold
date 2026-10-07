@@ -27,9 +27,9 @@ import { useLoad } from './useLoad.ts';
 const FIELDS = ['brandColour', 'preset'] as const;
 
 const presetHints: Record<Preset, string> = {
-  standard: 'Small rounded corners on a cool grey page.',
-  rounded: 'Larger rounded corners on a warm page.',
-  square: 'Square corners on a neutral page.',
+  standard: 'Small rounded corners on a soft paper page.',
+  rounded: 'Larger rounded corners on a warmer page.',
+  square: 'Square corners on a neutral grey page.',
 };
 
 const presetOptions = presets.map((value) => ({

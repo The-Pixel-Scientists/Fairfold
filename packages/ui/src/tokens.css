@@ -1,12 +1,18 @@
 /* SPDX-License-Identifier: AGPL-3.0-or-later */
 
 /*
- * Design tokens (ADR 0006). One source for the console and the portal.
+ * Design tokens (ADRs 0006 and 0045). One source for the console and the
+ * portal: ink on paper, with colour kept for status and focus.
  *
- * Colour tokens are checked by tokens.test.ts: text pairs reach 4.5:1 and
- * UI pairs (borders, focus ring) reach 3:1. Change a colour here and the test
- * says whether the pairing still works. Every colour is a six-digit hex value
- * so the test can read it.
+ * Every colour has a light value, in the theme below, and a dark value, under
+ * [data-scheme='dark'] at the end of this file. public/scheme.js sets
+ * data-scheme on the page element before the first paint. A funder's
+ * theme.css overrides the accent in both (ADR 0019).
+ *
+ * Colour tokens are checked by tokens.test.ts in both schemes: text pairs
+ * reach 4.5:1 and UI pairs (borders, focus ring) reach 3:1. Change a colour
+ * here and the test says whether the pairing still works. Every colour is a
+ * six-digit hex value so the test can read it.
  *
  * Two density sets share one component set: comfortable (the default, for the
  * portal) and compact (the console). Set data-density on any element.
@@ -16,42 +22,45 @@
   /* Colour: a closed palette. Utilities exist only for the names below. */
   --color-*: initial;
 
-  /* Surfaces */
-  --color-canvas: #f5f6f8;
+  /* Surfaces: warm paper. Canvas is the page, surface a sheet on it, sunken a fill. */
+  --color-canvas: #f7f7f5;
   --color-surface: #ffffff;
-  --color-sunken: #eceef2;
+  --color-sunken: #efefec;
 
   /* Text */
-  --color-ink: #161a20;
-  --color-muted: #4b5360;
+  --color-ink: #17181b;
+  --color-muted: #5b5e64;
 
   /* Lines. Edge outlines a control and must reach 3:1; divider is decoration. */
-  --color-edge: #78808c;
-  --color-divider: #d9dde3;
+  --color-edge: #7c7f86;
+  --color-divider: #e5e5e1;
 
-  /* Accent: links, primary actions, current page */
-  --color-accent: #1f4bb8;
-  --color-accent-hover: #193d99;
-  --color-accent-soft: #e4ebfb;
+  /* Accent: links, primary actions, current page. Ink unless a funder sets a brand colour. */
+  --color-accent: #1b1d21;
+  --color-accent-hover: #36383c;
+  --color-accent-soft: #e8e8e9;
   --color-on-accent: #ffffff;
 
   /* Status */
-  --color-danger: #b3261e;
-  --color-danger-hover: #8f1d17;
-  --color-danger-soft: #fcebea;
+  --color-danger: #b42318;
+  --color-danger-hover: #8f1c13;
+  --color-danger-soft: #fcefed;
   --color-on-danger: #ffffff;
-  --color-success: #17653a;
-  --color-success-soft: #e3f4ea;
-  --color-warning: #7a4a00;
-  --color-warning-soft: #fdf1d8;
+  --color-success: #16703f;
+  --color-success-soft: #e8f5ed;
+  --color-warning: #8a5000;
+  --color-warning-soft: #fcf2e0;
+  --color-info: #2456b0;
+  --color-info-soft: #e9f0fb;
 
-  /* Focus ring: 3:1 or better against every surface */
-  --color-focus: #1a2f8a;
+  /* Focus ring: 3:1 or better against every surface. Never the accent, so it shows round a primary button. */
+  --color-focus: #2457d6;
 
-  /* Type. System fonts until self-hosted font files are chosen (ADR 0006). */
+  /* Type: Atkinson Hyperlegible Next, self-hosted (styles.css), then the system's own. */
   --font-*: initial;
   --font-sans:
-    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    'Atkinson Hyperlegible Next', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
   --font-mono: ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace;
 
   --text-*: initial;
@@ -69,6 +78,8 @@
   --text-2xl--line-height: 2rem;
   --text-3xl: 1.875rem;
   --text-3xl--line-height: 2.25rem;
+  --text-4xl: 2.25rem;
+  --text-4xl--line-height: 2.625rem;
 
   /* Spacing: multiples of 4px. The smallest target is 24px (WCAG 2.5.8). */
   --spacing: 0.25rem;
@@ -81,14 +92,36 @@
   --radius-lg: 0.5rem;
   --radius-full: 9999px;
 
-  /* Elevation */
+  /*
+   * Elevation. Use it as shadow-(--shadow-raised), which reads the property,
+   * so the dark values below apply.
+   */
   --shadow-*: initial;
-  --shadow-raised: 0 1px 2px rgb(22 26 32 / 0.08), 0 1px 3px rgb(22 26 32 / 0.06);
-  --shadow-overlay: 0 8px 24px rgb(22 26 32 / 0.16), 0 2px 6px rgb(22 26 32 / 0.08);
+  --shadow-raised: 0 1px 2px rgb(23 24 27 / 0.05), 0 1px 1px rgb(23 24 27 / 0.03);
+  --shadow-overlay: 0 16px 40px -12px rgb(23 24 27 / 0.22), 0 2px 8px rgb(23 24 27 / 0.06);
 
   /* Motion */
   --ease-*: initial;
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* Entrances for dialogs and their backdrop. Reduced motion stops them (styles.css). */
+@theme {
+  --animate-fade: fade var(--motion-normal) var(--ease-standard);
+  --animate-rise: rise var(--motion-normal) var(--ease-standard);
+
+  @keyframes fade {
+    from {
+      opacity: 0;
+    }
+  }
+
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(0.5rem) scale(0.98);
+    }
+  }
 }
 
 /* Values that change with density, plus motion and the focus ring. */
@@ -104,23 +137,24 @@
 }
 
 [data-density='compact'] {
-  --density-control-height: 2rem;
-  --density-control-px: 0.625rem;
+  --density-control-height: 2.25rem;
+  --density-control-px: 0.75rem;
   --density-body-size: 0.875rem;
   --density-body-leading: 1.25rem;
-  --density-gutter: 1rem;
-  --density-stack: 1rem;
-  --density-field-gap: 0.25rem;
+  --density-gutter: 1.25rem;
+  --density-stack: 1.25rem;
+  --density-field-gap: 0.375rem;
 }
 
 :root {
-  --sidebar-width: 14rem;
+  --sidebar-width: 15rem;
+  --content-width: 72rem;
 
   --focus-ring-width: 3px;
   --focus-ring-offset: 2px;
 
-  --motion-fast: 100ms;
-  --motion-normal: 180ms;
+  --motion-fast: 120ms;
+  --motion-normal: 200ms;
 }
 
 /* Utilities that read the density values above. */
@@ -132,4 +166,43 @@
   --spacing-gutter: var(--density-gutter);
   --spacing-stack: var(--density-stack);
   --spacing-field-gap: var(--density-field-gap);
+}
+
+/*
+ * Dark: the same names, for paper-white ink on a soft black page. In the
+ * theme layer, so a funder's theme.css, which is in no layer, still wins.
+ */
+@layer theme {
+  :root[data-scheme='dark'] {
+    --color-canvas: #111214;
+    --color-surface: #18191c;
+    --color-sunken: #212226;
+
+    --color-ink: #ececea;
+    --color-muted: #a3a6ac;
+
+    --color-edge: #74777f;
+    --color-divider: #2a2b2f;
+
+    --color-accent: #ececea;
+    --color-accent-hover: #ffffff;
+    --color-accent-soft: #2a2c30;
+    --color-on-accent: #141518;
+
+    --color-danger: #f28b82;
+    --color-danger-hover: #f6a8a1;
+    --color-danger-soft: #3a1d1b;
+    --color-on-danger: #1c0a08;
+    --color-success: #6fcf97;
+    --color-success-soft: #13291d;
+    --color-warning: #e6b45f;
+    --color-warning-soft: #2d2412;
+    --color-info: #93b8f5;
+    --color-info-soft: #172338;
+
+    --color-focus: #8ab4ff;
+
+    --shadow-raised: 0 1px 2px rgb(0 0 0 / 0.4), inset 0 1px 0 rgb(255 255 255 / 0.03);
+    --shadow-overlay: 0 24px 48px -12px rgb(0 0 0 / 0.6), 0 0 0 1px rgb(255 255 255 / 0.06);
+  }
 }
