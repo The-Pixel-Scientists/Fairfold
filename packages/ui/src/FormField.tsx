@@ -114,8 +114,11 @@ export function FormField({
 const controlClassName = [
   'block w-full min-h-control min-w-target rounded-md border border-edge bg-surface',
   'px-control-x py-1.5 text-body text-ink placeholder:text-muted',
-  'aria-invalid:border-danger aria-invalid:shadow-[inset_0_0_0_1px_var(--color-danger)]',
-  'disabled:cursor-not-allowed disabled:bg-sunken disabled:text-muted',
+  'transition-colors duration-(--motion-fast) ease-standard hover:border-ink',
+  'aria-invalid:border-danger aria-invalid:shadow-[inset_0_0_0_1px_var(--color-danger)] aria-invalid:hover:border-danger',
+  'disabled:cursor-not-allowed disabled:bg-sunken disabled:text-muted disabled:hover:border-edge',
+  // A file input's button looks like a quiet button inside the field.
+  'file:mr-3 file:cursor-pointer file:rounded-sm file:border-0 file:bg-sunken file:px-3 file:py-1 file:font-medium file:text-ink',
 ].join(' ');
 
 /** Add the field's wiring to a control's own props. A description you pass yourself is kept. */

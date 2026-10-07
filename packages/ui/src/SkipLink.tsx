@@ -40,7 +40,7 @@ export function SkipLink({
       className={cx(
         'fixed top-2 left-2 z-50 -translate-y-[200%] focus:translate-y-0',
         'inline-flex min-h-control min-w-target items-center rounded-md px-control-x',
-        'bg-accent text-body font-medium text-on-accent no-underline focus:shadow-overlay',
+        'bg-accent text-body font-medium text-on-accent no-underline focus:shadow-(--shadow-overlay)',
         'hover:text-on-accent',
         className,
       )}
