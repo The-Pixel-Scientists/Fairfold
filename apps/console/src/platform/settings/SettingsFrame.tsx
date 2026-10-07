@@ -4,7 +4,7 @@ import { Button, EmptyState, Link, LoadingState, PageHeading, useCan } from '@pi
 import type { ReactNode } from 'react';
 
 import { Screen } from '../../auth/Screen.tsx';
-import { navLinkClassName } from '../../shell/navLink.ts';
+import { tabLinkClassName } from '../../shell/navLink.ts';
 import type { Loaded } from './useLoad.ts';
 
 const sections = [
@@ -16,10 +16,10 @@ const sections = [
 function Sections() {
   return (
     <nav aria-label="Settings">
-      <ul role="list" className="flex flex-wrap gap-1">
+      <ul role="list" className="flex flex-wrap gap-x-6 border-b border-divider">
         {sections.map((section) => (
           <li key={section.to}>
-            <Link to={section.to} className={navLinkClassName}>
+            <Link to={section.to} className={tabLinkClassName}>
               {section.label}
             </Link>
           </li>
@@ -62,8 +62,8 @@ export function SettingsFrame({ title, children }: { title: string; children: Re
 /** A settings card: one thing to change, with its own heading and save button. */
 export function SettingsCard({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="flex flex-col gap-4 rounded-lg border border-divider bg-surface p-gutter">
-      <h2 className="text-lg font-semibold text-ink">{title}</h2>
+    <section className="flex flex-col gap-4 rounded-lg border border-divider bg-surface p-gutter shadow-(--shadow-raised) sm:p-6">
+      <h2 className="text-lg font-semibold tracking-tight text-ink">{title}</h2>
       {children}
     </section>
   );
