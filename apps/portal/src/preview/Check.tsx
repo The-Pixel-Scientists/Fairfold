@@ -14,14 +14,16 @@ import {
   buttonClassName,
   useNavigate,
 } from '@pixel-scientists/ui';
-import type { SummaryItem } from '@pixel-scientists/ui';
+import type { FormMoney, QuestionDefinition, SummaryItem } from '@pixel-scientists/ui';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 
 import { PageColumn } from '../PageColumn.tsx';
+import { answers, isShown, organisation, outcomes, project } from './form.ts';
+import type { FormScreen } from './form.ts';
 import { documents, fundingEvidence } from './journey.ts';
 import { ChevronIcon, ScreenHeader, Section } from './parts.tsx';
-import { application, applicant, budget, otherFunding, pounds, round, totalCost } from './story.ts';
+import { application, budget, otherFunding, pounds, round, totalCost } from './story.ts';
 
 const DECLARATION_ID = 'declarations';
 const DECLARATION_ERROR = 'Tick every box to confirm your declarations';
@@ -36,7 +38,7 @@ const declarations = [
 ] as const;
 
 /** An answer with a "Change" link that says, to a screen reader, which question it changes. */
-function answer(term: string, value: ReactNode, to = '/application'): SummaryItem {
+function answer(term: string, value: ReactNode, to: string): SummaryItem {
   return {
     term,
     value,
@@ -56,55 +58,45 @@ function lines(...text: string[]): ReactNode {
   ));
 }
 
-const organisation: readonly SummaryItem[] = [
-  answer('Organisation name', applicant.organisation),
-  answer('Registered charity', 'Yes'),
-  answer('Registered charity number', applicant.charityNumber),
-  answer('Address', lines(...applicant.address.split(', '))),
-  answer('Main contact name', applicant.name),
-  answer('Main contact email', applicant.email),
-  answer('Main contact phone', applicant.phone),
-  answer('Income last year', '£184,200'),
-  answer('Paid staff and regular volunteers', '44'),
-  answer('Who leads your organisation?', 'Led by women'),
-];
+const longDate = new Intl.DateTimeFormat('en-GB', {
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+});
 
-const project: readonly SummaryItem[] = [
-  answer('Project name', application.project),
-  answer(
-    'Project summary',
-    'A hot three-course lunch every Tuesday at Riverside Hall for people aged 65 and over who live alone.',
-  ),
-  answer(
-    'Why it is needed',
-    'Northfield Central has more older people living alone than anywhere else in the county. In our 2026 survey of 112 residents aged 65 and over, 6 in 10 said they eat their main meal alone most days, and 4 in 10 had not left home on at least three days that week. Our Tuesday coffee morning is always full, and 23 people are waiting for a lunch place that does not exist yet.',
-  ),
-  answer(
-    'What you will do',
-    'From 1 June 2027 we will serve a hot three-course lunch for up to 40 people every Tuesday for 48 weeks. A paid cook leads a rota of eight trained volunteers. A minibus brings 12 people who cannot get to the hall. After lunch there is something optional to join: a quiz, gentle exercise, or a visit from an adviser on benefits and health services.',
-  ),
-  answer('Start date', '1 June 2027'),
-  answer('End date', '25 April 2028'),
-  answer('Where it will take place', 'Riverside Hall, Mill Lane, Northfield'),
-  answer('Which areas will it serve?', 'Northfield Central'),
-  answer('Who will benefit most from your project?', lines('Older people', 'Disabled people')),
-];
+/** An answer as the person reads it back. */
+function display(field: QuestionDefinition, value: unknown): ReactNode {
+  switch (field.type) {
+    case 'yes_no':
+      return value === true ? 'Yes' : 'No';
+    case 'single_choice':
+    case 'multiple_choice':
+      return lines(
+        ...field.options
+          .filter((option) => [value].flat().includes(option.value))
+          .map(({ label }) => label),
+      );
+    case 'uk_address':
+      return lines(...Object.values(value as Record<string, string>));
+    case 'date':
+      return longDate.format(new Date(`${String(value)}T00:00`));
+    case 'currency':
+      return pounds((value as FormMoney).amountMinor / 100);
+    default:
+      return String(value);
+  }
+}
 
-const outcomes: readonly SummaryItem[] = [
-  answer(
-    'What will change',
-    'People will eat a hot meal with company at least once a week, make friends, and hear about benefits and health services they may be missing. We expect most regular guests to tell us they feel less lonely after six months.',
-  ),
-  answer('How many people will take part?', '120'),
-  answer(
-    'How will the people taking part help to shape it?',
-    'Guests chose the format in our 2026 survey, and four of them will join a planning group that meets once a month to choose the menus and activities.',
-  ),
-  answer(
-    'How you will know',
-    'We will ask guests to complete a short loneliness scale when they join and again after six months, and keep a register of who comes. We will report numbers, the change in scores and three guest stories at the end of the grant.',
-  ),
-];
+/** Every question the applicant is asked on a screen, each with a link to it. */
+function questionsOf({ path, groups }: FormScreen): readonly SummaryItem[] {
+  return groups
+    .flatMap(({ fields }) => fields)
+    .flatMap((field) =>
+      field.type === 'content' || !isShown(field.id, answers)
+        ? []
+        : [answer(field.label, display(field, answers[field.id]), `${path}#${field.id}`)],
+    );
+}
 
 /** The costs as a list, not a table, so each amount stays beside its name on a phone. */
 function CostList() {
@@ -153,29 +145,33 @@ const budgetItems: readonly SummaryItem[] = [
         <CostList />
       </details>
     </div>,
-    '/application/budget',
+    '/application/budget#cost-0-item',
   ),
   answer(
     'Other funding',
     lines(...otherFunding.map(({ source, amount }) => `${pounds(amount)} from ${source}`)),
-    '/application/budget',
+    '/application/budget#funding-0-source',
   ),
-  answer(fundingEvidence.label, ready(fundingEvidence.file.name), '/application/budget'),
+  answer(
+    fundingEvidence.label,
+    ready(fundingEvidence.file.name),
+    `/application/budget#${fundingEvidence.id}`,
+  ),
   {
     term: 'Amount you are asking for',
     value: <span className="font-semibold">{pounds(application.requested)}</span>,
   },
 ];
 
-const documentItems: readonly SummaryItem[] = documents.map(({ label, file }) =>
-  answer(label, ready(file.name), '/application/documents'),
+const documentItems: readonly SummaryItem[] = documents.map(({ id, label, file }) =>
+  answer(label, ready(file.name), `/application/documents#${id}`),
 );
 
 const checked: readonly { title: string; items: readonly SummaryItem[] }[] = [
-  { title: 'About your organisation', items: organisation },
-  { title: 'Your project', items: project },
+  { title: organisation.title, items: questionsOf(organisation) },
+  { title: project.title, items: questionsOf(project) },
   { title: 'Budget', items: budgetItems },
-  { title: 'Outcomes', items: outcomes },
+  { title: outcomes.title, items: questionsOf(outcomes) },
   { title: 'Documents', items: documentItems },
 ];
 

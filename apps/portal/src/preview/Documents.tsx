@@ -15,6 +15,7 @@ import type { FileDropItem } from '@pixel-scientists/ui';
 import { useState } from 'react';
 
 import { PageColumn } from '../PageColumn.tsx';
+import { useFocusFragment } from './fragment.ts';
 import { documents, documentsSavedAt, fileRules } from './journey.ts';
 import { ContactLine, ScreenHeader } from './parts.tsx';
 import { caseOfficer, funder, round } from './story.ts';
@@ -29,6 +30,7 @@ const initialFiles: Files = {
 
 export default function Documents() {
   const navigate = useNavigate();
+  useFocusFragment();
   const [files, setFiles] = useState<Files>(initialFiles);
   const ready = Object.values(files)
     .flat()
@@ -66,6 +68,7 @@ export default function Documents() {
         {documents.map((document) => (
           <FileDrop
             key={document.id}
+            id={document.id}
             label={document.label}
             hint={`${document.hint} ${fileRules}`}
             accept=".pdf,.doc,.docx"
