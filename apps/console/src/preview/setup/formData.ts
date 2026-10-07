@@ -62,6 +62,12 @@ export interface BudgetColumn {
   kind: 'text' | 'currency';
 }
 
+/** The ids of the budget tables a worked-out amount is made from: the first's total, less the second's. */
+export interface WorkedOut {
+  total: string;
+  less: string;
+}
+
 export interface FormQuestion {
   id: string;
   label: string;
@@ -75,6 +81,8 @@ export interface FormQuestion {
   /** Currency, in pounds. */
   minAmount: number;
   maxAmount: number;
+  /** Currency the applicant is shown, not asked for. */
+  workedOut: WorkedOut | null;
   /** Choice: one option to a line. */
   options: string;
   multiple: boolean;
@@ -108,6 +116,7 @@ const defaults = {
   wordLimit: 300,
   minAmount: 0,
   maxAmount: 0,
+  workedOut: null,
   options: '',
   multiple: false,
   columns: [],
@@ -275,6 +284,7 @@ export const formSections: readonly FormSection[] = [
         hint: 'We work this out for you: the total cost of the project, less other funding.',
         minAmount: 1_000,
         maxAmount: 25_000,
+        workedOut: { total: 'budget', less: 'other-funding' },
       }),
     ],
   },
@@ -339,6 +349,31 @@ export const formSections: readonly FormSection[] = [
     ],
   },
 ];
+
+/** A typed amount such as “£2,880” in pounds. Text that is not an amount counts as nothing. */
+export const amountOf = (text: string): number =>
+  Number.parseFloat(text.replace(/[£,\s]/g, '')) || 0;
+
+/** The cost column of a budget table, added up. */
+export function budgetTotal(question: FormQuestion, rows: readonly (readonly string[])[]): number {
+  const cost = question.columns.findIndex((column) => column.kind === 'currency');
+  return rows.reduce((sum, row) => sum + amountOf(row[cost] ?? ''), 0);
+}
+
+/** What each budget table adds up to, by question id. */
+export type Totals = Readonly<Record<string, number>>;
+
+/** Each budget table's total as the form first shows it, from the example rows. */
+export const sampleTotals: Totals = Object.fromEntries(
+  formSections
+    .flatMap((section) => section.questions)
+    .filter((item) => item.type === 'budget_table')
+    .map((item) => [item.id, budgetTotal(item, item.sample)]),
+);
+
+/** The amount a worked-out question shows: one total less the other, never below nothing. */
+export const workedOutAmount = ({ total, less }: WorkedOut, totals: Totals): number =>
+  Math.max((totals[total] ?? 0) - (totals[less] ?? 0), 0);
 
 export const blankQuestion = (id: string): FormQuestion =>
   question(id, 'Untitled question', 'short_text');
