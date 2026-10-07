@@ -56,7 +56,7 @@ Every screen of a funding round, built and still in design, is in the
 | [Fairfold Governance](modules/governance) | Boards, board packs, decisions, risks, policies and incidents | Planned for 2027 |
 | [Fairfold Activities](modules/dca) | A charity's own direct charitable activities, beside its grants | Planned for 2027 |
 | [Fairfold Data Protection](modules/privacy) | Subject access, breaches, impact assessments and records of processing | Planned for 2027 |
-| [Fairfold Integrations](modules/connect) | A plugin API and connections to other systems | Planned for 2027 |
+| [Fairfold Integrations](modules/connect) | A plugin API, connections to other systems and controlled access for AI agents through MCP | Planned for 2027 |
 | [Fairfold Field App](modules/field) | A mobile app for visits and work away from the office | Planned for 2027 |
 | [Fairfold Recruitment](modules/people) | Fair recruitment, from advert to shortlist | Planned for 2027 |
 | [Fairfold Forms](modules/forms) | Forms and surveys | Planned for 2027 |
