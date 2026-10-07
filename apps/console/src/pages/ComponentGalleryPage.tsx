@@ -30,6 +30,8 @@ import {
   ProblemQuestionsExample,
   SaveStatusExample,
 } from './FormExamples.tsx';
+import { DataExamples } from './gallery/DataExamples.tsx';
+import { LayoutExamples } from './gallery/LayoutExamples.tsx';
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -288,6 +290,9 @@ export default function ComponentGalleryPage() {
           page.
         </p>
       </Section>
+
+      <LayoutExamples />
+      <DataExamples />
     </div>
   );
 }
