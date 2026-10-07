@@ -16,9 +16,10 @@
 // Tests tagged @gallery use the development-only component gallery, which
 // production builds leave out: console-gallery runs them, under the policy,
 // against a build made with NODE_ENV=development. The csp-console and
-// csp-portal projects check each app's headers and nonce, and the fixture
-// itself. In CI a test that passes only on a retry fails the run, so a
-// violation that comes and goes is not missed.
+// csp-portal projects check each app's headers and nonce, the fixture
+// itself, and that the build has no development-only pages. In CI a test
+// that passes only on a retry fails the run, so a violation that comes and
+// goes is not missed.
 //
 // Untagged specs stub the API. Specs tagged @api need the real one, with
 // Mailpit, so they run only against the stack: `pnpm stack`, then
@@ -116,7 +117,7 @@ if (stack) {
 const projects = stack
   ? [
       project('console-stack', 'console', ports.stackConsole, { grepInvert: /@gallery/ }),
-      project('portal-stack', 'portal', ports.stackPortal),
+      project('portal-stack', 'portal', ports.stackPortal, { grepInvert: /@gallery/ }),
       project('csp-console', 'console', ports.stackConsole, policyChecks),
       project('csp-portal', 'portal', ports.stackPortal, policyChecks),
       project('journey', 'console', ports.stackConsole, { testDir: 'e2e' }),
