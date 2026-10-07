@@ -22,6 +22,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 
 import { PageColumn } from '../PageColumn.tsx';
+import { useFocusFragment } from './fragment.ts';
 import { fileRules, fundingEvidence, savedAt } from './journey.ts';
 import { CrossIcon, PlusIcon, ScreenHeader, Section, TickIcon } from './parts.tsx';
 import { budget, otherFunding, pounds, round } from './story.ts';
@@ -436,6 +437,7 @@ function Total({ label, pence }: { label: string; pence: number | null }) {
 
 export default function Budget() {
   const navigate = useNavigate();
+  useFocusFragment();
   const [saved, setSaved] = useState<SaveState>({ status: 'saved', at: savedAt });
   const saveNow = () => {
     setSaved({ status: 'saved', at: savedAt });
@@ -486,9 +488,8 @@ export default function Budget() {
         noValidate
         onSubmit={(event) => {
           event.preventDefault();
-          // The preview skips Section 4, Outcomes, which it does not draw.
           if (problems.length > 0) setAttempts((count) => count + 1);
-          else navigate('/application/documents');
+          else navigate('/application/outcomes');
         }}
         className="flex flex-col gap-10"
       >
@@ -570,6 +571,7 @@ export default function Budget() {
           </div>
           <Total label="Total other funding" pence={other} />
           <FileDrop
+            id={fundingEvidence.id}
             label={`${fundingEvidence.label} (optional)`}
             hint={`${fundingEvidence.hint} ${fileRules}`}
             accept=".pdf,.doc,.docx"

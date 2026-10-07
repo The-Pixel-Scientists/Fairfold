@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import PreviewApp from './PreviewApp.tsx';
 import { applyRoutes } from './routes.ts';
 
 afterEach(() => {
   window.history.replaceState(null, '', '/');
+  delete document.documentElement.dataset.scheme;
+  vi.restoreAllMocks();
 });
 
 /** A route's page loads on demand, which can take longer than the default wait on a busy machine. */
@@ -117,14 +119,12 @@ describe('the applying previews', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Budget' })).toBeTruthy();
   });
 
-  it('goes on to the documents when the budget is right', async () => {
+  it('goes on to the outcomes when the budget is right', async () => {
     const user = userEvent.setup();
     await openBudget();
 
     await user.click(screen.getByRole('button', { name: 'Save and continue' }));
-    expect(
-      await screen.findByRole('heading', { level: 1, name: 'Documents' }, loaded),
-    ).toBeTruthy();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Outcomes' }, loaded)).toBeTruthy();
   });
 
   it('adds a cost and puts focus in it, and removes one', async () => {
@@ -232,26 +232,27 @@ describe('the applying previews', () => {
     ).toBeTruthy();
   });
 
-  it('says only the Riverside Lunch Club application opens in the demo, and links to it', async () => {
+  it('says the demo walks through the Riverside Lunch Club application from the start, and links to it', async () => {
     const user = userEvent.setup();
     open('/applications');
     await screen.findByRole('heading', { level: 1, name: 'Your applications' }, loaded);
 
-    expect(
-      screen.queryByRole('link', { name: /Open the Riverside Lunch Club application/ }),
-    ).toBeNull();
+    expect(screen.queryByRole('link', { name: /from the start/ })).toBeNull();
     await user.click(
       screen.getByRole('button', { name: 'Continue application for Riverside Pocket Garden' }),
     );
 
     expect(
-      screen.getByText(/Only the Riverside Lunch Club application opens in this demo/),
+      screen.getByText(
+        'This demo walks through one application, Riverside Lunch Club, from the start.',
+      ),
     ).toBeTruthy();
     expect(
       screen
-        .getByRole('link', { name: 'Open the Riverside Lunch Club application' })
+        .getByRole('link', { name: 'See the Riverside Lunch Club application from the start' })
         .getAttribute('href'),
-    ).toBe('/dev/preview/application');
+    ).toBe('/dev/preview/round');
+    expect(screen.queryByText(/opens in this demo/)).toBeNull();
   });
 
   it('asks the applicant to accept the grant conditions, then confirms it', async () => {
@@ -268,5 +269,214 @@ describe('the applying previews', () => {
 
     expect(document.activeElement?.textContent).toMatch(/You have accepted these conditions/);
     expect(screen.queryByRole('button', { name: 'Accept the conditions' })).toBeNull();
+  });
+
+  it('shows the saved organisation answers, and asks another question if it is not a charity', async () => {
+    const user = userEvent.setup();
+    open('/application/organisation');
+    await screen.findByRole('heading', { level: 1, name: 'About your organisation' }, loaded);
+
+    const value = (name: RegExp) => screen.getByLabelText<HTMLInputElement>(name).value;
+    expect(value(/^Organisation name/)).toBe('Northfield Community Trust');
+    expect(value(/^Registered charity number/)).toBe('1999876');
+    expect(value(/^Address line 1/)).toBe('Riverside Hall');
+    expect(value(/^Postcode/)).toBe('NF1 3QR');
+    expect(value(/^Income last year/)).toBe('184200');
+    expect(value(/^Paid staff and regular volunteers/)).toBe('44');
+    expect(screen.getByRole<HTMLInputElement>('checkbox', { name: 'Led by women' }).checked).toBe(
+      true,
+    );
+
+    await user.click(screen.getByRole('radio', { name: 'No' }));
+    expect(screen.queryByLabelText(/^Registered charity number/)).toBeNull();
+    expect(screen.getByRole('group', { name: /^Governing document/ })).toBeTruthy();
+  });
+
+  it('shows the saved project answers, with the words left in a long answer', async () => {
+    open('/application/project');
+    await screen.findByRole('heading', { level: 1, name: 'Your project' }, loaded);
+
+    expect(screen.getAllByText('You have 32 words left').length).toBeGreaterThan(0);
+    const start = within(screen.getByRole('group', { name: /^Start date/ }));
+    expect(start.getByLabelText<HTMLInputElement>('Day').value).toBe('1');
+    expect(start.getByLabelText<HTMLInputElement>('Month').value).toBe('6');
+    expect(start.getByLabelText<HTMLInputElement>('Year').value).toBe('2027');
+    for (const name of ['Northfield Central', 'Older people', 'Disabled people']) {
+      expect(screen.getByRole<HTMLInputElement>('checkbox', { name }).checked).toBe(true);
+    }
+  });
+
+  it('shows the saved outcomes answers', async () => {
+    open('/application/outcomes');
+    await screen.findByRole('heading', { level: 1, name: 'Outcomes' }, loaded);
+
+    expect(screen.getByLabelText<HTMLInputElement>(/^How many people will take part/).value).toBe(
+      '120',
+    );
+    expect(screen.getByLabelText(/^How you will know/).textContent).toMatch(/loneliness scale/);
+  });
+
+  it('links each written section from the task list, and carries on in task list order', async () => {
+    const user = userEvent.setup();
+    open('/application');
+    await screen.findByRole('heading', { level: 1, name: 'Your application' }, loaded);
+
+    for (const [name, path] of [
+      ['About your organisation', '/application/organisation'],
+      ['Your project', '/application/project'],
+      ['Outcomes', '/application/outcomes'],
+    ]) {
+      expect(screen.getByRole('link', { name }).getAttribute('href')).toBe(`/dev/preview${path}`);
+    }
+
+    await user.click(screen.getByRole('link', { name: 'About your organisation' }));
+    await screen.findByRole('heading', { level: 1, name: 'About your organisation' }, loaded);
+    await user.click(screen.getByRole('button', { name: 'Save and continue' }));
+    await screen.findByRole('heading', { level: 1, name: 'Your project' }, loaded);
+    await user.click(screen.getByRole('button', { name: 'Save and continue' }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Budget' }, loaded)).toBeTruthy();
+  });
+
+  it('goes back to the task list from a written section when you come back later', async () => {
+    const user = userEvent.setup();
+    open('/application/outcomes');
+    await screen.findByRole('heading', { level: 1, name: 'Outcomes' }, loaded);
+
+    await user.click(screen.getByRole('button', { name: 'Save and come back later' }));
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Your application' }, loaded),
+    ).toBeTruthy();
+  });
+
+  it('opens every "Change" link at its own field and puts focus there', async () => {
+    open('/application/check');
+    await screen.findByRole('heading', { level: 1, name: 'Check your answers' }, loaded);
+    const hrefs = screen
+      .getAllByRole('link', { name: /^Change / })
+      .map((link) => link.getAttribute('href') ?? '');
+    cleanup();
+
+    expect(hrefs).toHaveLength(29);
+    for (const href of hrefs) {
+      expect(href).toMatch(/^\/dev\/preview\/application\/[a-z]+#[a-z0-9-]+$/);
+      window.history.replaceState(null, '', href);
+      const { unmount } = render(<PreviewApp />);
+      await waitFor(() => {
+        expect(document.activeElement?.id).toBe(href.split('#')[1]);
+      }, loaded);
+      unmount();
+    }
+  }, 120_000);
+
+  it('takes you to the question you chose to change, not to the top of the page', async () => {
+    const user = userEvent.setup();
+    open('/application/check');
+    await screen.findByRole('heading', { level: 1, name: 'Check your answers' }, loaded);
+
+    await user.click(screen.getByRole('link', { name: 'Change main contact email' }));
+    await screen.findByRole('heading', { level: 1, name: 'About your organisation' }, loaded);
+    await waitFor(() => {
+      expect(document.activeElement).toBe(screen.getByLabelText(/^Main contact email/));
+    }, loaded);
+  });
+
+  it('reads the saved answers back on check your answers', async () => {
+    open('/application/check');
+    await screen.findByRole('heading', { level: 1, name: 'Check your answers' }, loaded);
+
+    for (const text of [
+      'Northfield Community Trust',
+      '1999876',
+      '£184,200',
+      '1 June 2027',
+      '120',
+    ]) {
+      expect(screen.getAllByText(text).length).toBeGreaterThan(0);
+    }
+    expect(screen.getByText('Led by women')).toBeTruthy();
+    expect(screen.getByText('NF1 3QR')).toBeTruthy();
+  });
+
+  it('signs out to a calm page that says your work is safe and offers to sign in again', async () => {
+    const user = userEvent.setup();
+    open('/application');
+    await screen.findByRole('heading', { level: 1, name: 'Your application' }, loaded);
+
+    await user.click(screen.getByRole('button', { name: 'Sign out' }));
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'You have signed out' }, loaded),
+    ).toBeTruthy();
+    expect(screen.getByText(/Your work is safe/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Sign out' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Sign in again' }).getAttribute('href')).toBe(
+      '/dev/preview/',
+    );
+  });
+
+  it('keeps the open draft, not the sent application, as the work saved on the signed-out page', async () => {
+    open('/signed-out');
+    await screen.findByRole('heading', { level: 1, name: 'You have signed out' }, loaded);
+
+    expect(screen.getByText('Riverside Pocket Garden')).toBeTruthy();
+    expect(screen.getByText('Green Spaces Fund, 2027')).toBeTruthy();
+    expect(screen.getByText(/Last saved/).textContent).toBe('Last saved 20 February 2027');
+    expect(screen.queryByText(/Riverside Lunch Club/)).toBeNull();
+  });
+
+  it.each(['/signed-out/', '/signed-out//'])(
+    'shows no email or "Sign out" on %s, as a static host serves it with a trailing slash',
+    async (path) => {
+      open(path);
+      await screen.findByRole('heading', { level: 1, name: 'You have signed out' }, loaded);
+
+      expect(screen.queryByText('sam@example.org')).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Sign out' })).toBeNull();
+    },
+  );
+
+  it('still shows the email and "Sign out" on another page with a trailing slash', async () => {
+    open('/applications/');
+    await screen.findByRole('heading', { level: 1, name: 'Your applications' }, loaded);
+
+    expect(screen.getByText('sam@example.org')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Sign out' })).toBeTruthy();
+  });
+
+  it('opens the decision letter from the outcome, and prints it when asked', async () => {
+    const user = userEvent.setup();
+    const print = vi.spyOn(window, 'print').mockImplementation(() => undefined);
+    open('/outcome');
+    await screen.findByRole(
+      'heading',
+      { level: 1, name: 'Your application was successful' },
+      loaded,
+    );
+
+    expect(screen.queryByText(/PDF, 96 KB/)).toBeNull();
+    await user.click(screen.getByRole('link', { name: 'Read or print your decision letter' }));
+    await screen.findByRole('heading', { level: 1, name: 'Your decision letter' }, loaded);
+
+    const letter = within(
+      screen.getByRole('article', { name: 'Decision letter for Riverside Lunch Club' }),
+    );
+    expect(letter.getByText('Northfield Foundation')).toBeTruthy();
+    expect(letter.getByText('Conditions of your grant')).toBeTruthy();
+    expect(letter.getByText('What happens next')).toBeTruthy();
+    expect(letter.getByText(/will give Northfield Community Trust £12,500/)).toBeTruthy();
+    expect(screen.queryByText(/score|reviewer/i)).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Print or save as PDF' }));
+    expect(print).toHaveBeenCalledOnce();
+  });
+
+  it('prints the letter in the light scheme, then puts the person back in their own', async () => {
+    open('/outcome/letter');
+    await screen.findByRole('heading', { level: 1, name: 'Your decision letter' }, loaded);
+    document.documentElement.dataset.scheme = 'dark';
+
+    window.dispatchEvent(new Event('beforeprint'));
+    expect(document.documentElement.dataset.scheme).toBe('light');
+    window.dispatchEvent(new Event('afterprint'));
+    expect(document.documentElement.dataset.scheme).toBe('dark');
   });
 });
