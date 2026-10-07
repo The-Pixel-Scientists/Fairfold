@@ -4,27 +4,45 @@
 // development builds only. They use the real components and a fixed
 // synthetic story (story.ts), and are the designs the screens are built to.
 
-import { Button, Link, Router } from '@pixel-scientists/ui';
+import { Button, Link, Router, useLocation, useNavigate } from '@pixel-scientists/ui';
 import type { ReactNode } from 'react';
 
 import { PageColumn, PageIntro } from '../PageColumn.tsx';
+import { SIGNED_OUT_PATH } from '../paths.ts';
 import { PortalShell } from '../PortalShell.tsx';
 import { productName } from '../product.ts';
 import { applyRoutes } from './routes.ts';
 import { applicant } from './story.ts';
 
+/**
+ * The shell, as a signed-in applicant sees it, and without the person once they
+ * have signed out. A static host adds a trailing slash, so it is ignored.
+ * Printing leaves out its skip link, header and footer.
+ */
 function PreviewShell({ children }: { children: ReactNode }) {
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
   return (
-    <PortalShell
-      actions={
-        <>
-          <p className="text-body text-muted">{applicant.email}</p>
-          <Button>Sign out</Button>
-        </>
-      }
-    >
-      {children}
-    </PortalShell>
+    <div className="print:[&_:is(header,footer,a[href='#main-content']):not(main_*)]:hidden">
+      <PortalShell
+        actions={
+          pathname.replace(/\/+$/, '') === SIGNED_OUT_PATH ? undefined : (
+            <>
+              <p className="text-body text-muted">{applicant.email}</p>
+              <Button
+                onClick={() => {
+                  navigate(SIGNED_OUT_PATH);
+                }}
+              >
+                Sign out
+              </Button>
+            </>
+          )
+        }
+      >
+        {children}
+      </PortalShell>
+    </div>
   );
 }
 

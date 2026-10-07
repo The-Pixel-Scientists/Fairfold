@@ -15,12 +15,12 @@ const status: Record<(typeof sections)[number]['id'], Pick<TaskItem, 'status' | 
   organisation: {
     status: 'completed',
     hint: 'Who you are and how to reach you.',
-    to: '/application',
+    to: '/application/organisation',
   },
   project: {
     status: 'completed',
     hint: 'What you will do and who it will help.',
-    to: '/application',
+    to: '/application/project',
   },
   budget: {
     status: 'in-progress',
@@ -30,7 +30,7 @@ const status: Record<(typeof sections)[number]['id'], Pick<TaskItem, 'status' | 
   outcomes: {
     status: 'not-started',
     hint: 'What will change for people. About 10\u00a0minutes.',
-    to: '/application',
+    to: '/application/outcomes',
   },
   documents: {
     status: 'not-started',

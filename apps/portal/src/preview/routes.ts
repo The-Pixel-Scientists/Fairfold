@@ -4,6 +4,8 @@
 
 import type { RouteDefinition } from '@pixel-scientists/ui';
 
+import { SIGNED_OUT_PATH } from '../paths.ts';
+
 export const applyRoutes: readonly RouteDefinition[] = [
   {
     path: '/round',
@@ -12,9 +14,24 @@ export const applyRoutes: readonly RouteDefinition[] = [
   },
   { path: '/application', title: 'Your application', load: () => import('./Application.tsx') },
   {
+    path: '/application/organisation',
+    title: 'Section 1 of 6: About your organisation',
+    load: () => import('./Organisation.tsx'),
+  },
+  {
+    path: '/application/project',
+    title: 'Section 2 of 6: Your project',
+    load: () => import('./Project.tsx'),
+  },
+  {
     path: '/application/budget',
     title: 'Section 3 of 6: Budget',
     load: () => import('./Budget.tsx'),
+  },
+  {
+    path: '/application/outcomes',
+    title: 'Section 4 of 6: Outcomes',
+    load: () => import('./Outcomes.tsx'),
   },
   {
     path: '/application/documents',
@@ -29,4 +46,6 @@ export const applyRoutes: readonly RouteDefinition[] = [
   },
   { path: '/applications', title: 'Your applications', load: () => import('./Applications.tsx') },
   { path: '/outcome', title: 'Your outcome', load: () => import('./Outcome.tsx') },
+  { path: '/outcome/letter', title: 'Your decision letter', load: () => import('./Letter.tsx') },
+  { path: SIGNED_OUT_PATH, title: 'You have signed out', load: () => import('./SignedOut.tsx') },
 ];

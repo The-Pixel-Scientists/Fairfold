@@ -4,37 +4,13 @@
 // the amount, the conditions, what happens next and who to ask. It shows
 // nothing before release, and never a score or a reviewer.
 
-import { Button, Link, SummaryList, Tag } from '@pixel-scientists/ui';
+import { Button, Link, SummaryList, Tag, buttonClassName } from '@pixel-scientists/ui';
 import { useEffect, useRef, useState } from 'react';
 
 import { PageColumn } from '../PageColumn.tsx';
+import { acceptBy, conditions, decisionSent, grantPeriod, note, steps } from './award.ts';
 import { ContactLine, ScreenHeader, Section, Steps, TickIcon } from './parts.tsx';
 import { applicant, application, caseOfficer, funder, pounds, round } from './story.ts';
-
-const conditions = [
-  'Spend the grant on the costs in your budget. Ask us first if you need to change how you spend it.',
-  'Make sure every volunteer and driver who works with older people has a DBS (Disclosure and Barring Service) check before they start.',
-  'Send us a short progress report after six months, and a final report within a month of the project ending.',
-  'Tell us if you get other money for the same costs.',
-];
-
-const half = application.requested / 2;
-const acceptBy = '29 April 2027';
-
-const steps = [
-  {
-    title: 'Accept your grant conditions',
-    text: `Accept them on this page by ${acceptBy}, 28 days from your decision. Then we email your grant agreement to ${applicant.email} for your trustees to sign.`,
-  },
-  {
-    title: 'We pay your grant',
-    text: `We pay the first ${pounds(half)} within 10 working days of getting your signed agreement. We pay the second ${pounds(half)} after your progress report.`,
-  },
-  {
-    title: 'Start your project',
-    text: 'Your grant starts on 1 June 2027. Tell us if your first lunch moves from Tuesday 1 June.',
-  },
-];
 
 /** What the applicant sees after their decision is released. A decision is private until then. */
 export default function Outcome() {
@@ -78,10 +54,7 @@ export default function Outcome() {
       </div>
 
       <blockquote className="flex max-w-prose flex-col gap-3 border-l-2 border-edge pl-5">
-        <p className="text-lg text-ink">
-          We were glad to read about the lunch club. A hot meal and a friendly face every week is
-          exactly the sort of project this fund is for. We look forward to seeing it start.
-        </p>
+        <p className="text-lg text-ink">{note}</p>
         <footer className="text-body text-muted">
           {caseOfficer.name}, {caseOfficer.role}, {funder.name}
         </footer>
@@ -92,8 +65,8 @@ export default function Outcome() {
           items={[
             { term: 'Reference', value: application.reference },
             { term: 'Fund', value: `${round.programme}, ${round.name}` },
-            { term: 'Grant period', value: '1 June 2027 to 25 April 2028' },
-            { term: 'Decision sent', value: '1 April 2027' },
+            { term: 'Grant period', value: grantPeriod },
+            { term: 'Decision sent', value: decisionSent },
           ]}
         />
       </Section>
@@ -150,7 +123,9 @@ export default function Outcome() {
       </Section>
 
       <div className="flex flex-col gap-3 border-t border-divider pt-8 sm:flex-row sm:items-center sm:gap-6">
-        <Button className="w-full sm:w-auto">Download your decision letter (PDF, 96 KB)</Button>
+        <Link to="/outcome/letter" className={buttonClassName('secondary', 'w-full sm:w-auto')}>
+          Read or print your decision letter
+        </Link>
         <Link to="/applications" className="inline-flex min-h-control items-center">
           Back to your applications
         </Link>

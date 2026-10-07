@@ -70,6 +70,16 @@ export const application = {
   submitted: '1 March 2027 at 2:14pm',
 };
 
+/**
+ * The application Sam has still to finish, to a different fund. The previews
+ * walk through the one above and do not open this one.
+ */
+export const draftApplication = {
+  project: 'Riverside Pocket Garden',
+  fund: 'Green Spaces Fund, 2027',
+  lastSaved: '20 February 2027',
+};
+
 export const sections = [
   { id: 'organisation', title: 'About your organisation' },
   { id: 'project', title: 'Your project' },

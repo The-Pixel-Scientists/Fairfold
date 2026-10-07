@@ -12,7 +12,7 @@ import type { ReactNode } from 'react';
 
 import { PageColumn } from '../PageColumn.tsx';
 import { ScreenHeader, Section } from './parts.tsx';
-import { application, pounds, round } from './story.ts';
+import { application, draftApplication, pounds, round } from './story.ts';
 
 interface Entry {
   id: string;
@@ -29,12 +29,12 @@ const date = (text: string) => text.replaceAll(' ', ' ');
 
 const draft: Entry = {
   id: 'green-spaces',
-  project: 'Riverside Pocket Garden',
-  fund: 'Green Spaces Fund, 2027',
+  project: draftApplication.project,
+  fund: draftApplication.fund,
   status: { words: 'Draft', tone: 'neutral' },
   facts: [
     ['Sections completed', '2 of 6'],
-    ['Last saved', date('20 February 2027')],
+    ['Last saved', date(draftApplication.lastSaved)],
     ['Closes', `${date('26 April 2027')} at 5pm`],
   ],
   note: 'Not sent yet. Everything you have written is saved.',
@@ -115,8 +115,8 @@ function Card({ entry, children }: { entry: Entry; children?: ReactNode }) {
 }
 
 /**
- * Only the Community Grants application has screens in this demo, so opening the
- * other draft says so and points to the one that does.
+ * The demo walks through the Community Grants application, already sent by now,
+ * so opening the other draft says so and points to where that one starts.
  */
 function DraftCard() {
   const [pressed, setPressed] = useState(false);
@@ -136,9 +136,9 @@ function DraftCard() {
       <div role="status" className="empty:hidden">
         {pressed && (
           <div className="flex max-w-prose flex-col items-start gap-1 rounded-lg bg-sunken p-4 text-body text-ink">
-            <p>Only the {application.project} application opens in this demo.</p>
-            <Link to="/application" className="inline-flex min-h-control items-center">
-              Open the {application.project} application
+            <p>This demo walks through one application, {application.project}, from the start.</p>
+            <Link to="/round" className="inline-flex min-h-control items-center">
+              See the {application.project} application from the start
             </Link>
           </div>
         )}
