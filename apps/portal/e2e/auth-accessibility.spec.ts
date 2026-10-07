@@ -9,7 +9,7 @@ import type { Page } from '@playwright/test';
 
 import { expect, test } from '../../../scripts/e2e/fixtures.ts';
 import { applicantSession, eastmere, problem, signedOut, stubApi } from './auth-api.ts';
-import { expectNoHorizontalScroll, expectNoViolations, widths } from './axe.ts';
+import { expectNoHorizontalScroll, expectNoViolations, variants } from './axe.ts';
 
 const TOKEN = 'tok_0123456789abcdefghijklmnopqrstuvwxyz';
 /** An address long enough to test that nothing runs off a 320 px screen. */
@@ -357,9 +357,13 @@ const screens: Screen[] = [
   },
 ];
 
-for (const width of widths) {
-  test.describe(`at ${width.name}`, () => {
-    test.use({ viewport: width.viewport, deviceScaleFactor: width.deviceScaleFactor });
+for (const variant of variants) {
+  test.describe(`at ${variant.name}`, () => {
+    test.use({
+      viewport: variant.viewport,
+      deviceScaleFactor: variant.deviceScaleFactor,
+      colorScheme: variant.scheme,
+    });
 
     for (const screen of screens) {
       test(`@a11y ${screen.name} has no axe violations`, async ({ page }) => {

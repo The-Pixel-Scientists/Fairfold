@@ -15,7 +15,7 @@ import {
   stubApi,
   stubSignedIn,
 } from './auth-api.ts';
-import { expectNoHorizontalScroll, expectNoViolations, widths } from './auth-axe.ts';
+import { expectNoHorizontalScroll, expectNoViolations, variants } from './auth-axe.ts';
 
 const TOKEN = 'tok_0123456789abcdefghijklmnopqrstuvwxyz';
 const KEY = 'JBSWY3DPEHPK3PXP';
@@ -350,9 +350,13 @@ const screens: Screen[] = [
   },
 ];
 
-for (const width of widths) {
-  test.describe(`at ${width.name}`, () => {
-    test.use({ viewport: width.viewport, deviceScaleFactor: width.deviceScaleFactor });
+for (const variant of variants) {
+  test.describe(`at ${variant.name}`, () => {
+    test.use({
+      viewport: variant.viewport,
+      deviceScaleFactor: variant.deviceScaleFactor,
+      colorScheme: variant.scheme,
+    });
 
     for (const screen of screens) {
       test(`@a11y ${screen.name} has no axe violations`, async ({ page }) => {

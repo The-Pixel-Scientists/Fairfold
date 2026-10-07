@@ -8,7 +8,7 @@
 import { expect, test } from '../../../scripts/e2e/fixtures.ts';
 
 import { stubSignedIn } from './auth-api.ts';
-import { expectNoHorizontalScroll, expectNoViolations, widths } from './auth-axe.ts';
+import { expectNoHorizontalScroll, expectNoViolations, variants } from './auth-axe.ts';
 
 const pages = [
   {
@@ -42,9 +42,13 @@ const pages = [
   },
 ];
 
-for (const width of widths) {
-  test.describe(`at ${width.name}`, () => {
-    test.use({ viewport: width.viewport, deviceScaleFactor: width.deviceScaleFactor });
+for (const variant of variants) {
+  test.describe(`at ${variant.name}`, () => {
+    test.use({
+      viewport: variant.viewport,
+      deviceScaleFactor: variant.deviceScaleFactor,
+      colorScheme: variant.scheme,
+    });
 
     for (const target of pages) {
       const tag = target.gallery ? '@gallery ' : '';

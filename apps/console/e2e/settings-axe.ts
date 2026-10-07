@@ -7,7 +7,7 @@
 import { test } from '../../../scripts/e2e/fixtures.ts';
 import type { Page } from '@playwright/test';
 
-import { expectNoHorizontalScroll, expectNoViolations, widths } from './auth-axe.ts';
+import { expectNoHorizontalScroll, expectNoViolations, variants } from './auth-axe.ts';
 import { custom, standard, stubSettings } from './settings-api.ts';
 import type { Funder, SettingsStub } from './settings-api.ts';
 
@@ -26,9 +26,13 @@ export interface SettingsState {
 
 export function checkSettingsStates(states: readonly SettingsState[]): void {
   for (const look of looks) {
-    for (const width of widths) {
-      test.describe(`in ${look.name} at ${width.name}`, () => {
-        test.use({ viewport: width.viewport, deviceScaleFactor: width.deviceScaleFactor });
+    for (const variant of variants) {
+      test.describe(`in ${look.name} at ${variant.name}`, () => {
+        test.use({
+          viewport: variant.viewport,
+          deviceScaleFactor: variant.deviceScaleFactor,
+          colorScheme: variant.scheme,
+        });
 
         for (const state of states) {
           test(`@a11y ${state.name} has no axe violations`, async ({ page }) => {
