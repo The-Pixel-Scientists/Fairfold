@@ -2,6 +2,7 @@
 
 import { AppShell, NotFoundPage, Router, SessionProvider } from '@pixel-scientists/ui';
 import type { PageDefinition, RouteDefinition } from '@pixel-scientists/ui';
+import { Suspense, lazy } from 'react';
 import type { ReactNode } from 'react';
 
 import { endSession, loadSession } from './api.ts';
@@ -76,6 +77,15 @@ export const tenantRoutes: readonly RouteDefinition[] = [
   { path: '/enter-code', title: 'Enter your code', component: EnterCodePage },
 ];
 
+/**
+ * Design previews of screens not built yet: under /dev/preview in development,
+ * and the whole app in a demo build (`vite build --mode demo`), which the
+ * product site hosts. The production build drops them.
+ */
+const demo = import.meta.env.MODE === 'demo';
+const PreviewApp =
+  import.meta.env.DEV || demo ? lazy(() => import('./preview/PreviewApp.tsx')) : null;
+
 function TenantNotFound() {
   return (
     <Screen kind="member">
@@ -111,6 +121,13 @@ function TenantLayout({ children }: { children: ReactNode }) {
  * funder opens the new address afresh.
  */
 export function App() {
+  if (PreviewApp !== null && (demo || window.location.pathname.startsWith('/dev/preview'))) {
+    return (
+      <Suspense fallback={null}>
+        <PreviewApp />
+      </Suspense>
+    );
+  }
   const slug = tenantSlugOf(window.location.pathname);
   if (slug === null) {
     return <Router routes={topLevelRoutes} layout={TopLayout} titleSuffix={titleSuffix} />;
