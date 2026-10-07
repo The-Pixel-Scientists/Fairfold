@@ -18,7 +18,8 @@ export interface TenantLogoProps {
 /**
  * The funder's logo with its name as the alternative text, or the name alone
  * when it has no logo. The image is held to the height of a line of header
- * text, so a tall logo does not push the page about.
+ * text, so a tall logo does not push the page about. On a dark page it sits
+ * on a light chip, since most logos are drawn for a light background.
  */
 export function TenantLogo({ slug, name, hasLogo, version = 0, className }: TenantLogoProps) {
   if (!hasLogo) return <span className={cx('font-medium text-ink', className)}>{name}</span>;
@@ -27,7 +28,10 @@ export function TenantLogo({ slug, name, hasLogo, version = 0, className }: Tena
       key={version}
       src={tenantAsset(slug, 'logo')}
       alt={name}
-      className={cx('block h-8 w-auto max-w-48 object-contain object-left', className)}
+      className={cx(
+        'block h-8 w-auto max-w-48 object-contain object-left dark:rounded-sm dark:bg-ink dark:px-1.5 dark:py-0.5',
+        className,
+      )}
     />
   );
 }

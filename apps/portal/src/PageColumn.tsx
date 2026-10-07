@@ -17,7 +17,7 @@ export function PageColumn({ children }: { children: ReactNode }) {
 export function PageIntro({ title, children }: { title: string; children?: ReactNode }) {
   return (
     <div className="flex flex-col gap-4">
-      <PageHeading className="text-3xl">{title}</PageHeading>
+      <PageHeading className="text-3xl sm:text-4xl">{title}</PageHeading>
       {children ? (
         <div className="flex max-w-prose flex-col gap-4 text-lg text-ink">{children}</div>
       ) : null}

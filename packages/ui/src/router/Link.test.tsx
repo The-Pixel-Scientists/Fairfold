@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -172,5 +172,33 @@ describe('Router: links', () => {
 
     expect(window.history.length).toBe(before);
     expect(window.location.pathname).toBe('/');
+  });
+
+  it('marks a section link while a page in it is open, and only then', () => {
+    function Page() {
+      return (
+        <>
+          <Link to="/settings" section>
+            Settings section
+          </Link>
+          <Link to="/settings">Settings page</Link>
+          <Link to="/set" section>
+            Set section
+          </Link>
+          <Link to="/settings/look" section>
+            Look section
+          </Link>
+        </>
+      );
+    }
+    window.history.replaceState(null, '', '/settings/look');
+    render(<Router routes={[{ path: '/settings/look', title: 'Look', component: Page }]} />);
+
+    const current = (name: string) =>
+      screen.getByRole('link', { name }).getAttribute('aria-current');
+    expect(current('Settings section')).toBe('true');
+    expect(current('Settings page')).toBeNull();
+    expect(current('Set section')).toBeNull();
+    expect(current('Look section')).toBe('page');
   });
 });

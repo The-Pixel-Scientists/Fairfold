@@ -23,17 +23,18 @@ export function AccountControls({ session }: { session: SessionData }) {
 
   return (
     <>
-      <p className="flex items-center gap-2 text-body">
+      <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-body">
         <TenantLogo
           slug={slug}
           name={tenant?.name ?? session.activeMembership?.tenant.name ?? slug}
           hasLogo={tenant?.theme.hasLogo ?? false}
           version={version}
         />
-        <span className="text-muted">{session.user.email}</span>
+        <span className="text-muted [overflow-wrap:anywhere]">{session.user.email}</span>
       </p>
       {others.length > 0 && (
         <Button
+          variant="quiet"
           onClick={() => {
             setSwitching(true);
           }}
@@ -42,6 +43,7 @@ export function AccountControls({ session }: { session: SessionData }) {
         </Button>
       )}
       <Button
+        variant="quiet"
         onClick={() => {
           setSignOutFailed(false);
           signOut().catch(() => {

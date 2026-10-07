@@ -52,8 +52,9 @@ test.describe('programmes page', () => {
       name: 'Programmes',
     });
     await expect(current).toHaveAttribute('aria-current', 'page');
-    // Not colour alone: the current page is underlined, which forced colours keep.
-    await expect(current).toHaveCSS('text-decoration-line', 'underline');
+    // Not colour alone: the current page has heavier type and a bar at its start.
+    await expect(current).toHaveCSS('font-weight', '600');
+    expect(await current.evaluate((link) => getComputedStyle(link, '::before').width)).toBe('3px');
   });
 
   test('leaves focus where the browser put it on the first load', async ({ page }) => {
@@ -89,7 +90,7 @@ test.describe('design tokens', () => {
     });
 
     for (const [name, value] of Object.entries(tokens)) expect(value, name).not.toBe('');
-    expect(tokens['--color-accent']).toBe('#1f4bb8');
+    expect(tokens['--color-accent']).toBe('#1b1d21');
     expect(tokens['--focus-ring-width']).toBe('3px');
   });
 });
@@ -289,7 +290,9 @@ test.describe('keyboard and focus', () => {
     const { checked, small } = await page
       .locator('main button, main input, main textarea, nav a, header a')
       .evaluateAll((elements) => {
-        const sizes = elements.map((element) => {
+        // A visually hidden input, such as the file input, is not the target: its label is.
+        const targets = elements.filter((element) => !element.matches('.sr-only'));
+        const sizes = targets.map((element) => {
           const box = element.getBoundingClientRect();
           return {
             name: element.textContent || element.getAttribute('name'),

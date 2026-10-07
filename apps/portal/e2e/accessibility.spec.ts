@@ -6,7 +6,7 @@
 // 640 px wide window at twice the pixel density.
 
 import { expect, test } from '../../../scripts/e2e/fixtures.ts';
-import { expectNoHorizontalScroll, expectNoViolations, widths } from './axe.ts';
+import { expectNoHorizontalScroll, expectNoViolations, variants } from './axe.ts';
 
 const pages = [
   { name: 'home page', path: '/', heading: "Use your funder's link" },
@@ -14,9 +14,13 @@ const pages = [
   { name: 'not found page', path: '/Not-Found', heading: 'Page not found' },
 ];
 
-for (const width of widths) {
-  test.describe(`at ${width.name}`, () => {
-    test.use({ viewport: width.viewport, deviceScaleFactor: width.deviceScaleFactor });
+for (const variant of variants) {
+  test.describe(`at ${variant.name}`, () => {
+    test.use({
+      viewport: variant.viewport,
+      deviceScaleFactor: variant.deviceScaleFactor,
+      colorScheme: variant.scheme,
+    });
 
     for (const target of pages) {
       test(`@a11y ${target.name} has no axe violations`, async ({ page }) => {

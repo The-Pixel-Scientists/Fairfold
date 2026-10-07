@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { contrastRatio, defaultTheme, presets, type Preset } from '../theme.ts';
-import { presetTokens, themeCss } from './theme-css.ts';
+import { DARK_SCHEME_SELECTOR, presetTokens, themeCss } from './theme-css.ts';
 
 // Tests run on Node.js, but this package has no Node.js types: just enough to read a file.
 const { process } = globalThis as unknown as {
@@ -13,19 +13,29 @@ const { dirname } = import.meta as unknown as { dirname: string };
 const tokensCss = process
   .getBuiltinModule('node:fs')
   .readFileSync(`${dirname}/../../../../ui/src/tokens.css`, 'utf8');
+const lightTokens = tokensCss.slice(0, tokensCss.indexOf(DARK_SCHEME_SELECTOR));
+const darkTokens = tokensCss.slice(tokensCss.indexOf(DARK_SCHEME_SELECTOR));
 
 /** A custom property set to a hex colour, a rem length or zero, and nothing else. */
 const DECLARATION = /^ {2}--[a-z]+(?:-[a-z]+)*: (?:#[0-9a-f]{6}|\d+(?:\.\d+)?rem|0);$/;
 
-function declarations(css: string): string[] {
+/** The declarations in each of the two blocks, after checking that nothing else is there. */
+function blocks(css: string): { light: string[]; dark: string[] } {
   const lines = css.split('\n');
+  const darkStart = lines.indexOf(`${DARK_SCHEME_SELECTOR} {`);
   expect(lines[0]).toBe(':root {');
+  expect(lines.slice(darkStart - 2, darkStart)).toEqual(['}', '']);
   expect(lines.slice(-2)).toEqual(['}', '']);
-  return lines.slice(1, -2);
+  return { light: lines.slice(1, darkStart - 2), dark: lines.slice(darkStart + 1, -2) };
+}
+
+function declarations(css: string): string[] {
+  const { light, dark } = blocks(css);
+  return [...light, ...dark];
 }
 
 describe('themeCss', () => {
-  it('sets the accent shades, surfaces and radii as custom properties', () => {
+  it('sets the accent shades, surfaces and radii for each colour scheme', () => {
     expect(themeCss({ brandColour: '#1F4BB8', preset: 'rounded' })).toBe(
       [
         ':root {',
@@ -33,21 +43,43 @@ describe('themeCss', () => {
         '  --color-accent-hover: #193c93;',
         '  --color-accent-soft: #e9edf8;',
         '  --color-canvas: #f8f7f4;',
-        '  --color-sunken: #f0efea;',
+        '  --color-sunken: #f1f0eb;',
         '  --radius-sm: 0.5rem;',
         '  --radius-md: 0.75rem;',
         '  --radius-lg: 1rem;',
+        '}',
+        '',
+        ":root[data-scheme='dark'] {",
+        '  --color-accent: #aac4f9;',
+        '  --color-accent-hover: #ccdbf9;',
+        '  --color-accent-soft: #162545;',
+        '  --color-canvas: #12110e;',
+        '  --color-sunken: #23211d;',
         '}',
         '',
       ].join('\n'),
     );
   });
 
-  it('uses only custom properties that tokens.css defines', () => {
+  it('turns ink into the dark scheme’s paper white', () => {
+    expect(blocks(themeCss(defaultTheme)).dark.slice(0, 3)).toEqual([
+      '  --color-accent: #ececea;',
+      '  --color-accent-hover: #ffffff;',
+      '  --color-accent-soft: #2a2c30;',
+    ]);
+  });
+
+  it('uses only custom properties that tokens.css defines for that scheme', () => {
     for (const preset of presets) {
-      for (const line of declarations(themeCss({ ...defaultTheme, preset }))) {
-        const name = line.trim().split(':')[0] ?? '';
-        expect(tokensCss, name).toContain(`${name}:`);
+      const { light, dark } = blocks(themeCss({ ...defaultTheme, preset }));
+      for (const [lines, tokens] of [
+        [light, lightTokens],
+        [dark, darkTokens],
+      ] as const) {
+        for (const line of lines) {
+          const name = line.trim().split(':')[0] ?? '';
+          expect(tokens, name).toContain(`${name}:`);
+        }
       }
     }
   });
@@ -91,24 +123,21 @@ describe('themeCss', () => {
 });
 
 describe('presetTokens', () => {
-  it('keeps every surface at least as light as the standard one, so contrast still holds', () => {
+  it('keeps each light surface at least as light as the standard one, and each dark one at least as dark', () => {
     const standard = presetTokens.standard;
+    const lightness = (colour: string) => contrastRatio(colour, '#000000');
     for (const preset of presets) {
-      const { canvas, sunken } = presetTokens[preset];
-      expect(contrastRatio(canvas, '#000000')).toBeGreaterThanOrEqual(
-        contrastRatio(standard.canvas, '#000000'),
-      );
-      expect(contrastRatio(sunken, '#000000')).toBeGreaterThanOrEqual(
-        contrastRatio(standard.sunken, '#000000'),
-      );
+      const { canvas, sunken, darkCanvas, darkSunken } = presetTokens[preset];
+      expect(lightness(canvas)).toBeGreaterThanOrEqual(lightness(standard.canvas));
+      expect(lightness(sunken)).toBeGreaterThanOrEqual(lightness(standard.sunken));
+      expect(lightness(darkCanvas)).toBeLessThanOrEqual(lightness(standard.darkCanvas));
+      expect(lightness(darkSunken)).toBeLessThanOrEqual(lightness(standard.darkSunken));
     }
   });
 
-  it('match tokens.css for the standard preset', () => {
-    const css = themeCss(defaultTheme);
-    for (const line of declarations(css)) {
-      if (line.includes('--color-accent')) continue;
-      expect(tokensCss).toContain(line.trim());
-    }
+  it('match tokens.css for the standard preset in both schemes, accent included', () => {
+    const { light, dark } = blocks(themeCss(defaultTheme));
+    for (const line of light) expect(lightTokens).toContain(line.trim());
+    for (const line of dark) expect(darkTokens).toContain(line.trim());
   });
 });

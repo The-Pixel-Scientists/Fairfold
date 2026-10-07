@@ -15,7 +15,7 @@ function Navigation({ items }: { items: readonly NavigationItem[] }) {
     <ul className="flex flex-wrap gap-1 md:flex-col">
       {items.map((item) => (
         <li key={item.to}>
-          <Link to={item.to} className={navLinkClassName}>
+          <Link to={item.to} section={item.to !== '/'} className={navLinkClassName}>
             {item.label}
           </Link>
         </li>

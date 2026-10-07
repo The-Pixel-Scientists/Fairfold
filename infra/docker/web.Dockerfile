@@ -19,13 +19,13 @@ RUN corepack enable
 COPY . .
 RUN --mount=type=cache,id=tps-pnpm-store,target=/pnpm-store \
     pnpm install --frozen-lockfile --store-dir /pnpm-store --filter "@pixel-scientists/${APP}..."
-# The component gallery is for development only. A build that kept it, for
-# example one run with NODE_ENV=development, must never ship: not its route,
-# its title or its chunk.
+# The component gallery and the design previews are for development only. A
+# build that kept them, for example one run with NODE_ENV=development, must
+# never ship: not their routes, their titles or their chunks.
 RUN pnpm --filter "@pixel-scientists/${APP}" build \
-    && if grep -rqE '/dev/components|Component gallery' "apps/${APP}/dist" \
-      || find "apps/${APP}/dist/assets" -name '*Gallery*' | grep -q .; then \
-      echo "apps/${APP}/dist holds the component gallery. Build it for production." >&2; \
+    && if grep -rqE '/dev/components|Component gallery|/dev/preview|Design preview' "apps/${APP}/dist" \
+      || find "apps/${APP}/dist/assets" \( -name '*Gallery*' -o -name 'PreviewApp*' \) | grep -q .; then \
+      echo "apps/${APP}/dist holds development-only pages. Build it for production." >&2; \
       exit 1; \
     fi
 

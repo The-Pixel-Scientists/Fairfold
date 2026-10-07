@@ -43,7 +43,7 @@ export function Dialog({ open, onOpenChange, title, description, children, actio
   return (
     <Primitive.Root open={open} onOpenChange={onOpenChange}>
       <Primitive.Portal>
-        <Primitive.Overlay className="fixed inset-0 z-50 bg-ink/50" />
+        <Primitive.Overlay className="fixed inset-0 z-50 animate-fade bg-[rgb(10_11_13/0.5)]" />
         <Primitive.Content
           ref={content}
           {...(description === undefined ? noDescription : {})}
@@ -59,9 +59,11 @@ export function Dialog({ open, onOpenChange, title, description, children, actio
             event.preventDefault();
             target.focus();
           }}
-          className="fixed top-1/2 left-1/2 z-50 flex max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-md -translate-x-1/2 -translate-y-1/2 flex-col gap-4 overflow-y-auto rounded-lg border border-edge bg-surface p-gutter shadow-overlay"
+          className="fixed top-1/2 left-1/2 z-50 flex max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-md -translate-x-1/2 -translate-y-1/2 flex-col gap-4 overflow-y-auto rounded-lg border border-divider bg-surface p-gutter shadow-(--shadow-overlay) animate-rise sm:p-7"
         >
-          <Primitive.Title className="text-lg font-semibold text-ink">{title}</Primitive.Title>
+          <Primitive.Title className="text-lg font-semibold tracking-tight text-ink">
+            {title}
+          </Primitive.Title>
           {description !== undefined && (
             <Primitive.Description asChild>
               <div className="text-body text-muted">{description}</div>

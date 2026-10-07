@@ -15,9 +15,7 @@ export default function ProgrammesPage() {
             A programme is one grant you run, with its rounds, forms and reviewers. When your team
             sets one up, it appears here.
           </p>
-          <p className="mt-2">
-            Ask your administrator to set up a programme, or to add you to one that exists.
-          </p>
+          <p>Ask your administrator to set up a programme, or to add you to one that exists.</p>
         </EmptyState>
       </div>
     </Screen>

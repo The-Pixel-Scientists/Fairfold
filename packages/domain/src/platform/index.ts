@@ -55,6 +55,7 @@ export {
   checkTheme,
   contrastRatio,
   defaultTheme,
+  deriveDarkShades,
   deriveShades,
   logoTypes,
   MIN_CONTRAST,

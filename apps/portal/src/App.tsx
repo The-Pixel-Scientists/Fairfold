@@ -2,6 +2,7 @@
 
 import { NotFoundPage, Router, SessionProvider } from '@pixel-scientists/ui';
 import type { PageDefinition, RouteDefinition } from '@pixel-scientists/ui';
+import { Suspense, lazy } from 'react';
 import type { ReactNode } from 'react';
 
 import { endSession, loadSession } from './api.ts';
@@ -96,11 +97,27 @@ function TenantLayout({ children }: { children: ReactNode }) {
 }
 
 /**
+ * Design previews of screens not built yet: under /dev/preview in development,
+ * and the whole app in a demo build (`vite build --mode demo`), which the
+ * product site hosts. The production build drops them.
+ */
+const demo = import.meta.env.MODE === 'demo';
+const PreviewApp =
+  import.meta.env.DEV || demo ? lazy(() => import('./preview/PreviewApp.tsx')) : null;
+
+/**
  * The first segment of the address picks the app: a funder's slug opens that
  * funder's portal, with the router under `/<slug>`; anything else is one of
  * the few pages outside a funder. A page load keeps one slug.
  */
 export function App() {
+  if (PreviewApp !== null && (demo || window.location.pathname.startsWith('/dev/preview'))) {
+    return (
+      <Suspense fallback={null}>
+        <PreviewApp />
+      </Suspense>
+    );
+  }
   const slug = tenantSlugOf(window.location.pathname);
   if (slug === null) {
     return (

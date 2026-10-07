@@ -425,7 +425,7 @@ export function Router({
       <Layout>
         <div ref={outlet} aria-busy={isPending ? true : undefined}>
           {showPending && (
-            <p className="fixed top-2 left-1/2 z-40 max-w-[calc(100%-1rem)] -translate-x-1/2 rounded-md border border-edge bg-surface px-3 py-1 text-body text-ink shadow-raised">
+            <p className="fixed top-2 left-1/2 z-40 max-w-[calc(100%-1rem)] -translate-x-1/2 rounded-md border border-edge bg-surface px-3 py-1 text-body text-ink shadow-(--shadow-raised)">
               {loadingMessage}
             </p>
           )}

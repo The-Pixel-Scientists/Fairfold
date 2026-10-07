@@ -38,6 +38,8 @@ const apiProxy: Record<string, ProxyOptions> | undefined = apiOrigin
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   html: { cspNonce: 'TPS_CSP_NONCE' },
+  // scheme.js and the favicon, shared with the other app.
+  publicDir: '../../packages/ui/src/public',
   server: { allowedHosts: ['.localhost'], proxy: apiProxy },
   preview: { allowedHosts: ['.localhost'], proxy: apiProxy },
 });

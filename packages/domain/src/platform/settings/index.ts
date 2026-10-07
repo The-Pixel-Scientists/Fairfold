@@ -42,4 +42,4 @@ export {
   type Settings,
   type ThemeTokens,
 } from './schemas.ts';
-export { presetTokens, themeCss } from './theme-css.ts';
+export { DARK_SCHEME_SELECTOR, presetTokens, themeCss, themeProperties } from './theme-css.ts';

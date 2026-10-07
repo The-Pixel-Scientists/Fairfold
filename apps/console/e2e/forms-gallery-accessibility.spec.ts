@@ -6,12 +6,16 @@
 // policy.
 
 import { test } from '../../../scripts/e2e/fixtures.ts';
-import { expectNoHorizontalScroll, expectNoViolations, widths } from './auth-axe.ts';
+import { expectNoHorizontalScroll, expectNoViolations, variants } from './auth-axe.ts';
 import { galleryStates } from './forms-gallery-states.ts';
 
-for (const width of widths) {
-  test.describe(`at ${width.name}`, () => {
-    test.use({ viewport: width.viewport, deviceScaleFactor: width.deviceScaleFactor });
+for (const variant of variants) {
+  test.describe(`at ${variant.name}`, () => {
+    test.use({
+      viewport: variant.viewport,
+      deviceScaleFactor: variant.deviceScaleFactor,
+      colorScheme: variant.scheme,
+    });
 
     for (const state of galleryStates) {
       test(`@a11y @gallery the form examples have no axe violations with ${state.name}`, async ({

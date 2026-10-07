@@ -8,6 +8,7 @@ import {
   checkTheme,
   contrastRatio,
   defaultTheme,
+  deriveDarkShades,
   deriveShades,
   MIN_CONTRAST,
   themeSchema,
@@ -38,12 +39,12 @@ describe('checkTheme', () => {
   });
 
   it('checks every surface, not only white', () => {
-    // 4.54:1 on white, but 3.91:1 on the sunken surface (#eceef2).
+    // 4.54:1 on white, but 3.94:1 on the sunken surface (#efefec).
     expect(contrastRatio('#767676', '#ffffff')).toBeGreaterThan(MIN_CONTRAST);
     expect(checkTheme({ brandColour: '#767676' }).problems).toHaveLength(1);
-    expect(contrastRatio('#6c6c6c', '#eceef2')).toBeGreaterThanOrEqual(MIN_CONTRAST);
+    expect(contrastRatio('#6c6c6c', '#efefec')).toBeGreaterThanOrEqual(MIN_CONTRAST);
     expect(checkTheme({ brandColour: '#6c6c6c' }).problems).toEqual([]);
-    expect(contrastRatio('#6d6d6d', '#eceef2')).toBeLessThan(MIN_CONTRAST);
+    expect(contrastRatio('#6d6d6d', '#efefec')).toBeLessThan(MIN_CONTRAST);
     expect(checkTheme({ brandColour: '#6d6d6d' }).problems).toHaveLength(1);
   });
 
@@ -57,7 +58,7 @@ describe('checkTheme', () => {
     expect(check.suggestion).toMatch(/^#[0-9a-f]{6}$/);
     const suggestion = check.suggestion ?? '';
     expect(checkTheme({ brandColour: suggestion }).problems).toEqual([]);
-    expect(contrastRatio(suggestion, '#eceef2')).toBeLessThan(MIN_CONTRAST + 0.5);
+    expect(contrastRatio(suggestion, '#efefec')).toBeLessThan(MIN_CONTRAST + 0.5);
     expect(check.problems).toEqual([
       { field: 'brandColour', message: messages.brandColourContrast(suggestion) },
     ]);
@@ -72,7 +73,67 @@ describe('checkTheme', () => {
     const { brand, hover, tint } = deriveShades('#1F4BB8');
     expect(brand).toBe('#1f4bb8');
     expect(contrastRatio(hover, '#ffffff')).toBeGreaterThan(contrastRatio(brand, '#ffffff'));
-    expect(contrastRatio('#161a20', tint)).toBeGreaterThanOrEqual(MIN_CONTRAST);
+    expect(contrastRatio('#17181b', tint)).toBeGreaterThanOrEqual(MIN_CONTRAST);
+  });
+});
+
+describe('deriveShades', () => {
+  it('lightens the hover shade of a colour too dark to show a darker one', () => {
+    const { brand, hover } = deriveShades(defaultTheme.brandColour);
+    expect(hover).toBe('#36383c');
+    expect(contrastRatio(hover, '#000000')).toBeGreaterThan(contrastRatio(brand, '#000000'));
+    expect(contrastRatio(hover, '#ffffff')).toBeGreaterThanOrEqual(MIN_CONTRAST);
+  });
+});
+
+describe('deriveDarkShades', () => {
+  /** Every pair the dark scheme draws with the shades, from packages/ui/src/tokens.css. */
+  function darkPairs({ brand, hover, tint }: { brand: string; hover: string; tint: string }) {
+    return [
+      ...['#111214', '#18191c', '#212226', tint].map((surface) => [brand, surface] as const),
+      [brand, '#141518'],
+      [hover, '#141518'],
+      ['#ececea', tint],
+      ['#a3a6ac', tint],
+    ] as const;
+  }
+
+  it('turns ink, black and greys into the dark scheme’s own paper white', () => {
+    for (const colour of [defaultTheme.brandColour, '#000000', '#595959']) {
+      expect(deriveDarkShades(colour)).toEqual({
+        brand: '#ececea',
+        hover: '#ffffff',
+        tint: '#2a2c30',
+      });
+    }
+  });
+
+  it('keeps a colour’s hue at a lighter shade, with a dark tint of it', () => {
+    expect(deriveDarkShades('#0B5D3B')).toEqual({
+      brand: '#8ed7ae',
+      hover: '#a5eec5',
+      tint: '#182b21',
+    });
+  });
+
+  it('reaches AA in the dark scheme for every colour that passes the light check', () => {
+    const steps = [0x00, 0x24, 0x49, 0x6d, 0x92, 0xb6, 0xdb, 0xff];
+    let checked = 0;
+    for (const red of steps) {
+      for (const green of steps) {
+        for (const blue of steps) {
+          const colour = `#${[red, green, blue].map((value) => value.toString(16).padStart(2, '0')).join('')}`;
+          if (checkTheme({ brandColour: colour }).problems.length > 0) continue;
+          checked += 1;
+          for (const [a, b] of darkPairs(deriveDarkShades(colour))) {
+            expect(contrastRatio(a, b), `${colour}: ${a} on ${b}`).toBeGreaterThanOrEqual(
+              MIN_CONTRAST,
+            );
+          }
+        }
+      }
+    }
+    expect(checked).toBeGreaterThan(100);
   });
 });
 
