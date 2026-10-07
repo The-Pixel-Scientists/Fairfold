@@ -6,6 +6,7 @@
 // plain JSON in the shape of the contracts in packages/domain/src/platform/settings;
 // the console checks each one against its contract.
 
+import { themeCss as buildThemeCss } from '@pixel-scientists/domain/platform/settings';
 import type { Page } from '@playwright/test';
 
 import { consoleSession, stubSignedIn } from './auth-api.ts';
@@ -48,35 +49,9 @@ const administrator = [
   'grants.data.export',
 ];
 
-/** Each preset's radius and surfaces, as `theme.css` sets them (packages/domain/src/platform/settings/theme-css.ts). */
-const presets = {
-  standard: { radius: ['0.25rem', '0.375rem', '0.5rem'], canvas: '#f5f6f8', sunken: '#eceef2' },
-  rounded: { radius: ['0.5rem', '0.75rem', '1rem'], canvas: '#f8f7f4', sunken: '#f0efea' },
-  square: { radius: ['0', '0', '0'], canvas: '#f6f6f6', sunken: '#eeeeee' },
-} as const;
-
-/** A colour `amount` of the way towards another, as `#rrggbb`. */
-function mix(from: string, to: string, amount: number): string {
-  const channel = (hex: string, at: number) => Number.parseInt(hex.slice(at, at + 2), 16);
-  return `#${[1, 3, 5]
-    .map((at) => Math.round(channel(from, at) + (channel(to, at) - channel(from, at)) * amount))
-    .map((value) => value.toString(16).padStart(2, '0'))
-    .join('')}`;
-}
-
+/** The stylesheet the API serves for a look, from the function it uses. */
 export function themeCss({ brandColour, preset }: Pick<Funder, 'brandColour' | 'preset'>): string {
-  const shape = presets[preset];
-  const properties: [string, string][] = [
-    ['--color-accent', brandColour],
-    ['--color-accent-hover', mix(brandColour, '#000000', 0.2)],
-    ['--color-accent-soft', mix(brandColour, '#ffffff', 0.9)],
-    ['--color-canvas', shape.canvas],
-    ['--color-sunken', shape.sunken],
-    ['--radius-sm', shape.radius[0]],
-    ['--radius-md', shape.radius[1]],
-    ['--radius-lg', shape.radius[2]],
-  ];
-  return `:root {\n${properties.map(([name, value]) => `  ${name}: ${value};\n`).join('')}}\n`;
+  return buildThemeCss({ brandColour, preset });
 }
 
 const tokens = (funder: Funder) => ({

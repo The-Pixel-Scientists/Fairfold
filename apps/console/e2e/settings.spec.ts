@@ -231,10 +231,13 @@ test.describe('brand colour and preset', () => {
     });
     await expect.poll(() => accent(page)).toBe('#0b5d3b');
     await expect(page.locator('html')).toHaveAttribute('data-preset', 'rounded');
-    // The link to the current page is in the brand colour. (The button under the pointer is in its hover shade.)
-    await expect(
-      page.getByRole('navigation', { name: 'Settings' }).getByRole('link', { name: 'Look' }),
-    ).toHaveCSS('color', 'rgb(11, 93, 59)');
+    // The tab for the current page has a bar under it in the brand colour.
+    const tab = page
+      .getByRole('navigation', { name: 'Settings' })
+      .getByRole('link', { name: 'Look' });
+    await expect
+      .poll(() => tab.evaluate((link) => getComputedStyle(link, '::after').backgroundColor))
+      .toBe('rgb(11, 93, 59)');
 
     await page.reload();
     await expect(h1(page, 'Look and logo')).toBeVisible();
