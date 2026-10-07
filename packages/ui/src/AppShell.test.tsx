@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { describe, expect, it } from 'vitest';
@@ -35,6 +35,77 @@ describe('AppShell', () => {
     const main = screen.getByRole('main');
     expect(main.id).toBe('main-content');
     expect(main.contains(screen.getByRole('heading', { level: 1, name: 'Programmes' }))).toBe(true);
+  });
+
+  it('has a footer landmark, after the page, with the Appearance group in it', () => {
+    render(
+      <AppShell productName="Fairfold Grants" navigation={navigation}>
+        <h1>Programmes</h1>
+      </AppShell>,
+    );
+
+    const footer = screen.getByRole('contentinfo');
+    expect(within(footer).getByRole('group', { name: 'Appearance' })).toBeTruthy();
+    expect(within(footer).getAllByRole('radio')).toHaveLength(3);
+    expect(screen.getAllByRole('contentinfo')).toHaveLength(1);
+    // Not inside the main landmark or the header, and after the page in reading order.
+    expect(screen.getByRole('main').contains(footer)).toBe(false);
+    expect(screen.getByRole('banner').contains(footer)).toBe(false);
+    expect(
+      screen.getByRole('main').compareDocumentPosition(footer) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(screen.getAllByRole('group', { name: 'Appearance' })).toHaveLength(1);
+  });
+
+  it('has the footer without navigation too', () => {
+    render(
+      <AppShell productName="Fairfold Grants">
+        <h1>Programmes</h1>
+      </AppShell>,
+    );
+
+    expect(
+      within(screen.getByRole('contentinfo')).getByRole('group', { name: 'Appearance' }),
+    ).toBeTruthy();
+  });
+
+  it('adds nothing to the banner from the product mark', () => {
+    render(
+      <AppShell productName="Fairfold Grants" areaName="Staff console">
+        <h1>Programmes</h1>
+      </AppShell>,
+    );
+
+    const banner = screen.getByRole('banner');
+    const mark = banner.querySelector('svg');
+    expect(mark?.getAttribute('aria-hidden')).toBe('true');
+    expect(mark?.querySelector('title, desc')).toBeNull();
+    expect(mark?.hasAttribute('aria-label')).toBe(false);
+    expect(mark?.hasAttribute('aria-labelledby')).toBe(false);
+    expect(mark?.textContent).toBe('');
+    expect(within(banner).queryAllByRole('img')).toEqual([]);
+    expect(banner.textContent).toBe('Fairfold GrantsStaff console');
+  });
+
+  it('names the home link by the product name alone, without the mark', () => {
+    function Frame({ children }: { children: ReactNode }) {
+      return (
+        <AppShell productName="Fairfold Grants" homeHref="/">
+          {children}
+        </AppShell>
+      );
+    }
+    window.history.replaceState(null, '', '/');
+    render(
+      <Router
+        routes={[{ path: '/', title: 'Home', component: () => <h1>Home</h1> }]}
+        layout={Frame}
+      />,
+    );
+
+    const link = within(screen.getByRole('banner')).getByRole('link');
+    expect(link.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
+    expect(screen.getByRole('link', { name: 'Fairfold Grants' })).toBe(link);
   });
 
   it('makes the product name a link to the home path, through the router, when asked', () => {
