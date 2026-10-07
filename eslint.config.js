@@ -249,6 +249,12 @@ export default defineConfig(
         'error',
         { nav: ['navigation'], ol: ['list'], ul: ['list'] },
       ],
+      // A region that scrolls sideways, such as a wide table's, must take
+      // focus so keyboard users can scroll it (axe: scrollable-region-focusable).
+      'jsx-a11y-x/no-noninteractive-tabindex': [
+        'error',
+        { roles: ['tabpanel', 'region'], tags: [] },
+      ],
     },
   },
   moduleBoundaries,
