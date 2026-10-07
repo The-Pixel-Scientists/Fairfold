@@ -8,7 +8,10 @@
     "module": "preserve",
     "moduleResolution": "bundler",
     "lib": ["es2024", "dom", "dom.iterable"],
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    // public/scheme.js is served as it is, and checked like the rest.
+    "allowJs": true,
+    "checkJs": true
   },
   "include": ["src", "test", "package.json"]
 }
