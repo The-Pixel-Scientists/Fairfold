@@ -23,6 +23,27 @@ The other tools are planned, and the aim is for every tool to launch in
 2027. Each has a placeholder folder in [`modules/`](modules) that says what
 it will do.
 
+## A first look
+
+Fairfold Grants is ink on paper, set in
+[Atkinson Hyperlegible Next](https://github.com/googlefonts/atkinson-hyperlegible-next),
+with a light and a dark scheme that follow your device unless you choose
+one. A funder's brand colour carries into both. These are real screens on
+synthetic data, and the pictures follow your GitHub theme.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/console-dark.webp">
+  <img src="docs/images/console-light.webp" alt="The staff console's look and logo settings: side navigation, tabs, a brand colour that passes its contrast check, the three presets and a preview of the funder's look.">
+</picture>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/portal-dark.webp">
+  <img src="docs/images/portal-light.webp" alt="The applicant portal on three phones: the start page, creating an account, and an application form part-way through, for a lunch club in a village hall.">
+</picture>
+
+Every screen of a funding round, built and still in design, is in the
+[product book](https://fairfold.org.uk/book/).
+
 ## The Fairfold suite
 
 | Tool | What it does | Status |
