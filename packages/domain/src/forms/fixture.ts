@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
 // Test data for the form engine's tests: a small form with one field of
-// every type, conditions, eligibility, identity and aggregate-only fields.
+// every type but a table, conditions, eligibility, identity and
+// aggregate-only fields; and a budget form of table questions.
 // Synthetic only.
 
 import { formDefinitionSchema } from './rules.ts';
@@ -155,4 +156,66 @@ export const exampleAnswers = {
   f_region: 'north',
   f_planning: true,
   f_ethnicity: 'two',
+};
+
+/** A budget with one row per cost, and an identity table of trustees. */
+export const budgetInput = {
+  sections: [
+    {
+      id: 's_budget',
+      title: 'Budget',
+      fields: [
+        {
+          id: 'f_budget',
+          type: 'table',
+          label: 'What will the money pay for?',
+          required: true,
+          rowNoun: 'cost',
+          maxRows: 10,
+          columns: [
+            { id: 'c_item', type: 'short_text', label: 'Item', maxCharacters: 100 },
+            {
+              id: 'c_cost',
+              type: 'currency',
+              label: 'Cost',
+              minMinor: 100,
+              maxMinor: 2_500_000,
+              total: true,
+            },
+          ],
+        },
+        {
+          id: 'f_trustees',
+          type: 'table',
+          label: 'Who are your trustees?',
+          identity: true,
+          rowNoun: 'trustee',
+          columns: [
+            { id: 'c_name', type: 'short_text', label: 'Name' },
+            {
+              id: 'c_role',
+              type: 'dropdown',
+              label: 'Role',
+              required: false,
+              options: [
+                { value: 'chair', label: 'Chair' },
+                { value: 'treasurer', label: 'Treasurer' },
+                { value: 'trustee', label: 'Trustee' },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
+
+export const budgetForm = formDefinitionSchema.parse(budgetInput);
+
+export const budgetAnswers = {
+  f_budget: [
+    { c_item: 'Roof repairs', c_cost: { amountMinor: 1_000_000, currency: 'GBP' } },
+    { c_item: 'Scaffolding', c_cost: { amountMinor: 250_050, currency: 'GBP' } },
+  ],
+  f_trustees: [{ c_name: 'Alex Northfield', c_role: 'chair' }, { c_name: 'Sam Southfield' }],
 };
