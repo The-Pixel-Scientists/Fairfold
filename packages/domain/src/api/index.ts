@@ -5,6 +5,12 @@
 import '../jitless/index.ts';
 
 export {
+  isProjectedAnswersSchema,
+  projectedAnswers,
+  projectedAnswersSchemas,
+  type ProjectedAnswers,
+} from './answers/projection.ts';
+export {
   apiBasePath,
   call,
   upload,

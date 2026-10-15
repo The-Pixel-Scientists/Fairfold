@@ -4,9 +4,13 @@
 // schema-rules.ts. A schema that cannot convert on the side asked for gives
 // undefined, and the rules refuse it: custom and recursive schemas never
 // convert, and a transform converts on its output side only when a schema
-// for its result follows it.
+// for its result follows it. A projected answers schema (answers/) is marked
+// as such and its values are not walked: answers are the one exception to
+// the response rules (ADR 0004).
 
 import { z } from 'zod';
+
+import { isProjectedAnswersSchema } from './answers/projection.ts';
 
 export type JsonSchema = Readonly<Record<string, unknown>>;
 
@@ -23,16 +27,27 @@ export function list(value: unknown): unknown[] {
 
 export function toJsonSchema(schema: z.ZodType, io: 'input' | 'output'): JsonSchema | undefined {
   try {
-    return z.toJSONSchema(schema, { io, unrepresentable: 'throw', cycles: 'throw' });
+    return z.toJSONSchema(schema, {
+      io,
+      unrepresentable: 'throw',
+      cycles: 'throw',
+      // Marks projected answers by identity, and removes the mark anywhere
+      // else, so no schema's metadata can claim the exception.
+      override: ({ zodSchema, jsonSchema }) => {
+        if (isProjectedAnswersSchema(zodSchema)) jsonSchema['x-projected-answers'] = true;
+        else delete jsonSchema['x-projected-answers'];
+      },
+    });
   } catch {
     return undefined;
   }
 }
 
-/** Every schema inside a JSON Schema document, the root included. */
+/** Every schema inside a JSON Schema document, the root included, but not inside projected answers. */
 export function* schemaNodes(node: unknown): Generator<JsonSchema> {
   if (!isObject(node)) return;
   yield node;
+  if (node['x-projected-answers'] === true) return;
   for (const key of ['items', 'additionalProperties', 'propertyNames', 'contains']) {
     yield* schemaNodes(node[key]);
   }
