@@ -8,7 +8,15 @@ import type { Generated } from '@pixel-scientists/db';
 import type { AuthEventCode } from '@pixel-scientists/domain/auth';
 
 export type AuthTables = {
-  'auth.user': { id: string; email: string };
+  'auth.user': {
+    id: Generated<string>;
+    email: string;
+    email_verified: boolean;
+    status: Generated<string>;
+  };
+  'auth.account': { user_id: string; account_id: string; provider_id: string; password: string };
+  'auth.verification': { identifier: string; value: string; expires_at: Date };
+  'auth.two_factor': { user_id: string; verified: boolean };
   'auth.session': {
     user_id: string;
     token_hash: Buffer;
@@ -30,11 +38,11 @@ export type AuthTables = {
 
 export type TenantTables = {
   'app.membership': {
-    id: string;
+    id: Generated<string>;
     tenant_id: string;
     user_id: string;
     roles: string[];
-    status: string;
+    status: Generated<string>;
   };
   'app.tenant': { id: string; slug: string; name: string; status: string };
   'app.tenant_module': { module: string; enabled: boolean };
