@@ -13,13 +13,16 @@ export type ProjectionAudience = (typeof projectionAudiences)[number];
 
 /**
  * Content blocks and aggregate-only answers are for the applicant alone.
- * Blind reviewers see what reviewers see, less identity fields. Any other
- * audience sees nothing.
+ * Blind reviewers see what reviewers see, less identity fields and every
+ * file question, because a document can name the applicant whatever it is
+ * called (ADR 0047). Any other audience sees nothing.
  */
 export function canSee(field: FormField, audience: ProjectionAudience): boolean {
   if (field.type === 'content' || field.audiences === 'aggregate_only') {
     return audience === 'applicant';
   }
-  if (audience === 'blind_reviewer') return field.audiences.includes('reviewer') && !field.identity;
+  if (audience === 'blind_reviewer') {
+    return field.type !== 'file' && field.audiences.includes('reviewer') && !field.identity;
+  }
   return (field.audiences as readonly string[]).includes(audience);
 }

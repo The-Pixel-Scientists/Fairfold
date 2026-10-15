@@ -48,9 +48,13 @@ describe('parseDefinition', () => {
     });
   });
 
-  it('refuses a field type it does not know, such as a file upload', () => {
+  it('refuses a field type it does not know, such as a signature', () => {
     const input = variant((form) => {
-      (form.sections[0]?.fields as object[]).push({ id: 'f_file', type: 'file', label: 'File' });
+      (form.sections[0]?.fields as object[]).push({
+        id: 'f_sign',
+        type: 'signature',
+        label: 'Sign',
+      });
     });
     expect(parseDefinition(input).success).toBe(false);
   });

@@ -4,6 +4,7 @@
 // wrong and how to fix it. Answer messages are for applicants; definition
 // messages are for staff building a form. None repeats an answer.
 
+import { fileTypeLabels, type FileType } from '../files/types.ts';
 import { formatMoney, type Money } from '../platform/money.ts';
 
 /** The most questions one form may hold. */
@@ -23,6 +24,24 @@ function rows(value: number, noun: string): string {
   if (/(?:s|x|z|ch|sh)$/i.test(noun)) return `${count(value)} ${noun}es`;
   if (/[^aeiou]y$/i.test(noun)) return `${count(value)} ${noun.slice(0, -1)}ies`;
   return `${count(value)} ${noun}s`;
+}
+
+function files(value: number): string {
+  return `${count(value)} file${value === 1 ? '' : 's'}`;
+}
+
+/** File types in words, the first with its article: "a PDF or Word document". */
+function fileTypesInWords(types: readonly FileType[]): string {
+  const words = types.map((type) => fileTypeLabels[type]);
+  const last = words.pop();
+  const list = words.length === 0 ? `${last}` : `${words.join(', ')} or ${last}`;
+  return `${/^[aeiou]/i.test(list) ? 'an' : 'a'} ${list}`;
+}
+
+/** A size limit in MB (MiB), or KB below 1 MB, rounded down to a tenth so it never overstates. */
+function size(bytes: number): string {
+  const [unit, per] = bytes >= 1024 * 1024 ? ['MB', 1024 * 1024] : ['KB', 1024];
+  return `${(Math.floor((bytes * 10) / per) / 10).toLocaleString('en-GB')} ${unit}`;
 }
 
 /**
@@ -92,6 +111,12 @@ export const formMessages = {
   enterCellAmount: (row: string) => `Enter an amount for ${row}.`,
   chooseCell: (row: string) => `Choose an answer for ${row}.`,
   cell: cellMessages,
+  uploadFile: 'Upload a file for this question.',
+  fileIds: 'Send the files for this question as a list of file ids.',
+  uploadEachOnce: 'Upload each file only once.',
+  uploadAtMost: (max: number) => `Upload no more than ${files(max)}.`,
+  fileType: (types: readonly FileType[]) => `The file must be ${fileTypesInWords(types)}.`,
+  fileSize: (maxBytes: number) => `The file must be ${size(maxBytes)} or smaller.`,
 
   // Definitions.
   audiences: 'Choose who sees the answer: the applicant, and staff or reviewers or both.',
@@ -109,5 +134,7 @@ export const formMessages = {
   selectionsOptions: 'Allow no more selections than there are options.',
   columnIdUsedTwice: 'Give this column a different id. Each column in a table needs its own.',
   totalType: 'Turn off the total. Only number and currency columns can have one.',
+  fileTypesUnique: 'Choose each file type only once.',
+  fileAudiences: 'Choose who sees the files: the applicant, and staff or reviewers or both.',
   tooManyFields: `Use no more than ${count(MAX_FIELDS)} questions in a form.`,
 } as const;

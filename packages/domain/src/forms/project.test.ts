@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { projectionAudiences, type ProjectionAudience } from './audience.ts';
+import { canSee, projectionAudiences, type ProjectionAudience } from './audience.ts';
 import type { FormField } from './definition.ts';
 import { exampleAnswers, exampleForm } from './fixture.ts';
 import { projectAnswers } from './project.ts';
@@ -16,7 +16,8 @@ function mayView(field: FormField, audience: ProjectionAudience): boolean {
   if (field.audiences === 'aggregate_only') return false;
   if (audience === 'staff') return field.audiences.includes('staff');
   const reviewer = field.audiences.includes('reviewer');
-  return audience === 'reviewer' ? reviewer : reviewer && !field.identity;
+  if (audience === 'reviewer') return reviewer;
+  return reviewer && !field.identity && field.type !== 'file';
 }
 
 describe('projectAnswers', () => {
@@ -84,7 +85,15 @@ const AUDIENCES = [
   ['applicant'],
   'aggregate_only',
 ] as const;
-const TYPES = ['short_text', 'yes_no', 'single_choice', 'number', 'multiple_choice', 'content'];
+const TYPES = [
+  'short_text',
+  'yes_no',
+  'single_choice',
+  'number',
+  'multiple_choice',
+  'file',
+  'content',
+];
 const OPTIONS = [
   { value: 'a', label: 'A' },
   { value: 'b', label: 'B' },
@@ -106,7 +115,10 @@ function randomCase(seed: number) {
       if (type === 'content') return { id: fieldId, type, body: 'Read this.', conditions };
       // A gate is seen by everyone, so any later field may depend on it.
       const gate = type === 'yes_no' && next() < 0.5;
-      const audiences = gate ? undefined : pick(AUDIENCES);
+      // A file question is never aggregate only.
+      const audiences = gate
+        ? undefined
+        : pick(AUDIENCES.slice(0, type === 'file' ? -1 : undefined));
       if (gate) gates.push(fieldId);
       return {
         id: fieldId,
@@ -129,6 +141,7 @@ function randomCase(seed: number) {
       single_choice: 'a',
       number: 7,
       multiple_choice: ['b'],
+      file: ['0f8fad5b-d9cb-469f-a165-70867728950e'],
       content: 'not an answer',
     };
     answers[field.id] = values[field.type];
@@ -139,7 +152,7 @@ function randomCase(seed: number) {
 // 500 forms, parsed without zod's JIT, can take several seconds on a busy machine.
 describe('projectAnswers, on 500 random forms', { timeout: 30_000 }, () => {
   it('keeps exactly the shown answers each audience may see, and nothing else', () => {
-    const seen = { hidden: 0, aggregateOnly: 0, identity: 0 };
+    const seen = { hidden: 0, aggregateOnly: 0, identity: 0, file: 0 };
     for (let seed = 1; seed <= 500; seed += 1) {
       const { form, answers } = randomCase(seed);
       const shown = visibleFields(form, answers);
@@ -148,6 +161,7 @@ describe('projectAnswers, on 500 random forms', { timeout: 30_000 }, () => {
         if (!shown.includes(field)) seen.hidden += 1;
         else if (field.audiences === 'aggregate_only') seen.aggregateOnly += 1;
         else if (field.identity) seen.identity += 1;
+        else if (field.type === 'file' && canSee(field, 'reviewer')) seen.file += 1;
       }
       for (const audience of projectionAudiences) {
         const projected = projectAnswers(form, answers, audience);
@@ -160,13 +174,18 @@ describe('projectAnswers, on 500 random forms', { timeout: 30_000 }, () => {
         for (const field of form.sections.flatMap((section) => section.fields)) {
           if (!(field.id in projected) || field.type === 'content') continue;
           if (audience !== 'applicant') expect(field.audiences).not.toBe('aggregate_only');
-          if (audience === 'blind_reviewer') expect(field.identity).toBe(false);
+          if (audience === 'blind_reviewer') {
+            expect(field.identity).toBe(false);
+            expect(field.type).not.toBe('file');
+          }
         }
       }
     }
-    // The cases cover answers hidden by conditions, aggregate-only answers and identity answers.
+    // The cases cover answers hidden by conditions, aggregate-only answers, identity answers,
+    // and file answers reviewers see but blind reviewers must not.
     expect(seen.hidden).toBeGreaterThan(50);
     expect(seen.aggregateOnly).toBeGreaterThan(50);
     expect(seen.identity).toBeGreaterThan(50);
+    expect(seen.file).toBeGreaterThan(50);
   });
 });

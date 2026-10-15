@@ -11,7 +11,9 @@
 //   - options differ, lower limits are not above upper ones, and a form has
 //     at most MAX_FIELDS questions;
 //   - a table's column ids differ, only number and currency columns have a
-//     total, and a table controls no condition (it is no choice question).
+//     total, and a table controls no condition (it is no choice question);
+//   - a file question lists each type once, is never aggregate only, and
+//     controls no condition or eligibility rule.
 
 import type { z } from 'zod';
 
@@ -111,6 +113,12 @@ function fieldProblems(field: FormField, path: Path): Problem[] {
       }
       limitProblems(column, addColumn);
     });
+  }
+  if (field.type === 'file') {
+    if (new Set(field.allowedTypes).size !== field.allowedTypes.length) {
+      add('allowedTypes', m.fileTypesUnique);
+    }
+    if (field.audiences === 'aggregate_only') add('audiences', m.fileAudiences);
   }
   return problems;
 }

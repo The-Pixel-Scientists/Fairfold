@@ -31,12 +31,14 @@ export {
   TABLE_MAX_ROWS,
   tableColumnSchema,
   type Condition,
+  type FileField,
   type FormField,
   type Question,
   type TableColumn,
   type TableField,
 } from './definition.ts';
 export { checkEligibility, type EligibilityResult } from './eligibility.ts';
+export { checkFile } from './file.ts';
 export { formMessages, MAX_FIELDS } from './messages.ts';
 export { projectAnswers } from './project.ts';
 export {

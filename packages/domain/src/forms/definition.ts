@@ -8,6 +8,7 @@
 
 import { z } from 'zod';
 
+import { fileTypes, MAX_FILE_BYTES, MAX_FILES_PER_FIELD } from '../files/types.ts';
 import { catalogueParams } from '../platform/messages.ts';
 import { currencies } from '../platform/money.ts';
 import { formMessages } from './messages.ts';
@@ -153,6 +154,22 @@ export const fieldSchema = z.discriminatedUnion('type', [
     maxRows: z.int().min(1).max(TABLE_MAX_ROWS).default(20),
     columns: z.array(tableColumnSchema).min(1).max(6),
   }),
+  /**
+   * Files the applicant attaches (ADR 0047). Its answer is the ids of the
+   * files linked to the application, which the server adds from its join
+   * table: a client never sends them.
+   */
+  z.strictObject({
+    ...question,
+    type: z.literal('file'),
+    allowedTypes: z
+      .array(z.enum(fileTypes))
+      .min(1)
+      .max(fileTypes.length)
+      .default([...fileTypes]),
+    maxBytes: z.int().min(1024).max(MAX_FILE_BYTES).default(MAX_FILE_BYTES),
+    maxFiles: z.int().min(1).max(MAX_FILES_PER_FIELD).default(1),
+  }),
   /** Text for the applicant to read. It takes no answer. */
   z.strictObject({
     id: fieldIdSchema,
@@ -179,6 +196,7 @@ export type DefinitionShape = z.output<typeof definitionShapeSchema>;
 export type FormField = z.output<typeof fieldSchema>;
 export type Question = Exclude<FormField, { type: 'content' }>;
 export type TableField = Extract<FormField, { type: 'table' }>;
+export type FileField = Extract<FormField, { type: 'file' }>;
 export type TableColumn = z.output<typeof tableColumnSchema>;
 export type Condition = z.output<typeof conditionSchema>;
 

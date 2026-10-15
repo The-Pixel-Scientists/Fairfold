@@ -14,9 +14,13 @@
 // table. Any other value, empty or not, is checked against the field's type.
 // A table's cells follow the same rules, by their column's type, and a
 // problem with one cell names it `<field id>.<row from 1>.<column id>`.
+// A file question's answer is the ids of its linked files, and an empty list
+// is no answer. The server adds them from its join table before it checks
+// or projects answers; a client never sends them (ADR 0047).
 
 import { z } from 'zod';
 
+import { idSchema } from '../id.ts';
 import { messages, type FieldProblem } from '../platform/messages.ts';
 import { moneySchema } from '../platform/money.ts';
 import { ukAddressSchema } from './answers.ts';
@@ -25,6 +29,7 @@ import {
   LONG_TEXT_MAX_CHARACTERS,
   questionsOf,
   SHORT_TEXT_MAX_CHARACTERS,
+  type FileField,
   type Question,
   type TableColumn,
   type TableField,
@@ -71,7 +76,7 @@ const STRING_ANSWERS = new Set<Question['type']>([
 function isNoAnswer(field: Question, value: unknown): boolean {
   if (value === undefined || value === null) return true;
   if (typeof value === 'string') return STRING_ANSWERS.has(field.type) && value.trim() === '';
-  const list = field.type === 'multiple_choice' || field.type === 'table';
+  const list = field.type === 'multiple_choice' || field.type === 'table' || field.type === 'file';
   return list && Array.isArray(value) && value.length === 0;
 }
 
@@ -157,6 +162,19 @@ function choiceProblem(field: Question & { type: 'multiple_choice' }, value: unk
     return m.chooseAtMost(field.maxSelections);
   }
   return undefined;
+}
+
+/**
+ * A lower-case uuid, checked by field type and never through the answer
+ * union, where it would also pass as an option value.
+ */
+const isFileId = (id: unknown): boolean =>
+  typeof id === 'string' && id === id.toLowerCase() && idSchema.safeParse(id).success;
+
+function fileProblem(field: FileField, value: unknown) {
+  if (!Array.isArray(value) || !value.every(isFileId)) return m.fileIds;
+  if (new Set(value).size !== value.length) return m.uploadEachOnce;
+  return value.length > field.maxFiles ? m.uploadAtMost(field.maxFiles) : undefined;
 }
 
 function addressProblems(field: Question, value: unknown): FieldProblem[] {
@@ -268,12 +286,15 @@ function answerProblems(field: Question, value: unknown, mode: ValidationMode): 
       return addressProblems(field, value);
     case 'table':
       return tableProblems(field, value, mode);
+    case 'file':
+      return one(fileProblem(field, value));
   }
 }
 
 function requiredMessage(field: Question): string {
   if (field.type === 'multiple_choice') return m.chooseAtLeast(field.minSelections ?? 1);
   if (field.type === 'table') return m.rowsAtLeast(Math.max(field.minRows, 1), field.rowNoun);
+  if (field.type === 'file') return m.uploadFile;
   const choice =
     field.type === 'single_choice' || field.type === 'dropdown' || field.type === 'yes_no';
   return choice ? m.chooseAnswer : m.enterAnswer;
