@@ -9,6 +9,8 @@ export type Generated<T> =
     ? ColumnType<S, I | undefined, U>
     : ColumnType<T, T | undefined, T>;
 
+export type Int8 = ColumnType<string, bigint | number | string, bigint | number | string>;
+
 export type Json = JsonValue;
 
 export type JsonArray = JsonValue[];
@@ -46,6 +48,20 @@ export interface AppConfigVersion {
   id: Generated<string>;
   tenant_id: string;
   version: number;
+}
+
+export interface AppFile {
+  content_type: string;
+  created_at: Generated<Timestamp>;
+  created_by: string;
+  id: Generated<string>;
+  name: string;
+  scan_state: Generated<string>;
+  scanned_at: Timestamp | null;
+  sha256: Buffer | null;
+  size_bytes: Int8;
+  storage_key: string | null;
+  tenant_id: string;
 }
 
 export interface AppMembership {
@@ -105,6 +121,7 @@ export interface AppTenantTheme {
 export interface DB {
   'app.audit_event': AppAuditEvent;
   'app.config_version': AppConfigVersion;
+  'app.file': AppFile;
   'app.membership': AppMembership;
   'app.retention_policy': AppRetentionPolicy;
   'app.tenant': AppTenant;
