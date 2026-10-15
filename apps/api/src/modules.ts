@@ -5,9 +5,11 @@
 // declares. A module never imports from this app; the platform reaches it
 // only through its server entry point.
 
+import { listAuditEvents } from '@pixel-scientists/domain/platform/audit-log';
 import { partyRoutes } from '@pixel-scientists/party/contracts';
 import { partyHandlers, partyResolvers } from '@pixel-scientists/party/server';
 
+import { listAuditEventsHandler } from './platform/audit-log/index.ts';
 import type { ScopeResolvers } from './policy/index.ts';
 import { ApiError } from './problems.ts';
 import { route, type Route } from './routes/register.ts';
@@ -24,6 +26,7 @@ export function composeModules(): ComposedModules {
   const party = partyHandlers({ notFound });
   return {
     routes: [
+      route(listAuditEvents, listAuditEventsHandler),
       route(partyRoutes.getProfile, party.getProfile),
       route(partyRoutes.updateProfile, party.updateProfile),
       route(partyRoutes.recordConsent, party.recordConsent),
