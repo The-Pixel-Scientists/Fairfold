@@ -7,7 +7,14 @@
 import { z } from 'zod';
 
 import { moneySchema } from '../platform/money.ts';
-import { fieldIdSchema, LONG_TEXT_MAX_CHARACTERS, optionValueSchema } from './definition.ts';
+import {
+  CELL_MAX_CHARACTERS,
+  columnIdSchema,
+  fieldIdSchema,
+  LONG_TEXT_MAX_CHARACTERS,
+  optionValueSchema,
+  TABLE_MAX_ROWS,
+} from './definition.ts';
 
 export const ukAddressSchema = z.strictObject({
   line1: z.string().max(100),
@@ -19,6 +26,19 @@ export const ukAddressSchema = z.strictObject({
 
 export type UkAddress = z.output<typeof ukAddressSchema>;
 
+/** One cell of a table answer: text or an option value, a number, an amount, or nothing. */
+export const cellValueSchema = z.union([
+  z.string().max(CELL_MAX_CHARACTERS * 2),
+  z.number(),
+  moneySchema,
+  z.null(),
+]);
+
+/** A table's rows, each keyed by column id. */
+export const tableRowsSchema = z
+  .array(z.record(columnIdSchema, cellValueSchema))
+  .max(TABLE_MAX_ROWS);
+
 /** `null` means no answer; validateAnswers() decides what else does, by field type. */
 export const answerValueSchema = z.union([
   // Characters are counted as code points; a code point can take two UTF-16 units.
@@ -28,6 +48,7 @@ export const answerValueSchema = z.union([
   z.array(optionValueSchema).max(100),
   moneySchema,
   ukAddressSchema,
+  tableRowsSchema,
   z.null(),
 ]);
 

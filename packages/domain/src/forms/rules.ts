@@ -9,7 +9,9 @@
 //   - eligibility questions are required, seen by staff, and stop on some but
 //     not all of their answers;
 //   - options differ, lower limits are not above upper ones, and a form has
-//     at most MAX_FIELDS questions.
+//     at most MAX_FIELDS questions;
+//   - a table's column ids differ, only number and currency columns have a
+//     total, and a table controls no condition (it is no choice question).
 
 import type { z } from 'zod';
 
@@ -21,6 +23,7 @@ import {
   type Condition,
   type DefinitionShape,
   type FormField,
+  type TableColumn,
 } from './definition.ts';
 import { formMessages as m, MAX_FIELDS } from './messages.ts';
 
@@ -61,13 +64,26 @@ function conditionSources(
   return sources;
 }
 
-function fieldProblems(field: FormField, path: Path): Problem[] {
-  const problems: Problem[] = [];
-  const add = (key: string, message: string) => problems.push({ path: [...path, key], message });
-  if ('options' in field) {
-    const values = field.options.map((option) => option.value);
+/** Problems a question and a table column of the same type share. */
+function limitProblems(item: FormField | TableColumn, add: (key: string, message: string) => void) {
+  if ('options' in item) {
+    const values = item.options.map((option) => option.value);
     if (new Set(values).size !== values.length) add('options', m.optionsUnique);
   }
+  if (item.type === 'number' && item.min !== undefined && item.max !== undefined) {
+    if (item.min > item.max) add('min', m.limitOrder);
+  }
+  if (item.type === 'currency' && item.maxMinor !== undefined && item.minMinor > item.maxMinor) {
+    add('minMinor', m.limitOrder);
+  }
+}
+
+function fieldProblems(field: FormField, path: Path): Problem[] {
+  const problems: Problem[] = [];
+  const at = (where: Path) => (key: string, message: string) =>
+    problems.push({ path: [...where, key], message });
+  const add = at(path);
+  limitProblems(field, add);
   if ('eligibility' in field && field.eligibility !== undefined) {
     if (!field.required) add('required', m.eligibilityRequired);
     if (!canSee(field, 'staff')) add('audiences', m.eligibilityStaff);
@@ -78,20 +94,23 @@ function fieldProblems(field: FormField, path: Path): Problem[] {
       else if (values.every((value) => stops.includes(value))) add('eligibility', m.eligibilityAll);
     }
   }
-  if (field.type === 'number' && field.min !== undefined && field.max !== undefined) {
-    if (field.min > field.max) add('min', m.limitOrder);
-  }
-  if (
-    field.type === 'currency' &&
-    field.maxMinor !== undefined &&
-    field.minMinor > field.maxMinor
-  ) {
-    add('minMinor', m.limitOrder);
-  }
   if (field.type === 'multiple_choice') {
     const { minSelections = 0, maxSelections = field.options.length } = field;
     if (minSelections > maxSelections) add('minSelections', m.limitOrder);
     if (maxSelections > field.options.length) add('maxSelections', m.selectionsOptions);
+  }
+  if (field.type === 'table') {
+    if (field.minRows > field.maxRows) add('minRows', m.limitOrder);
+    const ids = new Set<string>();
+    field.columns.forEach((column, c) => {
+      const addColumn = at([...path, 'columns', c]);
+      if (ids.has(column.id)) addColumn('id', m.columnIdUsedTwice);
+      ids.add(column.id);
+      if (column.total && column.type !== 'number' && column.type !== 'currency') {
+        addColumn('total', m.totalType);
+      }
+      limitProblems(column, addColumn);
+    });
   }
   return problems;
 }
@@ -158,18 +177,26 @@ export function parseDefinition(input: unknown) {
 
 /**
  * Field ids that a new version gives another type, against the latest of the
- * earlier versions (in order) that had each id. An id always means the same
- * question, so publishing refuses a version with any.
+ * earlier versions (in order) that had each id, and table columns likewise,
+ * named `<field id>.<column id>`. An id always means the same question, and
+ * a column id the same column, so publishing refuses a version with any.
  */
 export function changedFieldTypes(
   earlier: readonly FormDefinition[],
   next: FormDefinition,
 ): string[] {
+  const typesOf = (version: FormDefinition): [string, string][] =>
+    fieldsOf(version).flatMap((field) => [
+      [field.id, field.type],
+      ...(field.type === 'table'
+        ? field.columns.map((column): [string, string] => [`${field.id}.${column.id}`, column.type])
+        : []),
+    ]);
   const types = new Map<string, string>();
   for (const version of earlier) {
-    for (const field of fieldsOf(version)) types.set(field.id, field.type);
+    for (const [id, type] of typesOf(version)) types.set(id, type);
   }
-  return fieldsOf(next)
-    .filter((field) => types.has(field.id) && types.get(field.id) !== field.type)
-    .map((field) => field.id);
+  return typesOf(next)
+    .filter(([id, type]) => types.has(id) && types.get(id) !== type)
+    .map(([id]) => id);
 }

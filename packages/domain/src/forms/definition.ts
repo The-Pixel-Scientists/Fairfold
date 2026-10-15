@@ -15,11 +15,15 @@ import { formMessages } from './messages.ts';
 /** Answers are keyed by these. A published id always means the same question. */
 export const fieldIdSchema = z.string().regex(/^f_[a-z0-9]{1,32}$/);
 export const sectionIdSchema = z.string().regex(/^s_[a-z0-9]{1,32}$/);
+/** A table's cells are keyed by these, within their row. */
+export const columnIdSchema = z.string().regex(/^c_[a-z0-9]{1,32}$/);
 /** Stable too: conditions, eligibility and answers refer to them. */
 export const optionValueSchema = z.string().regex(/^[a-z0-9][a-z0-9_-]{0,39}$/);
 
 export const SHORT_TEXT_MAX_CHARACTERS = 500;
 export const LONG_TEXT_MAX_CHARACTERS = 20_000;
+export const TABLE_MAX_ROWS = 50;
+export const CELL_MAX_CHARACTERS = 200;
 
 export const fieldAudiences = ['applicant', 'staff', 'reviewer'] as const;
 
@@ -58,13 +62,44 @@ const question = {
   conditions,
 };
 
-const options = z
-  .array(z.strictObject({ value: optionValueSchema, label: z.string().min(1).max(200) }))
-  .min(2)
-  .max(100);
+const option = z.strictObject({ value: optionValueSchema, label: z.string().min(1).max(200) });
+const options = z.array(option).min(2).max(100);
 
 const explanation = z.string().min(1).max(1000);
 const limit = (max: number) => z.int().min(1).max(max).optional();
+
+const numberLimits = {
+  wholeNumber: z.boolean().default(false),
+  min: z.number().optional(),
+  max: z.number().optional(),
+};
+
+const currencyLimits = {
+  currency: z.enum(currencies).default('GBP'),
+  /** In minor units, like every amount. No amount is below zero. */
+  minMinor: z.int().min(0).default(0),
+  maxMinor: z.int().min(0).optional(),
+};
+
+const column = {
+  id: columnIdSchema,
+  label: z.string().min(1).max(100),
+  required: z.boolean().default(true),
+  /** Sums the column; definitionProblems() allows it on number and currency columns only. */
+  total: z.boolean().default(false),
+};
+
+/** One column of a table question, checked as the question of the same type. */
+export const tableColumnSchema = z.discriminatedUnion('type', [
+  z.strictObject({
+    ...column,
+    type: z.literal('short_text'),
+    maxCharacters: z.int().min(1).max(CELL_MAX_CHARACTERS).default(CELL_MAX_CHARACTERS),
+  }),
+  z.strictObject({ ...column, type: z.literal('number'), ...numberLimits }),
+  z.strictObject({ ...column, type: z.literal('currency'), ...currencyLimits }),
+  z.strictObject({ ...column, type: z.literal('dropdown'), options: options.max(50) }),
+]);
 
 export const fieldSchema = z.discriminatedUnion('type', [
   z.strictObject({
@@ -79,21 +114,8 @@ export const fieldSchema = z.discriminatedUnion('type', [
     maxWords: limit(5000),
     maxCharacters: limit(LONG_TEXT_MAX_CHARACTERS),
   }),
-  z.strictObject({
-    ...question,
-    type: z.literal('number'),
-    wholeNumber: z.boolean().default(false),
-    min: z.number().optional(),
-    max: z.number().optional(),
-  }),
-  z.strictObject({
-    ...question,
-    type: z.literal('currency'),
-    currency: z.enum(currencies).default('GBP'),
-    /** In minor units, like every amount. No amount is below zero. */
-    minMinor: z.int().min(0).default(0),
-    maxMinor: z.int().min(0).optional(),
-  }),
+  z.strictObject({ ...question, type: z.literal('number'), ...numberLimits }),
+  z.strictObject({ ...question, type: z.literal('currency'), ...currencyLimits }),
   z.strictObject({ ...question, type: z.literal('date') }),
   z.strictObject({ ...question, type: z.literal('email') }),
   z.strictObject({ ...question, type: z.literal('phone') }),
@@ -121,6 +143,16 @@ export const fieldSchema = z.discriminatedUnion('type', [
     eligibility: z.strictObject({ stopWhen: z.boolean(), explanation }).optional(),
   }),
   z.strictObject({ ...question, type: z.literal('uk_address') }),
+  /** Rows of answers, such as a budget with one row per cost. */
+  z.strictObject({
+    ...question,
+    type: z.literal('table'),
+    /** One row, in the singular, as messages name it: "cost" gives "Enter an amount for cost 2". */
+    rowNoun: z.string().min(1).max(40),
+    minRows: z.int().min(0).max(TABLE_MAX_ROWS).default(0),
+    maxRows: z.int().min(1).max(TABLE_MAX_ROWS).default(20),
+    columns: z.array(tableColumnSchema).min(1).max(6),
+  }),
   /** Text for the applicant to read. It takes no answer. */
   z.strictObject({
     id: fieldIdSchema,
@@ -146,6 +178,8 @@ export const definitionShapeSchema = z.strictObject({
 export type DefinitionShape = z.output<typeof definitionShapeSchema>;
 export type FormField = z.output<typeof fieldSchema>;
 export type Question = Exclude<FormField, { type: 'content' }>;
+export type TableField = Extract<FormField, { type: 'table' }>;
+export type TableColumn = z.output<typeof tableColumnSchema>;
 export type Condition = z.output<typeof conditionSchema>;
 
 /** Every field, in the order the applicant meets them. */
