@@ -18,6 +18,12 @@
     },
     {
       "path": "../../packages/domain"
+    },
+    {
+      "path": "../../modules/party/tsconfig.web.json"
+    },
+    {
+      "path": "../../modules/grants/tsconfig.web.json"
     }
   ]
 }
