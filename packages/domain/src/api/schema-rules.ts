@@ -12,10 +12,12 @@
 //     and no email address goes in a URL; path parameters are ids, or that
 //     slug;
 //   - responses hold no union of objects, lists and plain values;
-//   - a raw (non-JSON) body answers 200 in content types from a fixed list.
+//   - a raw (non-JSON) response answers 200 in content types from a fixed
+//     list, and a raw upload body is a file's bytes up to a limit.
 
 import type { z } from 'zod';
 
+import { MAX_FILE_BYTES, type FileType } from '../files/types.ts';
 import { idSchema } from '../id.ts';
 import { slugPattern } from '../platform/tenant.ts';
 import {
@@ -128,39 +130,80 @@ export function paramProblems(names: readonly string[], schema: z.ZodType | unde
   return problems;
 }
 
-/** The content types a raw body may have (S03-11). */
+/** The content types a public route's raw response may have (S03-11): a stylesheet or an image. */
 export const rawContentTypes = ['text/css', 'image/png', 'image/webp'] as const;
 
 export type RawContentType = (typeof rawContentTypes)[number];
 
-/** A body that is not JSON, such as a stylesheet or an image, in one of the content types named. */
+/**
+ * A response that is not JSON, in one of the content types named: a
+ * stylesheet or an image on a public route, a stored file on a console or
+ * portal route (ADR 0047).
+ */
 export interface RawBody {
-  readonly raw: readonly RawContentType[];
+  readonly raw: readonly (RawContentType | FileType)[];
 }
+
+/** The content type of a raw upload body. */
+export const rawUploadContentType = 'application/octet-stream';
+
+/**
+ * A request body that is a file's bytes, not JSON, of at most `maxBytes`
+ * (ADR 0047). The file's name travels percent-encoded in the `File-Name`
+ * header, never in the URL. The bytes and any declared type are claims: the
+ * server finds the type with sniffFileType().
+ */
+export interface RawUploadBody {
+  readonly raw: readonly [typeof rawUploadContentType];
+  readonly maxBytes: number;
+}
+
+export type RequestBody = z.ZodType | RawUploadBody;
 
 export type ResponseBody = z.ZodType | null | RawBody;
 
-export function isRawBody(body: unknown): body is RawBody {
+/** A raw response or a raw upload body, as opposed to a schema or no body. */
+export function isRawBody(body: unknown): body is RawBody | RawUploadBody {
   return typeof body === 'object' && body !== null && Object.hasOwn(body, 'raw');
 }
 
-/** Read as unknown: a cast or plain JavaScript can get past the types. */
-export function rawBodyProblems(status: string, body: RawBody): string[] {
-  const problems: string[] = [];
-  if (status !== '200') problems.push(`A raw body answers 200 only, not ${status}.`);
-  const types: unknown = body.raw;
-  const valid =
-    Object.keys(body).length === 1 &&
+function isListOnce(types: unknown, allowed: readonly string[]): boolean {
+  return (
     Array.isArray(types) &&
     types.length > 0 &&
     new Set(types).size === types.length &&
-    types.every((type) => rawContentTypes.some((allowed) => allowed === type));
-  if (!valid) {
-    problems.push(
-      `A raw body names one or more content types once each: ${rawContentTypes.join(', ')}.`,
-    );
+    types.every((type) => allowed.includes(type as string))
+  );
+}
+
+/** Read as unknown: a cast or plain JavaScript can get past the types. */
+export function rawBodyProblems(
+  status: string,
+  body: RawBody,
+  allowed: readonly string[],
+): string[] {
+  const problems: string[] = [];
+  if (status !== '200') problems.push(`A raw body answers 200 only, not ${status}.`);
+  if (Object.keys(body).length !== 1 || !isListOnce(body.raw, allowed)) {
+    problems.push(`A raw body names one or more content types once each: ${allowed.join(', ')}.`);
   }
   return problems;
+}
+
+/** Read as unknown, as above. */
+export function rawUploadProblems(body: RawUploadBody): string[] {
+  const { raw, maxBytes } = body as { raw: unknown; maxBytes: unknown };
+  const valid =
+    Object.keys(body).sort().join() === 'maxBytes,raw' &&
+    isListOnce(raw, [rawUploadContentType]) &&
+    Number.isSafeInteger(maxBytes) &&
+    (maxBytes as number) >= 1 &&
+    (maxBytes as number) <= MAX_FILE_BYTES;
+  return valid
+    ? []
+    : [
+        `A raw upload body is { raw: ['${rawUploadContentType}'], maxBytes } with maxBytes from 1 to ${MAX_FILE_BYTES}.`,
+      ];
 }
 
 export function responseProblems(status: string, schema: z.ZodType | null): string[] {
