@@ -4,7 +4,14 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-import { applicantSession, eastmere, problem, signedOut, stubApi } from '../testing/api.ts';
+import {
+  applicantSession,
+  eastmere,
+  funderReply,
+  problem,
+  signedOut,
+  stubApi,
+} from '../testing/api.ts';
 import { expectTitle, openPortal, setUpPortalTests } from '../testing/render.tsx';
 
 setUpPortalTests();
@@ -72,14 +79,14 @@ describe("a funder's start page for a visitor", () => {
 describe('checking the session', () => {
   it('says one moment while it checks', async () => {
     let finish: () => void = () => undefined;
-    vi.stubGlobal(
-      'fetch',
-      () =>
-        new Promise<Response>((resolve) => {
-          finish = () => {
-            resolve(new Response(JSON.stringify(applicantSession()), { status: 200 }));
-          };
-        }),
+    vi.stubGlobal('fetch', (url: string) =>
+      url === '/api/public/tenants/northfield'
+        ? Promise.resolve(new Response(JSON.stringify(funderReply().body), { status: 200 }))
+        : new Promise<Response>((resolve) => {
+            finish = () => {
+              resolve(new Response(JSON.stringify(applicantSession()), { status: 200 }));
+            };
+          }),
     );
     openPortal('/northfield/');
 

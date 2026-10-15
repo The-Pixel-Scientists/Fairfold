@@ -83,10 +83,22 @@ export const signedOut = problem(401, 'You are not signed in.');
 /** A reply, or a function that makes one, perhaps later: a promise holds the answer back until a test lets it go. */
 type Handler = Reply | ((body: unknown) => Reply | Promise<Reply>);
 
+export const FUNDER = 'GET /public/tenants/northfield';
+
+/** The funder's public name and look, in the shape of the contract. */
+export function funderReply(
+  options: { name?: string; hasLogo?: boolean; preset?: string } = {},
+): Reply {
+  const { name = 'Northfield Foundation', hasLogo = false, preset = 'standard' } = options;
+  return { status: 200, body: { name, theme: { brandColour: '#1f4bb8', preset, hasLogo } } };
+}
+
 /**
  * Answers `fetch` for the keys given, such as `GET /auth/session`, and fails
  * the test on any other request, so nothing is sent that a test did not
- * expect. Returns what was sent.
+ * expect. Every funder page reads the funder's name and look, so that read
+ * is answered with the standard look unless a test gives its own answer, and
+ * is listed in what was sent only then. Returns what was sent.
  */
 export function stubApi(handlers: Record<string, Handler>): SentRequest[] {
   const sent: SentRequest[] = [];
@@ -95,8 +107,8 @@ export function stubApi(handlers: Record<string, Handler>): SentRequest[] {
     vi.fn((url: string, init: RequestInit) => {
       const key = `${init.method ?? 'GET'} ${url.replace(/^\/api/, '')}`;
       const body: unknown = typeof init.body === 'string' ? JSON.parse(init.body) : undefined;
-      sent.push({ key, body });
-      const handler = handlers[key];
+      const handler = handlers[key] ?? (key === FUNDER ? funderReply() : undefined);
+      if (handlers[key] !== undefined || key !== FUNDER) sent.push({ key, body });
       if (handler === undefined) return Promise.reject(new Error(`Unexpected request: ${key}`));
       return Promise.resolve(typeof handler === 'function' ? handler(body) : handler).then(
         (reply) =>

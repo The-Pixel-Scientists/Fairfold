@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import { idSchema } from '@pixel-scientists/domain';
 import { NotFoundPage, Router, SessionProvider } from '@pixel-scientists/ui';
-import type { PageDefinition, RouteDefinition } from '@pixel-scientists/ui';
+import type { PageDefinition, Params, RouteDefinition, SearchSchema } from '@pixel-scientists/ui';
 import { Suspense, lazy } from 'react';
 import type { ReactNode } from 'react';
 
@@ -15,16 +16,27 @@ import { Screen } from './auth/Screen.tsx';
 import SignedOutPage from './auth/SignedOutPage.tsx';
 import SignInPage from './auth/SignInPage.tsx';
 import SignUpPage from './auth/SignUpPage.tsx';
+import { FunderProvider, useFunder } from './funder.tsx';
 import { PageColumn } from './PageColumn.tsx';
 import { pageLoadErrorPage } from './pages/PageLoadErrorPage.tsx';
 import StartPage from './pages/StartPage.tsx';
+import UnknownFunderPage from './pages/UnknownFunderPage.tsx';
+import FutureFundingPage from './party/FutureFundingPage.tsx';
+import OrganisationPage from './party/OrganisationPage.tsx';
+import OrganisationsPage from './party/OrganisationsPage.tsx';
+import ProfilePage from './party/ProfilePage.tsx';
 import {
+  ADD_ORGANISATION_PATH,
   CHECK_EMAIL_PATH,
   COMPLETE_SIGN_UP_PATH,
   FORGOT_PASSWORD_PATH,
+  FUTURE_FUNDING_PATH,
   HOME_PATH,
   HOW_APPLYING_WORKS_PATH,
+  ORGANISATIONS_PATH,
+  ORGANISATION_PATH,
   PASSWORD_RESET_SENT_PATH,
+  PROFILE_PATH,
   RESET_PASSWORD_PATH,
   SIGNED_OUT_PATH,
   SIGN_IN_PATH,
@@ -51,6 +63,14 @@ export const topLevelRoutes: readonly RouteDefinition[] = [
   },
 ];
 
+/** Only a real id is an organisation's address, so `/organisations/new` and typing mistakes never reach it. */
+const organisationParams: SearchSchema<Params> = {
+  safeParse: (input) =>
+    idSchema.safeParse((input as Params)['organisationId']).success
+      ? { success: true, data: input as Params }
+      : { success: false, error: null },
+};
+
 /**
  * Pages under `/<slug>/`, which the router sees without the slug. They are in
  * the main bundle, not loaded on demand, so a weak connection cannot stop an
@@ -70,6 +90,16 @@ export const tenantRoutes: readonly RouteDefinition[] = [
   },
   { path: RESET_PASSWORD_PATH, title: 'Choose a new password', component: ResetPasswordPage },
   { path: SIGNED_OUT_PATH, title: 'You have signed out', component: SignedOutPage },
+  { path: PROFILE_PATH, title: 'Your details', component: ProfilePage },
+  { path: ORGANISATIONS_PATH, title: 'Your organisations', component: OrganisationsPage },
+  { path: ADD_ORGANISATION_PATH, title: 'Add your organisation', component: OrganisationPage },
+  {
+    path: ORGANISATION_PATH,
+    title: 'Change organisation details',
+    params: organisationParams,
+    component: OrganisationPage,
+  },
+  { path: FUTURE_FUNDING_PATH, title: 'Future funding', component: FutureFundingPage },
 ];
 
 function TenantNotFound() {
@@ -83,6 +113,12 @@ function TenantNotFound() {
 }
 
 const tenantNotFound: PageDefinition = { title: 'Page not found', component: TenantNotFound };
+const unknownFunder: PageDefinition = {
+  title: 'We cannot find this funder',
+  component: UnknownFunderPage,
+};
+/** A funder that does not exist has no pages. */
+const noRoutes: readonly RouteDefinition[] = [];
 
 function TopLayout({ children }: { children: ReactNode }) {
   return <PortalShell>{children}</PortalShell>;
@@ -93,6 +129,26 @@ function TenantLayout({ children }: { children: ReactNode }) {
     <SessionProvider load={loadSession} signOut={endSession}>
       {children}
     </SessionProvider>
+  );
+}
+
+/** The funder's pages, or the one page that says the funder cannot be found. */
+function FunderRouter({ slug }: { slug: string }) {
+  const funder = useFunder();
+  const shared = { errorPage: pageLoadErrorPage, basePath: `/${slug}`, titleSuffix: productName };
+  if (funder?.status === 'missing') {
+    return (
+      <Router
+        key="missing"
+        routes={noRoutes}
+        notFound={unknownFunder}
+        layout={TopLayout}
+        {...shared}
+      />
+    );
+  }
+  return (
+    <Router routes={tenantRoutes} notFound={tenantNotFound} layout={TenantLayout} {...shared} />
   );
 }
 
@@ -131,14 +187,9 @@ export function App() {
   }
   return (
     <TenantProvider value={slug}>
-      <Router
-        routes={tenantRoutes}
-        notFound={tenantNotFound}
-        errorPage={pageLoadErrorPage}
-        basePath={`/${slug}`}
-        layout={TenantLayout}
-        titleSuffix={productName}
-      />
+      <FunderProvider>
+        <FunderRouter slug={slug} />
+      </FunderProvider>
     </TenantProvider>
   );
 }
