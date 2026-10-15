@@ -56,7 +56,16 @@ contract in `packages/domain` (`registerRoutes()` in `src/routes/register.ts`)
 and served under `/api`. A route without a contract stops the API at start-up,
 and so does a contract that breaks the route rules, has more than one success
 response, or names a scope rule that no module resolves. Request bodies are
-limited to 1 MiB.
+limited to 64 KiB, except where a route sets its own limit (the logo upload
+takes a little over 200 KB as base64). A client has 70 seconds to send its
+headers and 2 minutes for the whole request, and an idle connection is kept
+65 seconds. A raw response (the public stylesheet and logo) is sent as the
+handler returns it, in a content type the contract names. An error keeps only
+the `Retry-After` and `Allow` headers it carries.
+
+The API refuses to start if `HTTP_PROXY`, `HTTPS_PROXY` or `NODE_USE_ENV_PROXY`
+is set, in any case, because a proxy would resolve names where the API cannot
+check them (ADR 0010).
 
 One module decides whether a caller may run a route (`src/policy/policy.ts`).
 It checks permissions, never role names, in this order:
@@ -73,6 +82,18 @@ It checks permissions, never role names, in this order:
 3. The handler runs in that transaction, with the parsed input and the
    context, and commits with it. A handler has no other way to the database
    and does not check access itself.
+
+The public tenant routes (`/api/public/tenants/:slug`, `/theme.css` and
+`/logo`) need no session and set no tenant: they call the two public functions
+of ADR 0019. An unknown, suspended or malformed slug gets the same 404. The
+stylesheet is built by `themeCss()` from validated tokens only.
+
+A handler writes a configuration version for a change to settings, a theme or
+a module switch with `context.config.record(entityType, entityId, diff)`, in
+the same transaction and with the acting membership as author. Two requests
+that write the same version cannot both succeed: the second gets a 409. The
+table keeps its diff as an object, so the list of changes is stored under
+`changes`.
 
 A handler records audit events only through its context: `context.audit.record()`
 for a state change and `context.audit.read()` for a sensitive read, both bound to

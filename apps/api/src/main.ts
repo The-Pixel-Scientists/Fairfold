@@ -70,7 +70,7 @@ async function main(): Promise<void> {
       checkDatabase: () => database.check(),
       inTenant: database.inTenant,
       auth,
-      ...composeModules(),
+      ...composeModules({ publicTenants: database.publicTenants }),
       trustProxy: config.trustProxy,
     });
   } catch (error) {

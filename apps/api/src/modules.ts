@@ -9,9 +9,12 @@ import { listAuditEvents } from '@pixel-scientists/domain/platform/audit-log';
 import { partyRoutes } from '@pixel-scientists/party/contracts';
 import { partyHandlers, partyResolvers } from '@pixel-scientists/party/server';
 
+import type { PublicTenants } from './database.ts';
 import { listAuditEventsHandler } from './platform/audit-log/index.ts';
+import { settingsRoutes } from './platform/settings/index.ts';
 import type { ScopeResolvers } from './policy/index.ts';
 import { ApiError } from './problems.ts';
+import { publicRoutes } from './public/index.ts';
 import { route, type Route } from './routes/register.ts';
 
 export interface ComposedModules {
@@ -22,11 +25,13 @@ export interface ComposedModules {
 /** A record the caller may not reach reads exactly as a missing one does. */
 const notFound = (): Error => new ApiError(404, undefined, { reason: 'not_found' });
 
-export function composeModules(): ComposedModules {
+export function composeModules(deps: { publicTenants: PublicTenants }): ComposedModules {
   const party = partyHandlers({ notFound });
   return {
     routes: [
       route(listAuditEvents, listAuditEventsHandler),
+      ...settingsRoutes,
+      ...publicRoutes(deps.publicTenants),
       route(partyRoutes.getProfile, party.getProfile),
       route(partyRoutes.updateProfile, party.updateProfile),
       route(partyRoutes.recordConsent, party.recordConsent),

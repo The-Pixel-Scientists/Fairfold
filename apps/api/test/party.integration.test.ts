@@ -85,7 +85,7 @@ beforeAll(async () => {
     checkDatabase: () => database.check(),
     inTenant: database.inTenant,
     auth: auth.module,
-    ...composeModules(),
+    ...composeModules({ publicTenants: database.publicTenants }),
   });
 }, 60_000);
 
