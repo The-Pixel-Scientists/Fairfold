@@ -29,6 +29,21 @@ export const grantsAuditActions = defineAuditActions('grants', [
   'grants.application.withdrawn',
   'grants.application.stage_changed',
   'grants.application.viewed',
+  // Assessment (S08-04). Saving draft scores is not audited, being the
+  // reviewer's unsubmitted work; submitting is.
+  'grants.reviewer.added',
+  'grants.reviewer.removed',
+  'grants.assignment.created',
+  'grants.assignment.removed',
+  'grants.assignment.conflict_declared',
+  'grants.review.submitted',
+  // Decisions and their emails (S08-04, ADR 0020).
+  'grants.decision.recorded',
+  'grants.decision.changed',
+  'grants.decision.released',
+  'grants.decision_email.sent',
+  'grants.decision_email.failed',
+  'grants.decision_email.resent',
 ]);
 
 export type GrantsAuditAction = (typeof grantsAuditActions)[number];

@@ -16,6 +16,11 @@ describe('grants audit actions', () => {
         'grants.stage',
         'grants.form_version',
         'grants.application',
+        'grants.reviewer',
+        'grants.assignment',
+        'grants.review',
+        'grants.decision',
+        'grants.decision_email',
       ]),
     );
   });
@@ -39,6 +44,18 @@ describe('grants audit actions', () => {
       'Application withdrawn',
       'Application stage changed',
       'Application viewed',
+      'Reviewer added',
+      'Reviewer removed',
+      'Assignment created',
+      'Assignment removed',
+      'Assignment conflict declared',
+      'Review submitted',
+      'Decision recorded',
+      'Decision changed',
+      'Decision released',
+      'Decision email sent',
+      'Decision email failed',
+      'Decision email resent',
     ]);
   });
 });

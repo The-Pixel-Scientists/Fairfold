@@ -65,7 +65,136 @@ export {
   type ApplicantStatus,
   type ApplicantStatusInput,
 } from './applications/status.ts';
+export {
+  assignedSchema,
+  assignmentListSchema,
+  assignmentSchema,
+  poolReviewerSchema,
+  reviewerCandidatesSchema,
+  reviewerPoolSchema,
+  reviewerRefSchema,
+  type Assigned,
+  type Assignment,
+  type AssignmentList,
+  type ReviewerCandidates,
+  type ReviewerPool,
+  type ReviewerRef,
+} from './assessment/answers.ts';
+export {
+  assignReviewersAutomatically,
+  automaticAssignInputSchema,
+  automaticAssignResultSchema,
+  type AutomaticAssignInput,
+  type AutomaticAssignResult,
+} from './assessment/automatic.ts';
+export {
+  assignInputSchema,
+  MAX_ASSIGN_SUBMISSIONS,
+  MAX_POOL_ADD,
+  MAX_REVIEWERS_PER_SUBMISSION,
+  poolAddInputSchema,
+  type AssignInput,
+  type PoolAddInput,
+} from './assessment/inputs.ts';
+export {
+  assignmentStatuses,
+  assignmentStatusSchema,
+  reviewStatusSchema,
+  type AssignmentStatus,
+  type ReviewStatus,
+} from './assessment/lists.ts';
+export {
+  declareConflict,
+  getReview,
+  listReviews,
+  reviewListSchema,
+  reviewRoutes,
+  reviewSchema,
+  reviewScoresSchema,
+  reviewSummarySchema,
+  saveReviewScores,
+  submitReview,
+  type Review,
+  type ReviewList,
+  type ReviewScores,
+  type ReviewSummary,
+} from './assessment/reviews.ts';
+export {
+  addReviewers,
+  assessmentRoutes,
+  assignReviewers,
+  getReviewerPool,
+  listAssignments,
+  listReviewerCandidates,
+  removeAssignment,
+  removeReviewer,
+} from './assessment/routes.ts';
+export {
+  scoreSchema,
+  scoresInputSchema,
+  type Score,
+  type ScoresInput,
+} from './assessment/scores.ts';
+export {
+  getScoreSpread,
+  getSubmissionScores,
+  scoreSpreadSchema,
+  spreadRoutes,
+  spreadRowSchema,
+  submissionScoresSchema,
+  type ScoreSpread,
+  type SpreadRow,
+  type SubmissionScores,
+} from './assessment/spread.ts';
 export { grantsAuditActions, type GrantsAuditAction } from './audit.ts';
+export {
+  decisionListSchema,
+  decisionRowSchema,
+  decisionSchema,
+  emailDeliverySchema,
+  emailPreviewSchema,
+  recordedSchema,
+  releaseResultSchema,
+  type Decision,
+  type DecisionList,
+  type DecisionRow,
+  type EmailDelivery,
+  type EmailPreview,
+  type Recorded,
+  type ReleaseResult,
+} from './decisions/answers.ts';
+export {
+  renderTemplate,
+  type MergeValues,
+  type OutcomeTemplate,
+  type RenderedEmail,
+} from './decisions/email.ts';
+export {
+  bulkDecisionInputSchema,
+  decisionInputSchema,
+  MAX_DECISIONS,
+  releaseInputSchema,
+  type BulkDecisionInput,
+  type DecisionInput,
+  type ReleaseInput,
+} from './decisions/inputs.ts';
+export {
+  decisionEmailErrorCodes,
+  decisionEmailErrorCodeSchema,
+  decisionEmailStatuses,
+  decisionEmailStatusSchema,
+  type DecisionEmailErrorCode,
+  type DecisionEmailStatus,
+} from './decisions/lists.ts';
+export {
+  decisionRoutes,
+  listDecisions,
+  previewDecisionEmail,
+  recordDecision,
+  recordDecisions,
+  releaseDecisions,
+  sendDecisionEmails,
+} from './decisions/routes.ts';
 export {
   formVersionListSchema,
   formVersionSchema,
