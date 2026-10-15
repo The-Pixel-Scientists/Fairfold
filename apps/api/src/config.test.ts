@@ -94,6 +94,10 @@ describe('loadConfig', () => {
       'Set TPS_DB_PORT.',
       'Set TPS_DB_NAME.',
       'Set TPS_DB_APP_API_PASSWORD or TPS_DB_APP_API_PASSWORD_FILE.',
+      'Set TPS_SMTP_HOST.',
+      'Set TPS_SMTP_PORT.',
+      'Set TPS_SMTP_TLS.',
+      'Set TPS_SMTP_FROM.',
     ]);
     expect(() => loadConfig({}, readFile)).toThrow(/^The API cannot start because/);
     expect(() => loadConfig({}, readFile)).toThrow('  - Set TPS_DB_NAME.');
@@ -348,12 +352,18 @@ describe('the mail server', () => {
     return content;
   };
 
-  it('starts without a mail server, as the stack and pnpm dev do until the sender exists', () => {
+  it('needs a mail server', () => {
     const noMail = (env: Env): Env =>
       Object.fromEntries(Object.entries(env).filter(([key]) => !key.startsWith('TPS_SMTP_')));
 
-    expect(loadConfig(noMail(deployed), readFile).smtp).toBeUndefined();
-    expect(loadConfig(noMail(development), readFile).smtp).toBeUndefined();
+    for (const env of [deployed, development]) {
+      expect(problemsOf(noMail(env))).toEqual([
+        'Set TPS_SMTP_HOST.',
+        'Set TPS_SMTP_PORT.',
+        'Set TPS_SMTP_TLS.',
+        'Set TPS_SMTP_FROM.',
+      ]);
+    }
   });
 
   it('names every mail setting still missing once any is set', () => {
@@ -387,13 +397,13 @@ describe('the mail server', () => {
   it('reads the password from a variable or a file, and keeps it out of output', () => {
     const env = { ...deployed, TPS_SMTP_USER: 'mailer' };
     const fromVariable = loadConfig({ ...env, TPS_SMTP_PASSWORD: 'p4ss' }, readFile).smtp;
-    expect(fromVariable?.auth?.user).toBe('mailer');
-    expect(fromVariable?.auth?.password.reveal()).toBe('p4ss');
+    expect(fromVariable.auth?.user).toBe('mailer');
+    expect(fromVariable.auth?.password.reveal()).toBe('p4ss');
     const fromFile = loadConfig(
       { ...env, TPS_SMTP_PASSWORD_FILE: SMTP_PASSWORD_FILE },
       readSmtpFile,
     ).smtp;
-    expect(fromFile?.auth?.password.reveal()).toBe('smtp-password-from-a-file');
+    expect(fromFile.auth?.password.reveal()).toBe('smtp-password-from-a-file');
     expect(JSON.stringify(fromFile)).not.toContain('smtp-password-from-a-file');
     expect(inspect(fromFile)).not.toContain('smtp-password-from-a-file');
   });
@@ -419,14 +429,14 @@ describe('the mail server', () => {
   });
 
   it('accepts starttls and tls, and refuses any other mode', () => {
-    expect(loadConfig({ ...deployed, TPS_SMTP_TLS: 'tls' }, readFile).smtp?.tls).toBe('tls');
+    expect(loadConfig({ ...deployed, TPS_SMTP_TLS: 'tls' }, readFile).smtp.tls).toBe('tls');
     expect(problemsOf({ ...deployed, TPS_SMTP_TLS: 'ssl' })).toEqual([
       'TPS_SMTP_TLS must be starttls, tls or none.',
     ]);
   });
 
   it('allows no TLS only for a mail server at a loopback IP address, with or without TPS_DEV', () => {
-    expect(loadConfig(development, readFile).smtp?.tls).toBe('none');
+    expect(loadConfig(development, readFile).smtp.tls).toBe('none');
     // The stack: no TPS_DEV, and Mailpit on the API container's own loopback.
     for (const host of ['127.0.0.1', '::1']) {
       const smtp = loadConfig(
@@ -452,7 +462,7 @@ describe('the mail server', () => {
     expect(problemsOf({ ...deployed, ...login })).toEqual([
       expect.stringContaining('A mail server login is sent in clear') as string,
     ]);
-    expect(loadConfig({ ...development, ...login }, readFile).smtp?.auth?.user).toBe('mailer');
+    expect(loadConfig({ ...development, ...login }, readFile).smtp.auth?.user).toBe('mailer');
   });
 
   it('refuses a sender address that is not an address, or holds a line break', () => {

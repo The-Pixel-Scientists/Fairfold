@@ -16,9 +16,8 @@
 //   - A development password is accepted only with TPS_DEV=1 and a
 //     database server on this machine, and TPS_DEV=1 makes the
 //     listener bind to the loopback address.
-//   - The mail server is optional for now. Once any TPS_SMTP_ variable
-//     is set, host, port, TLS mode and sender are all needed. The TLS mode is
-//     starttls (required), tls, or none, which is accepted only for a
+//   - The mail server is required: host, port, TLS mode and sender. The TLS
+//     mode is starttls, tls, or none, which is accepted only for a
 //     mail server at a loopback IP address, so mail never leaves the machine
 //     (or the stack's shared network namespace), and with a login only with
 //     TPS_DEV=1. Its user and password are set together or not at all.
@@ -65,15 +64,6 @@ export type LogLevel = (typeof LOG_LEVELS)[number];
 export const SMTP_TLS_MODES = ['starttls', 'tls', 'none'] as const;
 export type SmtpTlsMode = (typeof SMTP_TLS_MODES)[number];
 
-const SMTP_VARIABLES = [
-  'TPS_SMTP_HOST',
-  'TPS_SMTP_PORT',
-  'TPS_SMTP_TLS',
-  'TPS_SMTP_FROM',
-  'TPS_SMTP_USER',
-  'TPS_SMTP_PASSWORD',
-] as const;
-
 const SMTP_REQUIRED = ['TPS_SMTP_HOST', 'TPS_SMTP_PORT', 'TPS_SMTP_TLS', 'TPS_SMTP_FROM'] as const;
 
 /** The outbound mail server (ADR 0010: a fixed destination, reached only through its own client). */
@@ -103,8 +93,7 @@ export interface Config {
     /** Left out for a server on this machine, which is reached without TLS. */
     readonly tls?: { readonly mode: 'verify-full' | 'disable'; readonly ca?: string };
   };
-  /** Left out until main.ts creates the sender (S02-16, last commit); then these become required. */
-  readonly smtp?: SmtpSettings;
+  readonly smtp: SmtpSettings;
 }
 
 /** Thrown when the environment does not hold a valid configuration. */
@@ -262,14 +251,11 @@ function environmentSchema(development: boolean) {
           MINIMUM_PASSWORD_LENGTH,
           `TPS_DB_APP_API_PASSWORD must be at least ${String(MINIMUM_PASSWORD_LENGTH)} characters.`,
         ),
-      // Optional as a block: loadConfig requires SMTP_REQUIRED once any mail setting is set.
-      TPS_SMTP_HOST: hostVariable('TPS_SMTP_HOST').optional(),
-      TPS_SMTP_PORT: portVariable('TPS_SMTP_PORT').optional(),
-      TPS_SMTP_TLS: z
-        .enum(SMTP_TLS_MODES, {
-          error: () => 'TPS_SMTP_TLS must be starttls, tls or none.',
-        })
-        .optional(),
+      TPS_SMTP_HOST: hostVariable('TPS_SMTP_HOST'),
+      TPS_SMTP_PORT: portVariable('TPS_SMTP_PORT'),
+      TPS_SMTP_TLS: z.enum(SMTP_TLS_MODES, {
+        error: () => 'TPS_SMTP_TLS must be starttls, tls or none.',
+      }),
       TPS_SMTP_USER: z
         .string()
         .max(256)
@@ -294,8 +280,7 @@ function environmentSchema(development: boolean) {
             !hasControlCharacter(from) &&
             emailSchema.safeParse(from).success,
           'TPS_SMTP_FROM must be an email address, such as grants@example.org.',
-        )
-        .optional(),
+        ),
     })
     .superRefine((env, context) => {
       if (env.TPS_DB_TLS === undefined && !isLoopbackHost(env.TPS_DB_HOST)) {
@@ -332,7 +317,7 @@ function environmentSchema(development: boolean) {
       }
       // An IP literal, not a name: the mail client asks DNS before /etc/hosts,
       // so a spoofed answer could send a name such as localhost elsewhere.
-      const smtpHost = env.TPS_SMTP_HOST ?? '';
+      const smtpHost = env.TPS_SMTP_HOST;
       if (env.TPS_SMTP_TLS === 'none' && !(isIP(smtpHost) !== 0 && isLoopbackHost(smtpHost))) {
         context.addIssue({
           code: 'custom',
@@ -366,13 +351,10 @@ function environmentSchema(development: boolean) {
 
 type Values = z.infer<ReturnType<typeof environmentSchema>>;
 
-function mailSettings(values: Values): SmtpSettings | undefined {
+function mailSettings(values: Values): SmtpSettings {
   const { TPS_SMTP_HOST: host, TPS_SMTP_PORT: port } = values;
   const { TPS_SMTP_TLS: tls, TPS_SMTP_FROM: from } = values;
   const { TPS_SMTP_USER: user, TPS_SMTP_PASSWORD: password } = values;
-  if (host === undefined || port === undefined || tls === undefined || from === undefined) {
-    return undefined;
-  }
   return {
     host,
     port,
@@ -435,10 +417,8 @@ export function loadConfig(env: Env, readFile: (path: string) => string = readTe
   }
 
   // Checked here, not in the schema, so it is reported with every other problem.
-  if (SMTP_VARIABLES.some((name) => raw[name] !== undefined)) {
-    for (const name of SMTP_REQUIRED) {
-      if (raw[name] === undefined) problems.set(name, `Set ${name}.`);
-    }
+  for (const name of SMTP_REQUIRED) {
+    if (raw[name] === undefined) problems.set(name, `Set ${name}.`);
   }
 
   const result = environmentSchema(raw['TPS_DEV'] === '1').safeParse(raw);

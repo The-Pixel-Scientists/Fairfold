@@ -7,53 +7,76 @@
 // port or a database connection.
 
 import { buildApp } from './app.ts';
+import { loadAuthSettings, createAuth, type AuthSettings } from './auth/index.ts';
 import { ConfigError, loadConfig, type Config } from './config.ts';
 import { openDatabase } from './database.ts';
-import { createSender } from './email/sender.ts';
-import { createSmtpTransport } from './email/transport.ts';
 import { createLogger } from './logger.ts';
 import { composeModules } from './modules.ts';
 
-function readConfig(): Config | undefined {
-  try {
-    return loadConfig(process.env);
-  } catch (error) {
-    if (error instanceof ConfigError) {
-      process.stderr.write(`${error.message}\n`);
-      return undefined;
+/** Both groups of settings, with every problem in either reported together. */
+function readSettings(): { config: Config; authSettings: AuthSettings } | undefined {
+  const problems: string[] = [];
+  const read = <T>(load: () => T): T | undefined => {
+    try {
+      return load();
+    } catch (error) {
+      if (error instanceof ConfigError) {
+        problems.push(...error.problems);
+        return undefined;
+      }
+      throw error;
     }
-    throw error;
+  };
+  const config = read(() => loadConfig(process.env));
+  const authSettings = read(() => loadAuthSettings(process.env));
+  if (config === undefined || authSettings === undefined) {
+    process.stderr.write(`${new ConfigError(problems).message}\n`);
+    return undefined;
   }
+  return { config, authSettings };
 }
 
 async function main(): Promise<void> {
-  const config = readConfig();
-  if (config === undefined) {
+  const settings = readSettings();
+  if (settings === undefined) {
     process.exitCode = 1;
     return;
   }
+  const { config, authSettings } = settings;
 
   const logger = createLogger({ level: config.logLevel });
   const database = openDatabase(config.database, logger);
-  // Held for the auth module, which S02-16c wires in. Mail is optional until then.
-  const sender =
-    config.smtp === undefined
-      ? undefined
-      : createSender(config.smtp, logger, createSmtpTransport(config.smtp));
-  logger.info({ configured: sender !== undefined }, 'Outbound mail');
+  // No sender is passed yet: createAuth and buildApp accept none (S02-08 adds it).
+  // Better Auth refuses to start beside its own environment variables.
+  let auth;
+  try {
+    auth = createAuth(authSettings, { database: config.database, log: logger });
+  } catch (error) {
+    if (error instanceof ConfigError) process.stderr.write(`${error.message}\n`);
+    else logger.fatal({ err: error }, 'The auth module could not be created');
+    await database.close();
+    process.exitCode = 1;
+    return;
+  }
+  // Closed in order: the pools of the auth module, then the API's.
+  const closeAll = async (): Promise<void> => {
+    await auth.close();
+    await database.close();
+  };
   let app;
   try {
     app = await buildApp({
       logger,
       checkDatabase: () => database.check(),
       inTenant: database.inTenant,
+      auth,
       ...composeModules(),
       trustProxy: config.trustProxy,
     });
   } catch (error) {
     // A route that cannot be served safely stops the API here, naming the route.
     logger.fatal({ err: error }, 'The API could not be built');
-    await database.close();
+    await closeAll();
     process.exitCode = 1;
     return;
   }
@@ -65,7 +88,7 @@ async function main(): Promise<void> {
     logger.info({ signal }, 'Stopping');
     void app
       .close()
-      .then(() => database.close())
+      .then(closeAll)
       .then(
         () => {
           logger.info('Stopped');
@@ -98,7 +121,7 @@ async function main(): Promise<void> {
   } catch (error) {
     logger.fatal({ err: error }, 'The API could not start listening');
     await app.close();
-    await database.close();
+    await closeAll();
     process.exitCode = 1;
   }
 }

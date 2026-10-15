@@ -40,6 +40,11 @@ describe('starting the API', () => {
       'TPS_DB_PORT',
       'TPS_DB_NAME',
       'TPS_DB_APP_API_PASSWORD',
+      'TPS_SMTP_HOST',
+      'TPS_AUTH_SECRET',
+      'TPS_DB_APP_AUTH_PASSWORD',
+      'TPS_CONSOLE_ORIGIN',
+      'TPS_PORTAL_ORIGIN',
     ]) {
       expect(result.stderr).toContain(`Set ${name}`);
     }
@@ -55,18 +60,27 @@ describe('starting the API', () => {
   });
 
   it('does not print a secret it was given', () => {
-    const result = start({ TPS_DB_APP_API_PASSWORD: 'short-SECRET' });
+    const result = start({ TPS_DB_APP_API_PASSWORD: 'short-leak-7q' }); // gitleaks:allow
 
     expect(result.status).toBe(1);
     expect(result.stderr).toContain('TPS_DB_APP_API_PASSWORD must be at least 16 characters.');
-    expect(result.stderr).not.toContain('SECRET');
+    expect(result.stderr).not.toContain('leak-7q');
   });
 
   it('does not print the mail password it was given', () => {
-    const result = start({ TPS_SMTP_PASSWORD: 'mail-SECRET' });
+    const result = start({ TPS_SMTP_PASSWORD: 'mail-leak-7q' });
 
     expect(result.status).toBe(1);
     expect(result.stderr).toContain('Set TPS_SMTP_HOST');
-    expect(result.stderr).not.toContain('SECRET');
+    expect(result.stderr).not.toContain('leak-7q');
+  });
+
+  it('does not print the auth secret it was given, and reports it with the other problems', () => {
+    const result = start({ TPS_AUTH_SECRET: 'short-leak-7q' }); // gitleaks:allow
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('TPS_AUTH_SECRET must be at least 32 bytes.');
+    expect(result.stderr).toContain('Set TPS_DB_NAME');
+    expect(result.stderr).not.toContain('leak-7q');
   });
 });
