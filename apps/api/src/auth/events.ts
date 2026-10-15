@@ -7,7 +7,8 @@
 // own audit log as `platform.auth.<code>`, as app_api with the tenant of the
 // acting or new session, if the user holds a membership there. The copy is
 // keyed by the auth event's id, so a retry cannot duplicate it. A copy that
-// fails leaves its pending row for the replay command (deferred, D2).
+// fails, or an event with no session to take the tenant from (a failed
+// sign-in), leaves its pending row for the replay command (deferred, D2).
 //
 // No password, token, code or cookie is ever a detail of an event.
 
@@ -21,8 +22,8 @@ import type { AuthTables, TenantTables } from './tables.ts';
 export interface AuthEventDetails {
   readonly requestId: string;
   readonly userId?: string;
-  /** The tenant of the acting or new session, whose audit log gets a copy. */
-  readonly tenant?: TenantId;
+  /** The tenant the event happened in: the acting session's, or the one a sign-in URL named. */
+  readonly tenant?: string;
   /** A typed identifier, kept as ADR 0010's sign-in limits set out. */
   readonly identifier?: string;
   /** The client address Fastify derived through the trusted proxies. */
@@ -76,10 +77,17 @@ function isDuplicateCopy(error: unknown): boolean {
   return code === '23505' && constraint === 'audit_event_auth_copy_once';
 }
 
-/** Copy a committed event to its tenant's audit log. Never throws. */
-export async function copyAuthEvent(deps: CopyDependencies, event: AuthEvent): Promise<void> {
-  const { tenant, userId } = event;
-  if (tenant === undefined || userId === undefined) return;
+/**
+ * Copy a committed event to its tenant's audit log, given the tenant of the
+ * acting or new session, which must be the event's. Never throws.
+ */
+export async function copyAuthEvent(
+  deps: CopyDependencies,
+  event: AuthEvent,
+  tenant: TenantId | undefined,
+): Promise<void> {
+  const { userId } = event;
+  if (tenant === undefined || userId === undefined || event.tenant !== tenant) return;
   try {
     try {
       await withTenant(deps.api, tenant, async (tx) => {

@@ -297,7 +297,7 @@ describe('auth event copies', { timeout: 30_000 }, () => {
       recordAuthEvent(trx, 'sessions_revoked', {
         requestId: randomUUID(),
         userId: member.userId,
-        tenant: member.tenant.id as TenantId,
+        tenant: member.tenant.id,
       }),
     );
   }
@@ -312,8 +312,9 @@ describe('auth event copies', { timeout: 30_000 }, () => {
       applicationName: 'tps-db-tests',
     });
     try {
-      await copyAuthEvent({ api: apiDb, auth: authDb, log: logger }, event);
-      await copyAuthEvent({ api: apiDb, auth: authDb, log: logger }, event);
+      const tenant = member.tenant.id as TenantId;
+      await copyAuthEvent({ api: apiDb, auth: authDb, log: logger }, event, tenant);
+      await copyAuthEvent({ api: apiDb, auth: authDb, log: logger }, event, tenant);
     } finally {
       await apiDb.destroy();
     }
@@ -348,7 +349,11 @@ describe('auth event copies', { timeout: 30_000 }, () => {
       applicationName: 'tps-db-tests',
     });
     await closed.destroy();
-    await copyAuthEvent({ api: closed, auth: authDb, log: logger }, event);
+    await copyAuthEvent(
+      { api: closed, auth: authDb, log: logger },
+      event,
+      member.tenant.id as TenantId,
+    );
     const pending = await asMigrator(
       'SELECT 1 FROM auth.audit_copy_pending WHERE auth_event_id = $1',
       [event.id],
