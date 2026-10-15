@@ -7,6 +7,7 @@
 
 import type { TenantId } from '@pixel-scientists/db';
 import type { App, Permission } from '@pixel-scientists/domain/platform';
+import type { ConfigDiff, ConfigEntityType } from '@pixel-scientists/domain/platform/settings';
 import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
 
 import type { AuditEvent } from './audit/writer.ts';
@@ -43,11 +44,27 @@ export interface RequestAudit {
   read(entity: Pick<AuditEvent, 'action' | 'entityId'>): Promise<void>;
 }
 
+/** The configuration version writer bound to the request's transaction and the acting membership. */
+export interface RequestConfig {
+  /**
+   * Write the entity's next `app.config_version` in the request's
+   * transaction (architecture rule 10). The diff is checked against the
+   * entity type's schema. A change made at the same time to the same entity
+   * fails with a 409.
+   */
+  record<T extends ConfigEntityType>(
+    entityType: T,
+    entityId: string,
+    diff: ConfigDiff<T>,
+  ): Promise<void>;
+}
+
 /** The context of a console or portal route, after the policy has let the caller in. */
 export interface MemberContext extends RequestContext {
   readonly app: App;
   readonly session: RequestSession;
   readonly audit: RequestAudit;
+  readonly config: RequestConfig;
   readonly membership: {
     readonly id: string;
     /** What the caller's roles give in this app, from the role map. */
