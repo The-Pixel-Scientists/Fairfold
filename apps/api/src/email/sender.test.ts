@@ -53,6 +53,12 @@ describe('send', () => {
     );
   });
 
+  it('keeps line feeds and tabs in the body', async () => {
+    const { sender } = setup();
+
+    await expect(sender.send({ ...email, text: 'One\n\tTwo\n' })).resolves.toEqual({ sent: true });
+  });
+
   it.each([
     ['a line break in the subject', { subject: 'Hi\r\nBcc: spy@example.net' }],
     ['a bare line feed in the subject', { subject: 'Hi\nBcc: spy@example.net' }],
@@ -69,6 +75,10 @@ describe('send', () => {
     ['a very long subject', { subject: 'x'.repeat(201) }],
     ['an empty body', { text: '' }],
     ['a very long body', { text: 'x'.repeat(100_001) }],
+    ['a carriage return in the body', { text: 'a\r.\r\nMAIL FROM:<spy@example.net>' }],
+    ['a bare carriage return in the body', { text: 'a\rb' }],
+    ['a null in the body', { text: 'a\0b' }],
+    ['a Unicode line separator in the body', { text: 'a\u2028b' }],
   ])('refuses %s before it connects', async (_name, change) => {
     const { sender, transport } = setup();
 
@@ -102,8 +112,9 @@ describe('send', () => {
     expect(failureCode(null)).toBe('failed');
   });
 
-  it('refuses a rejected sender address as rejected, not as a refused recipient', () => {
+  it('refuses a rejected sender address or message as rejected, not as a refused recipient', () => {
     expect(failureCode(clientError('EENVELOPE', 'MAIL FROM'))).toBe('rejected');
+    expect(failureCode(clientError('EENVELOPE', 'DATA'))).toBe('rejected');
   });
 
   it('only ever answers with a code from the closed list', () => {

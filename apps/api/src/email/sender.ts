@@ -5,11 +5,7 @@
 // answer with a code, never a thrown error, and a log line carries the code
 // and the request id only: not the recipient, subject, text or error message.
 //
-// The SMTP client itself is behind MailTransport. The implementation
-// (transport.ts, with the dependency S02-02 pins) is not built yet, so
-// nothing here connects anywhere. It must pin the host and port, verify the
-// certificate, use no proxy and set time limits (ADR 0010) before the API
-// sends real mail.
+// The SMTP client itself is behind MailTransport (transport.ts).
 
 import { emailSchema } from '@pixel-scientists/domain/auth';
 import type { FastifyBaseLogger } from 'fastify';
@@ -89,7 +85,7 @@ export function failureCode(error: unknown): EmailFailureCode {
   if (code === 'ETIMEDOUT') return 'timeout';
   if (code === 'EAUTH') return 'auth_failed';
   if (code === 'EENVELOPE') {
-    return errorCommand(error) === 'MAIL FROM' ? 'rejected' : 'recipient_refused';
+    return errorCommand(error) === 'RCPT TO' ? 'recipient_refused' : 'rejected';
   }
   if (code === 'EMESSAGE') return 'rejected';
   if (code === 'ETLS' || /^(ERR_TLS|ERR_SSL|CERT_)/.test(code) || /CERT|SELF_SIGNED/.test(code)) {
@@ -97,6 +93,11 @@ export function failureCode(error: unknown): EmailFailureCode {
   }
   if (CONNECTION_ERRORS.has(code)) return 'connection_failed';
   return 'failed';
+}
+
+/** A body may hold line feeds and tabs. A bare carriage return could end the message early at a relay (SMTP smuggling). */
+function isSafeBody(text: string): boolean {
+  return !hasControlCharacter(text.replaceAll('\n', '').replaceAll('\t', ''));
 }
 
 function isSendable(email: Email): boolean {
@@ -108,7 +109,8 @@ function isSendable(email: Email): boolean {
     email.subject.length <= MAX_SUBJECT_LENGTH &&
     !hasControlCharacter(email.subject) &&
     email.text !== '' &&
-    email.text.length <= MAX_TEXT_LENGTH
+    email.text.length <= MAX_TEXT_LENGTH &&
+    isSafeBody(email.text)
   );
 }
 
