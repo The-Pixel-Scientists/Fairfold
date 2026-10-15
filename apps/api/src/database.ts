@@ -3,7 +3,16 @@
 // The API's one database connection pool, as the `app_api` role, through the
 // client in packages/db. Only packages/db imports a database driver.
 
-import { createDatabase, withTenant, type TenantId } from '@pixel-scientists/db';
+import {
+  createDatabase,
+  publicTenant,
+  publicTenantLogo,
+  withTenant,
+  type Kysely,
+  type PublicTenantRow,
+  type TenantId,
+} from '@pixel-scientists/db';
+import type { LogoType } from '@pixel-scientists/domain/platform';
 import type { FastifyBaseLogger } from 'fastify';
 
 import type { Config } from './config.ts';
@@ -20,10 +29,26 @@ export type InTenant = <T>(
   work: (tx: TenantTransaction) => Promise<T>,
 ) => Promise<T>;
 
+/**
+ * An active tenant's public face and logo by slug, through ADR 0019's
+ * functions. No tenant is set on the connection, and a suspended, unknown or
+ * malformed slug gives nothing.
+ */
+export interface PublicTenants {
+  tenant(slug: string): Promise<PublicTenantRow | undefined>;
+  logo(slug: string): Promise<{ logo: Buffer; logoType: LogoType } | undefined>;
+}
+
+export function publicTenantsOn(db: Kysely<unknown>): PublicTenants {
+  return { tenant: (slug) => publicTenant(db, slug), logo: (slug) => publicTenantLogo(db, slug) };
+}
+
 export interface ApiDatabase {
   /** Resolves if the database answers a trivial query, and rejects if it does not. */
   check(): Promise<void>;
   inTenant: InTenant;
+  /** For routes that need no session. */
+  publicTenants: PublicTenants;
   /** Closes the pool. */
   close(): Promise<void>;
 }
@@ -48,6 +73,7 @@ export function openDatabase(settings: Config['database'], log: FastifyBaseLogge
       await db.selectNoFrom((eb) => eb.lit(1).as('ok')).execute();
     },
     inTenant: (tenant, work) => withTenant(db, tenant, work),
+    publicTenants: publicTenantsOn(db),
     close: () => db.destroy(),
   };
 }
