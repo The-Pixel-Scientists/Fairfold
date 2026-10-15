@@ -10,6 +10,8 @@ import { buildApp } from './app.ts';
 import { loadAuthSettings, createAuth, type AuthSettings } from './auth/index.ts';
 import { ConfigError, loadConfig, type Config } from './config.ts';
 import { openDatabase } from './database.ts';
+import { createSender } from './email/sender.ts';
+import { createSmtpTransport } from './email/transport.ts';
 import { createLogger } from './logger.ts';
 import { composeModules } from './modules.ts';
 
@@ -46,11 +48,12 @@ async function main(): Promise<void> {
 
   const logger = createLogger({ level: config.logLevel });
   const database = openDatabase(config.database, logger);
-  // No sender is passed yet: createAuth and buildApp accept none (S02-08 adds it).
+  // The auth emails go through the configured mail server (S02-16b).
+  const sender = createSender(config.smtp, logger, createSmtpTransport(config.smtp));
   // Better Auth refuses to start beside its own environment variables.
   let auth;
   try {
-    auth = createAuth(authSettings, { database: config.database, log: logger });
+    auth = createAuth(authSettings, { database: config.database, log: logger, sender });
   } catch (error) {
     if (error instanceof ConfigError) process.stderr.write(`${error.message}\n`);
     else logger.fatal({ err: error }, 'The auth module could not be created');
