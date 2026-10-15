@@ -105,3 +105,22 @@ export function isAnyShape(node: JsonSchema): boolean {
   const types = typesOf(node);
   return types.has('object') && types.has('array') && SCALARS.some((type) => types.has(type));
 }
+
+/**
+ * A raw upload body as the OpenAPI document shows it (ADR 0047): its content
+ * type, and its limit in bytes, in words and as `x-max-bytes`, since JSON
+ * Schema has no keyword for the size of binary content.
+ */
+export function rawUploadRequestBody(body: {
+  readonly raw: readonly string[];
+  readonly maxBytes: number;
+}): JsonSchema {
+  const schema = { type: 'string', 'x-max-bytes': body.maxBytes };
+  return {
+    required: true,
+    description: `The file's bytes, at most ${body.maxBytes.toLocaleString('en-GB')} bytes, with its name percent-encoded in the File-Name header.`,
+    content: Object.fromEntries(
+      body.raw.map((type) => [type, { schema: { ...schema, contentMediaType: type } }]),
+    ),
+  };
+}
