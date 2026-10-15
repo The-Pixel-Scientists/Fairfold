@@ -21,16 +21,20 @@
 //     mail server at a loopback IP address, so mail never leaves the machine
 //     (or the stack's shared network namespace), and with a login only with
 //     TPS_DEV=1. Its user and password are set together or not at all.
+//   - The API refuses to start with HTTP_PROXY, HTTPS_PROXY or
+//     NODE_USE_ENV_PROXY set, in any case (ADR 0010): a proxy would resolve
+//     names where the API cannot check them.
 //
 // Every problem is reported at once, so one restart fixes them all.
 
 import { readFileSync } from 'node:fs';
-import { isIP, isIPv4 } from 'node:net';
+import { isIP } from 'node:net';
 
+import { isLoopbackHost, readSecret, type Env } from '@pixel-scientists/db';
 import { emailSchema } from '@pixel-scientists/domain/auth';
 import { z } from 'zod';
 
-export type Env = Readonly<Record<string, string | undefined>>;
+export type { Env };
 
 /** A secret that never reaches a log line or a JSON document by accident. */
 export class Secret {
@@ -125,21 +129,15 @@ const HOST_NAME = /^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$/i;
 
 const LOOPBACK_HOST = '127.0.0.1';
 
-/** The same rule as isLoopbackHost in packages/db/scripts/settings.ts. */
-export function isLoopbackHost(host: string): boolean {
-  if (host === 'localhost' || host === '::1' || host === '[::1]') return true;
-  return isIPv4(host) && host.startsWith('127.');
-}
+/** Variables that can also come from a file, named by NAME_FILE. */
+const FILE_VARIABLES = ['TPS_DB_APP_API_PASSWORD', 'TPS_DB_TLS_CA', 'TPS_SMTP_PASSWORD'] as const;
 
-/**
- * Variables that can also come from a file, named by NAME_FILE. A secret has
- * its final newline removed, as a mounted secret file usually ends with one.
- */
-const FILE_VARIABLES = [
-  { name: 'TPS_DB_APP_API_PASSWORD', trimFinalNewline: true },
-  { name: 'TPS_DB_TLS_CA', trimFinalNewline: false },
-  { name: 'TPS_SMTP_PASSWORD', trimFinalNewline: true },
-] as const;
+/** Proxy variables that the API refuses, in any case. */
+const PROXY_VARIABLES: ReadonlySet<string> = new Set([
+  'http_proxy',
+  'https_proxy',
+  'node_use_env_proxy',
+]);
 
 function required(name: string): z.ZodString {
   return z.string({ error: () => `Set ${name}.` }).min(1, `Set ${name}.`);
@@ -370,25 +368,21 @@ function mailSettings(values: Values): SmtpSettings {
 const VARIABLES = Object.keys(environmentSchema(false).shape);
 
 /**
- * Read a value from NAME, or from the file named by NAME_FILE. Returns a
- * problem instead of throwing, so every problem can be reported together.
+ * Read a value from NAME, or from the file named by NAME_FILE, with a final
+ * newline removed. Returns a problem instead of throwing, so every problem
+ * can be reported together. A variable that is set in neither form is not an
+ * error here: the schema says whether it is required.
  */
 function resolveFileVariable(
   env: Env,
   name: string,
-  trimFinalNewline: boolean,
   readFile: (path: string) => string,
 ): { value?: string; problem?: string } {
-  const value = env[name] ?? '';
-  const file = env[`${name}_FILE`] ?? '';
-  if (value !== '' && file !== '') return { problem: `Set ${name} or ${name}_FILE, not both.` };
-  if (file === '') return value === '' ? {} : { value };
+  if ((env[name] ?? '') === '' && (env[`${name}_FILE`] ?? '') === '') return {};
   try {
-    const content = readFile(file);
-    return { value: trimFinalNewline ? content.replace(/\r?\n$/, '') : content };
-  } catch {
-    // The reason can name paths on the host, so say only which variable failed.
-    return { problem: `${name}_FILE names a file that cannot be read.` };
+    return { value: readSecret(env, name, readFile) };
+  } catch (error) {
+    return { problem: error instanceof Error ? error.message : `Set ${name}.` };
   }
 }
 
@@ -410,11 +404,19 @@ export function loadConfig(env: Env, readFile: (path: string) => string = readTe
 
   // Problems by variable, so a variable is reported once.
   const problems = new Map<string, string>();
-  for (const { name, trimFinalNewline } of FILE_VARIABLES) {
-    const resolved = resolveFileVariable(env, name, trimFinalNewline, readFile);
+  for (const name of FILE_VARIABLES) {
+    const resolved = resolveFileVariable(env, name, readFile);
     raw[name] = resolved.value;
     if (resolved.problem !== undefined) problems.set(name, resolved.problem);
   }
+
+  const proxies = Object.keys(env)
+    .filter((name) => PROXY_VARIABLES.has(name.toLowerCase()))
+    .map(
+      (name) =>
+        `${name} is set. The API does not use a proxy, so unset it: ` +
+        'a proxy would resolve names where the API cannot check them.',
+    );
 
   // Checked here, not in the schema, so it is reported with every other problem.
   for (const name of SMTP_REQUIRED) {
@@ -428,12 +430,12 @@ export function loadConfig(env: Env, readFile: (path: string) => string = readTe
       if (!problems.has(name)) problems.set(name, issue.message);
     }
   }
-  if (problems.size > 0 || !result.success) {
+  if (problems.size > 0 || proxies.length > 0 || !result.success) {
     const ordered = VARIABLES.flatMap((name) => {
       const problem = problems.get(name);
       return problem === undefined ? [] : [problem];
     });
-    throw new ConfigError(ordered);
+    throw new ConfigError([...ordered, ...proxies]);
   }
 
   const values = result.data;

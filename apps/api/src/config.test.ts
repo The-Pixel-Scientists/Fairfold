@@ -299,7 +299,7 @@ describe('database TLS', () => {
     ]);
   });
 
-  it('takes the certificate authority from a variable, or from a file as it is', () => {
+  it('takes the certificate authority from a variable, or from a file without its final newline', () => {
     const fromVariable = loadConfig({ ...deployed, TPS_DB_TLS_CA: CERTIFICATE }, readFile);
     expect(fromVariable.database.tls).toEqual({ mode: 'verify-full', ca: CERTIFICATE });
 
@@ -307,7 +307,7 @@ describe('database TLS', () => {
       { ...deployed, TPS_DB_TLS_CA_FILE: '/run/secrets/db_ca' },
       readFile,
     );
-    expect(fromFile.database.tls).toEqual({ mode: 'verify-full', ca: CERTIFICATE });
+    expect(fromFile.database.tls).toEqual({ mode: 'verify-full', ca: CERTIFICATE.trimEnd() });
   });
 
   it('refuses both the certificate authority and its file', () => {
@@ -335,8 +335,39 @@ describe('database TLS', () => {
       'TPS_DB_TLS_CA_FILE names a file that cannot be read.',
     ]);
     expect(problemsOf({ ...deployed, TPS_DB_TLS_CA_FILE: '/run/secrets/empty' })).toEqual([
-      'TPS_DB_TLS_CA must hold a certificate in PEM format.',
+      'Set TPS_DB_TLS_CA or TPS_DB_TLS_CA_FILE.',
     ]);
+  });
+});
+
+describe('proxy variables', () => {
+  it.each([
+    'HTTP_PROXY',
+    'HTTPS_PROXY',
+    'NODE_USE_ENV_PROXY',
+    'http_proxy',
+    'https_proxy',
+    'node_use_env_proxy',
+    'Http_Proxy',
+  ])('refuses to start with %s set', (name) => {
+    expect(problemsOf({ ...deployed, [name]: 'http://proxy.example.org:3128' })).toEqual([
+      `${name} is set. The API does not use a proxy, so unset it: ` +
+        'a proxy would resolve names where the API cannot check them.',
+    ]);
+  });
+
+  it('refuses one set to an empty value or to 0, which a proxy library may still read', () => {
+    expect(problemsOf({ ...deployed, HTTPS_PROXY: '' })).toHaveLength(1);
+    expect(problemsOf({ ...deployed, NODE_USE_ENV_PROXY: '0' })).toHaveLength(1);
+  });
+
+  it('reports a proxy beside every other problem', () => {
+    const problems = problemsOf({ ...without(deployed, 'TPS_DB_NAME'), HTTP_PROXY: 'x' });
+    expect(problems).toHaveLength(2);
+  });
+
+  it('allows NO_PROXY, which only names exceptions', () => {
+    expect(() => loadConfig({ ...deployed, NO_PROXY: 'localhost' }, readFile)).not.toThrow();
   });
 });
 

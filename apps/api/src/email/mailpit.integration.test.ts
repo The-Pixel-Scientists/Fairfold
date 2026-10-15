@@ -8,10 +8,11 @@ import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { isIP } from 'node:net';
 
+import { isLoopbackHost } from '@pixel-scientists/db';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import { captureLogs } from '../../test/support.ts';
-import { isLoopbackHost, Secret, type SmtpSettings } from '../config.ts';
+import { Secret, type SmtpSettings } from '../config.ts';
 import { createLogger } from '../logger.ts';
 import { createSender } from './sender.ts';
 import { createSmtpTransport } from './transport.ts';
