@@ -39,7 +39,24 @@ export const variants = [
 /** WCAG 2.0 to 2.2 level A and AA, plus axe's own best practices. */
 const tags = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice'];
 
+/**
+ * Waits for the page's finite animations, such as a dialog fading in, so axe
+ * reads the colours they end on. Mid-fade, a dialog's text can measure below
+ * the contrast it has once shown.
+ */
+async function settleAnimations(page: Page): Promise<void> {
+  await page.evaluate(() =>
+    Promise.all(
+      document
+        .getAnimations()
+        .filter((animation) => animation.effect?.getComputedTiming().endTime !== Infinity)
+        .map((animation) => animation.finished.catch(() => undefined)),
+    ),
+  );
+}
+
 export async function expectNoViolations(page: Page): Promise<void> {
+  await settleAnimations(page);
   const results = await new AxeBuilder({ page }).withTags(tags).analyze();
   expect(results.violations, JSON.stringify(results.violations, null, 2)).toEqual([]);
 }
