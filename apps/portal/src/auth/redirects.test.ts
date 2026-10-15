@@ -59,6 +59,33 @@ describe('redirectFor: a session that ended before the page opened', () => {
   );
 });
 
+describe('redirectFor: an applicant page', () => {
+  it('sends a visitor to sign in, and back to the page afterwards, without a notice', () => {
+    const state = { status: 'signed-out', reason: null } as const;
+    expect(redirectFor('applicant', state, '/profile', null, false)).toBe(
+      '/sign-in?next=%2Fprofile',
+    );
+  });
+
+  it('says why, and keeps the page, when the session timed out on it', () => {
+    const state = { status: 'signed-out', reason: 'timeout' } as const;
+    expect(redirectFor('applicant', state, '/organisations/new', null, true)).toBe(
+      '/sign-in?next=%2Forganisations%2Fnew&notice=timeout',
+    );
+  });
+
+  it('opens the signed-out page after sign out', () => {
+    const state = { status: 'signed-out', reason: 'signed-out' } as const;
+    expect(redirectFor('applicant', state, '/profile', null, true)).toBe('/signed-out');
+  });
+
+  it('keeps a signed-in applicant on it, and waits while the session loads or could not be read', () => {
+    expect(redirectFor('applicant', ready, '/profile', null, true)).toBeNull();
+    expect(redirectFor('applicant', { status: 'loading' }, '/profile', null, false)).toBeNull();
+    expect(redirectFor('applicant', { status: 'failed' }, '/profile', null, false)).toBeNull();
+  });
+});
+
 describe('redirectFor: someone signed in', () => {
   it('sends them from the account pages to the funder page, or where they were going', () => {
     expect(redirectFor('account', ready, '/sign-in', null, true)).toBe('/');

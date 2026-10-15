@@ -16,3 +16,14 @@ export const FORGOT_PASSWORD_PATH = '/forgot-password';
 export const PASSWORD_RESET_SENT_PATH = '/forgot-password/sent';
 export const RESET_PASSWORD_PATH = '/reset-password';
 export const SIGNED_OUT_PATH = '/signed-out';
+
+export const PROFILE_PATH = '/profile';
+export const ORGANISATIONS_PATH = '/organisations';
+export const ADD_ORGANISATION_PATH = '/organisations/new';
+export const ORGANISATION_PATH = '/organisations/:organisationId';
+export const FUTURE_FUNDING_PATH = '/future-funding';
+
+/** The path of one organisation's page, from its id. */
+export function organisationPath(organisationId: string): string {
+  return `${ORGANISATIONS_PATH}/${encodeURIComponent(organisationId)}`;
+}

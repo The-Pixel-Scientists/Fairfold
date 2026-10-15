@@ -8,6 +8,8 @@ import type { CallInput, CallResult, JsonRouteContract } from '@pixel-scientists
 import { getSession, signOut } from '@pixel-scientists/domain/auth';
 import type { Session } from '@pixel-scientists/domain/auth';
 
+import { forgetDrafts } from './party/drafts.ts';
+
 /** Seconds from a `Retry-After` header: a number, or a date. Null when it says nothing usable. */
 export function retryAfterSeconds(header: string | null, now = Date.now()): number | null {
   if (header === null) return null;
@@ -68,11 +70,12 @@ export async function loadSession(): Promise<Session | null> {
   }
 }
 
-/** Ends the session. A session that has already ended counts as ended. */
+/** Ends the session, and forgets what was typed and not saved. A session that has already ended counts as ended. */
 export async function endSession(): Promise<void> {
   try {
     await callApi(signOut, {});
   } catch (error) {
     if (!isSignedOut(error)) throw error;
   }
+  forgetDrafts();
 }
