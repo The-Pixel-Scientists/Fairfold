@@ -146,6 +146,23 @@ export {
   type SpreadRow,
   type SubmissionScores,
 } from './assessment/spread.ts';
+export {
+  attachmentListSchema,
+  attachmentMessages,
+  attachmentViewSchema,
+  MAX_ATTACHMENT_BYTES,
+  type AttachmentList,
+  type AttachmentView,
+} from './attachments/answers.ts';
+export {
+  attachmentRoutes,
+  downloadAttachment,
+  downloadSubmissionAttachment,
+  listAttachments,
+  listSubmissionAttachments,
+  removeAttachment,
+  uploadAttachment,
+} from './attachments/routes.ts';
 export { grantsAuditActions, type GrantsAuditAction } from './audit.ts';
 export {
   decisionListSchema,
