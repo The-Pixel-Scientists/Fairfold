@@ -20,10 +20,12 @@ export {
   listModules,
   publicTenantRoutes,
   removeLogo,
+  removeThemeTokens,
   settingsRoutes,
   switchModule,
   updateSettings,
   updateTheme,
+  updateThemeTokens,
   uploadLogo,
 } from './routes.ts';
 export {
@@ -35,11 +37,31 @@ export {
   settingsSchema,
   tenantNameSchema,
   themeChangeSchema,
+  themeSettingsSchema,
+  themeTokensChangeSchema,
   themeTokensSchema,
   timeZones,
   timeZoneSchema,
   type PublicTenant,
   type Settings,
+  type ThemeSettings,
   type ThemeTokens,
 } from './schemas.ts';
-export { DARK_SCHEME_SELECTOR, presetTokens, themeCss, themeProperties } from './theme-css.ts';
+export {
+  COMFORTABLE_SELECTOR,
+  DARK_SCHEME_SELECTOR,
+  presetTokens,
+  themeCss,
+  themeProperties,
+  tokensFromPreset,
+  type PresetLook,
+  type ThemeLook,
+} from './theme-css.ts';
+export {
+  parseTokenStylesheet,
+  stylesheetMessages,
+  TOKEN_STYLESHEET_MAX_BYTES,
+  tokenStylesheet,
+  type StylesheetProblem,
+  type StylesheetResult,
+} from './token-stylesheet.ts';

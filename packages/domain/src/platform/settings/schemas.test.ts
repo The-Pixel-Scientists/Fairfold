@@ -4,12 +4,15 @@ import { describe, expect, it } from 'vitest';
 
 import { LOGO_MAX_BYTES } from '../logo.ts';
 import { messages } from '../messages.ts';
+import { defaultTokens } from '../theme-tokens.ts';
 import {
   logoUploadSchema,
   moduleStateSchema,
   settingsSchema,
   tenantNameSchema,
   themeChangeSchema,
+  themeSettingsSchema,
+  themeTokensChangeSchema,
   timeZones,
 } from './schemas.ts';
 
@@ -110,6 +113,35 @@ describe('themeChangeSchema', () => {
     ]) {
       expect(themeChangeSchema.safeParse(theme).success).toBe(false);
     }
+  });
+});
+
+describe('themeTokensChangeSchema', () => {
+  it('takes a whole token set, and nothing else', () => {
+    expect(themeTokensChangeSchema.parse({ tokens: defaultTokens })).toEqual({
+      tokens: defaultTokens,
+    });
+    for (const body of [
+      {},
+      { tokens: null },
+      { tokens: defaultTokens, preset: 'square' },
+      { tokens: { ...defaultTokens, font: 'Comic Sans' } },
+    ]) {
+      expect(themeTokensChangeSchema.safeParse(body).success).toBe(false);
+    }
+  });
+});
+
+describe('themeSettingsSchema', () => {
+  it('answers the theme with its tokens, or null while a preset is in use', () => {
+    const theme = { brandColour: '#1b1d21', preset: 'standard', hasLogo: false };
+    expect(themeSettingsSchema.parse({ ...theme, tokens: null })).toEqual({
+      ...theme,
+      tokens: null,
+    });
+    expect(themeSettingsSchema.parse({ ...theme, tokens: defaultTokens }).tokens).toEqual(
+      defaultTokens,
+    );
   });
 });
 
