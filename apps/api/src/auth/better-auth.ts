@@ -12,6 +12,7 @@ import { twoFactor } from 'better-auth/plugins/two-factor';
 
 import { ConfigError } from '../config.ts';
 import { authAdapter } from './adapter.ts';
+import { hashPassword, verifyPassword } from './passwords.ts';
 import type { AuthSettings } from './settings.ts';
 
 /**
@@ -66,6 +67,13 @@ export function createBetterAuth(settings: AuthSettings, db: Kysely<unknown>) {
       disableSignUp: true,
       requireEmailVerification: true,
       autoSignIn: false,
+      // The contract's lengths, and our Argon2id in place of its scrypt.
+      minPasswordLength: 12,
+      maxPasswordLength: 256,
+      password: {
+        hash: hashPassword,
+        verify: ({ hash, password }) => verifyPassword(hash, password),
+      },
     },
     emailVerification: { autoSignInAfterVerification: false },
     user: { fields: { emailVerified: 'email_verified', ...timestamps } },
