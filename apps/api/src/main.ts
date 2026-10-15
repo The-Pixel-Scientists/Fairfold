@@ -9,6 +9,8 @@
 import { buildApp } from './app.ts';
 import { ConfigError, loadConfig, type Config } from './config.ts';
 import { openDatabase } from './database.ts';
+import { createSender } from './email/sender.ts';
+import { createSmtpTransport } from './email/transport.ts';
 import { createLogger } from './logger.ts';
 import { composeModules } from './modules.ts';
 
@@ -33,6 +35,12 @@ async function main(): Promise<void> {
 
   const logger = createLogger({ level: config.logLevel });
   const database = openDatabase(config.database, logger);
+  // Held for the auth module, which S02-16c wires in. Mail is optional until then.
+  const sender =
+    config.smtp === undefined
+      ? undefined
+      : createSender(config.smtp, logger, createSmtpTransport(config.smtp));
+  logger.info({ configured: sender !== undefined }, 'Outbound mail');
   let app;
   try {
     app = await buildApp({
