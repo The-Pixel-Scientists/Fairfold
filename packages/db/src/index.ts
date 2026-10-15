@@ -19,6 +19,15 @@ export {
   type DatabaseSettings,
   type DatabaseTls,
 } from './database.ts';
+export {
+  chargeRateLimits,
+  EMAIL_SCOPES,
+  refundSignIn,
+  SIGN_IN_SCOPES,
+  type RateLimitCharge,
+  type RateLimitClient,
+  type RateLimitScope,
+} from './rate-limits.ts';
 export { sessionContext, touchSession, type SessionContextRow } from './sessions.ts';
 export { isLoopbackHost, readSecret, readSetting, type Env } from './settings.ts';
 export { TenantLeakError, withTenant, type TenantId } from './tenant-context.ts';
