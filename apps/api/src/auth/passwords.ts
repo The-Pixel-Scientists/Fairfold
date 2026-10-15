@@ -71,7 +71,11 @@ export const MINIMUM_COMMON_PASSWORDS = 3000;
 
 /**
  * The bundled list: SecLists' xato-net 1,000,000 file at a pinned commit,
- * only its entries of 12 or more characters (D9), one per line in UTF-8.
+ * only its entries of 12 or more characters (D9), one per line in UTF-8, in
+ * the file's order. Taken from
+ * Passwords/Common-Credentials/xato-net-10-million-passwords-1000000.txt at
+ * danielmiessler/SecLists f1196104c5594a19d78b486c52c0794b9d947993 (MIT; see
+ * NOTICE).
  */
 export const COMMON_PASSWORDS_FILE = new URL('./common-passwords.txt', import.meta.url);
 
