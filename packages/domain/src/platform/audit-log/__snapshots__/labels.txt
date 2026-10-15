@@ -11,6 +11,9 @@ platform.membership.suspended: Membership suspended
 platform.membership.reinstated: Membership reinstated
 platform.membership.removed: Membership removed
 platform.warehouse.exported: Warehouse exported
+platform.file.uploaded: File uploaded
+platform.file.refused: File refused
+platform.file.downloaded: File downloaded
 platform.auth.account_created: Account created
 platform.auth.sign_in_succeeded: Sign-in succeeded
 platform.auth.sign_in_failed: Sign-in failed

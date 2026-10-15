@@ -32,6 +32,16 @@ describe('platform audit actions', () => {
     expect(platformAuditActions).not.toContain('platform.invitation.accepted');
   });
 
+  it('record uploads, refusals and staff downloads of files', () => {
+    expect(platformAuditActions).toEqual(
+      expect.arrayContaining([
+        'platform.file.uploaded',
+        'platform.file.refused',
+        'platform.file.downloaded',
+      ]),
+    );
+  });
+
   it('name their entity type', () => {
     expect(auditEntityType('platform.membership.suspended')).toBe('platform.membership');
     expect(auditEntityType('platform.auth.sign_in_failed')).toBe('platform.auth');

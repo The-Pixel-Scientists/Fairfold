@@ -70,6 +70,12 @@ export const platformAuditActions = defineAuditActions('platform', [
   'platform.membership.reinstated',
   'platform.membership.removed',
   'platform.warehouse.exported',
+  // A file stored clean, a file refused as infected or unchecked, and a staff
+  // download (ADR 0047). Their values are ids, type, size and verdict, never
+  // the file's name.
+  'platform.file.uploaded',
+  'platform.file.refused',
+  'platform.file.downloaded',
   // A tenant's copy of an auth event (ADR 0010), whose entity id is the auth event's id.
   // Accepting an invitation is one of them: `platform.auth.invitation_accepted`.
   ...authEventCodes.map((code) => `platform.auth.${code}` as const),
