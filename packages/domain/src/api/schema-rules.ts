@@ -9,8 +9,8 @@
 //     name or check;
 //   - request keys are plain ASCII names that never name the acting user or
 //     tenant, a slug is only the :slug of /public/tenants/ or /auth/tenants/,
-//     and no email address goes in a URL; path parameters are ids, or that
-//     slug;
+//     and no email address goes in a URL; path parameters are ids, a form
+//     question's :fieldId (ADR 0047), or that slug;
 //   - responses hold no union of objects, lists and plain values;
 //   - a raw (non-JSON) response answers 200 in content types from a fixed
 //     list, and a raw upload body is a file's bytes up to a limit.
@@ -18,6 +18,7 @@
 import type { z } from 'zod';
 
 import { MAX_FILE_BYTES, type FileType } from '../files/types.ts';
+import { fieldIdSchema } from '../forms/definition.ts';
 import { idSchema } from '../id.ts';
 import { slugPattern } from '../platform/tenant.ts';
 import {
@@ -53,6 +54,7 @@ const IDENTITY_PROBES = [
 /** ASCII only, so a look-alike letter cannot slip a name past the checks above. */
 const KEY = /^[A-Za-z][A-Za-z0-9_]*$/;
 const ID_PATTERN = toJsonSchema(idSchema, 'input')?.['pattern'];
+const FIELD_ID_PATTERN = toJsonSchema(fieldIdSchema, 'input')?.['pattern'];
 
 function shapeProblems(label: string, root: JsonSchema): string[] {
   const problems: string[] = [];
@@ -105,7 +107,10 @@ function keyProblems(path: string, part: string, key: string): string[] {
   return [];
 }
 
-/** Path parameters: exactly those the path names, each required, each an id or the tenant slug. */
+/**
+ * Path parameters: exactly those the path names, each required, each an id,
+ * the tenant slug, or a form question's stable id as `:fieldId`.
+ */
 export function paramProblems(names: readonly string[], schema: z.ZodType | undefined): string[] {
   const root = schema === undefined ? {} : toJsonSchema(schema, 'input');
   if (root === undefined) return [];
@@ -122,9 +127,13 @@ export function paramProblems(names: readonly string[], schema: z.ZodType | unde
       required.includes(name) &&
       (name === 'slug'
         ? param['pattern'] === slugPattern.source
-        : param['format'] === 'uuid' && param['pattern'] === ID_PATTERN);
+        : name === 'fieldId'
+          ? param['pattern'] === FIELD_ID_PATTERN
+          : param['format'] === 'uuid' && param['pattern'] === ID_PATTERN);
     if (!valid) {
-      problems.push(`The path parameter :${name} must be required, and an id or the tenant slug.`);
+      problems.push(
+        `The path parameter :${name} must be required, and an id, a field id or the tenant slug.`,
+      );
     }
   }
   return problems;

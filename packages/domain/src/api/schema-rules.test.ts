@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
 import { fileTypes, MAX_FILE_BYTES } from '../files/types.ts';
+import { fieldIdSchema } from '../forms/definition.ts';
 import { idSchema } from '../id.ts';
 import { slugSchema } from '../platform/tenant.ts';
 import {
@@ -152,9 +153,10 @@ describe('requestProblems', () => {
 });
 
 describe('paramProblems', () => {
-  it('passes required ids and the tenant slug', () => {
+  it("passes required ids, the tenant slug and a question's field id", () => {
     expect(paramProblems(['programmeId'], z.strictObject({ programmeId: idSchema }))).toEqual([]);
     expect(paramProblems(['slug'], z.strictObject({ slug: slugSchema }))).toEqual([]);
+    expect(paramProblems(['fieldId'], z.strictObject({ fieldId: fieldIdSchema }))).toEqual([]);
     expect(paramProblems([], undefined)).toEqual([]);
   });
 
@@ -178,6 +180,11 @@ describe('paramProblems', () => {
     expect(paramProblems(['slug'], looseSlug)).not.toEqual([]);
     const idAsSlug = z.strictObject({ slug: idSchema });
     expect(paramProblems(['slug'], idAsSlug)).not.toEqual([]);
+    for (const fieldId of [z.string(), z.string().regex(/^f_[a-z0-9]+$/), idSchema]) {
+      expect(paramProblems(['fieldId'], z.strictObject({ fieldId }))).not.toEqual([]);
+    }
+    const fieldIdElsewhere = z.strictObject({ programmeId: fieldIdSchema });
+    expect(paramProblems(['programmeId'], fieldIdElsewhere)).not.toEqual([]);
   });
 });
 
