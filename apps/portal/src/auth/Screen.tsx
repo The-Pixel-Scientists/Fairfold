@@ -4,6 +4,7 @@ import { Button, LoadingState, useLocation, useNavigate, useSession } from '@pix
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 
+import { useFunder } from '../funder.tsx';
 import { PageColumn, PageIntro } from '../PageColumn.tsx';
 import { PortalShell } from '../PortalShell.tsx';
 import { useTenantSlug } from '../tenant.ts';
@@ -17,10 +18,12 @@ import type { PageKind } from './redirects.ts';
  * visitor where their session says they belong: signed-in people leave the
  * sign-in pages, and a session that has just ended leads to the page that
  * says so. A signed-in person who has no applicant membership with this
- * funder is told so, and can sign out.
+ * funder is told so, and can sign out. The page waits until the session and
+ * the funder's look have both been read, so it is not drawn twice.
  */
 export function Screen({ kind, children }: { kind: PageKind; children: ReactNode }) {
   const { state, reload } = useSession();
+  const funder = useFunder();
   const slug = useTenantSlug();
   const navigate = useNavigate();
   const { pathname, search } = useLocation();
@@ -34,7 +37,7 @@ export function Screen({ kind, children }: { kind: PageKind; children: ReactNode
     if (destination !== null) navigate(destination, { replace: true });
   }, [destination, navigate]);
 
-  if (state.status === 'loading') {
+  if (state.status === 'loading' || funder?.status === 'loading') {
     return (
       <PortalShell>
         <PageColumn>
