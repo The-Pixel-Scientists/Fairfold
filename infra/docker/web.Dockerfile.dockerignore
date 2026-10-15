@@ -2,8 +2,9 @@
 #
 # What web.Dockerfile may see: the workspace manifests, the shared TypeScript
 # settings, the console and portal with the packages they build from, and the
-# web server. Everything else, including .env files and node_modules, stays
-# out.
+# web server. Of each module, only its contracts and screens: the boundary
+# lint (ADR 0016) keeps those from reaching module server code, which stays
+# out. Everything else, including .env files and node_modules, stays out.
 
 *
 !package.json
@@ -12,10 +13,14 @@
 !tsconfig.base.json
 !apps/*/package.json
 !packages/*/package.json
+!modules/*/package.json
 !apps/console/
 !apps/portal/
 !packages/domain/src/
 !packages/ui/src/
+!modules/*/src/contracts/
+!modules/*/src/console/
+!modules/*/src/portal/
 !scripts/web-server.ts
 **/node_modules
 **/dist
