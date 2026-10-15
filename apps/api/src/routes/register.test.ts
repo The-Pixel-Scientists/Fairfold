@@ -8,6 +8,12 @@
 import { defineRoute, type RouteContract } from '@pixel-scientists/domain/api';
 import { authRoutes } from '@pixel-scientists/domain/auth';
 import { permissions, type ModuleId, type Permission } from '@pixel-scientists/domain/platform';
+import {
+  getLogo,
+  getPublicTenant,
+  getThemeCss,
+  updateSettings,
+} from '@pixel-scientists/domain/platform/settings';
 import type { FastifyInstance } from 'fastify';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
@@ -297,6 +303,144 @@ describe('registered routes', () => {
     ).toMatchObject({
       schema: { properties: { requestId: { type: 'string' }, errors: { type: 'array' } } },
     });
+  });
+});
+
+describe('raw responses', () => {
+  let app: FastifyInstance | undefined;
+  afterEach(async () => {
+    await app?.close();
+    app = undefined;
+  });
+
+  const css = ':root { --color-accent: #1b1d21; }';
+  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x00, 0xff]);
+
+  it('send the bytes as they are, with the content type the handler names', async () => {
+    ({ app } = await build({
+      routes: [
+        route(getThemeCss, () => Promise.resolve({ type: 'text/css', body: css })),
+        route(getLogo, () =>
+          Promise.resolve({
+            type: 'image/png',
+            body: png,
+            headers: { 'content-disposition': 'inline' },
+          }),
+        ),
+      ],
+    }));
+
+    const sheet = await app.inject({ url: '/api/public/tenants/fund/theme.css' });
+    expect(sheet.statusCode).toBe(200);
+    expect(sheet.headers['content-type']).toBe('text/css; charset=utf-8');
+    expect(sheet.headers['x-content-type-options']).toBe('nosniff');
+    expect(sheet.body).toBe(css);
+
+    const logo = await app.inject({ url: '/api/public/tenants/fund/logo' });
+    expect(logo.headers['content-type']).toBe('image/png');
+    expect(logo.headers['content-disposition']).toBe('inline');
+    expect(logo.rawPayload.equals(png)).toBe(true);
+  });
+
+  it('refuse a content type the contract does not name, without sending the body', async () => {
+    ({ app } = await build({
+      routes: [
+        route(getLogo, () =>
+          Promise.resolve({ type: 'text/html' as 'image/png', body: '<script>alert(1)</script>' }),
+        ),
+      ],
+    }));
+
+    const response = await app.inject({ url: '/api/public/tenants/fund/logo' });
+
+    expect(response.statusCode).toBe(500);
+    expect(response.body).not.toContain('script');
+  });
+
+  it('are documented by their content types', async () => {
+    ({ app } = await build({
+      routes: [route(getThemeCss, () => Promise.resolve({ type: 'text/css', body: css }))],
+    }));
+
+    const { paths } = (await app.inject({ url: '/openapi.json' })).json<{
+      paths: Record<string, { get: { responses: Record<string, { content: object }> } }>;
+    }>();
+
+    expect(
+      Object.keys(
+        paths['/api/public/tenants/{slug}/theme.css']?.get.responses['200']?.content ?? {},
+      ),
+    ).toEqual(['text/css']);
+  });
+});
+
+describe('public routes with a path parameter', () => {
+  let app: FastifyInstance | undefined;
+  afterEach(async () => {
+    await app?.close();
+    app = undefined;
+  });
+
+  const notFound = () => Promise.reject(new ApiError(404, undefined, { reason: 'not_found' }));
+
+  it('answer a malformed slug as they answer an unknown one', async () => {
+    ({ app } = await build({ routes: [route(getPublicTenant, notFound)] }));
+
+    const unknown = await app.inject({ url: '/api/public/tenants/nobody' });
+    for (const slug of ['A', 'x', 'with_underscore', 'has-trailing-', 'a'.repeat(41), '-leading']) {
+      const malformed = await app.inject({ url: `/api/public/tenants/${slug}` });
+      expect(malformed.statusCode, slug).toBe(404);
+      expect(malformed.json<{ detail: string; errors?: unknown }>(), slug).toMatchObject({
+        detail: unknown.json<{ detail: string }>().detail,
+      });
+      expect(malformed.json<{ errors?: unknown }>().errors).toBeUndefined();
+    }
+  });
+
+  it('still answer other validation failures as problems with fields', async () => {
+    ({ app } = await build({ routes: [route(getPublicTenant, notFound)] }));
+
+    const response = await app.inject({ url: '/api/public/tenants/nobody?extra=1' });
+
+    expect(response.statusCode).toBe(400);
+  });
+});
+
+describe('a route’s own body limit', () => {
+  let app: FastifyInstance | undefined;
+  afterEach(async () => {
+    await app?.close();
+    app = undefined;
+  });
+
+  it('applies instead of the server’s, for that route alone', async () => {
+    const built = await build({
+      routes: [
+        route(
+          updateSettings,
+          () => Promise.resolve({ name: 'n', timeZone: 'Europe/London', fiscalYearStartMonth: 4 }),
+          { bodyLimit: 200_000 },
+        ),
+        route(authRoutes.completeSignUp, () => Promise.resolve(undefined)),
+      ],
+    });
+    app = built.app;
+    const headers = built.auth.as({ app: 'console', session: testSession() });
+    const post = (url: string, payload: object) =>
+      built.app.inject({
+        method: url.includes('settings') ? 'PUT' : 'POST',
+        url,
+        payload,
+        headers,
+      });
+
+    // Over the server's limit of 64 KiB and under the route's: read, then refused by validation.
+    const within = await post('/api/console/settings', { name: 'x'.repeat(100_000) });
+    expect(within.statusCode).toBe(400);
+    const over = await post('/api/console/settings', { name: 'x'.repeat(250_000) });
+    expect(over.statusCode).toBe(413);
+    const other = await post('/api/auth/sign-up/complete', { token: 'x'.repeat(70_000) });
+    expect(other.statusCode).toBe(413);
   });
 });
 
