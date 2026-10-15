@@ -7,6 +7,46 @@ import '@pixel-scientists/domain/jitless';
 
 export { grantsAuditActions, type GrantsAuditAction } from './audit.ts';
 export {
+  formVersionListSchema,
+  formVersionSchema,
+  formVersionSummarySchema,
+  type FormVersion,
+  type FormVersionList,
+  type FormVersionSummary,
+} from './forms/answers.ts';
+export {
+  formConfigEntityType,
+  formDiff,
+  formPathPattern,
+  formVersionDiffSchema,
+  MAX_FORM_CHANGES,
+  type FormVersionDiff,
+} from './forms/config.ts';
+export {
+  definitionBytes,
+  FORM_DEFINITION_MAX_BYTES,
+  formDefinitionInputSchema,
+  formDraftInputSchema,
+  formFileSchema,
+  formVersionMessages,
+  type FormDraftInput,
+  type FormFile,
+} from './forms/inputs.ts';
+export {
+  formVersionStatuses,
+  formVersionStatusSchema,
+  type FormVersionStatus,
+} from './forms/lists.ts';
+export {
+  createFormDraft,
+  discardFormDraft,
+  formRoutes,
+  getFormVersion,
+  listFormVersions,
+  publishFormDraft,
+  saveFormDraft,
+} from './forms/routes.ts';
+export {
   criterionSchema,
   emailTemplateSchema,
   emailTemplatesSchema,

@@ -10,7 +10,7 @@ describe('grants audit actions', () => {
   it('are defined for the audit writer', () => {
     for (const action of grantsAuditActions) expect(isAuditAction(action), action).toBe(true);
     expect(new Set(grantsAuditActions.map(auditEntityType))).toEqual(
-      new Set(['grants.programme', 'grants.round', 'grants.stage']),
+      new Set(['grants.programme', 'grants.round', 'grants.stage', 'grants.form_version']),
     );
   });
 
@@ -23,6 +23,10 @@ describe('grants audit actions', () => {
       'Round updated',
       'Round stages changed',
       'Stage rubric changed',
+      'Form version created',
+      'Form version updated',
+      'Form version published',
+      'Form version discarded',
     ]);
   });
 });

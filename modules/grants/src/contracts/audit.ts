@@ -15,6 +15,11 @@ export const grantsAuditActions = defineAuditActions('grants', [
   'grants.round.updated',
   'grants.round.stages_changed',
   'grants.stage.rubric_changed',
+  // Form versions (S05-06).
+  'grants.form_version.created',
+  'grants.form_version.updated',
+  'grants.form_version.published',
+  'grants.form_version.discarded',
 ]);
 
 export type GrantsAuditAction = (typeof grantsAuditActions)[number];
