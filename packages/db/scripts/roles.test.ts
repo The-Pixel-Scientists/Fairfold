@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { checkDroppable } from './db.ts';
+import { checkOwnDatabase } from './db.ts';
 import { passwordVariable, readRolePassword } from './roles.ts';
 
 describe('readRolePassword', () => {
@@ -36,7 +36,7 @@ describe('readRolePassword', () => {
   });
 });
 
-describe('checkDroppable', () => {
+describe('checkOwnDatabase', () => {
   const env = {
     TPS_DEV: '1',
     TPS_DB_HOST: '127.0.0.1',
@@ -45,37 +45,37 @@ describe('checkDroppable', () => {
 
   it("allows this worktree's databases on this machine in development", () => {
     expect(() => {
-      checkDroppable(env, 'tps_2026_w40');
+      checkOwnDatabase(env, 'tps_2026_w40', 'drop');
     }).not.toThrow();
     expect(() => {
-      checkDroppable({ ...env, TPS_DB_HOST: 'localhost' }, 'tps_2026_w40_test');
+      checkOwnDatabase({ ...env, TPS_DB_HOST: 'localhost' }, 'tps_2026_w40_test', 'drop');
     }).not.toThrow();
   });
 
   it('refuses outside development', () => {
     expect(() => {
-      checkDroppable({ ...env, TPS_DEV: '' }, 'tps_2026_w40');
+      checkOwnDatabase({ ...env, TPS_DEV: '' }, 'tps_2026_w40', 'drop');
     }).toThrow('only in development');
   });
 
   it('refuses a server on another machine', () => {
     expect(() => {
-      checkDroppable({ ...env, TPS_DB_HOST: 'db.example.org' }, 'tps_2026_w40');
+      checkOwnDatabase({ ...env, TPS_DB_HOST: 'db.example.org' }, 'tps_2026_w40', 'drop');
     }).toThrow('works only on this machine');
   });
 
   it('refuses names without the prefix', () => {
     expect(() => {
-      checkDroppable({ ...env, TPS_DEV_DATABASES: 'postgres' }, 'postgres');
+      checkOwnDatabase({ ...env, TPS_DEV_DATABASES: 'postgres' }, 'postgres', 'drop');
     }).toThrow('does not start with tps_');
   });
 
   it("refuses another worktree's database", () => {
     expect(() => {
-      checkDroppable(env, 'tps_2026_w41');
+      checkOwnDatabase(env, 'tps_2026_w41', 'drop');
     }).toThrow("it is not this worktree's database");
     expect(() => {
-      checkDroppable({ ...env, TPS_DEV_DATABASES: '' }, 'tps_2026_w40');
+      checkOwnDatabase({ ...env, TPS_DEV_DATABASES: '' }, 'tps_2026_w40', 'drop');
     }).toThrow("it is not this worktree's database");
   });
 });
