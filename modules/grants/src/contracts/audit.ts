@@ -20,6 +20,15 @@ export const grantsAuditActions = defineAuditActions('grants', [
   'grants.form_version.updated',
   'grants.form_version.published',
   'grants.form_version.discarded',
+  // Applications and submissions (S06-04). Autosaves of a draft are not
+  // audited: they are the applicant's own unsubmitted work, and submitting
+  // records the result. Each staff read of a submission is.
+  'grants.application.created',
+  'grants.application.eligibility_checked',
+  'grants.application.submitted',
+  'grants.application.withdrawn',
+  'grants.application.stage_changed',
+  'grants.application.viewed',
 ]);
 
 export type GrantsAuditAction = (typeof grantsAuditActions)[number];

@@ -5,6 +5,66 @@
 
 import '@pixel-scientists/domain/jitless';
 
+export {
+  answersSavedSchema,
+  applicationListSchema,
+  applicationSchema,
+  applicationSummarySchema,
+  eligibilitySchema,
+  openRoundDetailSchema,
+  openRoundListSchema,
+  openRoundSchema,
+  type AnswersSaved,
+  type Application,
+  type ApplicationList,
+  type ApplicationSummary,
+  type Eligibility,
+  type OpenRound,
+  type OpenRoundDetail,
+  type OpenRoundList,
+} from './applications/answers.ts';
+export {
+  saveAnswersInputSchema,
+  startApplicationInputSchema,
+  submitApplicationInputSchema,
+  type SaveAnswersInput,
+  type StartApplicationInput,
+  type SubmitApplicationInput,
+} from './applications/inputs.ts';
+export {
+  applicationStatuses,
+  applicationStatusSchema,
+  eligibilityOutcomes,
+  eligibilityOutcomeSchema,
+  submissionStatuses,
+  submissionStatusSchema,
+  type ApplicationStatus,
+  type EligibilityOutcome,
+  type SubmissionStatus,
+} from './applications/lists.ts';
+export {
+  applicationRoutes,
+  checkApplicationEligibility,
+  getApplication,
+  getOpenRound,
+  listApplications,
+  listOpenRounds,
+  saveApplicationAnswers,
+  startApplication,
+  submitApplication,
+  withdrawApplication,
+} from './applications/routes.ts';
+export {
+  applicantOutcome,
+  applicantOutcomeSchema,
+  applicantStatus,
+  applicantStatuses,
+  applicantStatusSchema,
+  type ApplicantDecision,
+  type ApplicantOutcome,
+  type ApplicantStatus,
+  type ApplicantStatusInput,
+} from './applications/status.ts';
 export { grantsAuditActions, type GrantsAuditAction } from './audit.ts';
 export {
   formVersionListSchema,
@@ -129,6 +189,34 @@ export {
   updateProgramme,
   updateRound,
 } from './programme/routes.ts';
+export {
+  eligibilityCheckSchema,
+  stageMoveResultSchema,
+  submissionCursorSchema,
+  submissionEventSchema,
+  submissionPageSchema,
+  submissionSchema,
+  submissionSummarySchema,
+  type EligibilityCheck,
+  type StageMoveResult,
+  type Submission,
+  type SubmissionEvent,
+  type SubmissionPage,
+  type SubmissionSummary,
+} from './submissions/answers.ts';
+export {
+  MAX_STAGE_MOVE,
+  stageMoveInputSchema,
+  submissionQuerySchema,
+  type StageMoveInput,
+  type SubmissionQuery,
+} from './submissions/inputs.ts';
+export {
+  getSubmission,
+  listSubmissions,
+  moveSubmissionsToStage,
+  submissionRoutes,
+} from './submissions/routes.ts';
 export {
   defaultEmailTemplates,
   emailTemplatesInputSchema,
