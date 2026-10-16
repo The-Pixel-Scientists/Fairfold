@@ -5,10 +5,22 @@
 // Content Security Policy (ADR 0006): the browser fired a
 // securitypolicyviolation event, or logged a violation to the console. Pages
 // served without a policy, such as the Vite dev servers' pages, report none.
+//
+// In Firefox, the first navigation of a new page is sent again if the browser
+// has not reported it after FIRST_NAVIGATION_MS. Playwright's Firefox driver
+// sometimes loses that navigation: in CI, a few tests a run timed out
+// in page.goto although every request had been answered within milliseconds
+// and the page had rendered. Each server answer carries
+// Cross-Origin-Opener-Policy, which moves the page out of about:blank's
+// browsing context group, and Chromium and WebKit never lost one. A page that
+// really does not load still fails, as the second try waits the full timeout.
 
-import { test as base, expect, type BrowserContext } from '@playwright/test';
+import { test as base, errors, expect, type BrowserContext, type Page } from '@playwright/test';
 
 export { expect };
+
+/** How long Firefox has to report the first navigation of a page before it is sent again. */
+const FIRST_NAVIGATION_MS = 15_000;
 
 /** The function each page calls to report a violation. */
 const REPORT = '__tpsSecurityPolicyViolation';
@@ -57,7 +69,26 @@ export async function watchSecurityPolicy(
   };
 }
 
+/** Send the first navigation of `page` again if Firefox does not report it in time. */
+function retryFirstNavigation(page: Page): void {
+  const goto = page.goto.bind(page);
+  page.goto = async (url, options) => {
+    if (page.url() !== 'about:blank') return goto(url, options);
+    const timeout = Math.min(options?.timeout ?? FIRST_NAVIGATION_MS, FIRST_NAVIGATION_MS);
+    try {
+      return await goto(url, { ...options, timeout });
+    } catch (error) {
+      if (!(error instanceof errors.TimeoutError)) throw error;
+      return goto(url, options);
+    }
+  };
+}
+
 export const test = base.extend<{ contentSecurityPolicy: undefined }>({
+  page: async ({ page, browserName }, use) => {
+    if (browserName === 'firefox') retryFirstNavigation(page);
+    await use(page);
+  },
   contentSecurityPolicy: [
     async ({ context }, use) => {
       const violations = await watchSecurityPolicy(context);
