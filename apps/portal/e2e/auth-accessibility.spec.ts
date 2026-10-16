@@ -45,6 +45,10 @@ const screens: Screen[] = [
   {
     name: 'checking the session',
     open: async (page) => {
+      // The funder is answered from the stub, so a stack without this funder
+      // still shows the wait. The later route wins, and leaves the session
+      // unanswered.
+      await stubApi(page, {});
       await page.route(
         (url) => url.pathname === '/api/auth/session',
         () => undefined,

@@ -1,6 +1,6 @@
 # ADR 0005: Development topology
 
-- **Status:** accepted
+- **Status:** accepted; proposed amendment in [ADR 0047](0047-file-uploads.md)
 - **Date:** 2026-09-27
 - **Deciders:** Aaron Gardner
 

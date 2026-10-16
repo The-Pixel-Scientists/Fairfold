@@ -27,6 +27,10 @@ describe('configuration diffs', () => {
       'platform.theme': [
         { field: 'brandColour', from: '#1f4bb8', to: '#7a2e8c' },
         { field: 'logo', from: null, to: { type: 'image/png', sha256: SHA256 } },
+        { field: 'token', token: 'dark.colorAccent', from: null, to: '#ececea' },
+        { field: 'token', token: 'radii.radiusSm', from: 0.25, to: 0 },
+        { field: 'token', token: 'font', from: 'atkinson', to: 'system' },
+        { field: 'token', token: 'type.text2xlLineHeight', from: 2, to: null },
       ],
       'platform.module': [{ field: 'enabled', from: true, to: false }],
     } as const;
@@ -42,6 +46,11 @@ describe('configuration diffs', () => {
         [{ field: 'brandColour', from: '#1f4bb8', to: 'red' }],
         [{ field: 'logo', from: null, to: { type: 'image/png', sha256: SHA256, bytes: 'iVBO' } }],
         [{ field: 'logo', from: null, to: { type: 'image/svg+xml', sha256: SHA256 } }],
+        [{ field: 'token', token: 'light.colorBrand', from: null, to: '#000000' }],
+        [{ field: 'token', token: '__proto__', from: null, to: '#000000' }],
+        [{ field: 'token', token: 'light.colorInk', from: null, to: 'red' }],
+        [{ field: 'token', token: 'font', from: 'atkinson', to: 'Comic Sans' }],
+        [{ field: 'token', token: 'font', from: null, to: 'system', css: '} body {' }],
       ],
       'platform.module': [[], [{ field: 'enabled', from: 'on', to: 'off' }]],
     };

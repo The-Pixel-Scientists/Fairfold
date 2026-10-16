@@ -15,7 +15,7 @@ import {
   validateAnswers,
   visibleFields,
 } from '@pixel-scientists/domain/forms';
-import type { Answers, FormDefinition } from '@pixel-scientists/domain/forms';
+import type { Answers, FormDefinition, FormField } from '@pixel-scientists/domain/forms';
 import { formatMoney } from '@pixel-scientists/domain/platform';
 import { AnswerView, Button, EligibilityStop, FormSection, SaveStatus } from '@pixel-scientists/ui';
 import type { FormHelpers } from '@pixel-scientists/ui';
@@ -25,13 +25,38 @@ import type { SubmitEvent } from 'react';
 /** The engine's own counter and money format, so what people see is what the server checks. */
 export const helpers: FormHelpers = { countWords, countCharacters, formatMoney };
 
+/** A field the kit can draw: the kit has no table or file renderer yet. */
+type ExampleField = Exclude<FormField, { type: 'table' | 'file' }>;
+
+type ExampleDefinition = {
+  sections: (Omit<FormDefinition['sections'][number], 'fields'> & { fields: ExampleField[] })[];
+};
+
+const isExampleField = (field: FormField): field is ExampleField =>
+  field.type !== 'table' && field.type !== 'file';
+
+/**
+ * Checks a form with the engine, then leaves out its table and file questions,
+ * so the engine and the screen agree on what the form asks. Remove this when
+ * the kit draws them.
+ */
+function exampleForm(input: unknown): ExampleDefinition {
+  const { sections } = formDefinitionSchema.parse(input);
+  return {
+    sections: sections.map((section) => ({
+      ...section,
+      fields: section.fields.filter(isExampleField),
+    })),
+  };
+}
+
 const spendOptions = [
   { value: 'building', label: 'Building work' },
   { value: 'equipment', label: 'Equipment' },
   { value: 'training', label: 'Training' },
 ];
 
-/** One question of every type but file upload, with its ids starting `f_<prefix>`. */
+/** One question of every type but table and file upload, with its ids starting `f_<prefix>`. */
 function typeFields(prefix: string) {
   const id = (name: string) => `f_${prefix}${name}`;
   return [
@@ -116,8 +141,8 @@ function typeFields(prefix: string) {
   ];
 }
 
-function typesForm(prefix: string): FormDefinition {
-  return formDefinitionSchema.parse({
+function typesForm(prefix: string): ExampleDefinition {
+  return exampleForm({
     sections: [{ id: `s_${prefix}types`, title: 'About your project', fields: typeFields(prefix) }],
   });
 }
@@ -141,7 +166,7 @@ const problemAnswers: Answers = {
   f_paddress: { line1: '1 High Street', town: '', postcode: 'XYZ' },
 };
 
-const conditionalForm = formDefinitionSchema.parse({
+const conditionalForm = exampleForm({
   sections: [
     {
       id: 's_cabout',
@@ -194,7 +219,7 @@ const conditionalForm = formDefinitionSchema.parse({
   ],
 });
 
-const eligibilityForm = formDefinitionSchema.parse({
+const eligibilityForm = exampleForm({
   sections: [
     {
       id: 's_gcheck',
@@ -227,7 +252,7 @@ const eligibilityForm = formDefinitionSchema.parse({
   ],
 });
 
-const readingForm = formDefinitionSchema.parse({
+const readingForm = exampleForm({
   sections: [
     {
       id: 's_vabout',
@@ -308,7 +333,7 @@ const readingAnswers: Answers = {
 };
 
 interface ExampleFormProps {
-  definition: FormDefinition;
+  definition: ExampleDefinition;
   initial?: Answers;
 }
 

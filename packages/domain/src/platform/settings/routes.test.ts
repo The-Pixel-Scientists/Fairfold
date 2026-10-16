@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { checkRoute } from '../../api/route.ts';
 import { isRawBody } from '../../api/schema-rules.ts';
 import * as settings from './routes.ts';
+import { themeSettingsSchema, themeTokensChangeSchema } from './schemas.ts';
 
 const consoleRoutes = Object.values(settings.settingsRoutes);
 const publicRoutes = Object.values(settings.publicTenantRoutes);
@@ -31,6 +32,30 @@ describe('settings and public tenant routes', () => {
         scope: 'tenant',
       });
     }
+  });
+
+  it('save and remove a funder’s own tokens, and every theme route answers the whole look', () => {
+    expect(settings.updateThemeTokens).toMatchObject({
+      method: 'PUT',
+      path: '/console/settings/theme/tokens',
+      body: themeTokensChangeSchema,
+    });
+    expect(settings.removeThemeTokens).toMatchObject({
+      method: 'DELETE',
+      path: '/console/settings/theme/tokens',
+    });
+    expect(settings.removeThemeTokens).not.toHaveProperty('body');
+    for (const route of [
+      settings.getTheme,
+      settings.updateTheme,
+      settings.updateThemeTokens,
+      settings.removeThemeTokens,
+      settings.uploadLogo,
+      settings.removeLogo,
+    ]) {
+      expect(route.responses[200], route.path).toBe(themeSettingsSchema);
+    }
+    expect(settings.updateTheme.summary).toContain('clearing any tokens of its own');
   });
 
   it('match the reviewed list of routes without a permission', () => {

@@ -48,3 +48,12 @@ shellEmulator: true
 auditConfig:
   ignoreGhsas:
     - GHSA-vfj7-8cjw-p6xm
+
+# Transitive versions raised past an advisory, each approved and dated. Remove
+# an entry once every dependant resolves the fixed version without it.
+# - GHSA-68fv-2mgg-jv7q, source-map-js, high, fixed in 1.2.2 (BSD-3-Clause,
+#   released 30 September 2026). Reached through postcss, css-tree and
+#   @tailwindcss/node, all asking for ^1.2.1. Approved by Aaron Gardner on
+#   15 October 2026.
+overrides:
+  source-map-js@<1.2.2: 1.2.2

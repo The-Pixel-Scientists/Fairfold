@@ -18,6 +18,9 @@
     },
     {
       "path": "../../packages/domain"
+    },
+    {
+      "path": "../../modules/grants/tsconfig.web.json"
     }
   ]
 }

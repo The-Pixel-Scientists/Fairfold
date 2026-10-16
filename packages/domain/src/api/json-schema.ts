@@ -4,9 +4,13 @@
 // schema-rules.ts. A schema that cannot convert on the side asked for gives
 // undefined, and the rules refuse it: custom and recursive schemas never
 // convert, and a transform converts on its output side only when a schema
-// for its result follows it.
+// for its result follows it. A projected answers schema (answers/) is marked
+// as such and its values are not walked: answers are the one exception to
+// the response rules (ADR 0004).
 
 import { z } from 'zod';
+
+import { isProjectedAnswersSchema } from './answers/projection.ts';
 
 export type JsonSchema = Readonly<Record<string, unknown>>;
 
@@ -23,16 +27,27 @@ export function list(value: unknown): unknown[] {
 
 export function toJsonSchema(schema: z.ZodType, io: 'input' | 'output'): JsonSchema | undefined {
   try {
-    return z.toJSONSchema(schema, { io, unrepresentable: 'throw', cycles: 'throw' });
+    return z.toJSONSchema(schema, {
+      io,
+      unrepresentable: 'throw',
+      cycles: 'throw',
+      // Marks projected answers by identity, and removes the mark anywhere
+      // else, so no schema's metadata can claim the exception.
+      override: ({ zodSchema, jsonSchema }) => {
+        if (isProjectedAnswersSchema(zodSchema)) jsonSchema['x-projected-answers'] = true;
+        else delete jsonSchema['x-projected-answers'];
+      },
+    });
   } catch {
     return undefined;
   }
 }
 
-/** Every schema inside a JSON Schema document, the root included. */
+/** Every schema inside a JSON Schema document, the root included, but not inside projected answers. */
 export function* schemaNodes(node: unknown): Generator<JsonSchema> {
   if (!isObject(node)) return;
   yield node;
+  if (node['x-projected-answers'] === true) return;
   for (const key of ['items', 'additionalProperties', 'propertyNames', 'contains']) {
     yield* schemaNodes(node[key]);
   }
@@ -104,4 +119,23 @@ function typesOf(node: JsonSchema): Set<string> {
 export function isAnyShape(node: JsonSchema): boolean {
   const types = typesOf(node);
   return types.has('object') && types.has('array') && SCALARS.some((type) => types.has(type));
+}
+
+/**
+ * A raw upload body as the OpenAPI document shows it (ADR 0047): its content
+ * type, and its limit in bytes, in words and as `x-max-bytes`, since JSON
+ * Schema has no keyword for the size of binary content.
+ */
+export function rawUploadRequestBody(body: {
+  readonly raw: readonly string[];
+  readonly maxBytes: number;
+}): JsonSchema {
+  const schema = { type: 'string', 'x-max-bytes': body.maxBytes };
+  return {
+    required: true,
+    description: `The file's bytes, at most ${body.maxBytes.toLocaleString('en-GB')} bytes, with its name percent-encoded in the File-Name header.`,
+    content: Object.fromEntries(
+      body.raw.map((type) => [type, { schema: { ...schema, contentMediaType: type } }]),
+    ),
+  };
 }

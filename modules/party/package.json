@@ -15,5 +15,9 @@
     "@pixel-scientists/db": "workspace:*",
     "@pixel-scientists/domain": "workspace:*",
     "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@pixel-scientists/ui": "workspace:*",
+    "react": "19.3.0"
   }
 }

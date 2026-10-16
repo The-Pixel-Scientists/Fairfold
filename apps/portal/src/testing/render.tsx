@@ -8,6 +8,7 @@ import type { RenderResult } from '@testing-library/react';
 import { afterEach, beforeEach, expect, vi } from 'vitest';
 
 import { App } from '../App.tsx';
+import { forgetDrafts } from '../party/drafts.ts';
 
 /** Show the portal as if the browser had opened `path`. */
 export function openPortal(path: string): RenderResult {
@@ -44,6 +45,7 @@ export function setUpPortalTests(): void {
 
   afterEach(() => {
     cleanup();
+    forgetDrafts();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
     vi.useRealTimers();

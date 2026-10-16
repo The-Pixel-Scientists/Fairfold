@@ -100,10 +100,34 @@ function detailFor(status: number, code: string | undefined): string {
   return status >= 500 ? SERVER_ERROR_DETAIL : 'We could not complete the request.';
 }
 
+/** The only headers an error may add to its problem: when to retry, and which methods are allowed. */
+const KEPT_HEADERS: ReadonlySet<string> = new Set(['retry-after', 'allow']);
+
+/** Printable ASCII, so a value cannot add a header line. */
+const HEADER_VALUE = /^[ -~]{1,100}$/;
+
+function keptHeaders(error: object): Record<string, string> {
+  const headers = (error as { headers?: unknown }).headers;
+  if (typeof headers !== 'object' || headers === null) return {};
+  const kept: Record<string, string> = {};
+  for (const [name, value] of Object.entries(headers as Record<string, unknown>)) {
+    const text = typeof value === 'number' ? String(value) : value;
+    if (
+      KEPT_HEADERS.has(name.toLowerCase()) &&
+      typeof text === 'string' &&
+      HEADER_VALUE.test(text)
+    ) {
+      kept[name.toLowerCase()] = text;
+    }
+  }
+  return kept;
+}
+
 interface Failure {
   status: number;
   detail: string;
   errors: readonly FieldProblem[];
+  headers?: Record<string, string>;
   /** Whether the error was unexpected, so it needs a log line with its stack. */
   unexpected: boolean;
   reason?: string;
@@ -151,6 +175,7 @@ function describe(error: unknown): Failure {
     status,
     detail: detailFor(status, typeof code === 'string' ? code : undefined),
     errors: [],
+    headers: keptHeaders(error),
     unexpected: status >= 500,
   };
 }
@@ -196,6 +221,7 @@ export function handleError(error: unknown, request: FastifyRequest, reply: Fast
     // Too late to change the response; the connection ends as it is.
     return;
   }
+  reply.headers(failure.headers ?? {});
   sendProblem(request, reply, failure.status, failure.detail, failure.errors);
 }
 

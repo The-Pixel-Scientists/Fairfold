@@ -6,7 +6,10 @@
 // contract before it uses it, so an answer that drifts from the contract
 // shows up as a failing spec.
 
+import { themeCss } from '@pixel-scientists/domain/platform/settings';
 import type { Page } from '@playwright/test';
+
+import { solidPng } from './png.ts';
 
 export interface Membership {
   id: string;
@@ -23,19 +26,45 @@ export const eastmere: Membership = {
   tenant: { slug: 'eastmere', name: 'Eastmere Trust' },
 };
 
+/** A funder's public name and look, as the portal reads them before anyone signs in. */
+export interface Funder {
+  name: string;
+  brandColour: string;
+  preset: 'standard' | 'rounded' | 'square';
+  hasLogo: boolean;
+}
+
+export const standard: Funder = {
+  name: 'Northfield Foundation',
+  brandColour: '#1f4bb8',
+  preset: 'standard',
+  hasLogo: false,
+};
+
+/** A saved custom look, for the specs that check the portal in it. */
+export const custom: Funder = {
+  ...standard,
+  brandColour: '#0b5d3b',
+  preset: 'rounded',
+  hasLogo: true,
+};
+
+const FUNDER = 'GET /public/tenants/northfield';
+
 const applicantPermissions = ['party.profile.manage', 'grants.applications.apply'];
 
 export interface SessionOptions {
   /** The funder the session works for; null is a signed-in person with no membership in the address. */
   active?: Membership | null;
   email?: string;
-  /** When the session ends, as an ISO date. Defaults to well in the future. */
+  /** When the session ends, as an ISO date. Defaults to eight hours from now. */
   expiresAt?: string;
 }
 
 export function applicantSession(options: SessionOptions = {}) {
   const { active = northfield, email = 'ada@example.org' } = options;
-  const { expiresAt = '2099-01-01T00:00:00.000Z' } = options;
+  // Hours ahead, not years: a timer set that far out overflows and fires at once, which starves the router in WebKit.
+  const { expiresAt = new Date(Date.now() + 8 * 3_600_000).toISOString() } = options;
   const withRoles = (membership: Membership) => ({ ...membership, roles: ['applicant'] });
   return {
     user: { id: '9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d', email },
@@ -87,11 +116,15 @@ export interface SentRequest {
 /**
  * Answers every request to `/api` from the handlers, keyed like
  * `GET /auth/session`. A request with no handler gets a 404, and shows up in
- * the list this returns, which holds every request sent so far.
+ * the list this returns, which holds every request sent so far. Every funder
+ * page reads the funder's name and look, so that read, its stylesheet and its
+ * logo are answered for `funder` unless a handler says otherwise, and the read
+ * is listed only when a handler answers it.
  */
 export async function stubApi(
   page: Page,
   handlers: Record<string, Handler>,
+  funder: Funder = standard,
 ): Promise<SentRequest[]> {
   const sent: SentRequest[] = [];
   await page.route(
@@ -100,8 +133,13 @@ export async function stubApi(
       const request = route.request();
       const key = `${request.method()} ${new URL(request.url()).pathname.replace(/^\/api/, '')}`;
       const body: unknown = request.postData() === null ? undefined : request.postDataJSON();
-      sent.push({ key, body });
-      const handler = handlers[key];
+      const { name, brandColour, preset, hasLogo } = funder;
+      const handler =
+        handlers[key] ??
+        (key === FUNDER
+          ? { status: 200, body: { name, theme: { brandColour, preset, hasLogo } } }
+          : undefined);
+      if (handlers[key] !== undefined || key !== FUNDER) sent.push({ key, body });
       const reply =
         handler === undefined
           ? problem(404, 'No answer was set up for this request.')
@@ -116,6 +154,13 @@ export async function stubApi(
       });
     },
   );
+  // Routes added later answer first, so these take the stylesheet and logo from the JSON catch-all.
+  await page.route('**/api/public/tenants/northfield/theme.css', (route) =>
+    route.fulfill({ status: 200, contentType: 'text/css; charset=utf-8', body: themeCss(funder) }),
+  );
+  await page.route('**/api/public/tenants/northfield/logo', (route) =>
+    route.fulfill({ status: 200, contentType: 'image/png', body: solidPng(240, 80, [11, 93, 59]) }),
+  );
   return sent;
 }
 
@@ -124,10 +169,15 @@ export async function stubSignedIn(
   page: Page,
   options: SessionOptions = {},
   more: Record<string, Handler> = {},
+  funder: Funder = standard,
 ): Promise<SentRequest[]> {
-  return stubApi(page, {
-    'GET /auth/session': { status: 200, body: applicantSession(options) },
-    'POST /auth/sign-out': { status: 204 },
-    ...more,
-  });
+  return stubApi(
+    page,
+    {
+      'GET /auth/session': { status: 200, body: applicantSession(options) },
+      'POST /auth/sign-out': { status: 204 },
+      ...more,
+    },
+    funder,
+  );
 }

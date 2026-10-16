@@ -6,41 +6,9 @@
 // friends fill these in from the development Compose file
 // (scripts/dev-env.ts).
 
-import { readFileSync } from 'node:fs';
-import { isIPv4 } from 'node:net';
+import { isLoopbackHost, readSetting, type Env } from '../src/settings.ts';
 
-export type Env = Readonly<Record<string, string | undefined>>;
-
-/** Read a required, non-secret setting. */
-export function readSetting(env: Env, name: string): string {
-  const value = env[name];
-  if (value === undefined || value === '') {
-    throw new Error(`Set ${name}.`);
-  }
-  return value;
-}
-
-/**
- * Read a secret from NAME, or from the file named by NAME_FILE (a mounted
- * Compose or Kubernetes secret). Setting both is an error, so it is always
- * clear which one is in use.
- */
-export function readSecret(env: Env, name: string, readFile = readTextFile): string {
-  const value = env[name];
-  const file = env[`${name}_FILE`];
-  if (value && file) {
-    throw new Error(`Set ${name} or ${name}_FILE, not both.`);
-  }
-  const secret = file ? readFile(file).replace(/\r?\n$/, '') : value;
-  if (!secret) {
-    throw new Error(`Set ${name} or ${name}_FILE.`);
-  }
-  return secret;
-}
-
-function readTextFile(path: string): string {
-  return readFileSync(path, 'utf8');
-}
+export { isLoopbackHost, readSecret, readSetting, type Env } from '../src/settings.ts';
 
 /** The database every PostgreSQL server has, used to create and drop others. */
 export const MAINTENANCE_DATABASE = 'postgres';
@@ -79,16 +47,6 @@ export function readServer(env: Env): ServerSettings {
     throw new Error('TPS_DB_PORT must be a port number from 1 to 65535.');
   }
   return { host, port };
-}
-
-/**
- * Whether a database host is this machine: localhost, an address in
- * 127.0.0.0/8, or ::1. Development-only actions, such as accepting the fixed
- * development passwords or dropping a database, refuse any other host.
- */
-export function isLoopbackHost(host: string): boolean {
-  if (host === 'localhost' || host === '::1' || host === '[::1]') return true;
-  return isIPv4(host) && host.startsWith('127.');
 }
 
 /** Whether this is development against a server on this machine. */

@@ -1,6 +1,6 @@
 # ADR 0019: Tenant addresses, public pages and theming
 
-- **Status:** accepted
+- **Status:** accepted; proposed amendment in [ADR 0046](0046-funder-stylesheets.md)
 - **Date:** 2026-10-04
 - **Deciders:** Aaron Gardner
 
@@ -62,10 +62,10 @@ Option 3 for public reads and option 5 for logos.
 
 These join ADR 0003's approved definer functions:
 
-| Function | Callable by | Returns | Its owner holds |
-| --- | --- | --- | --- |
-| `app.public_tenant(slug)` | `app_api`, `app_auth` | For an active tenant: id, name, brand colour, preset, and whether it has a logo; nothing otherwise | `SELECT` on `id`, `slug`, `name` and `status` of `app.tenant`, and on `tenant_id`, `brand_colour`, `preset` and `logo_type` of `app.tenant_theme`, each with a `SELECT` policy `TO` it that is `USING (true)` |
-| `app.public_tenant_logo(slug)` | `app_api` | For an active tenant: the logo and its type; nothing otherwise | `SELECT` on `id`, `slug` and `status` of `app.tenant`, and on `tenant_id`, `logo` and `logo_type` of `app.tenant_theme`, each with a `SELECT` policy `TO` it that is `USING (true)` |
+| Function                       | Callable by           | Returns                                                                                            | Its owner holds                                                                                                                                                                                               |
+| ------------------------------ | --------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `app.public_tenant(slug)`      | `app_api`, `app_auth` | For an active tenant: id, name, brand colour, preset, and whether it has a logo; nothing otherwise | `SELECT` on `id`, `slug`, `name` and `status` of `app.tenant`, and on `tenant_id`, `brand_colour`, `preset` and `logo_type` of `app.tenant_theme`, each with a `SELECT` policy `TO` it that is `USING (true)` |
+| `app.public_tenant_logo(slug)` | `app_api`             | For an active tenant: the logo and its type; nothing otherwise                                     | `SELECT` on `id`, `slug` and `status` of `app.tenant`, and on `tenant_id`, `logo` and `logo_type` of `app.tenant_theme`, each with a `SELECT` policy `TO` it that is `USING (true)`                           |
 
 - `/public/tenants/{slug}`, `/public/tenants/{slug}/theme.css` and
   `/public/tenants/{slug}/logo` use only these functions and set no tenant.
@@ -78,9 +78,9 @@ These join ADR 0003's approved definer functions:
 
 This also joins ADR 0003's approved definer functions:
 
-| Function | Callable by | Returns | Its owner holds |
-| --- | --- | --- | --- |
-| `auth.session_memberships(token_hash)` | `app_api` | For a live session (not revoked, its user active, inside its app's idle and absolute timeouts and its expiry) that has finished MFA or does not need it: the user's active memberships in active tenants, with membership id, tenant id, slug, name and roles; nothing otherwise | `SELECT` on `token_hash`, `user_id`, `app`, `mfa_state`, `expires_at`, `created_at`, `last_seen_at` and `revoked_at` of `auth.session`; on `id` and `status` of `auth.user`; on `id`, `tenant_id`, `user_id`, `roles` and `status` of `app.membership`; and on `id`, `slug`, `name` and `status` of `app.tenant`; each with a `SELECT` policy `TO` it that is `USING (true)` |
+| Function                               | Callable by | Returns                                                                                                                                                                                                                                                                          | Its owner holds                                                                                                                                                                                                                                                                                                                                                              |
+| -------------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `auth.session_memberships(token_hash)` | `app_api`   | For a live session (not revoked, its user active, inside its app's idle and absolute timeouts and its expiry) that has finished MFA or does not need it: the user's active memberships in active tenants, with membership id, tenant id, slug, name and roles; nothing otherwise | `SELECT` on `token_hash`, `user_id`, `app`, `mfa_state`, `expires_at`, `created_at`, `last_seen_at` and `revoked_at` of `auth.session`; on `id` and `status` of `auth.user`; on `id`, `tenant_id`, `user_id`, `roles` and `status` of `app.membership`; and on `id`, `slug`, `name` and `status` of `app.tenant`; each with a `SELECT` policy `TO` it that is `USING (true)` |
 
 - It lists a signed-in user's funders and lets them switch between them. No
   app role can read memberships across tenants, and a session waiting for
@@ -88,8 +88,8 @@ This also joins ADR 0003's approved definer functions:
 
 ### Creating a tenant
 
-| Function | Callable by | Returns | Its owner holds |
-| --- | --- | --- | --- |
+| Function                        | Callable by  | Returns             | Its owner holds                                                                                                  |
+| ------------------------------- | ------------ | ------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | `app.create_tenant(slug, name)` | `app_worker` | The new tenant's id | `INSERT` on `id`, `slug` and `name` of `app.tenant`, with an `INSERT` policy `TO` it that is `WITH CHECK (true)` |
 
 - Only the operator command (`pnpm tenant:create`) calls it, using the

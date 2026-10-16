@@ -12,6 +12,7 @@
 
 import type { z } from 'zod';
 
+import { fileTypes } from '../files/types.ts';
 import type { Permission, ScopeRule } from '../platform/access.ts';
 import { moduleIds, type ModuleId } from '../platform/modules.ts';
 import { accessProblems, type AuthSession } from './access-rules.ts';
@@ -19,8 +20,12 @@ import {
   isRawBody,
   paramProblems,
   rawBodyProblems,
+  rawContentTypes,
+  rawUploadProblems,
   requestProblems,
   responseProblems,
+  type RawUploadBody,
+  type RequestBody,
   type ResponseBody,
 } from './schema-rules.ts';
 
@@ -42,7 +47,12 @@ interface RouteBase {
   readonly summary: string;
   readonly params?: z.ZodType;
   readonly query?: z.ZodType;
-  readonly body?: z.ZodType;
+  /**
+   * JSON, or `{ raw: ['application/octet-stream'], maxBytes }` for a file's
+   * bytes on a console or portal `POST` route, with the file's name in the
+   * `File-Name` header (ADR 0047).
+   */
+  readonly body?: RequestBody;
   /**
    * Success responses by status; `null` means no body, and `{ raw: [...] }` a
    * body that is not JSON, in the content types named. Errors are always
@@ -76,8 +86,15 @@ interface PublicRoute extends RouteBase {
 
 export type RouteContract = MemberRoute | AuthRoute | PublicRoute;
 
-/** A route whose every response is JSON or empty: the only kind call() takes. */
+/** A route whose body is JSON or none, and whose every response is JSON or empty: the only kind call() takes. */
 export type JsonRouteContract = RouteContract & {
+  readonly body?: z.ZodType;
+  readonly responses: Readonly<Record<number, z.ZodType | null>>;
+};
+
+/** A route that takes a file's bytes and answers JSON: the only kind upload() takes. */
+export type UploadRouteContract = RouteContract & {
+  readonly body: RawUploadBody;
   readonly responses: Readonly<Record<number, z.ZodType | null>>;
 };
 
@@ -107,9 +124,18 @@ export function checkRoute(route: RouteContract): string[] {
 
   const pathParams = rest.filter((segment) => segment.startsWith(':')).map((s) => s.slice(1));
   problems.push(...paramProblems(pathParams, route.params));
-  for (const part of ['params', 'query', 'body'] as const) {
+  for (const part of ['params', 'query'] as const) {
     const schema = route[part];
     if (schema !== undefined) problems.push(...requestProblems(route.path, part, schema));
+  }
+  const { body } = route;
+  if (isRawBody(body)) {
+    problems.push(...rawUploadProblems(body));
+    if (route.method !== 'POST' || !isMember(route.audience)) {
+      problems.push('Only a console or portal POST route takes a raw upload body.');
+    }
+  } else if (body !== undefined) {
+    problems.push(...requestProblems(route.path, 'body', body));
   }
 
   const responses = Object.entries(route.responses);
@@ -119,13 +145,27 @@ export function checkRoute(route: RouteContract): string[] {
       problems.push(...responseProblems(status, body));
       continue;
     }
-    problems.push(...rawBodyProblems(status, body));
-    // S10-01 widens this to console downloads.
-    if (route.method !== 'GET' || route.audience !== 'public') {
-      problems.push('Only a public GET route answers a raw body.');
-    }
+    const allowed = rawResponseTypes(route);
+    if (allowed === null)
+      problems.push('Only a public, console or portal GET route answers a raw body.');
+    else problems.push(...rawBodyProblems(status, body, allowed));
   }
   return problems;
+}
+
+function isMember(audience: Audience): boolean {
+  return audience === 'console' || audience === 'portal';
+}
+
+/**
+ * The content types a route may answer raw, or null if it may not: a GET
+ * route only, a stylesheet or an image for the public, and a stored file's
+ * type for the console and portal (ADR 0047). Never on auth routes.
+ */
+function rawResponseTypes(route: RouteContract): readonly string[] | null {
+  if (route.method !== 'GET') return null;
+  if (route.audience === 'public') return rawContentTypes;
+  return isMember(route.audience) ? fileTypes : null;
 }
 
 /** Returns the contract unchanged, or throws if it breaks a rule. */

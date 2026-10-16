@@ -3,18 +3,22 @@
 import { EmptyState, Link, buttonClassName, useSession } from '@pixel-scientists/ui';
 
 import { Screen } from '../auth/Screen.tsx';
+import { useFunderName } from '../funder.tsx';
 import { standaloneLink } from '../links.ts';
 import { PageColumn, PageIntro } from '../PageColumn.tsx';
+import { GetReady } from '../party/GetReady.tsx';
+import { SavedNotice } from '../party/Saved.tsx';
 import { HOW_APPLYING_WORKS_PATH, SIGN_IN_PATH, SIGN_UP_PATH } from '../paths.ts';
 
 /** What someone who is not signed in sees first: two ways in, and what to expect. */
 function Welcome() {
+  const funder = useFunderName() ?? 'the funder';
   return (
     <PageColumn>
       <PageIntro title="Apply for a grant">
         <p>
-          Create an account with your email address. Then you can see which grants are open and
-          start an application.
+          Create an account with your email address. Then you can see which grants {funder} has open
+          and start an application.
         </p>
         <p>Setting up takes a few minutes. You only need your email address.</p>
       </PageIntro>
@@ -41,8 +45,10 @@ function Applications() {
   return (
     <PageColumn>
       <PageIntro title="Apply for a grant">
+        <SavedNotice />
         <p>You are signed in. You have not started an application yet.</p>
       </PageIntro>
+      <GetReady />
       <EmptyState title="No grants are open yet">
         <p>
           When a grant opens, it will appear here. We will tell you what you need before you start.

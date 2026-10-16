@@ -4,11 +4,13 @@
 // 10). The entity type names what changed and the entity id is the id of the
 // row changed: `app.tenant`, `app.tenant_theme` or `app.tenant_module`. The
 // diff lists each changed field with its old and new values; the logo is
-// recorded by its type and SHA-256 digest, never its bytes.
+// recorded by its type and SHA-256 digest, never its bytes. A funder's own
+// tokens are diffed by token, with null where none was set (ADR 0046).
 
 import { z } from 'zod';
 
 import { logoTypes, presets } from '../theme.ts';
+import { fonts, tokenPaths } from '../theme-tokens.ts';
 
 export const configEntityTypes = ['platform.tenant', 'platform.theme', 'platform.module'] as const;
 
@@ -19,6 +21,12 @@ function change<const F extends string, V extends z.ZodType>(field: F, value: V)
 }
 
 const hexColour = z.string().regex(/^#[0-9a-f]{6}$/);
+const tokenChange = z.strictObject({
+  field: z.literal('token'),
+  token: z.enum(tokenPaths),
+  from: z.union([hexColour, z.number(), z.enum(Object.keys(fonts))]).nullable(),
+  to: z.union([hexColour, z.number(), z.enum(Object.keys(fonts))]).nullable(),
+});
 const logo = z
   .strictObject({ type: z.enum(logoTypes), sha256: z.string().regex(/^[0-9a-f]{64}$/) })
   .nullable();
@@ -39,6 +47,7 @@ export const configDiffSchemas = {
         change('brandColour', hexColour),
         change('preset', z.enum(presets)),
         change('logo', logo),
+        tokenChange,
       ]),
     )
     .min(1),

@@ -3,15 +3,20 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
+import { fileTypes, MAX_FILE_BYTES } from '../files/types.ts';
+import { fieldIdSchema } from '../forms/definition.ts';
 import { idSchema } from '../id.ts';
 import { slugSchema } from '../platform/tenant.ts';
 import {
   isRawBody,
   paramProblems,
   rawBodyProblems,
+  rawContentTypes,
+  rawUploadProblems,
   requestProblems,
   responseProblems,
   type RawBody,
+  type RawUploadBody,
 } from './schema-rules.ts';
 
 const PATH = '/console/programmes/:programmeId';
@@ -148,9 +153,10 @@ describe('requestProblems', () => {
 });
 
 describe('paramProblems', () => {
-  it('passes required ids and the tenant slug', () => {
+  it("passes required ids, the tenant slug and a question's field id", () => {
     expect(paramProblems(['programmeId'], z.strictObject({ programmeId: idSchema }))).toEqual([]);
     expect(paramProblems(['slug'], z.strictObject({ slug: slugSchema }))).toEqual([]);
+    expect(paramProblems(['fieldId'], z.strictObject({ fieldId: fieldIdSchema }))).toEqual([]);
     expect(paramProblems([], undefined)).toEqual([]);
   });
 
@@ -174,6 +180,11 @@ describe('paramProblems', () => {
     expect(paramProblems(['slug'], looseSlug)).not.toEqual([]);
     const idAsSlug = z.strictObject({ slug: idSchema });
     expect(paramProblems(['slug'], idAsSlug)).not.toEqual([]);
+    for (const fieldId of [z.string(), z.string().regex(/^f_[a-z0-9]+$/), idSchema]) {
+      expect(paramProblems(['fieldId'], z.strictObject({ fieldId }))).not.toEqual([]);
+    }
+    const fieldIdElsewhere = z.strictObject({ programmeId: fieldIdSchema });
+    expect(paramProblems(['programmeId'], fieldIdElsewhere)).not.toEqual([]);
   });
 });
 
@@ -211,13 +222,18 @@ describe('responseProblems', () => {
 });
 
 describe('rawBodyProblems', () => {
-  it('passes a 200 in listed content types', () => {
-    expect(rawBodyProblems('200', { raw: ['text/css'] })).toEqual([]);
-    expect(rawBodyProblems('200', { raw: ['image/png', 'image/webp'] })).toEqual([]);
+  it('passes a 200 in the content types allowed', () => {
+    expect(rawBodyProblems('200', { raw: ['text/css'] }, rawContentTypes)).toEqual([]);
+    expect(rawBodyProblems('200', { raw: ['image/png', 'image/webp'] }, rawContentTypes)).toEqual(
+      [],
+    );
+    expect(rawBodyProblems('200', { raw: [...fileTypes] }, fileTypes)).toEqual([]);
   });
 
-  it('refuses another status, an unlisted or repeated type, and extra keys', () => {
-    expect(rawBodyProblems('204', { raw: ['text/css'] })).not.toEqual([]);
+  it('refuses another status, a type not allowed or repeated, and extra keys', () => {
+    expect(rawBodyProblems('204', { raw: ['text/css'] }, rawContentTypes)).not.toEqual([]);
+    expect(rawBodyProblems('200', { raw: ['text/css'] }, fileTypes)).not.toEqual([]);
+    expect(rawBodyProblems('200', { raw: ['application/pdf'] }, rawContentTypes)).not.toEqual([]);
     for (const body of [
       { raw: [] },
       { raw: ['text/html'] },
@@ -225,13 +241,43 @@ describe('rawBodyProblems', () => {
       { raw: 'text/css' },
       { raw: ['text/css'], charset: 'utf-8' },
     ]) {
-      expect(rawBodyProblems('200', body as unknown as RawBody)).not.toEqual([]);
+      expect(rawBodyProblems('200', body as unknown as RawBody, rawContentTypes)).not.toEqual([]);
     }
   });
 
   it('tells a raw body from a schema or no body', () => {
     expect(isRawBody({ raw: ['text/css'] })).toBe(true);
+    expect(isRawBody({ raw: ['application/octet-stream'], maxBytes: 1 })).toBe(true);
     expect(isRawBody(z.object({ raw: z.string() }))).toBe(false);
     expect(isRawBody(null)).toBe(false);
+  });
+});
+
+describe('rawUploadProblems', () => {
+  it('passes a file body of up to MAX_FILE_BYTES', () => {
+    expect(rawUploadProblems({ raw: ['application/octet-stream'], maxBytes: 1 })).toEqual([]);
+    expect(
+      rawUploadProblems({ raw: ['application/octet-stream'], maxBytes: MAX_FILE_BYTES }),
+    ).toEqual([]);
+  });
+
+  it('refuses any other shape, type or limit', () => {
+    for (const body of [
+      { raw: ['application/octet-stream'] },
+      { raw: ['application/octet-stream'], maxBytes: 0 },
+      { raw: ['application/octet-stream'], maxBytes: MAX_FILE_BYTES + 1 },
+      { raw: ['application/octet-stream'], maxBytes: 1.5 },
+      { raw: ['application/octet-stream'], maxBytes: '1024' },
+      { raw: ['application/octet-stream'], maxBytes: Number.POSITIVE_INFINITY },
+      { raw: ['application/pdf'], maxBytes: 1024 },
+      { raw: ['multipart/form-data'], maxBytes: 1024 },
+      { raw: ['application/octet-stream', 'application/octet-stream'], maxBytes: 1024 },
+      { raw: 'application/octet-stream', maxBytes: 1024 },
+      { raw: ['application/octet-stream'], maxBytes: 1024, name: 'x' },
+    ]) {
+      expect(rawUploadProblems(body as unknown as RawUploadBody), JSON.stringify(body)).toEqual([
+        `A raw upload body is { raw: ['application/octet-stream'], maxBytes } with maxBytes from 1 to ${String(MAX_FILE_BYTES)}.`,
+      ]);
+    }
   });
 });

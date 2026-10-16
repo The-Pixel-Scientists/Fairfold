@@ -9,6 +9,7 @@ import { LOGO_MAX_BYTES } from '../logo.ts';
 import { messages } from '../messages.ts';
 import { switchableModuleIds } from '../modules.ts';
 import { brandColourSchema, presets } from '../theme.ts';
+import { tokenSetSchema } from '../theme-tokens.ts';
 
 /** The IANA time zones this runtime knows, for the settings screen's list. */
 export const timeZones: readonly string[] = Intl.supportedValuesOf('timeZone');
@@ -57,6 +58,19 @@ export const themeTokensSchema = z.object({
 });
 
 export type ThemeTokens = z.infer<typeof themeTokensSchema>;
+
+/**
+ * What the console's theme routes answer: the above, and the funder's own
+ * tokens, null while a preset is in use (ADR 0046). Optional until the API
+ * stores tokens (S03-14).
+ */
+export const themeSettingsSchema = themeTokensSchema.extend({
+  tokens: tokenSetSchema.nullable().optional(),
+});
+
+export type ThemeSettings = z.infer<typeof themeSettingsSchema>;
+
+export const themeTokensChangeSchema = z.strictObject({ tokens: tokenSetSchema });
 
 export const themeChangeSchema = z.strictObject({
   brandColour: brandColourSchema,

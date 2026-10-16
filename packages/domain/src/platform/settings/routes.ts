@@ -18,7 +18,8 @@ import {
   settingsResponseSchema,
   settingsSchema,
   themeChangeSchema,
-  themeTokensSchema,
+  themeSettingsSchema,
+  themeTokensChangeSchema,
 } from './schemas.ts';
 
 const manage = {
@@ -49,17 +50,34 @@ export const getTheme = defineRoute({
   ...manage,
   method: 'GET',
   path: '/console/settings/theme',
-  summary: "Read the tenant's theme tokens",
-  responses: { 200: themeTokensSchema },
+  summary: "Read the tenant's look: brand colour, preset, logo and any tokens of its own",
+  responses: { 200: themeSettingsSchema },
 });
 
 export const updateTheme = defineRoute({
   ...manage,
   method: 'PUT',
   path: '/console/settings/theme',
-  summary: "Save the tenant's brand colour and preset",
+  summary: "Save the tenant's brand colour and preset, clearing any tokens of its own",
   body: themeChangeSchema,
-  responses: { 200: themeTokensSchema },
+  responses: { 200: themeSettingsSchema },
+});
+
+export const updateThemeTokens = defineRoute({
+  ...manage,
+  method: 'PUT',
+  path: '/console/settings/theme/tokens',
+  summary: "Save the tenant's own design tokens, used in place of its preset",
+  body: themeTokensChangeSchema,
+  responses: { 200: themeSettingsSchema },
+});
+
+export const removeThemeTokens = defineRoute({
+  ...manage,
+  method: 'DELETE',
+  path: '/console/settings/theme/tokens',
+  summary: "Remove the tenant's own design tokens and go back to its preset",
+  responses: { 200: themeSettingsSchema },
 });
 
 export const uploadLogo = defineRoute({
@@ -68,7 +86,7 @@ export const uploadLogo = defineRoute({
   path: '/console/settings/theme/logo',
   summary: "Upload the tenant's logo, a PNG or WebP image as base64",
   body: logoUploadSchema,
-  responses: { 200: themeTokensSchema },
+  responses: { 200: themeSettingsSchema },
 });
 
 export const removeLogo = defineRoute({
@@ -76,7 +94,7 @@ export const removeLogo = defineRoute({
   method: 'DELETE',
   path: '/console/settings/theme/logo',
   summary: "Remove the tenant's logo",
-  responses: { 200: themeTokensSchema },
+  responses: { 200: themeSettingsSchema },
 });
 
 export const listModules = defineRoute({
@@ -131,6 +149,8 @@ export const settingsRoutes = {
   updateSettings,
   getTheme,
   updateTheme,
+  updateThemeTokens,
+  removeThemeTokens,
   uploadLogo,
   removeLogo,
   listModules,

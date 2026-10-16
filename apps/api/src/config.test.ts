@@ -94,6 +94,10 @@ describe('loadConfig', () => {
       'Set TPS_DB_PORT.',
       'Set TPS_DB_NAME.',
       'Set TPS_DB_APP_API_PASSWORD or TPS_DB_APP_API_PASSWORD_FILE.',
+      'Set TPS_SMTP_HOST.',
+      'Set TPS_SMTP_PORT.',
+      'Set TPS_SMTP_TLS.',
+      'Set TPS_SMTP_FROM.',
     ]);
     expect(() => loadConfig({}, readFile)).toThrow(/^The API cannot start because/);
     expect(() => loadConfig({}, readFile)).toThrow('  - Set TPS_DB_NAME.');
@@ -295,7 +299,7 @@ describe('database TLS', () => {
     ]);
   });
 
-  it('takes the certificate authority from a variable, or from a file as it is', () => {
+  it('takes the certificate authority from a variable, or from a file without its final newline', () => {
     const fromVariable = loadConfig({ ...deployed, TPS_DB_TLS_CA: CERTIFICATE }, readFile);
     expect(fromVariable.database.tls).toEqual({ mode: 'verify-full', ca: CERTIFICATE });
 
@@ -303,7 +307,7 @@ describe('database TLS', () => {
       { ...deployed, TPS_DB_TLS_CA_FILE: '/run/secrets/db_ca' },
       readFile,
     );
-    expect(fromFile.database.tls).toEqual({ mode: 'verify-full', ca: CERTIFICATE });
+    expect(fromFile.database.tls).toEqual({ mode: 'verify-full', ca: CERTIFICATE.trimEnd() });
   });
 
   it('refuses both the certificate authority and its file', () => {
@@ -331,8 +335,39 @@ describe('database TLS', () => {
       'TPS_DB_TLS_CA_FILE names a file that cannot be read.',
     ]);
     expect(problemsOf({ ...deployed, TPS_DB_TLS_CA_FILE: '/run/secrets/empty' })).toEqual([
-      'TPS_DB_TLS_CA must hold a certificate in PEM format.',
+      'Set TPS_DB_TLS_CA or TPS_DB_TLS_CA_FILE.',
     ]);
+  });
+});
+
+describe('proxy variables', () => {
+  it.each([
+    'HTTP_PROXY',
+    'HTTPS_PROXY',
+    'NODE_USE_ENV_PROXY',
+    'http_proxy',
+    'https_proxy',
+    'node_use_env_proxy',
+    'Http_Proxy',
+  ])('refuses to start with %s set', (name) => {
+    expect(problemsOf({ ...deployed, [name]: 'http://proxy.example.org:3128' })).toEqual([
+      `${name} is set. The API does not use a proxy, so unset it: ` +
+        'a proxy would resolve names where the API cannot check them.',
+    ]);
+  });
+
+  it('refuses one set to an empty value or to 0, which a proxy library may still read', () => {
+    expect(problemsOf({ ...deployed, HTTPS_PROXY: '' })).toHaveLength(1);
+    expect(problemsOf({ ...deployed, NODE_USE_ENV_PROXY: '0' })).toHaveLength(1);
+  });
+
+  it('reports a proxy beside every other problem', () => {
+    const problems = problemsOf({ ...without(deployed, 'TPS_DB_NAME'), HTTP_PROXY: 'x' });
+    expect(problems).toHaveLength(2);
+  });
+
+  it('allows NO_PROXY, which only names exceptions', () => {
+    expect(() => loadConfig({ ...deployed, NO_PROXY: 'localhost' }, readFile)).not.toThrow();
   });
 });
 
@@ -348,12 +383,18 @@ describe('the mail server', () => {
     return content;
   };
 
-  it('starts without a mail server, as the stack and pnpm dev do until the sender exists', () => {
+  it('needs a mail server', () => {
     const noMail = (env: Env): Env =>
       Object.fromEntries(Object.entries(env).filter(([key]) => !key.startsWith('TPS_SMTP_')));
 
-    expect(loadConfig(noMail(deployed), readFile).smtp).toBeUndefined();
-    expect(loadConfig(noMail(development), readFile).smtp).toBeUndefined();
+    for (const env of [deployed, development]) {
+      expect(problemsOf(noMail(env))).toEqual([
+        'Set TPS_SMTP_HOST.',
+        'Set TPS_SMTP_PORT.',
+        'Set TPS_SMTP_TLS.',
+        'Set TPS_SMTP_FROM.',
+      ]);
+    }
   });
 
   it('names every mail setting still missing once any is set', () => {
@@ -387,13 +428,13 @@ describe('the mail server', () => {
   it('reads the password from a variable or a file, and keeps it out of output', () => {
     const env = { ...deployed, TPS_SMTP_USER: 'mailer' };
     const fromVariable = loadConfig({ ...env, TPS_SMTP_PASSWORD: 'p4ss' }, readFile).smtp;
-    expect(fromVariable?.auth?.user).toBe('mailer');
-    expect(fromVariable?.auth?.password.reveal()).toBe('p4ss');
+    expect(fromVariable.auth?.user).toBe('mailer');
+    expect(fromVariable.auth?.password.reveal()).toBe('p4ss');
     const fromFile = loadConfig(
       { ...env, TPS_SMTP_PASSWORD_FILE: SMTP_PASSWORD_FILE },
       readSmtpFile,
     ).smtp;
-    expect(fromFile?.auth?.password.reveal()).toBe('smtp-password-from-a-file');
+    expect(fromFile.auth?.password.reveal()).toBe('smtp-password-from-a-file');
     expect(JSON.stringify(fromFile)).not.toContain('smtp-password-from-a-file');
     expect(inspect(fromFile)).not.toContain('smtp-password-from-a-file');
   });
@@ -419,14 +460,14 @@ describe('the mail server', () => {
   });
 
   it('accepts starttls and tls, and refuses any other mode', () => {
-    expect(loadConfig({ ...deployed, TPS_SMTP_TLS: 'tls' }, readFile).smtp?.tls).toBe('tls');
+    expect(loadConfig({ ...deployed, TPS_SMTP_TLS: 'tls' }, readFile).smtp.tls).toBe('tls');
     expect(problemsOf({ ...deployed, TPS_SMTP_TLS: 'ssl' })).toEqual([
       'TPS_SMTP_TLS must be starttls, tls or none.',
     ]);
   });
 
   it('allows no TLS only for a mail server at a loopback IP address, with or without TPS_DEV', () => {
-    expect(loadConfig(development, readFile).smtp?.tls).toBe('none');
+    expect(loadConfig(development, readFile).smtp.tls).toBe('none');
     // The stack: no TPS_DEV, and Mailpit on the API container's own loopback.
     for (const host of ['127.0.0.1', '::1']) {
       const smtp = loadConfig(
@@ -452,7 +493,7 @@ describe('the mail server', () => {
     expect(problemsOf({ ...deployed, ...login })).toEqual([
       expect.stringContaining('A mail server login is sent in clear') as string,
     ]);
-    expect(loadConfig({ ...development, ...login }, readFile).smtp?.auth?.user).toBe('mailer');
+    expect(loadConfig({ ...development, ...login }, readFile).smtp.auth?.user).toBe('mailer');
   });
 
   it('refuses a sender address that is not an address, or holds a line break', () => {

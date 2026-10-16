@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
+import { fileTypes, MAX_FILE_BYTES } from '../files/types.ts';
 import { idSchema } from '../id.ts';
 import { slugSchema } from '../platform/tenant.ts';
 import { checkRoute, defineRoute, type RouteContract } from './route.ts';
@@ -44,6 +45,31 @@ const stylesheet = {
   scope: null,
   params: z.strictObject({ slug: slugSchema }),
   responses: { 200: { raw: ['text/css'] } },
+} satisfies RouteContract;
+
+const attach = {
+  method: 'POST',
+  path: '/portal/applications/:applicationId/files',
+  audience: 'portal',
+  module: 'grants',
+  summary: 'Attach a file to an application',
+  permission: 'grants.applications.apply',
+  scope: 'own_application',
+  params: z.strictObject({ applicationId: idSchema }),
+  body: { raw: ['application/octet-stream'], maxBytes: MAX_FILE_BYTES },
+  responses: { 201: z.strictObject({ id: idSchema }) },
+} satisfies RouteContract;
+
+const download = {
+  method: 'GET',
+  path: '/console/files/:fileId',
+  audience: 'console',
+  module: 'grants',
+  summary: 'Download a file',
+  permission: 'grants.applications.read',
+  scope: 'tenant',
+  params: z.strictObject({ fileId: idSchema }),
+  responses: { 200: { raw: [...fileTypes] } },
 } satisfies RouteContract;
 
 function problemsWith(change: Record<string, unknown>, route: RouteContract = valid): string[] {
@@ -102,21 +128,41 @@ describe('checkRoute', () => {
   });
 });
 
-describe('checkRoute for raw bodies', () => {
-  const message = 'Only a public GET route answers a raw body.';
+describe('checkRoute for raw responses', () => {
+  const message = 'Only a public, console or portal GET route answers a raw body.';
 
   it('passes each content type on its own or together', () => {
     const images = { 200: { raw: ['image/png', 'image/webp'] } };
     expect(problemsWith({ responses: images }, stylesheet)).toEqual([]);
+    expect(checkRoute(download)).toEqual([]);
+    const portal = {
+      path: '/portal/files/:fileId',
+      audience: 'portal',
+      permission: 'grants.applications.apply',
+      scope: 'own_application',
+      responses: { 200: { raw: ['application/pdf'] } },
+    };
+    expect(problemsWith(portal, download)).toEqual([]);
   });
 
-  it('allows a raw body only on public GET routes', () => {
+  it('allows a raw body only on public, console and portal GET routes', () => {
     expect(problemsWith({ method: 'DELETE' }, stylesheet)).toContain(message);
+    expect(problemsWith({ method: 'DELETE' }, download)).toContain(message);
     const raw = { responses: { 200: { raw: ['text/css'] } } };
-    expect(problemsWith({ ...raw, method: 'GET', body: undefined })).toContain(message);
     expect(problemsWith({ ...raw, path: '/auth/theme.css', params: undefined }, signOut)).toContain(
       message,
     );
+    const auth = { method: 'GET', path: '/auth/file', responses: download.responses };
+    expect(problemsWith(auth, signOut)).toContain(message);
+  });
+
+  it('lets a public route answer only stylesheets and images, and a console or portal route only file types', () => {
+    const pdf = { 200: { raw: ['application/pdf'] } };
+    expect(problemsWith({ responses: pdf }, stylesheet)).not.toEqual([]);
+    for (const type of ['text/css', 'image/webp', 'image/svg+xml', 'text/html']) {
+      const responses = { 200: { raw: [type] } };
+      expect(problemsWith({ responses }, download), type).not.toEqual([]);
+    }
   });
 
   it('needs status 200 and content types from the list, each once', () => {
@@ -130,6 +176,38 @@ describe('checkRoute for raw bodies', () => {
       { 200: { raw: ['text/css'], schema: z.string() } },
     ]) {
       expect(problemsWith({ responses }, stylesheet), JSON.stringify(responses)).not.toEqual([]);
+    }
+  });
+});
+
+describe('checkRoute for raw upload bodies', () => {
+  const message = 'Only a console or portal POST route takes a raw upload body.';
+
+  it('passes a console or portal POST route', () => {
+    expect(checkRoute(attach)).toEqual([]);
+    const staff = { path: '/console/files', audience: 'console', params: undefined };
+    const read = { permission: 'grants.applications.read', scope: 'tenant' };
+    expect(problemsWith({ ...staff, ...read }, attach)).toEqual([]);
+  });
+
+  it('refuses it on any other method or audience', () => {
+    for (const method of ['PUT', 'PATCH']) {
+      expect(problemsWith({ method }, attach), method).toContain(message);
+    }
+    const auth = { ...signOut, body: attach.body };
+    expect(checkRoute(auth)).toContain(message);
+    const open = { method: 'POST', path: '/public/tenants/:slug/files', body: attach.body };
+    expect(problemsWith(open, stylesheet)).toContain(message);
+    expect(problemsWith({ method: 'GET' }, attach)).toContain('A GET route takes no body.');
+  });
+
+  it('refuses a limit over MAX_FILE_BYTES and any other content type', () => {
+    for (const body of [
+      { raw: ['application/octet-stream'], maxBytes: MAX_FILE_BYTES + 1 },
+      { raw: ['application/pdf'], maxBytes: 1024 },
+      { raw: ['text/css'] },
+    ]) {
+      expect(problemsWith({ body }, attach), JSON.stringify(body)).not.toEqual([]);
     }
   });
 });

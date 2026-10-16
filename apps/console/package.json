@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@pixel-scientists/domain": "workspace:*",
+    "@pixel-scientists/grants": "workspace:*",
     "@pixel-scientists/ui": "workspace:*",
     "react": "19.3.0",
     "react-dom": "19.3.0"

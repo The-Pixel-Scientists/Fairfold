@@ -86,6 +86,24 @@ export const app: ClassificationRegistry = {
     updated_at: internal,
     updated_by: internal,
   },
+  // An uploaded file (ADR 0047). Its name often names a person. A linked
+  // file follows its record's retention rule, as grants.application's; a
+  // refused (infected or error) row, linked to nothing, follows the
+  // 12-month audit floor, for the retention sweep (S11-102).
+  'app.file': {
+    tenant_id: internal,
+    id: internal,
+    name: personal,
+    content_type: internal,
+    size_bytes: internal,
+    sha256: internal,
+    // The object this key names holds personal content, under the same rule.
+    storage_key: internal,
+    scan_state: internal,
+    scanned_at: internal,
+    created_by: internal,
+    created_at: internal,
+  },
   'app.audit_event': {
     tenant_id: audit,
     id: audit,

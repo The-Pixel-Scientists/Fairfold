@@ -14,6 +14,12 @@
     },
     {
       "path": "../../packages/db"
+    },
+    {
+      "path": "../../modules/party/tsconfig.server.json"
+    },
+    {
+      "path": "../../modules/grants/tsconfig.server.json"
     }
   ]
 }

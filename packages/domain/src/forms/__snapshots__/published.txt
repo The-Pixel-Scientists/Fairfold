@@ -1,0 +1,406 @@
+{
+  "definition": {
+    "sections": [
+      {
+        "id": "s_about",
+        "title": "About your organisation",
+        "conditions": [],
+        "fields": [
+          {
+            "id": "f_charity",
+            "label": "Is your organisation a registered charity?",
+            "required": true,
+            "identity": false,
+            "audiences": [
+              "applicant",
+              "staff",
+              "reviewer"
+            ],
+            "conditions": [],
+            "type": "yes_no",
+            "eligibility": {
+              "stopWhen": false,
+              "explanation": "This fund is open to registered charities only."
+            }
+          },
+          {
+            "id": "f_orgname",
+            "label": "Organisation name",
+            "required": true,
+            "identity": true,
+            "audiences": [
+              "applicant",
+              "staff",
+              "reviewer"
+            ],
+            "conditions": [],
+            "type": "short_text",
+            "maxCharacters": 120
+          },
+          {
+            "id": "f_email",
+            "label": "Contact email address",
+            "required": true,
+            "identity": true,
+            "audiences": [
+              "applicant",
+              "staff"
+            ],
+            "conditions": [],
+            "type": "email"
+          },
+          {
+            "id": "f_phone",
+            "label": "Contact phone number",
+            "required": false,
+            "identity": true,
+            "audiences": [
+              "applicant",
+              "staff",
+              "reviewer"
+            ],
+            "conditions": [],
+            "type": "phone"
+          },
+          {
+            "id": "f_address",
+            "label": "Registered address",
+            "required": false,
+            "identity": true,
+            "audiences": [
+              "applicant",
+              "staff",
+              "reviewer"
+            ],
+            "conditions": [],
+            "type": "uk_address"
+          },
+          {
+            "id": "f_site",
+            "label": "Website",
+            "required": false,
+            "identity": false,
+            "audiences": [
+              "applicant",
+              "staff",
+              "reviewer"
+            ],
+            "conditions": [],
+            "type": "url"
+          }
+        ]
+      },
+      {
+        "id": "s_project",
+        "title": "Your project",
+        "conditions": [],
+        "fields": [
+          {
+            "id": "f_kind",
+            "label": "What will the money pay for?",
+            "required": true,
+            "identity": false,
+            "audiences": [
+              "applicant",
+              "staff",
+              "reviewer"
+            ],
+            "conditions": [],
+            "type": "single_choice",
+            "options": [
+              {
+                "value": "building",
+                "label": "Building work"
+              },
+              {
+                "value": "equipment",
+                "label": "Equipment"
+              },
+              {
+                "value": "loans",
+                "label": "Paying off loans"
+              }
+            ],
+            "eligibility": {
+              "stopValues": [
+                "loans"
+              ],
+              "explanation": "We cannot pay off loans or other debts."
+            }
+          },
+          {
+            "id": "f_works",
+            "label": "Describe the building work",
+            "required": true,
+            "identity": false,
+            "audiences": [
+              "applicant",
+              "staff",
+              "reviewer"
+            ],
+            "conditions": [
+              {
+                "field": "f_kind",
+                "equals": "building"
+              }
+            ],
+            "type": "long_text",
+            "maxWords": 250
+          },
+          {
+            "id": "f_amount",
+            "label": "How much do you need?",
+            "required": true,
+            "identity": false,
+            "audiences": [
+              "applicant",
+              "staff",
+              "reviewer"
+            ],
+            "conditions": [],
+            "type": "currency",
+            "currency": "GBP",
+            "minMinor": 500000,
+            "maxMinor": 2500000
+          },
+          {
+            "id": "f_start",
+            "label": "When will the project start?",
+            "required": false,
+            "identity": false,
+            "audiences": [
+              "applicant",
+              "staff",
+              "reviewer"
+            ],
+            "conditions": [],
+            "type": "date"
+          },
+          {
+            "id": "f_people",
+            "label": "How many people will benefit?",
+            "required": false,
+            "identity": false,
+            "audiences": [
+              "applicant",
+              "staff",
+              "reviewer"
+            ],
+            "conditions": [],
+            "type": "number",
+            "wholeNumber": true,
+            "min": 1,
+            "max": 100000
+          },
+          {
+            "id": "f_groups",
+            "label": "Who will benefit?",
+            "required": false,
+            "identity": false,
+            "audiences": [
+              "applicant",
+              "staff",
+              "reviewer"
+            ],
+            "conditions": [],
+            "type": "multiple_choice",
+            "options": [
+              {
+                "value": "young",
+                "label": "Young people"
+              },
+              {
+                "value": "older",
+                "label": "Older people"
+              },
+              {
+                "value": "families",
+                "label": "Families"
+              }
+            ],
+            "minSelections": 1,
+            "maxSelections": 2
+          },
+          {
+            "id": "f_region",
+            "label": "Region",
+            "required": false,
+            "identity": false,
+            "audiences": [
+              "applicant",
+              "staff",
+              "reviewer"
+            ],
+            "conditions": [],
+            "type": "dropdown",
+            "options": [
+              {
+                "value": "north",
+                "label": "North"
+              },
+              {
+                "value": "south",
+                "label": "South"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "s_building",
+        "title": "Planning",
+        "conditions": [
+          {
+            "field": "f_kind",
+            "equals": "building"
+          }
+        ],
+        "fields": [
+          {
+            "id": "f_planning",
+            "label": "Do you have planning permission?",
+            "required": false,
+            "identity": false,
+            "audiences": [
+              "applicant",
+              "staff",
+              "reviewer"
+            ],
+            "conditions": [],
+            "type": "yes_no"
+          }
+        ]
+      },
+      {
+        "id": "s_monitoring",
+        "title": "Equality monitoring",
+        "conditions": [],
+        "fields": [
+          {
+            "id": "f_intro",
+            "type": "content",
+            "body": "Reviewers never see these answers.",
+            "conditions": []
+          },
+          {
+            "id": "f_ethnicity",
+            "label": "Which group best describes the people who lead your organisation?",
+            "required": false,
+            "identity": false,
+            "audiences": "aggregate_only",
+            "conditions": [],
+            "type": "single_choice",
+            "options": [
+              {
+                "value": "one",
+                "label": "Group one"
+              },
+              {
+                "value": "two",
+                "label": "Group two"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "projections": {
+    "applicant": {
+      "f_charity": true,
+      "f_orgname": "Northfield Community Trust",
+      "f_email": "hello@northfield.example",
+      "f_phone": "01632 960 001",
+      "f_address": {
+        "line1": "1 High Street",
+        "town": "Northfield",
+        "postcode": "NF1 1AA"
+      },
+      "f_site": "https://www.northfield.example",
+      "f_kind": "building",
+      "f_works": "A new roof for the community hall.",
+      "f_amount": {
+        "amountMinor": 1500000,
+        "currency": "GBP"
+      },
+      "f_start": "2027-04-01",
+      "f_people": 250,
+      "f_groups": [
+        "young",
+        "families"
+      ],
+      "f_region": "north",
+      "f_planning": true,
+      "f_ethnicity": "two"
+    },
+    "staff": {
+      "f_charity": true,
+      "f_orgname": "Northfield Community Trust",
+      "f_email": "hello@northfield.example",
+      "f_phone": "01632 960 001",
+      "f_address": {
+        "line1": "1 High Street",
+        "town": "Northfield",
+        "postcode": "NF1 1AA"
+      },
+      "f_site": "https://www.northfield.example",
+      "f_kind": "building",
+      "f_works": "A new roof for the community hall.",
+      "f_amount": {
+        "amountMinor": 1500000,
+        "currency": "GBP"
+      },
+      "f_start": "2027-04-01",
+      "f_people": 250,
+      "f_groups": [
+        "young",
+        "families"
+      ],
+      "f_region": "north",
+      "f_planning": true
+    },
+    "reviewer": {
+      "f_charity": true,
+      "f_orgname": "Northfield Community Trust",
+      "f_phone": "01632 960 001",
+      "f_address": {
+        "line1": "1 High Street",
+        "town": "Northfield",
+        "postcode": "NF1 1AA"
+      },
+      "f_site": "https://www.northfield.example",
+      "f_kind": "building",
+      "f_works": "A new roof for the community hall.",
+      "f_amount": {
+        "amountMinor": 1500000,
+        "currency": "GBP"
+      },
+      "f_start": "2027-04-01",
+      "f_people": 250,
+      "f_groups": [
+        "young",
+        "families"
+      ],
+      "f_region": "north",
+      "f_planning": true
+    },
+    "blind_reviewer": {
+      "f_charity": true,
+      "f_site": "https://www.northfield.example",
+      "f_kind": "building",
+      "f_works": "A new roof for the community hall.",
+      "f_amount": {
+        "amountMinor": 1500000,
+        "currency": "GBP"
+      },
+      "f_start": "2027-04-01",
+      "f_people": 250,
+      "f_groups": [
+        "young",
+        "families"
+      ],
+      "f_region": "north",
+      "f_planning": true
+    }
+  }
+}

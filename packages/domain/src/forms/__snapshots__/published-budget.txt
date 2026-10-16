@@ -1,0 +1,197 @@
+{
+  "definition": {
+    "sections": [
+      {
+        "id": "s_budget",
+        "title": "Budget",
+        "conditions": [],
+        "fields": [
+          {
+            "id": "f_budget",
+            "label": "What will the money pay for?",
+            "required": true,
+            "identity": false,
+            "audiences": [
+              "applicant",
+              "staff",
+              "reviewer"
+            ],
+            "conditions": [],
+            "type": "table",
+            "rowNoun": "cost",
+            "minRows": 0,
+            "maxRows": 10,
+            "columns": [
+              {
+                "id": "c_item",
+                "label": "Item",
+                "required": true,
+                "total": false,
+                "type": "short_text",
+                "maxCharacters": 100
+              },
+              {
+                "id": "c_cost",
+                "label": "Cost",
+                "required": true,
+                "total": true,
+                "type": "currency",
+                "currency": "GBP",
+                "minMinor": 100,
+                "maxMinor": 2500000
+              }
+            ]
+          },
+          {
+            "id": "f_trustees",
+            "label": "Who are your trustees?",
+            "required": false,
+            "identity": true,
+            "audiences": [
+              "applicant",
+              "staff",
+              "reviewer"
+            ],
+            "conditions": [],
+            "type": "table",
+            "rowNoun": "trustee",
+            "minRows": 0,
+            "maxRows": 20,
+            "columns": [
+              {
+                "id": "c_name",
+                "label": "Name",
+                "required": true,
+                "total": false,
+                "type": "short_text",
+                "maxCharacters": 200
+              },
+              {
+                "id": "c_role",
+                "label": "Role",
+                "required": false,
+                "total": false,
+                "type": "dropdown",
+                "options": [
+                  {
+                    "value": "chair",
+                    "label": "Chair"
+                  },
+                  {
+                    "value": "treasurer",
+                    "label": "Treasurer"
+                  },
+                  {
+                    "value": "trustee",
+                    "label": "Trustee"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "projections": {
+    "applicant": {
+      "f_budget": [
+        {
+          "c_item": "Roof repairs",
+          "c_cost": {
+            "amountMinor": 1000000,
+            "currency": "GBP"
+          }
+        },
+        {
+          "c_item": "Scaffolding",
+          "c_cost": {
+            "amountMinor": 250050,
+            "currency": "GBP"
+          }
+        }
+      ],
+      "f_trustees": [
+        {
+          "c_name": "Alex Northfield",
+          "c_role": "chair"
+        },
+        {
+          "c_name": "Sam Southfield"
+        }
+      ]
+    },
+    "staff": {
+      "f_budget": [
+        {
+          "c_item": "Roof repairs",
+          "c_cost": {
+            "amountMinor": 1000000,
+            "currency": "GBP"
+          }
+        },
+        {
+          "c_item": "Scaffolding",
+          "c_cost": {
+            "amountMinor": 250050,
+            "currency": "GBP"
+          }
+        }
+      ],
+      "f_trustees": [
+        {
+          "c_name": "Alex Northfield",
+          "c_role": "chair"
+        },
+        {
+          "c_name": "Sam Southfield"
+        }
+      ]
+    },
+    "reviewer": {
+      "f_budget": [
+        {
+          "c_item": "Roof repairs",
+          "c_cost": {
+            "amountMinor": 1000000,
+            "currency": "GBP"
+          }
+        },
+        {
+          "c_item": "Scaffolding",
+          "c_cost": {
+            "amountMinor": 250050,
+            "currency": "GBP"
+          }
+        }
+      ],
+      "f_trustees": [
+        {
+          "c_name": "Alex Northfield",
+          "c_role": "chair"
+        },
+        {
+          "c_name": "Sam Southfield"
+        }
+      ]
+    },
+    "blind_reviewer": {
+      "f_budget": [
+        {
+          "c_item": "Roof repairs",
+          "c_cost": {
+            "amountMinor": 1000000,
+            "currency": "GBP"
+          }
+        },
+        {
+          "c_item": "Scaffolding",
+          "c_cost": {
+            "amountMinor": 250050,
+            "currency": "GBP"
+          }
+        }
+      ]
+    }
+  }
+}

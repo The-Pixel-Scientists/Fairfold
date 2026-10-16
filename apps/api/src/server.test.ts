@@ -8,7 +8,14 @@ import { z } from 'zod';
 import { captureLogs } from '../test/support.ts';
 import { createLogger } from './logger.ts';
 import type { Problem } from './problems.ts';
-import { createServer } from './server.ts';
+import {
+  BODY_LIMIT_BYTES,
+  CONNECTION_TIMEOUT_MS,
+  createServer,
+  HEADERS_TIMEOUT_MS,
+  KEEP_ALIVE_TIMEOUT_MS,
+  REQUEST_TIMEOUT_MS,
+} from './server.ts';
 
 // Building the server loads Fastify, which is slow on a cold start.
 vi.setConfig({ testTimeout: 15_000 });
@@ -171,6 +178,88 @@ describe('validation of requests', () => {
 
     expect(response.statusCode).toBe(413);
     expect(problemOf(response.body).detail).toBe('The request body is too large.');
+  });
+});
+
+describe('limits on slow and large clients', () => {
+  it('sets every time limit, so no client holds a connection open for ever', async () => {
+    const server = await startServer();
+
+    expect(server.server.requestTimeout).toBe(REQUEST_TIMEOUT_MS);
+    expect(server.server.headersTimeout).toBe(HEADERS_TIMEOUT_MS);
+    expect(server.server.keepAliveTimeout).toBe(KEEP_ALIVE_TIMEOUT_MS);
+    expect(server.server.timeout).toBe(CONNECTION_TIMEOUT_MS);
+    for (const limit of [REQUEST_TIMEOUT_MS, HEADERS_TIMEOUT_MS, KEEP_ALIVE_TIMEOUT_MS]) {
+      expect(limit).toBeGreaterThan(0);
+    }
+    // Node.js refuses a header time above the request time, and advises one above keep-alive.
+    expect(HEADERS_TIMEOUT_MS).toBeLessThanOrEqual(REQUEST_TIMEOUT_MS);
+    expect(HEADERS_TIMEOUT_MS).toBeGreaterThan(KEEP_ALIVE_TIMEOUT_MS);
+  });
+
+  it('refuses a body one byte over the default limit, and takes one at it', async () => {
+    const server = createServer(createLogger({ level: 'silent' }));
+    app = server;
+    server
+      .withTypeProvider<ZodTypeProvider>()
+      .post('/blob', { schema: { body: z.object({ value: z.string() }) } }, () => 'ok');
+    await server.ready();
+    const send = (size: number) =>
+      server.inject({
+        method: 'POST',
+        url: '/blob',
+        headers: { 'content-type': 'application/json' },
+        payload: JSON.stringify({ value: 'x'.repeat(size - '{"value":""}'.length) }),
+      });
+
+    expect((await send(BODY_LIMIT_BYTES)).statusCode).toBe(200);
+    expect((await send(BODY_LIMIT_BYTES + 1)).statusCode).toBe(413);
+  });
+});
+
+describe('errors that carry headers', () => {
+  async function failing(headers: Record<string, unknown>, statusCode = 429) {
+    const server = createServer(createLogger({ level: 'silent' }));
+    app = server;
+    server.get('/limited', () => {
+      throw Object.assign(new Error('Slow down.'), { statusCode, headers });
+    });
+    await server.ready();
+    return server.inject({ url: '/limited' });
+  }
+
+  it('keep Retry-After and Allow, and nothing else', async () => {
+    const response = await failing({
+      'Retry-After': 30,
+      allow: 'GET, HEAD',
+      'set-cookie': 'session=stolen',
+      location: 'https://example.org',
+    });
+
+    expect(response.statusCode).toBe(429);
+    expect(response.headers['retry-after']).toBe('30');
+    expect(response.headers['allow']).toBe('GET, HEAD');
+    expect(response.headers['set-cookie']).toBeUndefined();
+    expect(response.headers['location']).toBeUndefined();
+    expect(response.headers['content-type']).toBe('application/problem+json; charset=utf-8');
+  });
+
+  it('drop a value that could add a header line', async () => {
+    const response = await failing({
+      'retry-after': '30\r\nSet-Cookie: a=b',
+      allow: 'GET\n',
+    });
+
+    expect(response.statusCode).toBe(429);
+    expect(response.headers['retry-after']).toBeUndefined();
+    expect(response.headers['allow']).toBeUndefined();
+    expect(response.headers['set-cookie']).toBeUndefined();
+  });
+
+  it('send nothing for an error with no headers', async () => {
+    const response = await failing({});
+
+    expect(response.headers['retry-after']).toBeUndefined();
   });
 });
 

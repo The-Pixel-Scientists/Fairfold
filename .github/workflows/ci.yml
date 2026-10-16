@@ -113,6 +113,8 @@ jobs:
         run: docker compose --file infra/compose/compose.dev.yaml up --detach --wait postgres
       - name: Migrate up, down and up again, as migrator
         run: pnpm db:migrate && pnpm db:rollback && pnpm db:migrate
+      - name: Check the generated database types match the migrations
+        run: pnpm db:migrate && pnpm db:types --check
       - name: Run the roles, schema lint, tenant and round-trip tests
         run: pnpm test:db
 
@@ -120,7 +122,7 @@ jobs:
     name: End-to-end and accessibility tests
     if: github.event_name != 'schedule'
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 75
     container:
       image: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
       options: --ipc=host

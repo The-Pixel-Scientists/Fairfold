@@ -37,6 +37,7 @@ it('finds every entry point on disk', () => {
       '.',
       'api',
       'auth',
+      'files',
       'forms',
       'jitless',
       'platform',

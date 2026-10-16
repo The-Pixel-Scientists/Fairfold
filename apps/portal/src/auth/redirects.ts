@@ -12,8 +12,9 @@ import { HOME_PATH, SIGNED_OUT_PATH, SIGN_IN_PATH } from '../paths.ts';
  * `account` pages are for people who are not signed in (sign in, sign up,
  * reset). `open` pages are for anyone: the funder's start page, which shows a
  * signed-in applicant their own page instead, and the page not found.
+ * `applicant` pages are for signed-in applicants only (details, organisations).
  */
-export type PageKind = 'account' | 'open';
+export type PageKind = 'account' | 'open' | 'applicant';
 
 /** The sentences the sign-in page can open with, by the word in `?notice=`. */
 export const notices = ['timeout', 'account-created', 'password-reset'] as const;
@@ -61,7 +62,8 @@ export function withQuery(path: string, next: string | null, notice: Notice | nu
  *
  * An open page leaves for the page that explains only when the session ended
  * while the person was on it (`signedInHere`). Someone who arrives there after
- * signing out, such as by the link to the start page, stays.
+ * signing out, such as by the link to the start page, stays. An applicant page
+ * always leaves, and comes back to `here` after sign-in.
  */
 export function redirectFor(
   kind: PageKind,
@@ -71,10 +73,9 @@ export function redirectFor(
   signedInHere: boolean,
 ): string | null {
   if (state.status === 'signed-out') {
-    if (kind === 'account' || !signedInHere) return null;
-    return state.reason === 'signed-out'
-      ? SIGNED_OUT_PATH
-      : withQuery(SIGN_IN_PATH, here, 'timeout');
+    if (kind === 'account' || (kind === 'open' && !signedInHere)) return null;
+    if (state.reason === 'signed-out') return SIGNED_OUT_PATH;
+    return withQuery(SIGN_IN_PATH, here, signedInHere ? 'timeout' : null);
   }
   if (state.status !== 'ready') return null;
   return kind === 'account' ? (next ?? HOME_PATH) : null;

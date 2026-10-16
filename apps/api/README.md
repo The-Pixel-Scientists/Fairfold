@@ -32,12 +32,12 @@ unset. The plain variable is for development and tests. Setting both is an error
 | `TPS_DB_TLS_CA` or `TPS_DB_TLS_CA_FILE` | No                                                 | Certificate authority of the database server, in PEM, when Node.js does not already trust it. Only with `verify-full`                                                                                                                  |
 | `TPS_DB_APP_API_PASSWORD_FILE`          | Yes in a deployment                                | Path of the file that holds the password of the `app_api` role, at least 16 characters                                                                                                                                                 |
 | `TPS_DB_APP_API_PASSWORD`               | Instead of the file, in development                | The password itself                                                                                                                                                                                                                    |
-| `TPS_SMTP_HOST`                         | With the other mail settings                       | Mail server host. Optional for now: the API does not send mail yet. Once any mail setting is set, the host, port, TLS mode and sender are all required                                                                                 |
-| `TPS_SMTP_PORT`                         | With the other mail settings                       | Mail server port                                                                                                                                                                                                                       |
-| `TPS_SMTP_TLS`                          | With the other mail settings                       | `starttls`, `tls` or `none`, which works only for a mail server at a loopback IP address (127.0.0.0/8 or `::1`), and with a login only when `TPS_DEV=1`. The relay must share the API's network namespace, as the stack's Mailpit does |
+| `TPS_SMTP_HOST`                         | Yes                                                | Mail server host. The API does not send mail yet, but it needs the mail settings to start                                                                                                                                              |
+| `TPS_SMTP_PORT`                         | Yes                                                | Mail server port                                                                                                                                                                                                                       |
+| `TPS_SMTP_TLS`                          | Yes                                                | `starttls`, `tls` or `none`, which works only for a mail server at a loopback IP address (127.0.0.0/8 or `::1`), and with a login only when `TPS_DEV=1`. The relay must share the API's network namespace, as the stack's Mailpit does |
 | `TPS_SMTP_USER`                         | With the password                                  | Mail server login. Set it together with the password, or leave both out                                                                                                                                                                |
 | `TPS_SMTP_PASSWORD` or `_FILE`          | With the user                                      | Mail server password, or the path of the file that holds it                                                                                                                                                                            |
-| `TPS_SMTP_FROM`                         | With the other mail settings                       | The address emails are sent from                                                                                                                                                                                                       |
+| `TPS_SMTP_FROM`                         | Yes                                                | The address emails are sent from                                                                                                                                                                                                       |
 | `TPS_LOG_LEVEL`                         | No                                                 | `fatal`, `error`, `warn`, `info` (the default), `debug`, `trace` or `silent`                                                                                                                                                           |
 | `TPS_DEV`                               | No                                                 | `1` for development: the listener binds to `127.0.0.1`, and the fixed development passwords are accepted, but only against a database server on this machine                                                                           |
 
@@ -56,7 +56,16 @@ contract in `packages/domain` (`registerRoutes()` in `src/routes/register.ts`)
 and served under `/api`. A route without a contract stops the API at start-up,
 and so does a contract that breaks the route rules, has more than one success
 response, or names a scope rule that no module resolves. Request bodies are
-limited to 1 MiB.
+limited to 64 KiB, except where a route sets its own limit (the logo upload
+takes a little over 200 KB as base64). A client has 70 seconds to send its
+headers and 2 minutes for the whole request, and an idle connection is kept
+65 seconds. A raw response (the public stylesheet and logo) is sent as the
+handler returns it, in a content type the contract names. An error keeps only
+the `Retry-After` and `Allow` headers it carries.
+
+The API refuses to start if `HTTP_PROXY`, `HTTPS_PROXY` or `NODE_USE_ENV_PROXY`
+is set, in any case, because a proxy would resolve names where the API cannot
+check them (ADR 0010).
 
 One module decides whether a caller may run a route (`src/policy/policy.ts`).
 It checks permissions, never role names, in this order:
@@ -73,6 +82,18 @@ It checks permissions, never role names, in this order:
 3. The handler runs in that transaction, with the parsed input and the
    context, and commits with it. A handler has no other way to the database
    and does not check access itself.
+
+The public tenant routes (`/api/public/tenants/:slug`, `/theme.css` and
+`/logo`) need no session and set no tenant: they call the two public functions
+of ADR 0019. An unknown, suspended or malformed slug gets the same 404. The
+stylesheet is built by `themeCss()` from validated tokens only.
+
+A handler writes a configuration version for a change to settings, a theme or
+a module switch with `context.config.record(entityType, entityId, diff)`, in
+the same transaction and with the acting membership as author. Two requests
+that write the same version cannot both succeed: the second gets a 409. The
+table keeps its diff as an object, so the list of changes is stored under
+`changes`.
 
 A handler records audit events only through its context: `context.audit.record()`
 for a state change and `context.audit.read()` for a sensitive read, both bound to

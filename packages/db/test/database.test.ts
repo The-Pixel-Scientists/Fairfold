@@ -44,7 +44,9 @@ describe('poolConfig', () => {
       // Likewise PGSSLNEGOTIATION.
       sslnegotiation: 'postgres',
       // Always set, so PGOPTIONS cannot add settings.
-      options: '-c statement_timeout=30000 -c idle_in_transaction_session_timeout=60000',
+      options:
+        '-c statement_timeout=30000 -c idle_in_transaction_session_timeout=60000 ' +
+        '-c client_connection_check_interval=10000',
     });
   });
 
@@ -63,7 +65,9 @@ describe('poolConfig', () => {
       connectionTimeoutMillis: 2_000,
       query_timeout: 4_000,
       keepAliveInitialDelayMillis: 3_000,
-      options: '-c statement_timeout=1234 -c idle_in_transaction_session_timeout=5678',
+      options:
+        '-c statement_timeout=1234 -c idle_in_transaction_session_timeout=5678 ' +
+        '-c client_connection_check_interval=10000',
     });
   });
 
@@ -172,5 +176,81 @@ describe('createDatabase', () => {
     } finally {
       await db.destroy();
     }
+  });
+
+  it('checks that the client of a long query is still there', async () => {
+    const db = createDatabase(databaseSettings('app_api', 1));
+    try {
+      const { rows } = await sql<{ interval: string }>`
+        SELECT pg_catalog.current_setting('client_connection_check_interval') AS interval
+      `.execute(db);
+      expect(rows).toEqual([{ interval: '10s' }]);
+    } finally {
+      await db.destroy();
+    }
+  });
+
+  it('returns each connection to the pool with no state left', async () => {
+    const db = createDatabase(databaseSettings('app_api', 1));
+    try {
+      const pid = sql<{ pid: number }>`SELECT pg_catalog.pg_backend_pid() AS pid`;
+      const before = (await pid.execute(db)).rows[0]?.pid;
+      await sql`SELECT pg_catalog.set_config('tps.leftover', 'yes', false)`.execute(db);
+      await sql`PREPARE leftover AS SELECT 1`.execute(db);
+      await db.transaction().execute(async (trx) => {
+        await sql`SELECT pg_catalog.set_config('tps.inside', 'yes', false)`.execute(trx);
+      });
+      const { rows } = await sql<{
+        pid: number;
+        leftover: string | null;
+        inside: string | null;
+        prepared: number;
+      }>`
+        SELECT pg_catalog.pg_backend_pid() AS pid,
+               pg_catalog.current_setting('tps.leftover', true) AS leftover,
+               pg_catalog.current_setting('tps.inside', true) AS inside,
+               (SELECT count(*)::int FROM pg_catalog.pg_prepared_statements) AS prepared
+      `.execute(db);
+      // The same connection, so the reset is what cleared it.
+      expect(rows).toEqual([{ pid: before, leftover: '', inside: '', prepared: 0 }]);
+    } finally {
+      await db.destroy();
+    }
+  });
+
+  it('closes a connection that cannot be reset', async () => {
+    const logged: string[] = [];
+    const db = createDatabase({
+      ...databaseSettings('app_api', 1),
+      log: (message) => logged.push(message),
+    });
+    try {
+      const pid = sql<{ pid: number }>`SELECT pg_catalog.pg_backend_pid() AS pid`;
+      const before = (await pid.execute(db)).rows[0]?.pid;
+      // A transaction left open makes DISCARD ALL fail.
+      await sql`BEGIN`.execute(db);
+      await expect
+        .poll(() => logged)
+        .toContain('A database connection could not be reset, so it was closed.');
+      expect((await pid.execute(db)).rows[0]?.pid).not.toBe(before);
+    } finally {
+      await db.destroy();
+    }
+  });
+
+  it('warns when the connection to a server elsewhere is not encrypted', async () => {
+    const warnings: string[] = [];
+    const warn = (message: string) => warnings.push(message);
+    const unused = { ...settings, maxConnections: 1, warn };
+    await createDatabase({ ...unused, host: 'db.internal', tls: { mode: 'disable' } }).destroy();
+    await createDatabase({ ...unused, tls: { mode: 'disable' } }).destroy();
+    await createDatabase({
+      ...unused,
+      host: 'db.internal',
+      tls: { mode: 'verify-full' },
+    }).destroy();
+    expect(warnings).toEqual([
+      'The database connection to db.internal is not encrypted. Use this only on a private network.',
+    ]);
   });
 });

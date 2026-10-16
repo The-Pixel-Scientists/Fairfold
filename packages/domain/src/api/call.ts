@@ -5,10 +5,13 @@
 // answer with the contract too. Every failure, before or after sending,
 // arrives as one ProblemError with words to show and fields to mark. A
 // redirect is a failure too: the API never sends one. Routes that answer a
-// raw body, such as a stylesheet, are loaded by URL instead.
+// raw body, such as a stylesheet, are loaded by URL instead, and routes that
+// take a file's bytes are sent with upload().
 
 import type { z } from 'zod';
 
+import { fileRefusalMessages } from '../files/messages.ts';
+import { encodeFileNameHeader, fileNameHeader, fileNameSchema } from '../files/name.ts';
 import {
   fieldForIssue,
   messageForIssue,
@@ -16,8 +19,8 @@ import {
   type FieldProblem,
 } from '../platform/messages.ts';
 import { ProblemError, problemSchema } from './problem.ts';
-import type { JsonRouteContract, RouteContract } from './route.ts';
-import { isRawBody } from './schema-rules.ts';
+import type { JsonRouteContract, RouteContract, UploadRouteContract } from './route.ts';
+import { isRawBody, rawUploadContentType, rawUploadProblems } from './schema-rules.ts';
 
 /** Each app's origin forwards this path to the API. */
 export const apiBasePath = '/api';
@@ -122,16 +125,45 @@ async function readJson(response: FetchResponse): Promise<unknown> {
   }
 }
 
+function checkTarget(route: RouteContract, basePath: string): void {
+  if (!BASE_PATH.test(basePath)) throw new TypeError('basePath must be a path, such as /api.');
+  if (!ROUTE_PATH.test(route.path)) throw new TypeError('A route path starts with its audience.');
+  if (Object.values(route.responses).some(isRawBody)) {
+    throw new TypeError('call() reads JSON; load a route that answers a raw body by its URL.');
+  }
+}
+
+/** A success parsed with the route's schema, or a problem as one ProblemError. */
+function settle<C extends RouteContract>(route: C, status: number, json: unknown): CallResult<C> {
+  if (status >= 200 && status < 300) {
+    const schema = route.responses[status];
+    if (schema === undefined || isRawBody(schema)) {
+      throw new ProblemError(status, messages.serviceFailed);
+    }
+    if (schema === null) return undefined as CallResult<C>;
+    const parsed = schema.safeParse(json);
+    if (!parsed.success) throw new ProblemError(status, messages.serviceFailed);
+    return parsed.data as CallResult<C>;
+  }
+  const problem = problemSchema.safeParse(json);
+  if (problem.success) {
+    throw new ProblemError(status, problem.data.detail, {
+      requestId: problem.data.requestId,
+      errors: problem.data.errors ?? [],
+    });
+  }
+  throw new ProblemError(status, status >= 500 ? messages.serviceFailed : messages.requestFailed);
+}
+
 export async function call<const C extends JsonRouteContract>(
   route: C,
   input: CallInput<C>,
   options: CallOptions = {},
 ): Promise<CallResult<C>> {
   const basePath = options.basePath ?? apiBasePath;
-  if (!BASE_PATH.test(basePath)) throw new TypeError('basePath must be a path, such as /api.');
-  if (!ROUTE_PATH.test(route.path)) throw new TypeError('A route path starts with its audience.');
-  if (Object.values(route.responses).some(isRawBody)) {
-    throw new TypeError('call() reads JSON; load a route that answers a raw body by its URL.');
+  checkTarget(route, basePath);
+  if (isRawBody(route.body)) {
+    throw new TypeError('call() sends JSON; send a file to a route that takes one with upload().');
   }
   const parts = input as { params?: unknown; query?: unknown; body?: unknown };
   const errors: FieldProblem[] = [];
@@ -160,21 +192,150 @@ export async function call<const C extends JsonRouteContract>(
   }
 
   const { status } = response;
-  if (status >= 200 && status < 300) {
-    const schema = route.responses[status];
-    if (schema === undefined) throw new ProblemError(status, messages.serviceFailed);
-    if (schema === null) return undefined as CallResult<C>;
-    const parsed = schema.safeParse(await readJson(response));
-    if (!parsed.success) throw new ProblemError(status, messages.serviceFailed);
-    return parsed.data as CallResult<C>;
-  }
+  const schema = route.responses[status];
+  // No body to read for a declared empty success.
+  return settle(route, status, schema === null ? undefined : await readJson(response));
+}
 
-  const problem = problemSchema.safeParse(await readJson(response));
-  if (problem.success) {
-    throw new ProblemError(status, problem.data.detail, {
-      requestId: problem.data.requestId,
-      errors: problem.data.errors ?? [],
-    });
+/** A file to send. A browser `File` is one. */
+export interface UploadFile {
+  readonly name: string;
+  readonly size: number;
+}
+
+/** The part of `XMLHttpRequest` upload() uses, so the package needs no DOM types. */
+export interface UploadRequest {
+  open(method: string, url: string): void;
+  setRequestHeader(name: string, value: string): void;
+  send(body: UploadFile): void;
+  abort(): void;
+  readonly status: number;
+  readonly responseText: string;
+  readonly responseURL: string;
+  readonly upload: { onprogress: ((event: { loaded: number }) => void) | null };
+  onload: (() => void) | null;
+  onerror: (() => void) | null;
+  onabort: (() => void) | null;
+}
+
+/** The part of `AbortSignal` upload() uses. */
+export interface UploadSignal {
+  readonly aborted: boolean;
+  readonly reason: unknown;
+  addEventListener(type: 'abort', listener: () => void): void;
+  removeEventListener(type: 'abort', listener: () => void): void;
+}
+
+export interface UploadOptions {
+  /** Where the API is on this origin, as for call(). */
+  basePath?: string;
+  /** Aborting rejects with the signal's reason. */
+  signal?: UploadSignal;
+  /** Bytes sent so far, of the file's size. */
+  onProgress?: (sent: number, total: number) => void;
+  /** Tests pass their own. */
+  request?: () => UploadRequest;
+}
+
+export type UploadInput<C extends RouteContract> = Part<'params', C>;
+
+function newRequest(): UploadRequest {
+  const { XMLHttpRequest } = globalThis as unknown as { XMLHttpRequest: new () => UploadRequest };
+  return new XMLHttpRequest();
+}
+
+function parseJson(text: string): unknown {
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return undefined;
   }
-  throw new ProblemError(status, status >= 500 ? messages.serviceFailed : messages.requestFailed);
+}
+
+/** The signal's reason, which AbortController makes an `AbortError`. */
+function abortReason(signal: UploadSignal | undefined): Error {
+  const reason = signal?.reason;
+  return reason instanceof Error ? reason : new Error('The upload was cancelled.');
+}
+
+/** The page's origin, to tell an answer from the API from one after a redirect. Empty outside a browser. */
+function pageOrigin(): string {
+  return (globalThis as { location?: { origin?: string } }).location?.origin ?? '';
+}
+
+/**
+ * Sends a file's bytes to a route with a raw upload body (ADR 0047):
+ * same-origin, as `application/octet-stream`, with the trimmed name
+ * percent-encoded in the `File-Name` header. It uses XMLHttpRequest because
+ * fetch cannot report upload progress. The answer and every failure are
+ * handled as call() handles them. The server checks the file again, and
+ * finds its type from its bytes.
+ */
+export async function upload<const C extends UploadRouteContract>(
+  route: C,
+  input: UploadInput<C>,
+  file: UploadFile,
+  options: UploadOptions = {},
+): Promise<CallResult<C>> {
+  const basePath = options.basePath ?? apiBasePath;
+  checkTarget(route, basePath);
+  if (
+    !isRawBody(route.body) ||
+    rawUploadProblems(route.body).length > 0 ||
+    route.query !== undefined
+  ) {
+    throw new TypeError('upload() sends a file to a route with a raw upload body and no query.');
+  }
+  const errors: FieldProblem[] = [];
+  const params = parsePart('params', route.params, (input as { params?: unknown }).params, errors);
+  if (errors.length > 0) throw new ProblemError(400, messages.fixFields, { errors });
+  const name = fileNameSchema.safeParse(file.name);
+  if (!name.success) {
+    throw new ProblemError(400, messageForIssue(name.error.issues[0] ?? {}));
+  }
+  if (file.size > route.body.maxBytes) throw new ProblemError(400, fileRefusalMessages.too_large);
+
+  const url = `${basePath}${fillPath(route.path, params)}`;
+  const { signal, onProgress } = options;
+  if (signal?.aborted === true) throw abortReason(signal);
+
+  return new Promise((resolve, reject) => {
+    const request = (options.request ?? newRequest)();
+    const abort = () => {
+      request.abort();
+    };
+    const fail = (error: Error) => {
+      signal?.removeEventListener('abort', abort);
+      reject(error);
+    };
+    request.upload.onprogress = (event) => {
+      onProgress?.(Math.min(event.loaded, file.size), file.size);
+    };
+    request.onload = () => {
+      // XMLHttpRequest follows redirects, and the API never sends one.
+      if (request.responseURL !== `${pageOrigin()}${url}`) {
+        fail(new ProblemError(0, messages.noConnection));
+        return;
+      }
+      try {
+        const result = settle(route, request.status, parseJson(request.responseText));
+        signal?.removeEventListener('abort', abort);
+        resolve(result);
+      } catch (error) {
+        fail(error as ProblemError);
+      }
+    };
+    request.onerror = () => {
+      fail(new ProblemError(0, messages.noConnection));
+    };
+    request.onabort = () => {
+      fail(abortReason(signal));
+    };
+    signal?.addEventListener('abort', abort);
+    request.open(route.method, url);
+    request.setRequestHeader('accept', 'application/json');
+    request.setRequestHeader('content-type', rawUploadContentType);
+    request.setRequestHeader(fileNameHeader, encodeFileNameHeader(name.data));
+    request.send(file);
+  });
 }

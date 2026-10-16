@@ -41,8 +41,8 @@ import {
   type Env,
 } from './settings.ts';
 
-/** `pnpm db:drop` refuses any other database (ADR 0005). */
-const DROPPABLE_PREFIX = 'tps_';
+/** `pnpm db:drop` and `pnpm db:types` refuse any other database (ADR 0005). */
+const DEVELOPMENT_PREFIX = 'tps_';
 
 type Step = 'prepare' | 'up' | 'down' | 'drop';
 const STEPS: readonly Step[] = ['prepare', 'up', 'down', 'drop'];
@@ -110,32 +110,33 @@ export async function prepareDatabase(env: Env, database: string): Promise<void>
 }
 
 /**
- * `pnpm db:drop` may drop only this worktree's own databases, on this
- * machine, in development (ADR 0005). scripts/dev-env.ts lists them in
- * TPS_DEV_DATABASES from the worktree's folder name, and nothing can
- * override that list.
+ * Development commands, `pnpm db:drop` and `pnpm db:types`, work only on
+ * this worktree's own databases, on this machine, in development (ADR 0005).
+ * scripts/dev-env.ts lists them in TPS_DEV_DATABASES from the worktree's
+ * folder name, and nothing can override that list. `verb` names the action
+ * in the error, such as "drop".
  */
-export function checkDroppable(env: Env, database: string): void {
+export function checkOwnDatabase(env: Env, database: string, verb: string): void {
   if (env['TPS_DEV'] !== '1') {
-    throw new Error('db drop runs only in development (TPS_DEV=1).');
+    throw new Error(`Refusing to ${verb} ${database}: this works only in development (TPS_DEV=1).`);
   }
   const host = readSetting(env, 'TPS_DB_HOST');
   if (!isLoopbackHost(host)) {
-    throw new Error(`Refusing to drop a database on ${host}: db drop works only on this machine.`);
+    throw new Error(`Refusing to ${verb} a database on ${host}: this works only on this machine.`);
   }
-  if (!database.startsWith(DROPPABLE_PREFIX)) {
+  if (!database.startsWith(DEVELOPMENT_PREFIX)) {
     throw new Error(
-      `Refusing to drop ${database}: its name does not start with ${DROPPABLE_PREFIX}.`,
+      `Refusing to ${verb} ${database}: its name does not start with ${DEVELOPMENT_PREFIX}.`,
     );
   }
   const own = (env['TPS_DEV_DATABASES'] ?? '').split(',').filter(Boolean);
   if (!own.includes(database)) {
-    throw new Error(`Refusing to drop ${database}: it is not this worktree's database.`);
+    throw new Error(`Refusing to ${verb} ${database}: it is not this worktree's database.`);
   }
 }
 
 export async function dropDatabase(env: Env, database: string): Promise<void> {
-  checkDroppable(env, database);
+  checkOwnDatabase(env, database, 'drop');
   await withSuperuser(env, MAINTENANCE_DATABASE, async (client) => {
     await client.query(`DROP DATABASE IF EXISTS ${client.escapeIdentifier(database)} WITH (FORCE)`);
   });

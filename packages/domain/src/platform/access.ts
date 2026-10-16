@@ -28,6 +28,11 @@ export const scopeRules = {
   own_organisation: { module: 'party', app: 'portal' },
   /** An application made by the caller. */
   own_application: { module: 'grants', app: 'portal' },
+  /**
+   * A round taking applications: its programme is open, its opening time has
+   * passed and its closing time has not, and it has a published form.
+   */
+  open_round: { module: 'grants', app: 'portal' },
 } as const satisfies Record<string, { module: ModuleId; app: App }>;
 
 export type ScopeRule = keyof typeof scopeRules;
@@ -73,7 +78,7 @@ export const permissions = {
   'grants.applications.apply': {
     app: 'portal',
     label: 'Apply for funding',
-    scopes: ['own_application'],
+    scopes: ['own_application', 'open_round'],
   },
   'grants.applications.read': { app: 'console', label: 'View applications', scopes: ['tenant'] },
   'grants.applications.triage': {

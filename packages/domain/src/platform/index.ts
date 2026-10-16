@@ -68,3 +68,21 @@ export {
   type ThemeCheck,
   type ThemeShades,
 } from './theme.ts';
+export {
+  checkTokens,
+  contrastPairs,
+  defaultTokens,
+  fonts,
+  MIN_INTERFACE_CONTRAST,
+  tokenDefinitions,
+  tokenMessages,
+  tokenPaths,
+  tokenSetSchema,
+  tokenValue,
+  type ColourKey,
+  type ContrastPair,
+  type FontId,
+  type TokenBlock,
+  type TokenDefinition,
+  type TokenSet,
+} from './theme-tokens.ts';

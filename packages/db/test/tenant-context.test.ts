@@ -7,7 +7,7 @@
 import { sql, type Kysely } from 'kysely';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { createDatabase } from '../src/database.ts';
+import { createDatabase, internalsOf } from '../src/database.ts';
 import {
   TenantLeakError,
   trustedTenantId,
@@ -42,11 +42,18 @@ function expectNoTenant(state: SessionState): void {
   expect(state.tenant).toBeNull();
 }
 
-/** Simulate a leak: set the tenant for the whole session, outside withTenant. */
+/**
+ * Simulate a leak: set the tenant for the whole session on a pooled
+ * connection, past both withTenant() and the reset the client's own queries
+ * get.
+ */
 async function leakTenant(db: Kysely<unknown>, tenant: TenantId): Promise<void> {
-  await db.connection().execute(async (connection) => {
-    await sql`SELECT pg_catalog.set_config('app.tenant_id', ${tenant}, false)`.execute(connection);
-  });
+  const client = await internalsOf(db).pool.connect();
+  try {
+    await client.query("SELECT pg_catalog.set_config('app.tenant_id', $1, false)", [tenant]);
+  } finally {
+    client.release();
+  }
 }
 
 describe('withTenant', () => {
@@ -120,7 +127,6 @@ describe('withTenant', () => {
 
   it('refuses and logs a connection that already has a tenant, and clears it', async () => {
     await leakTenant(db, tenantB);
-    expect((await sessionState(db)).tenant).toBe(tenantB);
 
     let ran = false;
     const refused = withTenant(db, tenantA, () => {

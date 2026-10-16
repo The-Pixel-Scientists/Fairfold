@@ -25,6 +25,7 @@ import {
 import { recordAudit, recordRead, type AuditActor } from '../audit/writer.ts';
 import type { MemberContext, RequestContext, RequestSession } from '../context.ts';
 import type { InTenant, TenantTransaction } from '../database.ts';
+import { recordConfigVersion } from '../platform/config-versions.ts';
 import { ApiError } from '../problems.ts';
 import type { ScopeInput, ScopeResolvers } from './scopes.ts';
 
@@ -160,6 +161,10 @@ export async function asMember<T>(
       audit: {
         record: (event) => recordAudit(tx, actor, event),
         read: (entity) => recordRead(tx, actor, entity),
+      },
+      config: {
+        record: (entityType, entityId, diff) =>
+          recordConfigVersion(tx, membership.id, entityType, entityId, diff),
       },
       membership: { id: membership.id, permissions },
     });

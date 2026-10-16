@@ -14,7 +14,7 @@
 import { Kysely, PostgresDialect, type PostgresPool, type PostgresPoolClient } from 'kysely';
 import pg from 'pg';
 
-import { isLoopbackHost } from '../scripts/settings.ts';
+import { isLoopbackHost } from './settings.ts';
 
 /** The roles this client may connect as. */
 export const CLIENT_ROLES = ['app_api', 'app_worker', 'app_auth'] as const;
@@ -66,6 +66,8 @@ export interface DatabaseSettings {
   readonly keepAliveInitialDelayMillis?: number;
   /** Where problems that no caller is waiting for are reported. Defaults to console.error. */
   readonly log?: DatabaseLog;
+  /** Where a risky setting is reported once, when the client is made. Defaults to console.warn. */
+  readonly warn?: (message: string) => void;
   /**
    * Called when a pooled connection fails while no query is running on it,
    * for example when the server restarts. Defaults to reporting it through
@@ -114,9 +116,53 @@ export function createDatabase<DB>(settings: DatabaseSettings): Kysely<DB> {
   // The pool repeats an idle connection's error, already reported above.
   pool.on('error', () => undefined);
 
-  const db = kyselyOver<DB>(pool);
+  if (settings.tls?.mode === 'disable' && !isLoopbackHost(settings.host)) {
+    (settings.warn ?? console.warn)(
+      `The database connection to ${settings.host} is not encrypted. Use this only on a private network.`,
+    );
+  }
+
+  const db = kyselyOver<DB>(resettingPool(pool, log));
+  // Kysely ends the pool only if it ran a query itself, and withTenant()
+  // takes connections from the pool directly.
+  const destroy = db.destroy.bind(db);
+  db.destroy = async () => {
+    await destroy();
+    if (!pool.ending) await pool.end();
+  };
   internals.set(db, { pool, log });
   return db;
+}
+
+/**
+ * The pool as Kysely sees it. Each connection runs DISCARD ALL before it goes
+ * back, so no setting, cursor, lock, prepared statement or temporary table
+ * outlives the query or transaction that made it. One that cannot be reset
+ * is closed instead.
+ */
+function resettingPool(pool: pg.Pool, log: DatabaseLog): PostgresPool {
+  return {
+    connect: async () => {
+      const client = await pool.connect();
+      return {
+        query: client.query.bind(client),
+        release: () => {
+          client.query('DISCARD ALL').then(
+            () => {
+              client.release();
+            },
+            (error: unknown) => {
+              const reported = error instanceof Error ? error : new Error('DISCARD ALL failed.');
+              log('A database connection could not be reset, so it was closed.', reported);
+              client.release(true);
+            },
+          );
+        },
+      };
+    },
+    end: () => pool.end(),
+    options: {},
+  };
 }
 
 /** `log`, except that an error it throws is dropped. */
@@ -167,8 +213,9 @@ export function poolConfig(settings: DatabaseSettings): pg.PoolConfig {
     ssl: sslOption(settings),
     sslnegotiation: 'postgres',
     // Startup options outlast DISCARD ALL, and setting them here stops
-    // PGOPTIONS adding any.
-    options: `-c statement_timeout=${statementTimeout} -c idle_in_transaction_session_timeout=${idleTimeout}`,
+    // PGOPTIONS adding any. The server checks every 10 seconds that the
+    // client of a long query is still there, and cancels it if not.
+    options: `-c statement_timeout=${statementTimeout} -c idle_in_transaction_session_timeout=${idleTimeout} -c client_connection_check_interval=10000`,
   };
 }
 
