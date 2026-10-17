@@ -9,6 +9,7 @@ import type { FormDependencies } from './forms/context.ts';
 import { formHandlers } from './forms/handlers.ts';
 import type { GrantsDependencies } from './programme/context.ts';
 import { programmeSetUpHandlers } from './programme/handlers.ts';
+import { submissionHandlers } from './submissions/handlers.ts';
 
 export { grantsResolvers } from './applications/resolvers.ts';
 export type { FormDependencies } from './forms/context.ts';
@@ -19,5 +20,6 @@ export function grantsHandlers(deps: GrantsDependencies & FormDependencies) {
     ...programmeSetUpHandlers(deps),
     ...formHandlers(deps),
     ...applicationHandlers(deps),
+    ...submissionHandlers(deps),
   };
 }

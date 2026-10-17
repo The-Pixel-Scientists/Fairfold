@@ -12,6 +12,7 @@ import {
   FORM_DEFINITION_MAX_BYTES,
   formRoutes,
   programmeRoutes,
+  submissionRoutes,
 } from '@pixel-scientists/grants/contracts';
 import { grantsHandlers, grantsResolvers } from '@pixel-scientists/grants/server';
 import { partyRoutes } from '@pixel-scientists/party/contracts';
@@ -105,6 +106,9 @@ export function composeModules(deps: { publicTenants: PublicTenants }): Composed
       route(applicationRoutes.checkApplicationEligibility, grants.checkApplicationEligibility),
       route(applicationRoutes.submitApplication, grants.submitApplication),
       route(applicationRoutes.withdrawApplication, grants.withdrawApplication),
+      route(submissionRoutes.listSubmissions, grants.listSubmissions),
+      route(submissionRoutes.getSubmission, grants.getSubmission),
+      route(submissionRoutes.moveSubmissionsToStage, grants.moveSubmissionsToStage),
     ],
     resolvers: { ...partyResolvers, ...grantsResolvers },
   };
