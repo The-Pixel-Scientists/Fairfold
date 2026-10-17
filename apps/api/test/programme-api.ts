@@ -22,7 +22,7 @@ import { composeModules } from '../src/modules.ts';
 import { addMember, type Member } from './settings-api.ts';
 import { smtpTestSettings, testAuth, testSession } from './support.ts';
 
-export type Method = 'GET' | 'POST' | 'PUT';
+export type Method = 'GET' | 'POST' | 'PUT' | 'DELETE';
 
 export interface Programme {
   id: string;
