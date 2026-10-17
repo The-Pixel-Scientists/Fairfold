@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
 // The applicant's route through a grant: the programmes open, a round, who is
-// applying, then the application, its eligibility, its sections, the check and
-// the confirmation. Each page loads on demand, since the forms are large and
-// an applicant is on the sign-in pages first.
+// applying, then the application, its eligibility, its sections, the check, the
+// confirmation and, once it is released, the outcome. Each page loads on demand,
+// since the forms are large and an applicant is on the sign-in pages first.
 
 import { idSchema } from '@pixel-scientists/domain';
 import { sectionIdSchema } from '@pixel-scientists/domain/forms';
@@ -14,6 +14,7 @@ import {
   APPLICATION_PATH,
   CHECK_PATH,
   ELIGIBILITY_PATH,
+  OUTCOME_PATH,
   PROGRAMMES_PATH,
   PROGRAMME_PATH,
   SECTION_PATH,
@@ -93,5 +94,11 @@ export const applyRoutes: readonly RouteDefinition[] = [
     title: 'Application submitted',
     params: application,
     load: () => import('./SubmittedPage.tsx'),
+  },
+  {
+    path: OUTCOME_PATH,
+    title: 'Your outcome',
+    params: application,
+    load: () => import('./OutcomePage.tsx'),
   },
 ];

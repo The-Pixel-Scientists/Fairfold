@@ -13,11 +13,18 @@ import { APPLICATIONS_PATH, applicationPath } from '../paths.ts';
 import { downloadHref } from './files.ts';
 import { dateAndTimeOf } from './format.ts';
 import { helpers } from './helpers.ts';
-import { ApplyPage, ApplyScreen, Block } from './parts.tsx';
+import { ApplyPage, ApplyScreen, Block, Steps } from './parts.tsx';
 import type { View } from './parts.tsx';
 import { useApplicationFilesRead } from './reads.ts';
 import type { ApplicationWithFiles } from './reads.ts';
-import { crumbs, loadingApplication, nameOf, noApplication } from './views.tsx';
+import {
+  crumbs,
+  loadingApplication,
+  nameOf,
+  noApplication,
+  statusView,
+  toApplications,
+} from './views.tsx';
 
 const steps = [
   {
@@ -87,29 +94,6 @@ function Sent({ application }: { application: Application }) {
   );
 }
 
-function Steps() {
-  return (
-    <Block title="What happens next">
-      <ol role="list" className="flex flex-col gap-5">
-        {steps.map((step, index) => (
-          <li key={step.title} className="flex gap-4">
-            <span
-              aria-hidden="true"
-              className="grid size-8 shrink-0 place-items-center rounded-full border border-edge bg-surface text-sm font-semibold text-ink tabular-nums"
-            >
-              {index + 1}
-            </span>
-            <div className="flex min-w-0 max-w-prose flex-col gap-1 pt-0.5">
-              <h3 className="text-body font-semibold text-ink">{step.title}</h3>
-              <p className="text-body text-muted">{step.text}</p>
-            </div>
-          </li>
-        ))}
-      </ol>
-    </Block>
-  );
-}
-
 /** The files that were sent, by question, each a link to download it. Nothing when there are none. */
 function SentFiles({ application, files }: ApplicationWithFiles) {
   const asked = new Set(files.map(({ fieldId }) => fieldId));
@@ -132,14 +116,6 @@ function SentFiles({ application, files }: ApplicationWithFiles) {
     </Block>
   );
 }
-
-const toApplications = (
-  <div>
-    <Link to={APPLICATIONS_PATH} className={buttonClassName('secondary', 'w-full sm:w-auto')}>
-      Go to your applications
-    </Link>
-  </div>
-);
 
 function submittedView(loaded: ApplicationWithFiles): View {
   const { application } = loaded;
@@ -176,24 +152,15 @@ function submittedView(loaded: ApplicationWithFiles): View {
         <>
           <Sent application={application} />
           <SentFiles {...loaded} />
-          <Steps />
+          <Block title="What happens next">
+            <Steps steps={steps} />
+          </Block>
           {toApplications}
         </>
       ),
     };
   }
-  return {
-    heading: {
-      title: 'Your application',
-      breadcrumbs: crumbs(application),
-      intro: (
-        <p>
-          {nameOf(application)}: {applicantStatuses[status]}.
-        </p>
-      ),
-    },
-    body: toApplications,
-  };
+  return statusView(application);
 }
 
 function Submitted() {

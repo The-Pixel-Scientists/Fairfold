@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
 // What the apply screens share: a page that reads from the API and keeps one
-// heading while it loads, a titled part of a page, and where focus goes when a
-// screen opens.
+// heading while it loads, a titled part of a page, the steps that follow, and
+// where focus goes when a screen opens.
 
 import { Button, Link, LoadingState, buttonClassName, cx, useLocation } from '@pixel-scientists/ui';
 import type { BreadcrumbItem } from '@pixel-scientists/ui';
@@ -120,6 +120,36 @@ export function Block({
       </h2>
       {children}
     </section>
+  );
+}
+
+export interface Step {
+  title: string;
+  text: ReactNode;
+}
+
+/** What happens next, in order, with a thin line from one step to the next. */
+export function Steps({ steps }: { steps: readonly Step[] }) {
+  return (
+    <ol role="list" className="flex flex-col">
+      {steps.map((step, index) => (
+        <li key={step.title} className="relative flex gap-4 pb-7 last:pb-0">
+          {index < steps.length - 1 && (
+            <span aria-hidden="true" className="absolute top-9 bottom-1 left-4 w-px bg-divider" />
+          )}
+          <span
+            aria-hidden="true"
+            className="relative grid size-8 shrink-0 place-items-center rounded-full border border-edge bg-surface text-sm font-semibold text-ink tabular-nums"
+          >
+            {index + 1}
+          </span>
+          <div className="flex min-w-0 max-w-prose flex-col gap-1 pt-0.5">
+            <h3 className="text-body font-semibold text-ink">{step.title}</h3>
+            <p className="text-body text-muted">{step.text}</p>
+          </div>
+        </li>
+      ))}
+    </ol>
   );
 }
 
