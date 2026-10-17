@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// The text checks in migration 0009 copy line() and paragraphs() in
+// The text checks in migrations 0009 and 0012 copy line() and paragraphs() in
 // modules/grants/src/contracts/programme/text.ts (S04-01): no character
 // that hides or reorders text, a line break allowed in paragraphs only, and
 // nothing that trim() removes at either end. packages/db cannot import a
@@ -28,6 +28,7 @@ const TEXT_CHECKS = [
   'email_template_version_body_text',
   'programme_description_text',
   'rubric_criterion_guidance_text',
+  'score_comment_text',
 ];
 
 /** Each check in the grants schema whose name ends in _text, by name, with its pattern. */
@@ -90,7 +91,7 @@ async function refusedByDatabase(pattern: string): Promise<string[]> {
   return rows.map((row) => row.found);
 }
 
-describe('the text checks in migration 0009', { timeout: 120_000 }, () => {
+describe('the text checks in migrations 0009 and 0012', { timeout: 120_000 }, () => {
   it('give every line column one pattern, and every paragraphs column another', () => {
     expect([...patterns.keys()].sort()).toEqual([...LINE_CHECKS, ...TEXT_CHECKS].sort());
     expect(new Set(LINE_CHECKS.map((name) => patterns.get(name))).size).toBe(1);
