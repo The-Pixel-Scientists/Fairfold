@@ -11,6 +11,18 @@ export type Generated<T> =
 
 export type Int8 = ColumnType<string, bigint | number | string, bigint | number | string>;
 
+export type Json = JsonValue;
+
+export type JsonArray = JsonValue[];
+
+export type JsonObject = {
+  [x: string]: JsonValue | undefined;
+};
+
+export type JsonPrimitive = boolean | number | string | null;
+
+export type JsonValue = JsonArray | JsonObject | JsonPrimitive;
+
 export type Timestamp = ColumnType<Date, Date | string, Date | string>;
 
 export interface GrantsEmailTemplateVersion {
@@ -22,6 +34,21 @@ export interface GrantsEmailTemplateVersion {
   programme_id: string;
   subject: string;
   tenant_id: string;
+  version: number;
+}
+
+export interface GrantsFormVersion {
+  created_at: Generated<Timestamp>;
+  created_by: string | null;
+  definition: Json | null;
+  id: Generated<string>;
+  published_at: Timestamp | null;
+  published_by: string | null;
+  round_id: string;
+  status: Generated<string>;
+  tenant_id: string;
+  updated_at: Generated<Timestamp>;
+  updated_by: string | null;
   version: number;
 }
 
@@ -87,6 +114,7 @@ export interface GrantsStage {
 
 export interface DB {
   'grants.email_template_version': GrantsEmailTemplateVersion;
+  'grants.form_version': GrantsFormVersion;
   'grants.programme': GrantsProgramme;
   'grants.round': GrantsRound;
   'grants.rubric_criterion': GrantsRubricCriterion;

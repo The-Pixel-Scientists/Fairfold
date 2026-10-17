@@ -3,10 +3,10 @@
 // Field classification for the grants schema. A programme's title and
 // summary, and a round's title, dates and award range, are public:
 // applicants see them. The rest of the set-up (descriptions, budgets, late
-// policies, stages, rubrics and email templates) is internal, as are ids,
-// statuses and actors. Nothing here is personal. Set-up is kept while the
-// tenant is a customer, since applications, scores and sent emails refer
-// to it.
+// policies, stages, rubrics, email templates and application forms) is
+// internal, as are ids, statuses and actors. Nothing here is personal.
+// Set-up is kept while the tenant is a customer, since applications, scores
+// and sent emails refer to it.
 
 import type { ClassificationRegistry, FieldClassification } from '../classification.ts';
 
@@ -75,5 +75,14 @@ export const grants: ClassificationRegistry = {
     body: internal,
     created_at: internal,
     created_by: internal,
+  },
+  'grants.form_version': {
+    ...keyAndActors,
+    round_id: internal,
+    version: internal,
+    status: internal,
+    definition: internal,
+    published_at: internal,
+    published_by: internal,
   },
 };
