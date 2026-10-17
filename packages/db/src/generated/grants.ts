@@ -55,6 +55,29 @@ export interface GrantsApplicationFile {
   tenant_id: string;
 }
 
+export interface GrantsAssignment {
+  application_id: string;
+  created_at: Generated<Timestamp>;
+  created_by: string | null;
+  id: Generated<string>;
+  reviewer_membership_id: string;
+  round_id: string;
+  stage_id: string;
+  status: Generated<string>;
+  submitted_at: Timestamp | null;
+  tenant_id: string;
+  updated_at: Generated<Timestamp>;
+  updated_by: string | null;
+}
+
+export interface GrantsConflictDeclaration {
+  assignment_id: string;
+  declared_at: Generated<Timestamp>;
+  declared_by: string;
+  id: Generated<string>;
+  tenant_id: string;
+}
+
 export interface GrantsEligibilityResult {
   application_id: string;
   checked_at: Generated<Timestamp>;
@@ -106,6 +129,15 @@ export interface GrantsProgramme {
   updated_by: string | null;
 }
 
+export interface GrantsReviewer {
+  added_at: Generated<Timestamp>;
+  added_by: string;
+  id: Generated<string>;
+  membership_id: string;
+  round_id: string;
+  tenant_id: string;
+}
+
 export interface GrantsRound {
   award_max_minor: Int8;
   award_min_minor: Int8;
@@ -141,6 +173,20 @@ export interface GrantsRubricCriterion {
   weight: number;
 }
 
+export interface GrantsScore {
+  assignment_id: string;
+  comment: Generated<string>;
+  created_at: Generated<Timestamp>;
+  created_by: string | null;
+  criterion_id: string;
+  id: Generated<string>;
+  score: number;
+  stage_id: string;
+  tenant_id: string;
+  updated_at: Generated<Timestamp>;
+  updated_by: string | null;
+}
+
 export interface GrantsStage {
   created_at: Generated<Timestamp>;
   created_by: string | null;
@@ -167,12 +213,16 @@ export interface GrantsStageTransition {
 export interface DB {
   'grants.application': GrantsApplication;
   'grants.application_file': GrantsApplicationFile;
+  'grants.assignment': GrantsAssignment;
+  'grants.conflict_declaration': GrantsConflictDeclaration;
   'grants.eligibility_result': GrantsEligibilityResult;
   'grants.email_template_version': GrantsEmailTemplateVersion;
   'grants.form_version': GrantsFormVersion;
   'grants.programme': GrantsProgramme;
+  'grants.reviewer': GrantsReviewer;
   'grants.round': GrantsRound;
   'grants.rubric_criterion': GrantsRubricCriterion;
+  'grants.score': GrantsScore;
   'grants.stage': GrantsStage;
   'grants.stage_transition': GrantsStageTransition;
 }

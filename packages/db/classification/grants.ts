@@ -8,9 +8,11 @@
 // personal as a whole until each form field carries its own classification;
 // its links to people and organisations are internal ids, as are its
 // statuses, times, late flag, eligibility outcomes and file links (ADR
-// 0047). Everything is kept while the tenant is a customer: applications,
-// scores and sent emails refer to the set-up, and erasure anonymises a
-// person in place (ADR 0017).
+// 0047). Reviewer pools, assignments, conflict declarations and scores are
+// internal, but for a score's comment, which is personal: a reviewer's
+// words about an applicant. Everything is kept while the tenant is a
+// customer: applications, scores and sent emails refer to the set-up, and
+// erasure anonymises a person in place (ADR 0017).
 
 import type { ClassificationRegistry, FieldClassification } from '../classification.ts';
 
@@ -135,5 +137,37 @@ export const grants: ClassificationRegistry = {
     field_id: internal,
     created_by: internal,
     created_at: internal,
+  },
+  'grants.reviewer': {
+    tenant_id: internal,
+    id: internal,
+    round_id: internal,
+    membership_id: internal,
+    added_at: internal,
+    added_by: internal,
+  },
+  'grants.assignment': {
+    ...keyAndActors,
+    round_id: internal,
+    application_id: internal,
+    reviewer_membership_id: internal,
+    stage_id: internal,
+    status: internal,
+    submitted_at: internal,
+  },
+  'grants.conflict_declaration': {
+    tenant_id: internal,
+    id: internal,
+    assignment_id: internal,
+    declared_at: internal,
+    declared_by: internal,
+  },
+  'grants.score': {
+    ...keyAndActors,
+    assignment_id: internal,
+    stage_id: internal,
+    criterion_id: internal,
+    score: internal,
+    comment: personal,
   },
 };
