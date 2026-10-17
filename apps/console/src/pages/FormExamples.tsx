@@ -16,7 +16,7 @@ import {
   validateAnswers,
   visibleFields,
 } from '@pixel-scientists/domain/forms';
-import type { Answers, FormDefinition, FormField } from '@pixel-scientists/domain/forms';
+import type { Answers, FormDefinition } from '@pixel-scientists/domain/forms';
 import { formatMoney } from '@pixel-scientists/domain/platform';
 import { AnswerView, Button, EligibilityStop, FormSection, SaveStatus } from '@pixel-scientists/ui';
 import type { FormHelpers } from '@pixel-scientists/ui';
@@ -26,28 +26,9 @@ import type { SubmitEvent } from 'react';
 /** The engine's own counter and money format, so what people see is what the server checks. */
 export const helpers: FormHelpers = { countWords, countCharacters, formatMoney, tableTotals };
 
-/** A field the kit can draw: the kit has no file renderer yet. */
-type ExampleField = Exclude<FormField, { type: 'file' }>;
-
-type ExampleDefinition = {
-  sections: (Omit<FormDefinition['sections'][number], 'fields'> & { fields: ExampleField[] })[];
-};
-
-const isExampleField = (field: FormField): field is ExampleField => field.type !== 'file';
-
-/**
- * Checks a form with the engine, then leaves out its file questions, so the
- * engine and the screen agree on what the form asks. Remove this when the kit
- * draws them.
- */
-function exampleForm(input: unknown): ExampleDefinition {
-  const { sections } = formDefinitionSchema.parse(input);
-  return {
-    sections: sections.map((section) => ({
-      ...section,
-      fields: section.fields.filter(isExampleField),
-    })),
-  };
+/** Checks a form with the engine, so the engine and the screen agree on what the form asks. */
+function exampleForm(input: unknown): FormDefinition {
+  return formDefinitionSchema.parse(input);
 }
 
 const spendOptions = [
@@ -141,7 +122,7 @@ function typeFields(prefix: string) {
   ];
 }
 
-function typesForm(prefix: string): ExampleDefinition {
+function typesForm(prefix: string): FormDefinition {
   return exampleForm({
     sections: [{ id: `s_${prefix}types`, title: 'About your project', fields: typeFields(prefix) }],
   });
@@ -362,7 +343,7 @@ function budgetTable(id: string, limits: { minRows: number; maxRows: number }) {
 }
 
 /** A form of one table question, and the section around it. */
-function tableForm(field: ReturnType<typeof budgetTable>): ExampleDefinition {
+function tableForm(field: ReturnType<typeof budgetTable>): FormDefinition {
   return exampleForm({
     sections: [{ id: `s_${field.id.slice(2)}`, title: 'Costs of the project', fields: [field] }],
   });
@@ -409,7 +390,7 @@ const tableReadingForm = exampleForm({
 });
 
 interface ExampleFormProps {
-  definition: ExampleDefinition;
+  definition: FormDefinition;
   initial?: Answers;
 }
 

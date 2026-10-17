@@ -23,6 +23,16 @@ import { useState } from 'react';
 import type { ReactNode, SubmitEvent } from 'react';
 
 import {
+  CheckingFileExample,
+  EmptyFileExample,
+  FileAnswerExample,
+  LimitFileExample,
+  OneFileExample,
+  ReadOnlyFileExample,
+  RefusedFileExample,
+  UploadingFileExample,
+} from './FileExamples.tsx';
+import {
   AnswerExample,
   ConditionalExample,
   EligibilityExample,
@@ -281,6 +291,38 @@ export default function ComponentGalleryPage() {
 
       <Section title="Table answer to read">
         <TableAnswerExample />
+      </Section>
+
+      <Section title="File question with no files">
+        <EmptyFileExample />
+      </Section>
+
+      <Section title="File question uploading a file">
+        <UploadingFileExample />
+      </Section>
+
+      <Section title="File question checking a file">
+        <CheckingFileExample />
+      </Section>
+
+      <Section title="File question with a refused file">
+        <RefusedFileExample />
+      </Section>
+
+      <Section title="File question with one file">
+        <OneFileExample />
+      </Section>
+
+      <Section title="File question at its file limit">
+        <LimitFileExample />
+      </Section>
+
+      <Section title="File question to read">
+        <ReadOnlyFileExample />
+      </Section>
+
+      <Section title="File answer to read">
+        <FileAnswerExample />
       </Section>
 
       <Section title="Save status">
