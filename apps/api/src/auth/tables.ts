@@ -51,6 +51,7 @@ export type AuthTables = {
     ip_address: string | null;
   };
   'auth.audit_copy_pending': { auth_event_id: string };
+  'auth.rate_limit': { scope: string; identifier: string | null };
 };
 
 export type TenantTables = {
