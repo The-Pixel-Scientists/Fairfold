@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import { useState } from 'react';
+
 import type { FieldProblemLike } from '../auth/problems.ts';
 import { ErrorSummary } from '../ErrorSummary.tsx';
 import type { ErrorSummaryItem } from '../ErrorSummary.tsx';
@@ -7,6 +9,7 @@ import { PageHeading } from '../PageHeading.tsx';
 import { ContentBlock, Question } from './Question.tsx';
 import type {
   FormAnswers,
+  FormFiles,
   FormSectionDefinition,
   QuestionHelpers,
   VisibleFields,
@@ -32,6 +35,13 @@ export interface FormSectionProps {
    * shows from the first, and takes focus again on each.
    */
   attempt?: number;
+  /**
+   * The form's files and what to do with them, for a form with a file
+   * question. Without it a file question can only be read. A file the browser
+   * or the server refuses shows beside its question and in the summary, which
+   * takes focus, with no `problems` needed from you.
+   */
+  files?: FormFiles;
   /** The section's heading level. An h1 is the page's heading and takes focus from the router. Defaults to h2. */
   headingLevel?: 'h1' | 'h2' | 'h3';
 }
@@ -59,12 +69,26 @@ export function FormSection({
   helpers,
   problems = [],
   attempt = 0,
+  files,
   headingLevel: Heading = 'h2',
 }: FormSectionProps) {
+  const [refusals, setRefusals] = useState<readonly FieldProblemLike[]>([]);
+  const [refused, setRefused] = useState(0);
   const shown = new Set(visible.map((field) => field.id));
   const fields = section.fields.filter((field) => shown.has(field.id));
   const problemsFor = (id: string) =>
-    problems.filter((problem) => problem.field === id || problem.field.startsWith(`${id}.`));
+    [...refusals, ...problems].filter(
+      (problem) => problem.field === id || problem.field.startsWith(`${id}.`),
+    );
+
+  /** Files refused in a question replace the ones refused before, and bring the summary back into focus. */
+  function refuse(fieldId: string, messages: readonly string[]) {
+    setRefusals((current) => [
+      ...current.filter(({ field }) => field !== fieldId),
+      ...messages.map((message) => ({ field: fieldId, message })),
+    ]);
+    if (messages.length > 0) setRefused((count) => count + 1);
+  }
 
   const summary: ErrorSummaryItem[] = fields.flatMap((field) =>
     field.type === 'content'
@@ -87,7 +111,9 @@ export function FormSection({
           <p className="text-body text-muted">{section.introduction}</p>
         )}
       </div>
-      {attempt > 0 && <ErrorSummary key={attempt} errors={summary} />}
+      {(attempt > 0 || refusals.length > 0) && (
+        <ErrorSummary key={`${String(attempt)}:${String(refused)}`} errors={summary} />
+      )}
       {fields.map((field) =>
         field.type === 'content' ? (
           <ContentBlock key={field.id} body={field.body} />
@@ -101,6 +127,10 @@ export function FormSection({
               onChange(field.id, value);
             }}
             helpers={helpers}
+            files={files}
+            onRefused={(messages) => {
+              refuse(field.id, messages);
+            }}
           />
         ),
       )}

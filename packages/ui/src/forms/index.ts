@@ -9,9 +9,13 @@ export type { FormSectionProps } from './FormSection.tsx';
 export { SaveStatus } from './SaveStatus.tsx';
 export type { SaveState, SaveStatusProps } from './SaveStatus.tsx';
 export type {
+  AttachedFile,
   ChoiceOption,
+  FileFieldDefinition,
+  FileHelpers,
   FormAnswers,
   FormFieldDefinition,
+  FormFiles,
   FormHelpers,
   FormMoney,
   FormSectionDefinition,

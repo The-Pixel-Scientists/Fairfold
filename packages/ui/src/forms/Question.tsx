@@ -8,10 +8,11 @@ import { FormField, Input, Select, Textarea } from '../FormField.tsx';
 import { RadioGroup } from '../RadioGroup.tsx';
 import { AddressInput } from './AddressInput.tsx';
 import { DateInput } from './DateInput.tsx';
+import { FileQuestion } from './FileQuestion.tsx';
 import { CurrencyInput, NumberInput } from './NumberInput.tsx';
 import { TableQuestion } from './TableQuestion.tsx';
 import { TextCount } from './TextCount.tsx';
-import type { QuestionDefinition, QuestionHelpers } from './types.ts';
+import type { FormFiles, QuestionDefinition, QuestionHelpers } from './types.ts';
 
 export interface QuestionProps {
   field: QuestionDefinition;
@@ -22,6 +23,10 @@ export interface QuestionProps {
   /** Called with the new answer, or null when the person clears it. */
   onChange: (value: unknown) => void;
   helpers: QuestionHelpers;
+  /** For a file question: the form's files and what to do with them. Without it the question can only be read. */
+  files?: FormFiles | undefined;
+  /** For a file question: called with the words for each file refused, and with none when a new choice starts. */
+  onRefused?: ((messages: readonly string[]) => void) | undefined;
 }
 
 const YES_NO = [
@@ -57,7 +62,15 @@ function textOf(value: unknown): string {
  * requirement in words and its error. The control's id is the field's id, so
  * an error summary can link to it.
  */
-export function Question({ field, value, problems, onChange, helpers }: QuestionProps) {
+export function Question({
+  field,
+  value,
+  problems,
+  onChange,
+  helpers,
+  files,
+  onRefused,
+}: QuestionProps) {
   const message = (key: string) => problems.find((problem) => problem.field === key)?.message;
   const error = message(field.id);
   const common = { id: field.id, label: labelOf(field), hint: field.hint, error };
@@ -222,6 +235,18 @@ export function Question({ field, value, problems, onChange, helpers }: Question
           value={value}
           problems={problems}
           onChange={onChange}
+          helpers={helpers}
+        />
+      );
+    case 'file':
+      return (
+        <FileQuestion
+          field={field}
+          files={files}
+          errors={problems
+            .filter((problem) => problem.field === field.id)
+            .map(({ message }) => message)}
+          onRefused={onRefused}
           helpers={helpers}
         />
       );

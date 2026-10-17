@@ -8,6 +8,7 @@ import type { ComponentProps } from 'react';
 
 import { FormSection } from '../src/forms/FormSection.tsx';
 import type {
+  FileHelpers,
   FormFieldDefinition,
   FormHelpers,
   FormMoney,
@@ -37,6 +38,23 @@ export const helpers: FormHelpers = {
         column.type === 'currency' && sum !== null ? { amountMinor: sum, currency: 'GBP' } : sum;
     }
     return totals;
+  },
+};
+
+/** File checks as the engine makes them, for a form that takes PDF and Word documents. */
+export const fileHelpers: FileHelpers = {
+  fileTypeLabels: {
+    'application/pdf': 'PDF',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'Word document',
+  },
+  // Only the first bytes, as the engine does for a PDF: the name and the declared type say nothing.
+  sniffFileType: (bytes) =>
+    new TextDecoder().decode(bytes.subarray(0, 5)) === '%PDF-' ? 'application/pdf' : null,
+  checkFile: (field, { bytes, type }) => {
+    if (bytes > field.maxBytes) return 'The file must be 10 MB or smaller.';
+    return type === null || !field.allowedTypes.includes(type)
+      ? 'The file must be a PDF or Word document.'
+      : undefined;
   },
 };
 

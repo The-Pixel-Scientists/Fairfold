@@ -3,9 +3,10 @@
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import { helpers, question } from '../../test/forms.tsx';
+import { fileHelpers, helpers, question } from '../../test/forms.tsx';
 import { AnswerView } from './AnswerView.tsx';
-import type { FormFieldDefinition, FormSectionDefinition } from './types.ts';
+import type { AnswerViewProps } from './AnswerView.tsx';
+import type { AttachedFile, FormFieldDefinition, FormSectionDefinition } from './types.ts';
 
 const options = [
   { value: 'north', label: 'North' },
@@ -344,6 +345,100 @@ describe('AnswerView', () => {
       expect(screen.queryByRole('table')).toBeNull();
       expect(screen.queryByText('Venue hire')).toBeNull();
       expect(screen.queryByText('Budget')).toBeNull();
+    });
+  });
+
+  describe('a file answer', () => {
+    const PDF = 'application/pdf';
+    const accounts = question({
+      id: 'f_accounts',
+      type: 'file',
+      label: 'Accounts',
+      allowedTypes: [PDF],
+      maxBytes: 10 * 1024 * 1024,
+      maxFiles: 3,
+    });
+    const attached = (id: string, name: string, extra: Partial<AttachedFile> = {}) => ({
+      id,
+      fieldId: 'f_accounts',
+      name,
+      type: PDF,
+      bytes: 2_202_010,
+      ...extra,
+    });
+    const files = [attached('a1', 'accounts.pdf'), attached('a2', 'plan.pdf', { bytes: 856_064 })];
+
+    function showFiles(props: Partial<AnswerViewProps> = {}) {
+      return render(
+        <AnswerView
+          sections={[{ id: 's_one', title: 'Documents', fields: [accounts] }]}
+          visible={[accounts]}
+          answers={{ f_accounts: ['a1', 'a2'] }}
+          helpers={{ ...helpers, ...fileHelpers }}
+          files={files}
+          {...props}
+        />,
+      );
+    }
+
+    it('lists the files as links to download them, each with its type and size', () => {
+      showFiles({ hrefFor: (id) => `/files/${id}` });
+
+      const links = within(screen.getByRole('list')).getAllByRole('link');
+      expect(links.map((link) => link.getAttribute('aria-label'))).toEqual([
+        'Download accounts.pdf, PDF, 2.1 MB',
+        'Download plan.pdf, PDF, 836 KB',
+      ]);
+      expect(links.map((link) => link.getAttribute('href'))).toEqual(['/files/a1', '/files/a2']);
+      expect(answerTo('Accounts')).toContain('PDF, 2.1 MB');
+    });
+
+    it('lists the names, as text, when it is not told where the files download from', () => {
+      showFiles();
+
+      expect(screen.queryByRole('link')).toBeNull();
+      expect(
+        within(screen.getByRole('list'))
+          .getAllByRole('listitem')
+          .map((item) => item.textContent),
+      ).toEqual(['accounts.pdfPDF, 2.1 MB', 'plan.pdfPDF, 836 KB']);
+    });
+
+    it('shows a type as its own name when the labels are not given', () => {
+      showFiles({ helpers });
+
+      expect(answerTo('Accounts')).toContain('application/pdf, 2.1 MB');
+    });
+
+    it('says "Not answered" when the question has no files, and shows none that answer another question', () => {
+      showFiles({ files: [attached('b1', 'other.pdf', { fieldId: 'f_other' })] });
+
+      expect(answerTo('Accounts')).toBe('Not answered');
+      expect(screen.queryByText('other.pdf')).toBeNull();
+    });
+
+    it('shows only the files it is given, never what the answer holds', () => {
+      showFiles({ files: [] });
+
+      expect(answerTo('Accounts')).toBe('Not answered');
+    });
+
+    it('shows no file, and not even the question, to an audience that is not given the field', () => {
+      showFiles({ visible: [], hrefFor: (id) => `/files/${id}` });
+
+      expect(screen.queryByText('Accounts')).toBeNull();
+      expect(screen.queryByText('accounts.pdf')).toBeNull();
+      expect(screen.queryByRole('link')).toBeNull();
+    });
+
+    it('shows a name as text only', () => {
+      showFiles({
+        files: [attached('a3', '<img src=x onerror=alert(1)>.pdf')],
+        hrefFor: (id) => `/files/${id}`,
+      });
+
+      expect(document.querySelector('img')).toBeNull();
+      expect(screen.getByRole('link').textContent).toBe('<img src=x onerror=alert(1)>.pdf');
     });
   });
 });
