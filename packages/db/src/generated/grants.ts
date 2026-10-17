@@ -25,6 +25,47 @@ export type JsonValue = JsonArray | JsonObject | JsonPrimitive;
 
 export type Timestamp = ColumnType<Date, Date | string, Date | string>;
 
+export interface GrantsApplication {
+  answers: Generated<Json>;
+  answers_version: Generated<number>;
+  applicant_person_id: string;
+  created_at: Generated<Timestamp>;
+  created_by: string | null;
+  form_version_id: string;
+  id: Generated<string>;
+  organisation_id: string;
+  round_id: string;
+  stage_id: string | null;
+  status: Generated<string>;
+  submitted_at: Timestamp | null;
+  submitted_late: Generated<boolean>;
+  tenant_id: string;
+  updated_at: Generated<Timestamp>;
+  updated_by: string | null;
+  withdrawn_at: Timestamp | null;
+}
+
+export interface GrantsApplicationFile {
+  application_id: string;
+  created_at: Generated<Timestamp>;
+  created_by: string;
+  field_id: string;
+  file_id: string;
+  id: Generated<string>;
+  tenant_id: string;
+}
+
+export interface GrantsEligibilityResult {
+  application_id: string;
+  checked_at: Generated<Timestamp>;
+  checked_by: string;
+  form_version_id: string;
+  id: Generated<string>;
+  outcome: string;
+  stopping_field_id: string | null;
+  tenant_id: string;
+}
+
 export interface GrantsEmailTemplateVersion {
   body: string;
   created_at: Generated<Timestamp>;
@@ -112,11 +153,26 @@ export interface GrantsStage {
   updated_by: string | null;
 }
 
+export interface GrantsStageTransition {
+  application_id: string;
+  from_stage_id: string | null;
+  id: Generated<string>;
+  moved_at: Generated<Timestamp>;
+  moved_by: string;
+  round_id: string;
+  tenant_id: string;
+  to_stage_id: string;
+}
+
 export interface DB {
+  'grants.application': GrantsApplication;
+  'grants.application_file': GrantsApplicationFile;
+  'grants.eligibility_result': GrantsEligibilityResult;
   'grants.email_template_version': GrantsEmailTemplateVersion;
   'grants.form_version': GrantsFormVersion;
   'grants.programme': GrantsProgramme;
   'grants.round': GrantsRound;
   'grants.rubric_criterion': GrantsRubricCriterion;
   'grants.stage': GrantsStage;
+  'grants.stage_transition': GrantsStageTransition;
 }
