@@ -8,11 +8,12 @@
 import type { FieldProblem } from '@pixel-scientists/domain/platform';
 import { listAuditEvents } from '@pixel-scientists/domain/platform/audit-log';
 import {
+  applicationRoutes,
   FORM_DEFINITION_MAX_BYTES,
   formRoutes,
   programmeRoutes,
 } from '@pixel-scientists/grants/contracts';
-import { grantsHandlers } from '@pixel-scientists/grants/server';
+import { grantsHandlers, grantsResolvers } from '@pixel-scientists/grants/server';
 import { partyRoutes } from '@pixel-scientists/party/contracts';
 import { partyHandlers, partyResolvers } from '@pixel-scientists/party/server';
 
@@ -95,7 +96,16 @@ export function composeModules(deps: { publicTenants: PublicTenants }): Composed
       route(formRoutes.saveFormDraft, grants.saveFormDraft, { bodyLimit: FORM_BODY_LIMIT_BYTES }),
       route(formRoutes.publishFormDraft, grants.publishFormDraft),
       route(formRoutes.discardFormDraft, grants.discardFormDraft),
+      route(applicationRoutes.listOpenRounds, grants.listOpenRounds),
+      route(applicationRoutes.getOpenRound, grants.getOpenRound),
+      route(applicationRoutes.startApplication, grants.startApplication),
+      route(applicationRoutes.listApplications, grants.listApplications),
+      route(applicationRoutes.getApplication, grants.getApplication),
+      route(applicationRoutes.saveApplicationAnswers, grants.saveApplicationAnswers),
+      route(applicationRoutes.checkApplicationEligibility, grants.checkApplicationEligibility),
+      route(applicationRoutes.submitApplication, grants.submitApplication),
+      route(applicationRoutes.withdrawApplication, grants.withdrawApplication),
     ],
-    resolvers: partyResolvers,
+    resolvers: { ...partyResolvers, ...grantsResolvers },
   };
 }

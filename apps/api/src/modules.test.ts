@@ -14,7 +14,7 @@ import {
   updateTheme,
   uploadLogo,
 } from '@pixel-scientists/domain/platform/settings';
-import { formRoutes, programmeRoutes } from '@pixel-scientists/grants/contracts';
+import { applicationRoutes, formRoutes, programmeRoutes } from '@pixel-scientists/grants/contracts';
 import { partyRoutes } from '@pixel-scientists/party/contracts';
 import { describe, expect, it } from 'vitest';
 
@@ -45,6 +45,7 @@ describe('composeModules', () => {
       ...Object.values(partyRoutes),
       ...Object.values(programmeRoutes),
       ...Object.values(formRoutes),
+      ...Object.values(applicationRoutes),
     ]);
   });
 
@@ -55,6 +56,7 @@ describe('composeModules', () => {
         ...Object.values(partyRoutes),
         ...Object.values(programmeRoutes),
         ...Object.values(formRoutes),
+        ...Object.values(applicationRoutes),
       ].map((contract) => contract.scope),
     );
 

@@ -5,6 +5,7 @@
 
 export {
   grantsHandlers,
+  grantsResolvers,
   type ConfigHistoryRow,
   type GrantsContext,
   type GrantsDependencies,
