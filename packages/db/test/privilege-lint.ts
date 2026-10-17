@@ -134,7 +134,7 @@ export const DEFINER_FUNCTIONS: ReadonlyMap<string, DefinerFunction> = new Map([
         ...['id', 'slug', 'name', 'status'].map(
           (column) => `SELECT on column app.tenant.${column}`,
         ),
-        ...['tenant_id', 'brand_colour', 'preset', 'logo_type'].map(
+        ...['tenant_id', 'brand_colour', 'preset', 'logo_type', 'tokens'].map(
           (column) => `SELECT on column app.tenant_theme.${column}`,
         ),
       ],

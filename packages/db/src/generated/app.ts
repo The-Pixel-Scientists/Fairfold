@@ -114,6 +114,7 @@ export interface AppTenantTheme {
   logo_type: string | null;
   preset: string;
   tenant_id: string;
+  tokens: Json | null;
   updated_at: Generated<Timestamp>;
   updated_by: string;
 }

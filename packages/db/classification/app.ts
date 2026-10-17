@@ -63,6 +63,7 @@ export const app: ClassificationRegistry = {
     preset: publicField,
     logo: publicField,
     logo_type: publicField,
+    tokens: publicField,
     updated_at: internal,
     updated_by: internal,
   },
