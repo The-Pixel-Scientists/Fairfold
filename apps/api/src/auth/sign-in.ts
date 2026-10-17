@@ -3,10 +3,11 @@
 // Password sign-in to a tenant's console or portal (ADR 0010). The attempt
 // is charged to its limits first, and a delayed attempt is refused without
 // checking the password. An unknown address costs a dummy hash, and every
-// failure gets the same problem. Success gives the charge back and issues a
-// session for the resolved app with the slug's tenant active: a console
-// session waits for MFA, a portal one needs none. A portal sign-in with no
-// membership in the tenant makes the person an applicant there.
+// failure gets the same problem. Success issues a session for the resolved
+// app with the slug's tenant active: a console session waits for MFA, which
+// gives the charge back when it completes, and a portal one needs none and
+// gives it back now. A portal sign-in with no membership in the tenant makes
+// the person an applicant there.
 
 import {
   chargeRateLimits,
@@ -27,7 +28,7 @@ import { copyAuthEvent, recordAuthEvent } from './events.ts';
 import { plainAddress } from './limits.ts';
 import { verifyNothing, verifyPassword } from './passwords.ts';
 import { sessionBody, type RouteDependencies } from './routes.ts';
-import { issueSession } from './sessions.ts';
+import { currentPassword, issueSession, lockUser } from './sessions.ts';
 import { appOf, tenantOf, tooMany } from './sign-up.ts';
 import type { AuthTables, TenantTables } from './tables.ts';
 
@@ -90,11 +91,10 @@ export function signInRoutes(deps: RouteDependencies): Route[] {
         ? await verifyPassword(account.password, password)
         : await verifyNothing(password);
 
-      if (!matched || account?.status !== 'active' || !account.email_verified) {
+      /** Record a failed attempt, and the limits it reached, and refuse it. */
+      const refuse = async (reason: string): Promise<never> => {
         const user = account === undefined ? {} : { userId: account.id, tenant: tenant.id };
         await deps.auth.transaction().execute(async (trx) => {
-          const reason =
-            account === undefined ? 'unknown_identifier' : matched ? 'not_active' : 'bad_password';
           await recordAuthEvent(trx, 'sign_in_failed', { requestId, ...user, ...client, reason });
           for (const scope of charged.reached) {
             await recordAuthEvent(trx, 'rate_limit_reached', {
@@ -106,7 +106,11 @@ export function signInRoutes(deps: RouteDependencies): Route[] {
           }
         });
         throw new ApiError(401, SIGN_IN_FAILED, { reason: 'sign_in_failed' });
-      }
+      };
+
+      if (account === undefined) return refuse('unknown_identifier');
+      if (!matched) return refuse('bad_password');
+      if (account.status !== 'active' || !account.email_verified) return refuse('not_active');
 
       const userId = account.id;
       let mfa: MfaState = 'not_required';
@@ -119,8 +123,15 @@ export function signInRoutes(deps: RouteDependencies): Route[] {
           .executeTakeFirst();
         mfa = totp === undefined ? 'enrol' : 'verify';
       }
-      const { token, event } = await deps.auth.transaction().execute(async (trx) => {
-        await refundSignIn(trx, client);
+      const verified = account.password;
+      const issued = await deps.auth.transaction().execute(async (trx) => {
+        // Take turns with a reset or revocation for the user, then make sure
+        // the password checked above is still theirs: one that a reset has
+        // replaced meanwhile does not sign in.
+        if (!(await lockUser(trx, userId, 'share'))) return 'not_active';
+        if ((await currentPassword(trx, userId)) !== verified) return 'bad_password';
+        // A console sign-in's charge is given back only once MFA completes.
+        if (mfa === 'not_required') await refundSignIn(trx, client);
         return {
           token: await issueSession(trx, {
             userId,
@@ -139,9 +150,12 @@ export function signInRoutes(deps: RouteDependencies): Route[] {
           }),
         };
       });
+      if (typeof issued === 'string') return refuse(issued);
+      const { token, event } = issued;
 
       // The new session is the source of its tenant from here on.
-      const session = await sessionContext(deps.api, hashToken(token));
+      const tokenHash = hashToken(token);
+      const session = await sessionContext(deps.api, tokenHash);
       if (session === undefined) throw new Error('The new session could not be read.');
       if (app === 'portal') await joinAsApplicant(deps, session.tenant, userId, requestId);
       await copyAuthEvent(deps, event, session.tenant);
@@ -154,6 +168,7 @@ export function signInRoutes(deps: RouteDependencies): Route[] {
         mfa: session.mfaState,
         expiresAt: session.expiresAt,
         reauthenticatedAt: session.reauthenticatedAt,
+        tokenHash,
       });
     }),
   ];

@@ -7,6 +7,7 @@ import { Suspense, lazy } from 'react';
 import type { ReactNode } from 'react';
 
 import { endSession, loadSession } from './api.ts';
+import { applyRoutes } from './apply/routes.ts';
 import CheckEmailPage from './auth/CheckEmailPage.tsx';
 import CompleteSignUpPage from './auth/CompleteSignUpPage.tsx';
 import ForgotPasswordPage from './auth/ForgotPasswordPage.tsx';
@@ -100,6 +101,7 @@ export const tenantRoutes: readonly RouteDefinition[] = [
     component: OrganisationPage,
   },
   { path: FUTURE_FUNDING_PATH, title: 'Future funding', component: FutureFundingPage },
+  ...applyRoutes,
 ];
 
 function TenantNotFound() {

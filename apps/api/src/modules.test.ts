@@ -14,6 +14,18 @@ import {
   updateTheme,
   uploadLogo,
 } from '@pixel-scientists/domain/platform/settings';
+import {
+  applicationRoutes,
+  assessmentRoutes,
+  assignReviewersAutomatically,
+  decisionRoutes,
+  exportRoutes,
+  formRoutes,
+  programmeRoutes,
+  reviewRoutes,
+  spreadRoutes,
+  submissionRoutes,
+} from '@pixel-scientists/grants/contracts';
 import { partyRoutes } from '@pixel-scientists/party/contracts';
 import { describe, expect, it } from 'vitest';
 
@@ -25,7 +37,7 @@ const publicTenants = {
 };
 
 describe('composeModules', () => {
-  it('registers a handler for every platform and party route contract, once', () => {
+  it('registers a handler for every platform, party and grants route contract, once', () => {
     const { routes } = composeModules({ publicTenants });
 
     expect(routes.map((route) => route.contract)).toEqual([
@@ -42,12 +54,36 @@ describe('composeModules', () => {
       getThemeCss,
       getLogo,
       ...Object.values(partyRoutes),
+      ...Object.values(programmeRoutes),
+      ...Object.values(formRoutes),
+      ...Object.values(applicationRoutes),
+      ...Object.values(submissionRoutes),
+      ...Object.values(assessmentRoutes),
+      assignReviewersAutomatically,
+      ...Object.values(spreadRoutes),
+      ...Object.values(reviewRoutes),
+      ...Object.values(decisionRoutes),
+      ...Object.values(exportRoutes),
     ]);
   });
 
-  it('resolves every scope rule the party routes use, and none that is the platform’s', () => {
+  it('resolves every scope rule the module routes use, and none that is the platform’s', () => {
     const { resolvers } = composeModules({ publicTenants });
-    const used = new Set(Object.values(partyRoutes).map((contract) => contract.scope));
+    const used = new Set(
+      [
+        ...Object.values(partyRoutes),
+        ...Object.values(programmeRoutes),
+        ...Object.values(formRoutes),
+        ...Object.values(applicationRoutes),
+        ...Object.values(submissionRoutes),
+        ...Object.values(assessmentRoutes),
+        assignReviewersAutomatically,
+        ...Object.values(spreadRoutes),
+        ...Object.values(reviewRoutes),
+        ...Object.values(exportRoutes),
+        ...Object.values(decisionRoutes),
+      ].map((contract) => contract.scope),
+    );
 
     expect(Object.keys(resolvers).sort()).toEqual(
       [...used].filter((rule) => rule !== 'tenant').sort(),

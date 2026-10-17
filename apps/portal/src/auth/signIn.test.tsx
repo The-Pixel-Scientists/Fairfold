@@ -70,7 +70,9 @@ describe('the sign-in page', () => {
     });
     expect(window.location.pathname).toBe('/northfield/');
     expect(
-      screen.getByText('You are signed in. You have not started an application yet.'),
+      screen.getByText(
+        'You are signed in. Choose a programme to apply to, or carry on with an application.',
+      ),
     ).toBeTruthy();
   });
 

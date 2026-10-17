@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import type { Permission } from '@pixel-scientists/domain/platform';
+import { grantsNavigation } from '@pixel-scientists/grants/console';
 import { hasPermission } from '@pixel-scientists/ui';
 import type { SessionData } from '@pixel-scientists/ui';
 
@@ -13,7 +14,7 @@ export interface NavigationItem {
 }
 
 export const navigationItems: readonly NavigationItem[] = [
-  { to: '/', label: 'Programmes', permission: 'grants.programmes.manage' },
+  ...grantsNavigation,
   { to: '/settings', label: 'Settings', permission: 'platform.settings.manage' },
 ];
 

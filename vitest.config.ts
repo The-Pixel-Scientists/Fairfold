@@ -7,8 +7,8 @@
 //   db-admin  Tests of the roles script and migration tooling, which connect
 //             to PostgreSQL as the superuser. Files end in .db.test.ts.
 //   db        Tests that need PostgreSQL and connect as the app roles: those
-//             in packages/db/test, and the API's and modules', which end in
-//             .integration.test.ts.
+//             in packages/db/test, and the seed's, the API's and modules',
+//             which end in .integration.test.ts.
 // `pnpm check` runs unit and ui. `pnpm test:db` runs db-admin and db, each
 // with only the credentials it needs; `pnpm test` runs all four
 // (scripts/test.ts).
@@ -30,6 +30,7 @@ export default defineConfig({
             'packages/config/**/*.test.ts',
             'packages/db/src/**/*.test.ts',
             'packages/db/scripts/**/*.test.ts',
+            'packages/db/seed/**/*.test.ts',
             'modules/*/src/contracts/**/*.test.ts',
             'modules/*/src/server/**/*.test.ts',
             'apps/api/**/*.test.ts',
@@ -76,6 +77,7 @@ export default defineConfig({
           environment: 'node',
           include: [
             'packages/db/test/**/*.test.ts',
+            'packages/db/seed/**/*.integration.test.ts',
             'apps/api/**/*.integration.test.ts',
             'modules/*/src/**/*.integration.test.ts',
           ],

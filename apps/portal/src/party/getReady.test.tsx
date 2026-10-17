@@ -46,7 +46,10 @@ describe('get ready to apply', () => {
     expect(screen.getByRole('link', { name: 'Future funding' }).getAttribute('href')).toBe(
       '/northfield/future-funding',
     );
-    expect(screen.getByRole('heading', { level: 2, name: 'No grants are open yet' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Programmes you can apply to' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Your applications' }).getAttribute('href')).toBe(
+      '/northfield/applications',
+    );
   });
 
   it('marks what is done, including a choice about future funding of either kind', async () => {

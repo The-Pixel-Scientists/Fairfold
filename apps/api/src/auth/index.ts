@@ -3,7 +3,8 @@
 // The auth module (ADR 0007, ADR 0010): the only code that reaches the auth
 // schema, as app_auth, and the only code that imports Better Auth.
 // createAuth() gives buildApp() its plugin and readSession(), and gives the
-// rest of the API revokeSessions().
+// rest of the API revokeSessions(), createInvitation() and
+// revokeSessionsForMembership().
 //
 // The plugin adds one hook before every route, on every request, whatever
 // its path (the router decodes percent-escapes, so a raw path is no guide):
@@ -15,9 +16,10 @@
 //
 // CORS stays off: no route or hook sends an Access-Control-* header.
 
-import { createDatabase, type TenantId } from '@pixel-scientists/db';
+import { createDatabase, type TenantId, type Transaction } from '@pixel-scientists/db';
 import { apiBasePath } from '@pixel-scientists/domain/api';
 import type { App } from '@pixel-scientists/domain/platform';
+import type { Invitation } from '@pixel-scientists/domain/platform/team';
 import type { FastifyBaseLogger, FastifyPluginAsync, FastifyRequest } from 'fastify';
 
 import type { Config } from '../config.ts';
@@ -29,14 +31,28 @@ import { createBetterAuth, type BetterAuth } from './better-auth.ts';
 import { clientTracker } from './clients.ts';
 import { copyAuthEvent, recordAuthEvent } from './events.ts';
 import { appResolver } from './hosts.ts';
+import { invitationRoutes } from './invitation-accept.ts';
+import { createInvitation, type Inviter } from './invitations.ts';
 import { identifierKeeper } from './limits.ts';
+import { revokeSessionsForMembership, type MembershipChange } from './memberships.ts';
 import { loadCommonPasswords } from './passwords.ts';
-import { authRoutes } from './routes.ts';
+import { mfaRoutes } from './mfa.ts';
+import { authRoutes, type RouteDependencies } from './routes.ts';
 import { revokeAll, sessionReader } from './sessions.ts';
 import type { AuthSettings } from './settings.ts';
+import { stepUpRoutes } from './step-up.ts';
+import { switchTenantRoutes } from './switch-tenant.ts';
+import type { AuthTables } from './tables.ts';
 
 export { loadAuthSettings, type AuthSettings } from './settings.ts';
 export { singleHostRewrite } from './hosts.ts';
+export {
+  createInvitation as createOperatorInvitation,
+  revokeInvitation,
+  type InvitationDependencies,
+  type Inviter,
+} from './invitations.ts';
+export type { MembershipChange } from './memberships.ts';
 
 export interface Auth extends AuthModule {
   /** Revoke a user's live sessions, or those active in one tenant, and record it. Returns how many. */
@@ -45,7 +61,15 @@ export interface Auth extends AuthModule {
     readonly tenant?: TenantId;
     readonly requestId: string;
   }): Promise<number>;
-  /** Better Auth's server API, for the auth routes still to come (S02-09). */
+  /** A member invites someone to the tenant of `trx`, a tenant transaction as app_api (invitations.ts). */
+  createInvitation(
+    trx: Transaction<unknown>,
+    actor: Extract<Inviter, { kind: 'user' }>,
+    input: { readonly email: string; readonly roles: readonly string[] },
+  ): Promise<Invitation>;
+  /** Revoke a member's sessions active in their tenant, in the change's transaction (memberships.ts). */
+  revokeSessionsForMembership(trx: Transaction<unknown>, change: MembershipChange): Promise<number>;
+  /** Better Auth's server API and context. */
   readonly betterAuth: BetterAuth;
   /** Waits for work after responses, such as sign-up emails, then closes the module's database pools. */
   close(): Promise<void>;
@@ -118,7 +142,7 @@ export function createAuth(settings: AuthSettings, deps: AuthDependencies): Auth
   const clients = clientTracker();
   // Work started after a response, which close() waits for.
   const running = new Set<Promise<void>>();
-  const routes = authRoutes({
+  const routeDeps: RouteDependencies = {
     api,
     auth,
     log: deps.log,
@@ -147,7 +171,28 @@ export function createAuth(settings: AuthSettings, deps: AuthDependencies): Auth
         .finally(() => running.delete(task));
       running.add(task);
     },
-  });
+  };
+  const totpKey = async () => (await betterAuth.$context).secretConfig;
+  const routes = [
+    ...authRoutes(routeDeps),
+    ...mfaRoutes(routeDeps, totpKey),
+    ...stepUpRoutes(routeDeps, totpKey),
+    ...switchTenantRoutes(routeDeps),
+    ...invitationRoutes(routeDeps),
+  ];
+  const users = auth.$extendTables<AuthTables>();
+  const invitations = {
+    consoleBase: `${settings.origins.console}${settings.consolePathPrefix ?? ''}`,
+    sender: deps.sender,
+    accountId: async (email: string) =>
+      (
+        await users
+          .selectFrom('auth.user')
+          .select('id')
+          .where('email', '=', email)
+          .executeTakeFirst()
+      )?.id,
+  };
 
   if (settings.consolePathPrefix !== undefined) {
     deps.log.warn(
@@ -203,6 +248,9 @@ export function createAuth(settings: AuthSettings, deps: AuthDependencies): Auth
     plugin,
     readSession,
     betterAuth,
+    createInvitation: (trx, actor, input) => createInvitation(invitations, trx, actor, input),
+    revokeSessionsForMembership: (trx, change) =>
+      revokeSessionsForMembership({ api, auth, log: deps.log }, trx, change),
     async revokeSessions({ userId, tenant, requestId }) {
       const { count, event } = await auth.transaction().execute(async (trx) => ({
         count: await revokeAll(trx, {

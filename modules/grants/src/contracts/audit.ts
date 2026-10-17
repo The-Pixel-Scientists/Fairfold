@@ -44,6 +44,10 @@ export const grantsAuditActions = defineAuditActions('grants', [
   'grants.decision_email.sent',
   'grants.decision_email.failed',
   'grants.decision_email.resent',
+  // Data out (S10-01): each 360Giving export, and each change to the
+  // funder's publisher details.
+  'grants.export.downloaded',
+  'grants.publisher_setting.changed',
 ]);
 
 export type GrantsAuditAction = (typeof grantsAuditActions)[number];

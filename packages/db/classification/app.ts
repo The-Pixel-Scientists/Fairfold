@@ -21,6 +21,10 @@ const personal: FieldClassification = {
   sensitivity: 'personal',
   retention: { kind: 'tenant_lifetime' },
 };
+const invitation: FieldClassification = {
+  sensitivity: 'internal',
+  retention: { kind: 'fixed', days: 90, from: 'expires_at' },
+};
 const audit: FieldClassification = {
   sensitivity: 'internal',
   retention: { kind: 'tenant_policy', policy: 'audit', minimumDays: 365 },
@@ -63,6 +67,7 @@ export const app: ClassificationRegistry = {
     preset: publicField,
     logo: publicField,
     logo_type: publicField,
+    tokens: publicField,
     updated_at: internal,
     updated_by: internal,
   },
@@ -103,6 +108,23 @@ export const app: ClassificationRegistry = {
     scanned_at: internal,
     created_by: internal,
     created_at: internal,
+  },
+  // An invitation to the team (ADR 0010). The address names a person who may
+  // never join, so every row goes 90 days after it expires, whatever its
+  // status; a membership it made stays.
+  'app.invitation': {
+    tenant_id: invitation,
+    id: invitation,
+    email: { ...invitation, sensitivity: 'personal' },
+    roles: invitation,
+    token_hash: invitation,
+    expires_at: invitation,
+    status: invitation,
+    accepted_membership_id: invitation,
+    created_at: invitation,
+    created_by: invitation,
+    updated_at: invitation,
+    updated_by: invitation,
   },
   'app.audit_event': {
     tenant_id: audit,

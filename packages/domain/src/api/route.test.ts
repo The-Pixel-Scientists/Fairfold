@@ -165,6 +165,23 @@ describe('checkRoute for raw responses', () => {
     }
   });
 
+  it('lets only a console route answer an export, such as a SQL load script', () => {
+    const sql = { 200: { raw: ['application/sql'] } };
+    expect(problemsWith({ responses: sql }, download)).toEqual([]);
+    const portal = {
+      path: '/portal/files/:fileId',
+      audience: 'portal',
+      permission: 'grants.applications.apply',
+      scope: 'own_application',
+      responses: sql,
+    };
+    expect(problemsWith(portal, download)).not.toEqual([]);
+    expect(problemsWith({ responses: sql }, stylesheet)).not.toEqual([]);
+    expect(problemsWith({ method: 'DELETE', responses: sql }, download)).toContain(
+      'Only a public, console or portal GET route answers a raw body.',
+    );
+  });
+
   it('needs status 200 and content types from the list, each once', () => {
     for (const responses of [
       { 201: { raw: ['text/css'] } },

@@ -38,8 +38,20 @@ import type { AuthTables } from './tables.ts';
 const SIGN_UP = 'sign_up:';
 const LINK_MS = 24 * 3600_000;
 
-const COMMON_PASSWORD =
-  'This password is too common, so it is easy to guess. Choose another, such as a few words together.';
+/** Refuse a new password on the common-password list. */
+export function refuseCommonPassword(list: ReadonlySet<string>, password: string): void {
+  if (!isCommonPassword(list, password)) return;
+  throw new ApiError(400, messages.fixFields, {
+    errors: [
+      {
+        field: 'body.password',
+        message:
+          'This password is too common, so it is easy to guess. Choose another, such as a few words together.',
+      },
+    ],
+    reason: 'common_password',
+  });
+}
 
 /** The app the request resolved to; the auth hook has refused any other host. */
 export function appOf(context: RequestContext): App {
@@ -55,13 +67,14 @@ export async function tenantOf(db: Kysely<unknown>, slug: string): Promise<Publi
 }
 
 /** Where an app's pages for a tenant start, such as https://apply.example.org/northfield. */
-function tenantBase(deps: RouteDependencies, app: App, slug: string): string {
+export function tenantBase(deps: RouteDependencies, app: App, slug: string): string {
   const prefix = app === 'console' ? (deps.settings.consolePathPrefix ?? '') : '';
   return `${deps.settings.origins[app]}${prefix}/${slug}`;
 }
 
 /** A token's verification identifier: its SHA-256 in unpadded base64url. */
-const tokenId = (token: string) => createHash('sha256').update(token, 'utf8').digest('base64url');
+export const tokenId = (token: string) =>
+  createHash('sha256').update(token, 'utf8').digest('base64url');
 
 /** A 429 with Retry-After. */
 export function tooMany(deps: RouteDependencies, requestId: string, seconds: number): ApiError {
@@ -70,7 +83,11 @@ export function tooMany(deps: RouteDependencies, requestId: string, seconds: num
 }
 
 /** Count an email to an address against ADR 0010's limits, or refuse it. */
-async function limitEmails(deps: RouteDependencies, requestId: string, client: RateLimitClient) {
+export async function limitEmails(
+  deps: RouteDependencies,
+  requestId: string,
+  client: RateLimitClient,
+) {
   const charged = await chargeRateLimits(deps.auth, EMAIL_SCOPES, client, (trx, reached) =>
     Promise.all(
       reached.map((scope) =>
@@ -185,12 +202,7 @@ export function signUpRoutes(deps: RouteDependencies): Route[] {
         .where('expires_at', '>', (eb) => eb.fn<Date>('now'))
         .executeTakeFirst();
       if (live === undefined) throw linkNotValid;
-      if (isCommonPassword(deps.commonPasswords, password)) {
-        throw new ApiError(400, messages.fixFields, {
-          errors: [{ field: 'body.password', message: COMMON_PASSWORD }],
-          reason: 'common_password',
-        });
-      }
+      refuseCommonPassword(deps.commonPasswords, password);
       const hash = await hashPassword(password);
       // The link is spent even when the address already has an account, so it never costs a second hash.
       const created = await deps.auth.transaction().execute(async (trx) => {

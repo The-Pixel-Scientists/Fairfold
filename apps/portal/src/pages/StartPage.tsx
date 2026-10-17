@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { EmptyState, Link, buttonClassName, useSession } from '@pixel-scientists/ui';
+import { Link, buttonClassName, useSession } from '@pixel-scientists/ui';
 
 import { Screen } from '../auth/Screen.tsx';
 import { useFunderName } from '../funder.tsx';
@@ -8,7 +8,13 @@ import { standaloneLink } from '../links.ts';
 import { PageColumn, PageIntro } from '../PageColumn.tsx';
 import { GetReady } from '../party/GetReady.tsx';
 import { SavedNotice } from '../party/Saved.tsx';
-import { HOW_APPLYING_WORKS_PATH, SIGN_IN_PATH, SIGN_UP_PATH } from '../paths.ts';
+import {
+  APPLICATIONS_PATH,
+  HOW_APPLYING_WORKS_PATH,
+  PROGRAMMES_PATH,
+  SIGN_IN_PATH,
+  SIGN_UP_PATH,
+} from '../paths.ts';
 
 /** What someone who is not signed in sees first: two ways in, and what to expect. */
 function Welcome() {
@@ -40,21 +46,23 @@ function Welcome() {
   );
 }
 
-/** What a signed-in applicant sees. Grants cannot be opened yet, so it says so and what will happen. */
+/** What a signed-in applicant sees: where to find a grant, their applications, and how ready they are. */
 function Applications() {
   return (
     <PageColumn>
       <PageIntro title="Apply for a grant">
         <SavedNotice />
-        <p>You are signed in. You have not started an application yet.</p>
+        <p>You are signed in. Choose a programme to apply to, or carry on with an application.</p>
       </PageIntro>
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <Link to={PROGRAMMES_PATH} className={buttonClassName('primary', 'w-full sm:w-auto')}>
+          Programmes you can apply to
+        </Link>
+        <Link to={APPLICATIONS_PATH} className={buttonClassName('secondary', 'w-full sm:w-auto')}>
+          Your applications
+        </Link>
+      </div>
       <GetReady />
-      <EmptyState title="No grants are open yet">
-        <p>
-          When a grant opens, it will appear here. We will tell you what you need before you start.
-          You do not need to do anything now.
-        </p>
-      </EmptyState>
     </PageColumn>
   );
 }

@@ -64,6 +64,21 @@ export interface AppFile {
   tenant_id: string;
 }
 
+export interface AppInvitation {
+  accepted_membership_id: string | null;
+  created_at: Generated<Timestamp>;
+  created_by: string | null;
+  email: string;
+  expires_at: Generated<Timestamp>;
+  id: Generated<string>;
+  roles: string[];
+  status: Generated<string>;
+  tenant_id: string;
+  token_hash: Buffer;
+  updated_at: Generated<Timestamp>;
+  updated_by: string | null;
+}
+
 export interface AppMembership {
   created_at: Generated<Timestamp>;
   created_by: string | null;
@@ -114,6 +129,7 @@ export interface AppTenantTheme {
   logo_type: string | null;
   preset: string;
   tenant_id: string;
+  tokens: Json | null;
   updated_at: Generated<Timestamp>;
   updated_by: string;
 }
@@ -122,6 +138,7 @@ export interface DB {
   'app.audit_event': AppAuditEvent;
   'app.config_version': AppConfigVersion;
   'app.file': AppFile;
+  'app.invitation': AppInvitation;
   'app.membership': AppMembership;
   'app.retention_policy': AppRetentionPolicy;
   'app.tenant': AppTenant;

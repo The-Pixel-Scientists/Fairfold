@@ -24,7 +24,11 @@ function announcement(page: Page) {
 
 test.describe('programmes page', () => {
   test.beforeEach(async ({ page }) => {
-    await stubSignedIn(page);
+    await stubSignedIn(
+      page,
+      {},
+      { 'GET /console/programmes': { status: 200, body: { programmes: [] } } },
+    );
   });
 
   test('has a title that says where you are, one h1 and an empty state that says what to do', async ({
@@ -36,9 +40,8 @@ test.describe('programmes page', () => {
     await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
     await expect(page.getByRole('heading', { level: 1, name: 'Programmes' })).toBeVisible();
     await expect(page.getByRole('heading', { level: 2, name: 'No programmes yet' })).toBeVisible();
-    await expect(
-      page.getByText('Ask your administrator to set up a programme, or to add you to one'),
-    ).toBeVisible();
+    await expect(page.getByText('A programme is one grant you run')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Create a programme' })).toBeVisible();
     await expect(page.getByRole('main')).toContainText('No programmes yet');
   });
 

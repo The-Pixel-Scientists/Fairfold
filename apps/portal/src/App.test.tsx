@@ -169,16 +169,12 @@ describe('how applying works page', () => {
     ]);
   });
 
-  it('opens by saying nobody can apply yet, then describes the steps in the future tense', async () => {
+  it('opens by saying how applying works, then describes the steps', async () => {
     openPortal('/how-applying-works');
     await screen.findByRole('heading', { level: 1, name: 'How applying works' });
 
-    expect(
-      screen.getByText(
-        /^No grants are open yet, so you cannot apply today. This is how applying will work./,
-      ),
-    ).toBeTruthy();
-    expect(screen.getByText(/We will save your answers as you go./)).toBeTruthy();
+    expect(screen.getByText(/^This is how applying works. Before you begin,/)).toBeTruthy();
+    expect(screen.getByText(/We save your answers as you go./)).toBeTruthy();
     expect(within(screen.getByRole('list')).getAllByRole('listitem')).toHaveLength(4);
   });
 

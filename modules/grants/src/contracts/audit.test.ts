@@ -21,6 +21,8 @@ describe('grants audit actions', () => {
         'grants.review',
         'grants.decision',
         'grants.decision_email',
+        'grants.export',
+        'grants.publisher_setting',
       ]),
     );
   });
@@ -56,6 +58,8 @@ describe('grants audit actions', () => {
       'Decision email sent',
       'Decision email failed',
       'Decision email resent',
+      'Export downloaded',
+      'Publisher setting changed',
     ]);
   });
 });

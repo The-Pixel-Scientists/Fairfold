@@ -2,11 +2,16 @@
 
 import type { ReactNode } from 'react';
 
+import { cx } from '../cx.ts';
+import { AnswerTable } from './AnswerTable.tsx';
+import { AnswerFiles } from './files.tsx';
+import { isMoney, isText, readNumber } from './read.ts';
+import { rowsOf } from './tables.ts';
 import type {
+  AnswerHelpers,
+  AttachedFile,
   FormAnswers,
   FormFieldDefinition,
-  FormHelpers,
-  FormMoney,
   FormSectionDefinition,
   QuestionDefinition,
   VisibleFields,
@@ -22,7 +27,20 @@ export interface AnswerViewProps {
   visible: VisibleFields;
   /** The answers to those fields, as the server projected them for this person. */
   answers: FormAnswers;
-  helpers: Pick<FormHelpers, 'formatMoney'>;
+  /**
+   * `tableTotals` is for forms with a table question: without it a table
+   * answer shows no totals. `fileTypeLabels` is for forms with a file
+   * question: without it a type shows as its own name.
+   */
+  helpers: AnswerHelpers;
+  /**
+   * For a file question: the files to show, each naming its question. Like the
+   * answers, they are what the server sent this person, and a file on a
+   * question that is not in `visible` is not shown.
+   */
+  files?: readonly AttachedFile[];
+  /** Where a file downloads from. Without it a file shows as its name. */
+  hrefFor?: (id: string) => string;
   /** The heading level of each section's title. Defaults to h3. */
   headingLevel?: 'h2' | 'h3' | 'h4';
 }
@@ -30,18 +48,6 @@ export interface AnswerViewProps {
 const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 const ADDRESS_PARTS = ['line1', 'line2', 'town', 'county', 'postcode'];
 const dateFormat = new Intl.DateTimeFormat('en-GB', { dateStyle: 'long', timeZone: 'UTC' });
-const numberFormat = new Intl.NumberFormat('en-GB', { maximumFractionDigits: 20 });
-
-function isText(value: unknown): value is string {
-  return typeof value === 'string' && value.trim() !== '';
-}
-
-function isMoney(value: unknown): value is FormMoney {
-  const { amountMinor, currency } = (
-    typeof value === 'object' && value !== null ? value : {}
-  ) as Partial<FormMoney>;
-  return typeof amountMinor === 'number' && currency === 'GBP';
-}
 
 function lines(items: readonly string[]): ReactNode {
   return items.map((item, index) => (
@@ -68,7 +74,7 @@ function addressLines(value: unknown): string[] {
 function answerText(
   field: QuestionDefinition,
   value: unknown,
-  helpers: AnswerViewProps['helpers'],
+  { helpers, files = [], hrefFor }: Pick<AnswerViewProps, 'helpers' | 'files' | 'hrefFor'>,
 ): ReactNode {
   switch (field.type) {
     case 'short_text':
@@ -80,9 +86,7 @@ function answerText(
         <span className="block whitespace-pre-line break-words">{value}</span>
       ) : null;
     case 'number':
-      return typeof value === 'number' && Number.isFinite(value)
-        ? numberFormat.format(value)
-        : null;
+      return readNumber(value);
     case 'currency':
       return isMoney(value) ? helpers.formatMoney(value) : null;
     case 'date':
@@ -111,6 +115,16 @@ function answerText(
       const address = addressLines(value);
       return address.length === 0 ? null : lines(address);
     }
+    case 'table': {
+      const rows = rowsOf(value);
+      return rows.length === 0 ? null : <AnswerTable field={field} rows={rows} helpers={helpers} />;
+    }
+    case 'file': {
+      const attached = files.filter(({ fieldId }) => fieldId === field.id);
+      return attached.length === 0 ? null : (
+        <AnswerFiles files={attached} hrefFor={hrefFor} labels={helpers.fileTypeLabels} />
+      );
+    }
   }
 }
 
@@ -130,6 +144,8 @@ export function AnswerView({
   visible,
   answers,
   helpers,
+  files,
+  hrefFor,
   headingLevel: Heading = 'h3',
 }: AnswerViewProps) {
   const shown = new Set(visible.map((field) => field.id));
@@ -147,15 +163,20 @@ export function AnswerView({
                 const answer = answerText(
                   field,
                   Object.hasOwn(answers, field.id) ? answers[field.id] : null,
-                  helpers,
+                  { helpers, files, hrefFor },
                 );
+                // A table needs the whole width, so its question sits above it.
+                const beside = !(field.type === 'table' && answer !== null);
                 return (
                   <div
                     key={field.id}
-                    className="flex flex-col gap-1 py-2 sm:grid sm:grid-cols-3 sm:gap-gutter"
+                    className={cx(
+                      'flex flex-col gap-1 py-2',
+                      beside && 'sm:grid sm:grid-cols-3 sm:gap-gutter',
+                    )}
                   >
                     <dt className="break-words text-body text-muted">{field.label}</dt>
-                    <dd className="text-body text-ink sm:col-span-2">
+                    <dd className={cx('min-w-0 text-body text-ink', beside && 'sm:col-span-2')}>
                       {answer ?? <span className="text-muted">Not answered</span>}
                     </dd>
                   </div>

@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import type { FormHelpers } from './types.ts';
 
 /** A screen reader hears the count once typing stops, not at every key. */
-const ANNOUNCE_AFTER_MS = 1000;
+export const ANNOUNCE_AFTER_MS = 1000;
 
 export interface TextCountProps {
   /** The id the answer is described by. */

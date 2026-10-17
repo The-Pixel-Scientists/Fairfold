@@ -144,13 +144,18 @@ export const rawContentTypes = ['text/css', 'image/png', 'image/webp'] as const;
 
 export type RawContentType = (typeof rawContentTypes)[number];
 
+/** The content types of a console route's export download (S10-01): the warehouse load script. */
+export const exportContentTypes = ['application/sql'] as const;
+
+export type ExportContentType = (typeof exportContentTypes)[number];
+
 /**
  * A response that is not JSON, in one of the content types named: a
  * stylesheet or an image on a public route, a stored file on a console or
- * portal route (ADR 0047).
+ * portal route (ADR 0047), or an export on a console route.
  */
 export interface RawBody {
-  readonly raw: readonly (RawContentType | FileType)[];
+  readonly raw: readonly (RawContentType | FileType | ExportContentType)[];
 }
 
 /** The content type of a raw upload body. */
