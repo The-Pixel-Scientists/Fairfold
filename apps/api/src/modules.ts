@@ -12,6 +12,7 @@ import {
   assessmentRoutes,
   assignReviewersAutomatically,
   decisionRoutes,
+  exportRoutes,
   FORM_DEFINITION_MAX_BYTES,
   formRoutes,
   programmeRoutes,
@@ -153,6 +154,9 @@ export function composeModules(deps: {
       route(decisionRoutes.previewDecisionEmail, grants.previewDecisionEmail),
       route(decisionRoutes.releaseDecisions, grants.releaseDecisions),
       route(decisionRoutes.sendDecisionEmails, grants.sendDecisionEmails),
+      route(exportRoutes.getPublisherSetting, grants.getPublisherSetting),
+      route(exportRoutes.savePublisherSetting, grants.savePublisherSetting),
+      route(exportRoutes.get360GivingExport, grants.get360GivingExport),
     ],
     resolvers: { ...partyResolvers, ...grantsResolvers },
   };
