@@ -31,9 +31,12 @@ import { copyAuthEvent, recordAuthEvent } from './events.ts';
 import { appResolver } from './hosts.ts';
 import { identifierKeeper } from './limits.ts';
 import { loadCommonPasswords } from './passwords.ts';
-import { authRoutes } from './routes.ts';
+import { mfaRoutes } from './mfa.ts';
+import { authRoutes, type RouteDependencies } from './routes.ts';
 import { revokeAll, sessionReader } from './sessions.ts';
 import type { AuthSettings } from './settings.ts';
+import { stepUpRoutes } from './step-up.ts';
+import { switchTenantRoutes } from './switch-tenant.ts';
 
 export { loadAuthSettings, type AuthSettings } from './settings.ts';
 export { singleHostRewrite } from './hosts.ts';
@@ -45,7 +48,7 @@ export interface Auth extends AuthModule {
     readonly tenant?: TenantId;
     readonly requestId: string;
   }): Promise<number>;
-  /** Better Auth's server API, for the auth routes still to come (S02-09). */
+  /** Better Auth's server API and context. */
   readonly betterAuth: BetterAuth;
   /** Waits for work after responses, such as sign-up emails, then closes the module's database pools. */
   close(): Promise<void>;
@@ -118,7 +121,7 @@ export function createAuth(settings: AuthSettings, deps: AuthDependencies): Auth
   const clients = clientTracker();
   // Work started after a response, which close() waits for.
   const running = new Set<Promise<void>>();
-  const routes = authRoutes({
+  const routeDeps: RouteDependencies = {
     api,
     auth,
     log: deps.log,
@@ -147,7 +150,14 @@ export function createAuth(settings: AuthSettings, deps: AuthDependencies): Auth
         .finally(() => running.delete(task));
       running.add(task);
     },
-  });
+  };
+  const totpKey = async () => (await betterAuth.$context).secretConfig;
+  const routes = [
+    ...authRoutes(routeDeps),
+    ...mfaRoutes(routeDeps, totpKey),
+    ...stepUpRoutes(routeDeps, totpKey),
+    ...switchTenantRoutes(routeDeps),
+  ];
 
   if (settings.consolePathPrefix !== undefined) {
     deps.log.warn(
