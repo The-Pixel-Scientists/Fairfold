@@ -4,6 +4,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
+import { joined } from '../testing/names.ts';
 import { setUpConsoleTests } from '../testing/render.tsx';
 import {
   actionButton,
@@ -22,8 +23,7 @@ type User = ReturnType<typeof userEvent.setup>;
 const COSTS = 'Costs';
 
 /** A box of one column, named as a screen reader reads it. */
-const of = (label: string, number: number) =>
-  new RegExp(`^${label}\\s*of column ${String(number)}$`);
+const of = (label: string, number: number) => joined(label, `of column ${String(number)}`);
 const COLUMN_ID = /^c_[a-z0-9]{12}$/;
 
 const openBudget = () => openDraft(saves, budgetDraft);

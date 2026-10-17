@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 
 import { consoleSession, problem, signedOut, stubApi } from '../testing/api.ts';
 import { titleSuffix } from '../product.ts';
+import { containing } from '../testing/names.ts';
 import { expectTitle, openConsole, setUpConsoleTests } from '../testing/render.tsx';
 import { SESSION, api, heading, ids, manager, ok, pounds, programme, round } from './fixtures.ts';
 
@@ -43,7 +44,7 @@ const list = {
 };
 
 const rowFor = (name: string) =>
-  screen.getByRole('rowheader', { name: new RegExp(name) }).closest('tr') as HTMLElement;
+  screen.getByRole('rowheader', { name: containing(name) }).closest('tr') as HTMLElement;
 
 describe('the programmes page', () => {
   it('lists each programme with its status and the round it opened last', async () => {

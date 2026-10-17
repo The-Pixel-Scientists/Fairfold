@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
 import { problem, stubApi } from '../testing/api.ts';
+import { joined } from '../testing/names.ts';
 import { openConsole, setUpConsoleTests } from '../testing/render.tsx';
 import { api, heading, ids, manager, ok, reads, round } from './fixtures.ts';
 import type { Handlers } from './fixtures.ts';
@@ -22,7 +23,7 @@ const open = async (more: Handlers = {}) => {
 const names = () =>
   screen.getAllByRole<HTMLInputElement>('textbox', { name: /^Stage name/ }).map((box) => box.value);
 const button = (verb: string, stage: string) =>
-  screen.getByRole('button', { name: new RegExp(`^${verb}\\s*${stage}$`) });
+  screen.getByRole('button', { name: joined(verb, stage) });
 
 describe('the stages of a round', () => {
   it('lists the stages in order, each with buttons to move and remove it', async () => {

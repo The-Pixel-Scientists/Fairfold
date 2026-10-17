@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
 import { problem, stubApi } from '../testing/api.ts';
+import { joined } from '../testing/names.ts';
 import { openConsole, setUpConsoleTests } from '../testing/render.tsx';
 import { api, ids, manager, ok, reads, round, stages, nth } from './fixtures.ts';
 import type { Handlers } from './fixtures.ts';
@@ -23,7 +24,7 @@ const labels = () =>
     .getAllByRole<HTMLInputElement>('textbox', { name: /^Criterion\s*\d/ })
     .map((box) => box.value);
 const button = (verb: string, criterion: string) =>
-  screen.getByRole('button', { name: new RegExp(`^${verb}\\s*${criterion}$`) });
+  screen.getByRole('button', { name: joined(verb, criterion) });
 const total = () => screen.getByText('Total weight').nextElementSibling?.textContent;
 
 describe('the rubric of a stage', () => {

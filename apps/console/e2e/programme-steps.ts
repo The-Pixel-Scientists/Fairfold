@@ -19,7 +19,7 @@ export async function enterMoment(
   [day, month, year]: [string, string, string],
   time: string,
 ): Promise<void> {
-  const date = page.getByRole('group', { name: new RegExp(`${word} date`) });
+  const date = page.getByRole('group', { name: `${word} date` });
   await date.getByRole('textbox', { name: 'Day' }).fill(day);
   await date.getByRole('textbox', { name: 'Month' }).fill(month);
   await date.getByRole('textbox', { name: 'Year' }).fill(year);
@@ -63,7 +63,7 @@ export async function addRubric(page: Page): Promise<void> {
   await page.getByRole('tab', { name: 'Stages and rubrics' }).click();
   const stages = page.getByRole('table', { name: 'Stages in this round' });
   for (const stage of ['Intake', 'Review', 'Decision']) {
-    await expect(stages.getByRole('rowheader', { name: new RegExp(stage) })).toBeVisible();
+    await expect(stages.getByRole('rowheader', { name: stage })).toBeVisible();
   }
   await page.getByRole('link', { name: 'Add rubric for Review' }).click();
   await expect(h1(page, 'Rubric for Review')).toBeFocused();

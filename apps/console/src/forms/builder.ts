@@ -7,6 +7,7 @@ import { screen, within } from '@testing-library/react';
 import { expect } from 'vitest';
 
 import { stubApi } from '../testing/api.ts';
+import { containing, joined } from '../testing/names.ts';
 import { openConsole } from '../testing/render.tsx';
 import { api, draft, ids, ok, reads } from './fixtures.ts';
 import type { Handlers } from './fixtures.ts';
@@ -33,20 +34,17 @@ export const saves: Handlers = {
     }),
 };
 
-const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const pattern = (text: string) => new RegExp(escape(text));
-
 /** A button named by what it does and what it does it to: "Move down" and "Organisation name". */
 export const actionButton = (verb: string, name: string) =>
-  screen.getByRole('button', { name: new RegExp(`^${verb}\\s*${escape(name)}$`) });
+  screen.getByRole('button', { name: joined(verb, name) });
 
 export const sectionList = () => screen.getByRole('list', { name: 'Sections' });
 export const sectionButton = (title: string) =>
-  within(sectionList()).getByRole('button', { name: pattern(title) });
+  within(sectionList()).getByRole('button', { name: containing(title) });
 
 export const questionList = () => screen.getByRole('list', { name: 'Questions' });
 export const questionButton = (label: string) =>
-  within(questionList()).getByRole('button', { name: pattern(label) });
+  within(questionList()).getByRole('button', { name: containing(label) });
 
 /** Says the questions of the section that is showing are these, in this order. */
 export function expectQuestions(...labels: string[]): void {

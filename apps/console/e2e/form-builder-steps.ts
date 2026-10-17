@@ -36,7 +36,9 @@ export async function addSection(page: Page, title: string, introduction?: strin
   if (introduction !== undefined) {
     await section.getByRole('textbox', { name: /^Introduction/ }).fill(introduction);
   }
-  await expect(page.getByRole('button', { name: new RegExp(`^\\d+\\. ${title}`) })).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: /^\d+\. / }).filter({ hasText: `. ${title}` }),
+  ).toBeVisible();
 }
 
 /** Opens the blank question a new section starts with, and gives it its words. */

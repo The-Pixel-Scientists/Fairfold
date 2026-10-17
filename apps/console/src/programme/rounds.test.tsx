@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 
 import { titleSuffix } from '../product.ts';
 import { problem, stubApi } from '../testing/api.ts';
+import { containing } from '../testing/names.ts';
 import { expectTitle, openConsole, setUpConsoleTests } from '../testing/render.tsx';
 import {
   api,
@@ -29,7 +30,7 @@ const box = (name: string) => screen.getByRole<HTMLInputElement>('textbox', { na
 /** The day, month and year boxes of a date, and the time beside it. */
 async function enter(user: UserEvent, word: 'Opening' | 'Closing', date: string, time: string) {
   const [day = '', month = '', year = ''] = date.split(' ');
-  const group = screen.getByRole('group', { name: new RegExp(`${word} date`) });
+  const group = screen.getByRole('group', { name: containing(`${word} date`) });
   await user.type(within(group).getByRole('textbox', { name: 'Day' }), day);
   await user.type(within(group).getByRole('textbox', { name: 'Month' }), month);
   await user.type(within(group).getByRole('textbox', { name: 'Year' }), year);
