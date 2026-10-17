@@ -17,6 +17,7 @@ import type { Permission, ScopeRule } from '../platform/access.ts';
 import { moduleIds, type ModuleId } from '../platform/modules.ts';
 import { accessProblems, type AuthSession } from './access-rules.ts';
 import {
+  exportContentTypes,
   isRawBody,
   paramProblems,
   rawBodyProblems,
@@ -159,13 +160,15 @@ function isMember(audience: Audience): boolean {
 
 /**
  * The content types a route may answer raw, or null if it may not: a GET
- * route only, a stylesheet or an image for the public, and a stored file's
- * type for the console and portal (ADR 0047). Never on auth routes.
+ * route only, a stylesheet or an image for the public, a stored file's type
+ * for the console and portal (ADR 0047), and an export's for the console
+ * (S10-01). Never on auth routes.
  */
 function rawResponseTypes(route: RouteContract): readonly string[] | null {
   if (route.method !== 'GET') return null;
   if (route.audience === 'public') return rawContentTypes;
-  return isMember(route.audience) ? fileTypes : null;
+  if (route.audience === 'console') return [...fileTypes, ...exportContentTypes];
+  return route.audience === 'portal' ? fileTypes : null;
 }
 
 /** Returns the contract unchanged, or throws if it breaks a rule. */
