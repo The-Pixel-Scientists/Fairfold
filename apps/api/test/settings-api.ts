@@ -49,7 +49,7 @@ export interface Event {
 
 const programmes = defineRoute({
   method: 'GET',
-  path: '/console/programmes',
+  path: '/console/module-switch-check',
   audience: 'console',
   module: 'grants',
   permission: 'grants.data.export',
@@ -124,7 +124,8 @@ export async function startSettingsApi(port: string) {
         ...(payload === undefined ? {} : { payload }),
       }),
     /** A request to the grants module's route. */
-    grants: (member: Member) => api.inject({ url: '/api/console/programmes', headers: as(member) }),
+    grants: (member: Member) =>
+      api.inject({ url: '/api/console/module-switch-check', headers: as(member) }),
     /** A request to the console settings route, as the administrator's own account in the portal. */
     asPortal: (member: Member) =>
       api.inject({
