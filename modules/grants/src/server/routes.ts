@@ -11,6 +11,8 @@ import type { AssessmentDependencies } from './assessment/context.ts';
 import { assessmentResolvers } from './assessment/resolvers.ts';
 import { decisionHandlers } from './decisions/handlers.ts';
 import type { DecisionDependencies } from './decisions/context.ts';
+import { exportHandlers } from './export/handlers.ts';
+import type { ExportDependencies } from './export/publisher.ts';
 import type { FormDependencies } from './forms/context.ts';
 import { formHandlers } from './forms/handlers.ts';
 import type { GrantsDependencies } from './programme/context.ts';
@@ -19,6 +21,7 @@ import { submissionHandlers } from './submissions/handlers.ts';
 
 export type { AssessmentDependencies } from './assessment/context.ts';
 export type { DecisionDependencies, MailSender } from './decisions/context.ts';
+export type { ExportDependencies } from './export/publisher.ts';
 export type { FormDependencies } from './forms/context.ts';
 export type { ConfigHistoryRow, GrantsContext, GrantsDependencies } from './programme/context.ts';
 
@@ -26,7 +29,11 @@ export type { ConfigHistoryRow, GrantsContext, GrantsDependencies } from './prog
 export const grantsResolvers = { ...applicationResolvers, ...assessmentResolvers };
 
 export function grantsHandlers(
-  deps: GrantsDependencies & FormDependencies & AssessmentDependencies & DecisionDependencies,
+  deps: GrantsDependencies &
+    FormDependencies &
+    AssessmentDependencies &
+    DecisionDependencies &
+    ExportDependencies,
 ) {
   return {
     ...programmeSetUpHandlers(deps),
@@ -35,5 +42,6 @@ export function grantsHandlers(
     ...submissionHandlers(deps),
     ...assessmentHandlers(deps),
     ...decisionHandlers(deps),
+    ...exportHandlers(deps),
   };
 }
