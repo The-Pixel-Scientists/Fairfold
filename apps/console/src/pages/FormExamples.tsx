@@ -12,6 +12,7 @@ import {
   countWords,
   formDefinitionSchema,
   projectAnswers,
+  tableTotals,
   validateAnswers,
   visibleFields,
 } from '@pixel-scientists/domain/forms';
@@ -23,22 +24,21 @@ import { useState } from 'react';
 import type { SubmitEvent } from 'react';
 
 /** The engine's own counter and money format, so what people see is what the server checks. */
-export const helpers: FormHelpers = { countWords, countCharacters, formatMoney };
+export const helpers: FormHelpers = { countWords, countCharacters, formatMoney, tableTotals };
 
-/** A field the kit can draw: the kit has no table or file renderer yet. */
-type ExampleField = Exclude<FormField, { type: 'table' | 'file' }>;
+/** A field the kit can draw: the kit has no file renderer yet. */
+type ExampleField = Exclude<FormField, { type: 'file' }>;
 
 type ExampleDefinition = {
   sections: (Omit<FormDefinition['sections'][number], 'fields'> & { fields: ExampleField[] })[];
 };
 
-const isExampleField = (field: FormField): field is ExampleField =>
-  field.type !== 'table' && field.type !== 'file';
+const isExampleField = (field: FormField): field is ExampleField => field.type !== 'file';
 
 /**
- * Checks a form with the engine, then leaves out its table and file questions,
- * so the engine and the screen agree on what the form asks. Remove this when
- * the kit draws them.
+ * Checks a form with the engine, then leaves out its file questions, so the
+ * engine and the screen agree on what the form asks. Remove this when the kit
+ * draws them.
  */
 function exampleForm(input: unknown): ExampleDefinition {
   const { sections } = formDefinitionSchema.parse(input);
@@ -332,6 +332,82 @@ const readingAnswers: Answers = {
   f_vgroup: 'two',
 };
 
+const pounds = (amount: number) => ({ amountMinor: amount * 100, currency: 'GBP' });
+
+/** A budget: what each cost is, what kind it is and what it comes to, with the costs added up. */
+function budgetTable(id: string, limits: { minRows: number; maxRows: number }) {
+  return {
+    id,
+    type: 'table',
+    label: 'Budget',
+    hint: 'Add a row for each cost. We add up the costs for you.',
+    required: true,
+    rowNoun: 'cost',
+    ...limits,
+    columns: [
+      { id: 'c_item', type: 'short_text', label: 'Item', maxCharacters: 80 },
+      {
+        id: 'c_kind',
+        type: 'dropdown',
+        label: 'Type of cost',
+        options: [
+          { value: 'staff', label: 'Staff' },
+          { value: 'venue', label: 'Venue' },
+          { value: 'supplies', label: 'Supplies' },
+        ],
+      },
+      { id: 'c_cost', type: 'currency', label: 'Cost', minMinor: 100, total: true },
+    ],
+  };
+}
+
+/** A form of one table question, and the section around it. */
+function tableForm(field: ReturnType<typeof budgetTable>): ExampleDefinition {
+  return exampleForm({
+    sections: [{ id: `s_${field.id.slice(2)}`, title: 'Costs of the project', fields: [field] }],
+  });
+}
+
+const costRows = [
+  { c_item: 'Venue hire, 48 Tuesdays at £60', c_kind: 'venue', c_cost: pounds(2880) },
+  { c_item: 'Session leader', c_kind: 'staff', c_cost: pounds(7200) },
+  { c_item: 'Refreshments', c_kind: 'supplies', c_cost: pounds(2420) },
+];
+
+const emptyTableForm = tableForm(budgetTable('f_tempty', { minRows: 0, maxRows: 20 }));
+const filledTableForm = tableForm(budgetTable('f_tfilled', { minRows: 1, maxRows: 20 }));
+const problemTableForm = tableForm(budgetTable('f_tproblems', { minRows: 1, maxRows: 20 }));
+const limitTableForm = tableForm(budgetTable('f_tlimit', { minRows: 1, maxRows: 3 }));
+
+/** Rows that each break a different rule: no kind, a cost below the least, text for a cost, and an empty row. */
+const problemRows = [
+  { c_item: 'Venue hire', c_kind: null, c_cost: { amountMinor: 50, currency: 'GBP' } },
+  { c_item: null, c_kind: 'staff', c_cost: 'a lot' },
+  {},
+];
+
+const tableReadingForm = exampleForm({
+  sections: [
+    {
+      id: 's_tread',
+      title: 'Costs of the project',
+      fields: [
+        budgetTable('f_tread', { minRows: 1, maxRows: 20 }),
+        {
+          id: 'f_tmore',
+          type: 'table',
+          label: 'Other funding',
+          rowNoun: 'source',
+          columns: [
+            { id: 'c_source', type: 'short_text', label: 'Where the money comes from' },
+            { id: 'c_amount', type: 'currency', label: 'Amount', total: true },
+          ],
+        },
+      ],
+    },
+  ],
+});
+
 interface ExampleFormProps {
   definition: ExampleDefinition;
   initial?: Answers;
@@ -449,6 +525,42 @@ export function AnswerExample() {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/** A table question with no rows: it says what to do, and asks for a first row on check. */
+export function EmptyTableExample() {
+  return <ExampleForm definition={emptyTableForm} />;
+}
+
+/** A budget with three rows and the total of its costs. */
+export function FilledTableExample() {
+  return <ExampleForm definition={filledTableForm} initial={{ f_tfilled: costRows }} />;
+}
+
+/** Rows that break rules, so the message beside each cell and the summary's links to them show on check. */
+export function ProblemTableExample() {
+  return <ExampleForm definition={problemTableForm} initial={{ f_tproblems: problemRows }} />;
+}
+
+/** A table with as many rows as it takes: the way to add another gives way to words. */
+export function LimitTableExample() {
+  return <ExampleForm definition={limitTableForm} initial={{ f_tlimit: costRows }} />;
+}
+
+/** A table answer as staff read it, and a table question that was not answered. */
+export function TableAnswerExample() {
+  const visible = visibleFields(tableReadingForm, { f_tread: costRows });
+  return (
+    <div className="max-w-prose">
+      <AnswerView
+        sections={tableReadingForm.sections}
+        visible={visible}
+        answers={{ f_tread: costRows }}
+        helpers={helpers}
+        headingLevel="h3"
+      />
     </div>
   );
 }

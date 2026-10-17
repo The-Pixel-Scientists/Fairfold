@@ -2,6 +2,7 @@
 
 import { useId } from 'react';
 
+import { cx } from '../cx.ts';
 import { Input, useFormFieldControl } from '../FormField.tsx';
 import { amountAnswer, amountText, numberAnswer, numberText, POUND } from './numbers.ts';
 import { useDraft } from './useDraft.ts';
@@ -10,6 +11,8 @@ interface InputProps {
   /** The answer: a number or an amount, or what was typed when it is neither. */
   value: unknown;
   onChange: (answer: unknown) => void;
+  /** Added to the box's own classes, for a table cell that sets its own width and alignment. */
+  className?: string;
 }
 
 /**
@@ -21,6 +24,7 @@ export function NumberInput({
   value,
   onChange,
   wholeNumber,
+  className,
 }: InputProps & { wholeNumber: boolean }) {
   const [text, setDraft] = useDraft(value, numberText);
   return (
@@ -29,7 +33,7 @@ export function NumberInput({
       inputMode={wholeNumber ? 'numeric' : 'decimal'}
       autoComplete="off"
       spellCheck={false}
-      className="max-w-48"
+      className={cx('max-w-48', className)}
       onChange={(event) => {
         const typed = event.currentTarget.value;
         const answer = numberAnswer(typed);
@@ -45,7 +49,7 @@ export function NumberInput({
  * beside the box and spoken as a description, and typing it is allowed. Use
  * it inside a FormField.
  */
-export function CurrencyInput({ value, onChange }: InputProps) {
+export function CurrencyInput({ value, onChange, className }: InputProps) {
   const [text, setDraft] = useDraft(value, amountText);
   const generatedId = useId();
   const field = useFormFieldControl();
@@ -61,7 +65,7 @@ export function CurrencyInput({ value, onChange }: InputProps) {
         autoComplete="off"
         spellCheck={false}
         aria-describedby={unitId}
-        className="max-w-48"
+        className={cx('max-w-48', className)}
         onChange={(event) => {
           const typed = event.currentTarget.value;
           const answer = amountAnswer(typed);

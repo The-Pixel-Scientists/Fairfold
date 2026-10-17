@@ -16,5 +16,7 @@ export type {
   FormMoney,
   FormSectionDefinition,
   QuestionDefinition,
+  TableColumnDefinition,
+  TableFieldDefinition,
   VisibleFields,
 } from './types.ts';

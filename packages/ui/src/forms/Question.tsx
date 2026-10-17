@@ -9,18 +9,19 @@ import { RadioGroup } from '../RadioGroup.tsx';
 import { AddressInput } from './AddressInput.tsx';
 import { DateInput } from './DateInput.tsx';
 import { CurrencyInput, NumberInput } from './NumberInput.tsx';
+import { TableQuestion } from './TableQuestion.tsx';
 import { TextCount } from './TextCount.tsx';
-import type { FormHelpers, QuestionDefinition } from './types.ts';
+import type { QuestionDefinition, QuestionHelpers } from './types.ts';
 
 export interface QuestionProps {
   field: QuestionDefinition;
   /** The answer, whatever type it is. Anything that does not fit the field shows as empty. */
   value: unknown;
-  /** The problems with this field and its parts, such as `f_address.postcode`. */
+  /** The problems with this field and its parts, such as `f_address.postcode` or `f_budget.2.c_cost`. */
   problems: readonly FieldProblemLike[];
   /** Called with the new answer, or null when the person clears it. */
   onChange: (value: unknown) => void;
-  helpers: Pick<FormHelpers, 'countWords' | 'countCharacters'>;
+  helpers: QuestionHelpers;
 }
 
 const YES_NO = [
@@ -212,6 +213,17 @@ export function Question({ field, value, problems, onChange, helpers }: Question
             ))}
           </Select>
         </FormField>
+      );
+    case 'table':
+      return (
+        <TableQuestion
+          field={field}
+          legend={common.label}
+          value={value}
+          problems={problems}
+          onChange={onChange}
+          helpers={helpers}
+        />
       );
     case 'uk_address':
       return (

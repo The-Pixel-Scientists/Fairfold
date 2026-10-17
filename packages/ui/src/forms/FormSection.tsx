@@ -5,7 +5,12 @@ import { ErrorSummary } from '../ErrorSummary.tsx';
 import type { ErrorSummaryItem } from '../ErrorSummary.tsx';
 import { PageHeading } from '../PageHeading.tsx';
 import { ContentBlock, Question } from './Question.tsx';
-import type { FormAnswers, FormHelpers, FormSectionDefinition, VisibleFields } from './types.ts';
+import type {
+  FormAnswers,
+  FormSectionDefinition,
+  QuestionHelpers,
+  VisibleFields,
+} from './types.ts';
 
 export interface FormSectionProps {
   section: FormSectionDefinition;
@@ -14,7 +19,7 @@ export interface FormSectionProps {
   answers: FormAnswers;
   /** Called with the field's id and its new answer, or null when the person clears it. */
   onChange: (fieldId: string, value: unknown) => void;
-  helpers: Pick<FormHelpers, 'countWords' | 'countCharacters'>;
+  helpers: QuestionHelpers;
   /**
    * What `validateAnswers()` found. Each message shows beside its field, and
    * in the summary once `attempt` is above zero. Pass problems when the
@@ -31,10 +36,13 @@ export interface FormSectionProps {
   headingLevel?: 'h1' | 'h2' | 'h3';
 }
 
-/** The id of the control a problem is about: `f_address.town` is the town box of `f_address`. */
+/**
+ * The id of the control a problem is about: `f_address.town` is the town box
+ * of `f_address`, and `f_budget.2.c_cost` is the cost cell of the second row.
+ */
 function controlId(problemField: string): string {
-  const [id = problemField, part] = problemField.split('.');
-  return part === undefined || part === 'line1' ? id : `${id}-${part}`;
+  const [id = problemField, ...parts] = problemField.split('.');
+  return parts.length === 0 || parts[0] === 'line1' ? id : `${id}-${parts.join('-')}`;
 }
 
 /**
