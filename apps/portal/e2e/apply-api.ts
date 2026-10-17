@@ -13,10 +13,13 @@ import {
   formDefinitionSchema,
   projectAnswers,
   validateAnswers,
+  visibleFields,
 } from '@pixel-scientists/domain/forms';
-import type { Answers } from '@pixel-scientists/domain/forms';
+import type { Answers, FormDefinition } from '@pixel-scientists/domain/forms';
 import type { Page } from '@playwright/test';
 
+import { stubFiles } from './apply-files-api.ts';
+import type { Attachment, FileStub } from './apply-files-api.ts';
 import { applicantSession, problem, standard, stubApi } from './auth-api.ts';
 import type { Funder, Handler, SentRequest, SessionOptions } from './auth-api.ts';
 
@@ -91,6 +94,46 @@ export const form = formDefinitionSchema.parse({
             { id: 'c_item', type: 'short_text', label: 'Item' },
             { id: 'c_cost', type: 'currency', label: 'Cost', total: true },
           ],
+        },
+      ],
+    },
+  ],
+});
+
+/**
+ * The same form with a documents section: accounts, which are needed and may
+ * be up to two files, a safeguarding policy and a note, which are not needed.
+ */
+export const filesForm = formDefinitionSchema.parse({
+  sections: [
+    ...form.sections,
+    {
+      id: 's_documents',
+      title: 'Documents',
+      fields: [
+        {
+          id: 'f_accounts',
+          type: 'file',
+          label: 'Your latest accounts',
+          hint: 'Signed by a trustee.',
+          required: true,
+          allowedTypes: [
+            'application/pdf',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          ],
+          maxFiles: 2,
+        },
+        {
+          id: 'f_policy',
+          type: 'file',
+          label: 'Your safeguarding policy',
+          allowedTypes: ['application/pdf'],
+        },
+        {
+          id: 'f_note',
+          type: 'long_text',
+          label: 'Anything else we should know about your documents?',
+          maxWords: 50,
         },
       ],
     },
@@ -173,20 +216,30 @@ const summaryOf = (application: Application, organisation: { id: string; name: s
   outcome: null,
 });
 
-const fullOf = (application: Application, organisation: { id: string; name: string }) => ({
-  ...summaryOf(application, organisation),
-  form: { id: FORM_ID, definition: form },
-  answers: application.answers,
-  answersVersion: application.answersVersion,
-  eligibility: checkEligibility(form, application.answers),
-  withdrawnAt: application.withdrawnAt,
-});
+/** The answers as the API builds them: the saved ones, with the ids of the files attached to each shown file question. */
+function answersWith(
+  definition: FormDefinition,
+  answers: Answers,
+  files: readonly Attachment[],
+): Answers {
+  const shown = new Set(visibleFields(definition, answers).map(({ id }) => id));
+  const merged = { ...answers };
+  for (const { id } of definition.sections.flatMap(({ fields }) => fields)) {
+    const ids = files.filter(({ fieldId }) => fieldId === id).map((file) => file.id);
+    if (shown.has(id) && ids.length > 0) merged[id] = ids;
+  }
+  return merged;
+}
 
 const ok = (body: unknown) => ({ status: 200, body });
 
 export interface ApplyOptions {
   /** The applications the applicant already has. */
   applications?: Application[];
+  /** The files attached to each application, by its id. */
+  files?: Record<string, Attachment[]>;
+  /** The round's form, in place of the one with no file question. */
+  form?: FormDefinition;
   /** Whether a round is open. */
   open?: boolean;
   /** Whether the applicant has added an organisation. */
@@ -199,9 +252,11 @@ export interface ApplyOptions {
   session?: SessionOptions;
 }
 
-export interface ApplyStub {
+export interface ApplyStub extends FileStub {
   /** The applicant's applications as the API holds them. A spec may change them between steps. */
   applications: Application[];
+  /** The files attached to each application, by its id. */
+  files: Record<string, Attachment[]>;
   /** Every request sent so far. */
   sent: SentRequest[];
   /** Makes the next `count` saves fail, as if the service were busy. */
@@ -215,6 +270,7 @@ export interface ApplyStub {
  */
 export async function stubApply(page: Page, options: ApplyOptions = {}): Promise<ApplyStub> {
   const {
+    form: definition = form,
     open = true,
     organisations = true,
     organisationName = ORGANISATION_NAME,
@@ -224,9 +280,20 @@ export async function stubApply(page: Page, options: ApplyOptions = {}): Promise
   } = options;
   const organisation = { id: ORGANISATION_ID, name: organisationName };
   const applications = structuredClone(options.applications ?? []);
+  const files = structuredClone(options.files ?? {});
   let failing = 0;
   const find = (id: string) => applications.find((application) => application.id === id);
   const missing = () => problem(404, 'Not found.');
+  const answersOf = (application: Application) =>
+    answersWith(definition, application.answers, files[application.id] ?? []);
+  const fullOf = (application: Application) => ({
+    ...summaryOf(application, organisation),
+    form: { id: FORM_ID, definition },
+    answers: answersOf(application),
+    answersVersion: application.answersVersion,
+    eligibility: checkEligibility(definition, answersOf(application)),
+    withdrawnAt: application.withdrawnAt,
+  });
 
   const handlers: Record<string, Handler> = {
     'GET /auth/session': { status: 200, body: applicantSession(session) },
@@ -241,7 +308,7 @@ export async function stubApply(page: Page, options: ApplyOptions = {}): Promise
               description:
                 'We pay for the everyday costs of a project.\n\nWe fund halls, equipment and training.',
             },
-            form: { id: FORM_ID, definition: form },
+            form: { id: FORM_ID, definition },
           })
         : missing(),
     'GET /portal/organisations': () =>
@@ -254,7 +321,7 @@ export async function stubApply(page: Page, options: ApplyOptions = {}): Promise
       }
       const started = draft();
       applications.push(started);
-      return { status: 201, body: fullOf(started, organisation) };
+      return { status: 201, body: fullOf(started) };
     },
     'GET /portal/applications': () =>
       ok({ applications: applications.map((application) => summaryOf(application, organisation)) }),
@@ -264,8 +331,9 @@ export async function stubApply(page: Page, options: ApplyOptions = {}): Promise
     const path = `/portal/applications/${id}`;
     handlers[`GET ${path}`] = () => {
       const application = find(id);
-      return application ? ok(fullOf(application, organisation)) : missing();
+      return application ? ok(fullOf(application)) : missing();
     };
+    handlers[`GET ${path}/files`] = () => ok({ attachments: files[id] ?? [] });
     handlers[`PUT ${path}/answers`] = (body) => {
       const application = find(id);
       if (!application) return missing();
@@ -277,16 +345,29 @@ export async function stubApply(page: Page, options: ApplyOptions = {}): Promise
       if (basedOn !== application.answersVersion) {
         return problem(409, 'These answers have changed since you opened them.');
       }
-      const problems = validateAnswers(form, answers, 'draft');
+      // A file is attached, never saved as an answer.
+      const attached = Object.keys(answers).filter((key) =>
+        definition.sections.some(({ fields }) =>
+          fields.some((field) => field.id === key && field.type === 'file'),
+        ),
+      );
+      if (attached.length > 0) {
+        return problem(
+          400,
+          'Attach files to their questions.',
+          attached.map((field) => ({ field, message: 'Upload a file for this question.' })),
+        );
+      }
+      const problems = validateAnswers(definition, answers, 'draft');
       if (problems.length > 0) return problem(400, 'Some answers are not valid.', problems);
-      application.answers = projectAnswers(form, answers, 'applicant');
+      application.answers = projectAnswers(definition, answers, 'applicant');
       application.answersVersion += 1;
       application.updatedAt = new Date().toISOString();
       return ok({ answersVersion: application.answersVersion, updatedAt: application.updatedAt });
     };
     handlers[`POST ${path}/eligibility-check`] = () => {
       const application = find(id);
-      return application ? ok(checkEligibility(form, application.answers)) : missing();
+      return application ? ok(checkEligibility(definition, answersOf(application))) : missing();
     };
     handlers[`POST ${path}/submit`] = (body) => {
       const application = find(id);
@@ -294,29 +375,32 @@ export async function stubApply(page: Page, options: ApplyOptions = {}): Promise
       if ((body as { basedOn: number }).basedOn !== application.answersVersion) {
         return problem(409, 'These answers have changed since you opened them.');
       }
-      const problems = validateAnswers(form, application.answers, 'submit');
+      const problems = validateAnswers(definition, answersOf(application), 'submit');
       if (
         problems.length > 0 ||
-        checkEligibility(form, application.answers).status !== 'eligible'
+        checkEligibility(definition, answersOf(application)).status !== 'eligible'
       ) {
         return problem(422, 'Some answers are missing.', problems);
       }
       application.status = 'submitted';
       application.submittedAt = new Date().toISOString();
-      return ok(fullOf(application, organisation));
+      return ok(fullOf(application));
     };
     handlers[`POST ${path}/withdraw`] = () => {
       const application = find(id);
       if (!application) return missing();
       application.status = 'withdrawn';
       application.withdrawnAt = new Date().toISOString();
-      return ok(fullOf(application, organisation));
+      return ok(fullOf(application));
     };
   }
 
   const requests = await stubApi(page, { ...handlers, ...more }, funder);
+  const uploads = await stubFiles(page, files, definition);
   return {
+    ...uploads,
     applications,
+    files,
     sent: requests,
     failSaves: (count) => {
       failing = count;
