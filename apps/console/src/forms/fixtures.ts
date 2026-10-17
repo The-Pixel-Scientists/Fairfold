@@ -102,7 +102,53 @@ export function version(
   };
 }
 
+/** One section with a table of costs, three columns, and a file question for the latest accounts. */
+export const budgetForm = stored({
+  sections: [
+    {
+      id: 's_budget',
+      title: 'Your budget',
+      fields: [
+        {
+          id: 'f_costs',
+          type: 'table',
+          label: 'Costs',
+          required: true,
+          rowNoun: 'cost',
+          minRows: 1,
+          maxRows: 10,
+          columns: [
+            { id: 'c_item', type: 'short_text', label: 'Item', maxCharacters: 80 },
+            { id: 'c_cost', type: 'currency', label: 'Cost', total: true },
+            {
+              id: 'c_kind',
+              type: 'dropdown',
+              label: 'Kind',
+              required: false,
+              options: [
+                { value: 'staff', label: 'Staff' },
+                { value: 'kit', label: 'Equipment' },
+              ],
+            },
+          ],
+        },
+        {
+          id: 'f_accounts',
+          type: 'file',
+          label: 'Latest accounts',
+          hint: 'Sign-off by your trustees is not needed.',
+          required: true,
+          allowedTypes: ['application/pdf', 'application/vnd.oasis.opendocument.spreadsheet'],
+          maxBytes: 5 * 1024 * 1024,
+          maxFiles: 2,
+        },
+      ],
+    },
+  ],
+});
+
 export const draft = version(ids.draft, 2, 'draft', organisationForm);
+export const budgetDraft = version(ids.draft, 2, 'draft', budgetForm);
 export const published = version(ids.published, 1, 'published', organisationForm);
 
 /** What a list shows of a version. */
