@@ -44,6 +44,7 @@ it('finds every entry point on disk', () => {
       'platform/audit-log',
       'platform/settings',
       'platform/team',
+      'warehouse',
     ]),
   );
 });
