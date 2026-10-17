@@ -213,6 +213,37 @@ export {
   sendDecisionEmails,
 } from './decisions/routes.ts';
 export {
+  amountAwarded,
+  grantIdentifier,
+  MAX_EXPORT_GRANTS,
+  recipientOrganization,
+  threeSixtyGivingExportSchema,
+  threeSixtyGivingFileSchema,
+  threeSixtyGivingGrantSchema,
+  threeSixtyGivingQuerySchema,
+  type RecipientOrganization,
+  type ThreeSixtyGivingExport,
+  type ThreeSixtyGivingFile,
+  type ThreeSixtyGivingGrant,
+  type ThreeSixtyGivingQuery,
+} from './export/360giving.ts';
+export { exportMessages, type ExportMessage } from './export/messages.ts';
+export {
+  publisherAnswerSchema,
+  publisherSettingConfigEntityType,
+  publisherSettingInputSchema,
+  publisherSettingSchema,
+  type PublisherAnswer,
+  type PublisherSetting,
+  type PublisherSettingInput,
+} from './export/publisher.ts';
+export {
+  exportRoutes,
+  get360GivingExport,
+  getPublisherSetting,
+  savePublisherSetting,
+} from './export/routes.ts';
+export {
   formVersionListSchema,
   formVersionSchema,
   formVersionSummarySchema,
