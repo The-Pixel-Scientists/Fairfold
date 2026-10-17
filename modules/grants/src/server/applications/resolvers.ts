@@ -13,7 +13,7 @@ import type { Tx } from '../programme/tables.ts';
 import { isOpenRound } from './rounds.ts';
 import { applicationsDb } from './tables.ts';
 
-interface ScopeCheck {
+export interface ScopeCheck {
   readonly tx: Tx;
   readonly userId: string;
   readonly input: { readonly params: unknown };
