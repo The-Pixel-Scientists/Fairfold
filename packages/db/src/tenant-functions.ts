@@ -17,6 +17,8 @@ export interface PublicTenantRow {
   readonly id: string;
   readonly name: string;
   readonly theme: ThemeTokens;
+  /** The funder's stored tokens, or null. Unchecked: parse with tokenSetSchema before use. */
+  readonly tokens: unknown;
 }
 
 /** An active tenant's public face, or undefined for any other slug. As app_api or app_auth. */
@@ -30,13 +32,17 @@ export async function publicTenant<DB>(
     brand_colour: string;
     preset: Preset;
     has_logo: boolean;
-  }>`SELECT id, name, brand_colour, preset, has_logo FROM app.public_tenant(${slug})`.execute(db);
+    tokens: unknown;
+  }>`
+    SELECT id, name, brand_colour, preset, has_logo, tokens FROM app.public_tenant(${slug})
+  `.execute(db);
   const [row] = rows;
   return (
     row && {
       id: row.id,
       name: row.name,
       theme: { brandColour: row.brand_colour, preset: row.preset, hasLogo: row.has_logo },
+      tokens: row.tokens,
     }
   );
 }

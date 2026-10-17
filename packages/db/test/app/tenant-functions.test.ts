@@ -100,6 +100,7 @@ describe('app.public_tenant()', { timeout: 30_000 }, () => {
       id: plain.id,
       name: 'Test tenant',
       theme: { brandColour: defaultTheme.brandColour, preset: defaultTheme.preset, hasLogo: false },
+      tokens: null,
     };
     expect(await publicTenant(api, plain.slug)).toEqual(expected);
     expect(await publicTenant(auth, plain.slug)).toEqual(expected);
@@ -110,6 +111,7 @@ describe('app.public_tenant()', { timeout: 30_000 }, () => {
       id: themed.id,
       name: 'Test tenant',
       theme: { brandColour: '#0b5394', preset: 'rounded', hasLogo: true },
+      tokens: null,
     });
   });
 
