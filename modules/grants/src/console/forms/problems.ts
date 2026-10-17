@@ -86,9 +86,21 @@ export function placeOf(path: Path): Place {
   return { section, field, key: rest.join('.') };
 }
 
+/** The controls of a table's column that its editor gives an id. A problem with any other part of the column is shown at its heading. */
+const COLUMN_CONTROLS = ['label', 'type', 'required', 'total', 'maxCharacters'];
+
 /** The id of the box a problem in a question is about, which the question's editor gives it. */
 export function fieldControlId(key: string): string {
-  const [head = '', second] = key.split('.');
+  const [head = '', second, third = '', fourth] = key.split('.');
+  if (head === 'columns') {
+    if (second === undefined) return 'field-columns-add';
+    if (third === 'options') {
+      return fourth === undefined
+        ? `field-columns-${second}-options-add`
+        : `field-columns-${second}-options-${fourth}-label`;
+    }
+    return `field-columns-${second}-${COLUMN_CONTROLS.includes(third) ? third : 'label'}`;
+  }
   if (head === 'options')
     return second === undefined ? 'field-options-add' : `field-options-${second}-label`;
   if (head === 'conditions') {
@@ -110,11 +122,15 @@ export function sectionControlId(key: string): string {
       : 'section-title';
 }
 
-/** "Section 2, question 3: Enter at least 1 character." */
+/** "Section 2, question 3: Enter at least 1 character.", and "…, column 2:" for a problem in a table's column. */
 export function inWords({ path, message }: Problem): string {
-  const { section, field } = placeOf(path);
+  const { section, field, key } = placeOf(path);
   if (section === undefined) return message;
-  const where = field === undefined ? '' : `, question ${String(field + 1)}`;
+  const column = /^columns\.(\d+)(?:\.|$)/.exec(key)?.[1];
+  const where = [
+    field === undefined ? '' : `, question ${String(field + 1)}`,
+    column === undefined ? '' : `, column ${String(Number(column) + 1)}`,
+  ].join('');
   return `Section ${String(section + 1)}${where}: ${message}`;
 }
 

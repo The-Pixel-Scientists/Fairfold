@@ -9,11 +9,14 @@ import {
   blankSection,
   conditionAnswers,
   conditionSources,
+  MAX_COLUMNS,
   moved,
+  newColumn,
+  withColumnType,
   withoutChoice,
   withType,
 } from './draft.ts';
-import type { ChoiceQuestion } from './draft.ts';
+import type { ChoiceQuestion, Column, FileQuestion, TableQuestion } from './draft.ts';
 
 function definition(...fields: object[]): FormDefinition {
   const parsed = parseDefinition({ sections: [{ id: 's_one', title: 'One', fields }] });
@@ -108,6 +111,112 @@ describe('changing the type of a question', () => {
     const limited = { ...question, type: 'short_text', maxWords: 10 } as Question;
 
     expect(withType(limited, 'long_text')).not.toHaveProperty('maxWords');
+  });
+});
+
+describe('a table question', () => {
+  const table = withType(blankQuestion(), 'table') as TableQuestion;
+
+  it('starts with a row noun, row limits and one blank column, and the form takes it once it is filled in', () => {
+    expect(table).toMatchObject({ type: 'table', rowNoun: 'row', minRows: 0, maxRows: 20 });
+    expect(table.columns).toHaveLength(1);
+    expect(table.columns[0]?.label).toBe('');
+    const filled = { ...table, label: 'Costs', columns: [{ ...newColumn(), label: 'Item' }] };
+    const parsed = parseDefinition({
+      sections: [{ id: 's_one', title: 'One', fields: [filled] }],
+    });
+    expect(parsed.success).toBe(true);
+  });
+
+  it('keeps what every question has when it changes type, and drops its rows and columns', () => {
+    const asText = withType({ ...table, label: 'Costs', required: false }, 'long_text');
+
+    expect(asText).toMatchObject({ type: 'long_text', label: 'Costs', required: false });
+    expect(asText).not.toHaveProperty('columns');
+  });
+
+  it('allows as many columns as the form engine does, and no more', () => {
+    const columns = (count: number) =>
+      Array.from({ length: count }, () => ({ ...newColumn(), label: 'Item' }));
+    const form = (count: number) =>
+      parseDefinition({
+        sections: [
+          {
+            id: 's_one',
+            title: 'One',
+            fields: [{ ...table, label: 'Costs', columns: columns(count) }],
+          },
+        ],
+      });
+
+    expect(form(MAX_COLUMNS).success).toBe(true);
+    expect(form(MAX_COLUMNS + 1).success).toBe(false);
+  });
+});
+
+describe('a table column', () => {
+  const ID = /^c_[a-z0-9]{12}$/;
+
+  it('is made with an id that the engine accepts, and never the same one twice', () => {
+    const first = newColumn();
+
+    expect(first).toMatchObject({ type: 'short_text', required: true, total: false });
+    expect(first.id).toMatch(ID);
+    expect(newColumn().id).not.toBe(first.id);
+  });
+
+  it('keeps its id, heading and whether it is required when its type changes', () => {
+    const column: Column = { ...newColumn(), label: 'Cost', required: false };
+
+    for (const type of ['number', 'currency', 'dropdown', 'short_text'] as const) {
+      expect(withColumnType(column, type)).toMatchObject({
+        id: column.id,
+        type,
+        label: 'Cost',
+        required: false,
+      });
+    }
+  });
+
+  it('keeps its total between a number and an amount, and loses it for any other type', () => {
+    const amount = withColumnType({ ...newColumn(), label: 'Cost' }, 'currency');
+    const total = { ...amount, total: true } as Column;
+
+    expect(withColumnType(total, 'number')).toMatchObject({ type: 'number', total: true });
+    expect(withColumnType(total, 'short_text')).toMatchObject({ total: false });
+    expect(withColumnType(total, 'dropdown')).toMatchObject({ total: false });
+  });
+
+  it('starts a dropdown with two blank choices of their own, and a text with the longest limit', () => {
+    const dropdown = withColumnType(newColumn(), 'dropdown');
+    const text = withColumnType(dropdown, 'short_text');
+
+    expect(dropdown).toMatchObject({ options: [{ label: '' }, { label: '' }] });
+    if (dropdown.type !== 'dropdown') throw new Error('Expected a dropdown column.');
+    expect(dropdown.options[0]?.value).not.toBe(dropdown.options[1]?.value);
+    expect(text).toMatchObject({ type: 'short_text', maxCharacters: 200 });
+  });
+});
+
+describe('a file question', () => {
+  it('starts with every type the platform takes, its largest file and one file, and is a question the engine takes', () => {
+    const file = withType({ ...blankQuestion(), label: 'Accounts' }, 'file') as FileQuestion;
+
+    expect(file).toMatchObject({ type: 'file', maxBytes: 10 * 1024 * 1024, maxFiles: 1 });
+    expect(file.allowedTypes).toHaveLength(7);
+    expect(
+      parseDefinition({ sections: [{ id: 's_one', title: 'One', fields: [file] }] }).success,
+    ).toBe(true);
+  });
+
+  it('is seen by the people the question was, and never only in totals', () => {
+    const staff = { ...blankQuestion(), audiences: ['applicant', 'staff'] } as Question;
+    const totals = { ...blankQuestion(), audiences: 'aggregate_only' } as Question;
+
+    expect(withType(staff, 'file')).toMatchObject({ audiences: ['applicant', 'staff'] });
+    expect(withType(totals, 'file')).toMatchObject({
+      audiences: ['applicant', 'staff', 'reviewer'],
+    });
   });
 });
 
