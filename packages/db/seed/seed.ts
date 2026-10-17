@@ -4,8 +4,8 @@
 // synthetic tenants and staff, so anyone can sign in and work through a
 // round.
 //
-//   pnpm db:seed [base | configured]      this worktree's development database
-//   pnpm stack seed [base | configured]   the stack's database
+//   pnpm db:seed [base | configured | applications]     this worktree's development database
+//   pnpm stack seed [base | configured | applications]  the stack's database
 //
 // `configured` is the default. Both commands supply the settings
 // (scripts/dev-env.ts and scripts/stack.ts). The seed refuses to run unless
@@ -27,13 +27,21 @@ import {
   readSetting,
   type Env,
 } from '../scripts/settings.ts';
+import { applications } from './applications.ts';
 import { base } from './base.ts';
 import { configured } from './configured.ts';
-import { emailOf, writeScenario, type Scenario } from './scenario.ts';
+import {
+  applicantEmailOf,
+  applicationsOf,
+  emailOf,
+  writeScenario,
+  type Scenario,
+} from './scenario.ts';
 
 const SCENARIOS = new Map<string, Scenario>([
   ['base', base],
   ['configured', configured],
+  ['applications', applications],
 ]);
 
 /**
@@ -119,6 +127,9 @@ async function main(argv: readonly string[], env: Env): Promise<void> {
   for (const tenant of scenario) {
     console.log(`\n${tenant.name}, at /${tenant.slug}`);
     for (const member of tenant.staff) console.log(`  ${emailOf(tenant, member)}  ${member[2]}`);
+    for (const { applicant } of applicationsOf(tenant)) {
+      console.log(`  ${applicantEmailOf(tenant, applicant)}  applicant`);
+    }
   }
 }
 

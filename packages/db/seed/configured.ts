@@ -3,13 +3,102 @@
 // Scenario `configured`, the default for `pnpm dev`: `base`, plus
 // Northfield's Community Spaces Fund, open, with one round from 12 October to
 // 2 November 2026 in Europe/London, its three stages, a rubric of three
-// weighted criteria on Review, and version 1 of each outcome's email, which
-// is the text every new programme starts with.
+// weighted criteria on Review, version 1 of its application form, published,
+// and version 1 of each outcome's email, which is the text every new
+// programme starts with.
 
 import { base } from './base.ts';
 import type { Programme, Scenario } from './scenario.ts';
 
-const communitySpacesFund: Programme = {
+/** Version 1 of the round's application form, as the form editor saves it. */
+export const communitySpacesForm = {
+  sections: [
+    {
+      id: 's_eligibility',
+      title: 'Check you can apply',
+      fields: [
+        {
+          id: 'f_local',
+          type: 'yes_no',
+          label: 'Does your group run a space in Northfield that local people use?',
+          required: true,
+          eligibility: {
+            stopWhen: false,
+            explanation: 'This fund is for groups that run a space in Northfield for local people.',
+          },
+        },
+      ],
+    },
+    {
+      id: 's_project',
+      title: 'Your project',
+      fields: [
+        {
+          id: 'f_title',
+          type: 'short_text',
+          label: 'Project name',
+          required: true,
+          maxCharacters: 120,
+        },
+        {
+          id: 'f_summary',
+          type: 'long_text',
+          label: 'What will you do, and who will it help?',
+          required: true,
+          maxWords: 500,
+        },
+        {
+          id: 'f_amount',
+          type: 'currency',
+          label: 'How much are you asking for?',
+          hint: 'Between £5,000 and £25,000.',
+          required: true,
+          minMinor: 5_000_00,
+          maxMinor: 25_000_00,
+        },
+      ],
+    },
+    {
+      id: 's_budget',
+      title: 'Budget',
+      fields: [
+        {
+          id: 'f_budget',
+          type: 'table',
+          label: 'What will the grant pay for?',
+          hint: 'Add a row for each cost.',
+          required: true,
+          rowNoun: 'cost',
+          minRows: 1,
+          columns: [
+            { id: 'c_item', type: 'short_text', label: 'Item' },
+            { id: 'c_cost', type: 'currency', label: 'Cost', total: true },
+          ],
+        },
+      ],
+    },
+    {
+      id: 's_documents',
+      title: 'Documents',
+      fields: [
+        {
+          id: 'f_accounts',
+          type: 'file',
+          label: 'Your latest annual accounts',
+          hint: 'A PDF or spreadsheet, up to 10 MB.',
+          allowedTypes: [
+            'application/pdf',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.oasis.opendocument.spreadsheet',
+          ],
+          maxBytes: 10 * 1024 * 1024,
+        },
+      ],
+    },
+  ],
+};
+
+export const communitySpacesFund: Programme = {
   title: 'Community Spaces Fund',
   summary:
     'Grants of £5,000 to £25,000 for community groups to create, improve or open up the spaces they run for local people.',
@@ -53,6 +142,7 @@ const communitySpacesFund: Programme = {
         },
         { name: 'Decision' },
       ],
+      form: communitySpacesForm,
     },
   ],
   templates: {

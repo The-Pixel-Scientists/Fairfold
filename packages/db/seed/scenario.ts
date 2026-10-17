@@ -5,10 +5,12 @@
 // forced row-level security binds like any app role (ADR 0003), so it sets
 // each tenant in turn and writes that tenant's rows, all in one transaction.
 // Actor columns stay null, as for anything the system does, except where the
-// schema needs a member.
+// schema needs a member: the programme manager publishes forms and moves
+// applications on, and applicants start, check and submit their own.
 
 import { argon2Sync, randomBytes, randomUUID } from 'node:crypto';
 
+import { checkEligibility, parseDefinition } from '@pixel-scientists/domain/forms';
 import { permissionsFor, type Preset, type Role } from '@pixel-scientists/domain/platform';
 import type pg from 'pg';
 
@@ -33,6 +35,35 @@ export interface Round {
   readonly latePolicy: 'refuse' | 'accept_and_flag';
   /** In order. Criteria are scored on the default scale, 1 to 5. */
   readonly stages: readonly { readonly name: string; readonly criteria?: readonly Criterion[] }[];
+  /** Version 1 of the application form, published the day before the round opens. */
+  readonly form?: unknown;
+  readonly applications?: readonly Application[];
+}
+
+export interface Organisation {
+  readonly name: string;
+  readonly legalForm: string;
+  readonly addressLine1: string;
+  readonly town: string;
+  readonly postcode: string;
+}
+
+/**
+ * A submitted application, from an applicant with an account who is a
+ * contact for their organisation. Its eligibility is checked when it
+ * starts. Submitting puts it in the first stage, and the programme manager
+ * moves it on a stage a day after the round closes, up to `stage`.
+ */
+export interface Application {
+  /** Given and family name. The address is given.family@applicants.<slug>.example. */
+  readonly applicant: readonly [givenName: string, familyName: string];
+  readonly organisation: Organisation;
+  readonly answers: Readonly<Record<string, unknown>>;
+  /** Wall-clock times in the round's time zone. Late when submitted after the round closes. */
+  readonly startedAt: string;
+  readonly submittedAt: string;
+  readonly withdrawnAt?: string;
+  readonly stage: string;
 }
 
 export interface Template {
@@ -73,6 +104,17 @@ export interface SeededTenant {
 
 export const emailOf = (tenant: Tenant, [givenName, familyName]: StaffMember): string =>
   `${givenName}.${familyName}@${tenant.slug}.example`.toLowerCase();
+
+export const applicantEmailOf = (
+  tenant: Tenant,
+  [givenName, familyName]: Application['applicant'],
+): string => `${givenName}.${familyName}@applicants.${tenant.slug}.example`.toLowerCase();
+
+/** Every application in the tenant's rounds. */
+export const applicationsOf = (tenant: Tenant): Application[] =>
+  (tenant.programmes ?? []).flatMap((programme) =>
+    programme.rounds.flatMap((round) => round.applications ?? []),
+  );
 
 const unpadded = (bytes: Buffer) => bytes.toString('base64').replace(/=+$/, '');
 
@@ -133,63 +175,90 @@ function inserter(client: pg.ClientBase, rows: Record<string, string[]>): Insert
   };
 }
 
+/** What the member who publishes forms and moves applications on may do. */
+const MANAGER = ['grants.programmes.manage', 'grants.applications.triage'] as const;
+
+/** What writing a tenant's rows needs. */
+interface Writer {
+  readonly client: pg.ClientBase;
+  readonly insert: Insert;
+  readonly tenant: Tenant;
+  readonly tenantId: string;
+  readonly password: string;
+  /** The first membership that may set up forms and move applications on. */
+  readonly manager: string | undefined;
+}
+
+/** An account with a password, a membership with `role` and a person: their ids. */
+async function addAccount(
+  writer: Omit<Writer, 'manager'>,
+  [givenName, familyName]: readonly [string, string, ...unknown[]],
+  email: string,
+  role: Role,
+): Promise<{ membership: string; person: string }> {
+  const { insert, tenantId, password } = writer;
+  const userId = await insert('auth.user', {
+    name: `${givenName} ${familyName}`,
+    email,
+    email_verified: true,
+  });
+  await insert('auth.account', {
+    user_id: userId,
+    account_id: userId,
+    provider_id: 'credential',
+    password: hashPassword(password),
+  });
+  const membership = await insert('app.membership', {
+    tenant_id: tenantId,
+    user_id: userId,
+    roles: [role],
+  });
+  const person = await insert('party.party', { tenant_id: tenantId, kind: 'person' });
+  await insert('party.person', {
+    tenant_id: tenantId,
+    id: person,
+    given_name: givenName,
+    family_name: familyName,
+    email,
+    user_id: userId,
+  });
+  return { membership, person };
+}
+
 async function writeTenant(
   client: pg.ClientBase,
   tenant: Tenant,
   password: string,
 ): Promise<SeededTenant> {
-  const id = randomUUID();
+  const tenantId = randomUUID();
   const rows: Record<string, string[]> = {};
   const insert = inserter(client, rows);
 
   // nosemgrep: tps-tenant-setting-only-in-tenant-context -- the seed runs as migrator against a checked local development database, setting each new tenant transaction-locally (ADR 0003)
-  await client.query("SELECT pg_catalog.set_config('app.tenant_id', $1, true)", [id]);
-  await insert('app.tenant', { id, slug: tenant.slug, name: tenant.name });
+  await client.query("SELECT pg_catalog.set_config('app.tenant_id', $1, true)", [tenantId]);
+  await insert('app.tenant', { id: tenantId, slug: tenant.slug, name: tenant.name });
+  const writer = { client, insert, tenant, tenantId, password };
   let settingsManager: string | undefined;
+  let manager: string | undefined;
   for (const member of tenant.staff) {
-    const [givenName, familyName, role] = member;
-    const email = emailOf(tenant, member);
-    const userId = await insert('auth.user', {
-      name: `${givenName} ${familyName}`,
-      email,
-      email_verified: true,
-    });
-    await insert('auth.account', {
-      user_id: userId,
-      account_id: userId,
-      provider_id: 'credential',
-      password: hashPassword(password),
-    });
-    const membership = await insert('app.membership', {
-      tenant_id: id,
-      user_id: userId,
-      roles: [role],
-    });
-    if (permissionsFor([role], 'console').includes('platform.settings.manage')) {
-      settingsManager ??= membership;
-    }
-    const person = await insert('party.party', { tenant_id: id, kind: 'person' });
-    await insert('party.person', {
-      tenant_id: id,
-      id: person,
-      given_name: givenName,
-      family_name: familyName,
-      email,
-      user_id: userId,
-    });
+    const role = member[2];
+    const { membership } = await addAccount(writer, member, emailOf(tenant, member), role);
+    const granted = permissionsFor([role], 'console');
+    if (granted.includes('platform.settings.manage')) settingsManager ??= membership;
+    if (MANAGER.every((permission) => granted.includes(permission))) manager ??= membership;
   }
   if (tenant.theme) {
     await insert('app.tenant_theme', {
-      tenant_id: id,
+      tenant_id: tenantId,
       brand_colour: tenant.theme.brandColour,
       preset: tenant.theme.preset,
       updated_by: settingsManager,
     });
   }
   for (const programme of tenant.programmes ?? []) {
-    await writeProgramme(client, insert, id, programme);
+    await writeProgramme({ ...writer, manager }, programme);
   }
-  return { id, slug: tenant.slug, rows };
+  return { id: tenantId, slug: tenant.slug, rows };
 }
 
 /** The instant that a wall-clock time names in a time zone, as PostgreSQL reads it. */
@@ -203,12 +272,8 @@ async function instant(client: pg.ClientBase, local: string, zone: string): Prom
   return at;
 }
 
-async function writeProgramme(
-  client: pg.ClientBase,
-  insert: Insert,
-  tenantId: string,
-  programme: Programme,
-): Promise<void> {
+async function writeProgramme(writer: Writer, programme: Programme): Promise<void> {
+  const { client, insert, tenantId } = writer;
   const { title, summary, description, status } = programme;
   const programmeId = await insert('grants.programme', {
     tenant_id: tenantId,
@@ -240,6 +305,7 @@ async function writeProgramme(
       award_max_minor: round.awardMaxMinor,
       late_policy: round.latePolicy,
     });
+    const stages: string[] = [];
     for (const [stageIndex, stage] of round.stages.entries()) {
       const stageId = await insert('grants.stage', {
         tenant_id: tenantId,
@@ -247,6 +313,7 @@ async function writeProgramme(
         name: stage.name,
         position: stageIndex + 1,
       });
+      stages.push(stageId);
       for (const [index, { label, guidance, weight }] of (stage.criteria ?? []).entries()) {
         await insert('grants.rubric_criterion', {
           tenant_id: tenantId,
@@ -257,6 +324,115 @@ async function writeProgramme(
           position: index + 1,
         });
       }
+    }
+    if (round.form !== undefined) {
+      await writeApplications(writer, round, { id: roundId, stages });
+    }
+  }
+}
+
+const DAY = 24 * 60 * 60 * 1000;
+
+/** Publish `round`'s form, then write its applications. */
+async function writeApplications(
+  writer: Writer,
+  round: Round,
+  written: { readonly id: string; readonly stages: readonly string[] },
+): Promise<void> {
+  const { client, insert, tenant, tenantId, manager } = writer;
+  const parsed = parseDefinition(round.form);
+  if (!parsed.success) throw new Error(`The form for ${round.title} is not a valid form.`);
+  if (manager === undefined) throw new Error(`${tenant.name} needs a programme manager.`);
+  const at = (local: string) => instant(client, local, round.timezone);
+  const opens = await at(round.opensAt);
+  const closes = await at(round.closesAt);
+  const formVersion = await insert('grants.form_version', {
+    tenant_id: tenantId,
+    round_id: written.id,
+    version: 1,
+    status: 'published',
+    definition: parsed.data,
+    published_at: new Date(opens.getTime() - DAY),
+    published_by: manager,
+  });
+
+  for (const application of round.applications ?? []) {
+    const { applicant, organisation, answers } = application;
+    const reached = round.stages.findIndex(({ name }) => name === application.stage);
+    const stageId = written.stages[reached];
+    if (stageId === undefined) throw new Error(`${round.title} has no stage ${application.stage}.`);
+    const eligibility = checkEligibility(parsed.data, answers);
+    if (eligibility.status === 'incomplete') {
+      throw new Error(
+        `An application to ${round.title} leaves an eligibility question unanswered.`,
+      );
+    }
+    const own = await addAccount(
+      writer,
+      applicant,
+      applicantEmailOf(tenant, applicant),
+      'applicant',
+    );
+    const organisationId = await insert('party.party', {
+      tenant_id: tenantId,
+      kind: 'organisation',
+    });
+    await insert('party.organisation', {
+      tenant_id: tenantId,
+      id: organisationId,
+      name: organisation.name,
+      legal_form: organisation.legalForm,
+      address_line1: organisation.addressLine1,
+      address_town: organisation.town,
+      address_postcode: organisation.postcode,
+    });
+    await insert('party.relationship', {
+      tenant_id: tenantId,
+      type: 'contact_for',
+      subject_id: own.person,
+      subject_kind: 'person',
+      object_id: organisationId,
+      object_kind: 'organisation',
+    });
+
+    const startedAt = await at(application.startedAt);
+    const submittedAt = await at(application.submittedAt);
+    const { withdrawnAt } = application;
+    const applicationId = await insert('grants.application', {
+      tenant_id: tenantId,
+      round_id: written.id,
+      form_version_id: formVersion,
+      applicant_person_id: own.person,
+      organisation_id: organisationId,
+      status: withdrawnAt === undefined ? 'submitted' : 'withdrawn',
+      answers,
+      stage_id: stageId,
+      submitted_at: submittedAt,
+      submitted_late: submittedAt > closes,
+      withdrawn_at: withdrawnAt === undefined ? null : await at(withdrawnAt),
+      created_at: startedAt,
+      created_by: own.membership,
+      updated_by: own.membership,
+    });
+    await insert('grants.eligibility_result', {
+      tenant_id: tenantId,
+      application_id: applicationId,
+      form_version_id: formVersion,
+      outcome: eligibility.status,
+      stopping_field_id: eligibility.status === 'stopped' ? eligibility.fieldId : null,
+      checked_at: startedAt,
+      checked_by: own.membership,
+    });
+    for (let stage = 0; stage <= reached; stage += 1) {
+      await insert('grants.stage_transition', {
+        tenant_id: tenantId,
+        round_id: written.id,
+        application_id: applicationId,
+        from_stage_id: stage === 0 ? null : written.stages[stage - 1],
+        to_stage_id: written.stages[stage],
+        moved_at: stage === 0 ? submittedAt : new Date(closes.getTime() + stage * DAY),
+        moved_by: stage === 0 ? own.membership : manager,
+      });
     }
   }
 }
