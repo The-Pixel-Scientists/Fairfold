@@ -287,9 +287,7 @@ const screens: Screen[] = [
     open: async (page) => {
       await stubApi(page, { 'GET /auth/session': { status: 200, body: applicantSession() } });
       await page.goto('/northfield/');
-      await expect(
-        page.getByRole('heading', { level: 2, name: 'No grants are open yet' }),
-      ).toBeVisible();
+      await expect(page.getByRole('link', { name: 'Programmes you can apply to' })).toBeVisible();
     },
   },
   {

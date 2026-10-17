@@ -159,7 +159,9 @@ test.describe('create an account', () => {
     await expect(h1(page, 'Apply for a grant')).toBeFocused();
     await expect(page).toHaveURL(/\/northfield\/$/);
     await expect(
-      page.getByText('You are signed in. You have not started an application yet.'),
+      page.getByText(
+        'You are signed in. Choose a programme to apply to, or carry on with an application.',
+      ),
     ).toBeVisible();
   });
 

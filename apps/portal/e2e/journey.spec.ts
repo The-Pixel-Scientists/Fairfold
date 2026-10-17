@@ -277,17 +277,11 @@ test.describe('how applying works page', () => {
     await expect(page.getByText('only after the funder has released it')).toBeVisible();
   });
 
-  test('opens by saying nobody can apply yet, and describes the steps in the future tense', async ({
-    page,
-  }) => {
+  test('opens by saying how applying works, and describes the steps', async ({ page }) => {
     await page.goto('/how-applying-works');
 
-    await expect(
-      page.getByText(
-        'No grants are open yet, so you cannot apply today. This is how applying will work.',
-      ),
-    ).toBeVisible();
-    await expect(page.getByText('We will save your answers as you go.')).toBeVisible();
+    await expect(page.getByText('This is how applying works.')).toBeVisible();
+    await expect(page.getByText('We save your answers as you go.')).toBeVisible();
   });
 });
 

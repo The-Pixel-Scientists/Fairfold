@@ -35,9 +35,7 @@ test.describe('signed in', () => {
     });
     await page.goto('/northfield/');
     await expect(h1(page, 'Apply for a grant')).toBeVisible();
-    await expect(
-      page.getByRole('heading', { level: 2, name: 'No grants are open yet' }),
-    ).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Programmes you can apply to' })).toBeVisible();
 
     await page.getByRole('button', { name: 'Sign out' }).click();
 
