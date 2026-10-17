@@ -1,51 +1,46 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
 // Everything the applicant has started or sent, with the status they are
-// allowed to see. A sent application can be withdrawn until its decision is
-// released, after asking them to confirm. Stages, scores and unreleased
-// decisions never reach this page: the API sends only what an applicant may see.
+// allowed to see, and, once its decision is released, the way to read it. A
+// sent application can be withdrawn until then, after asking them to confirm.
+// Stages, scores and unreleased decisions never reach this page: the API sends
+// only what an applicant may see.
 
 import { ProblemError } from '@pixel-scientists/domain/api';
-import {
-  applicantStatuses,
-  listApplications,
-  withdrawApplication,
-} from '@pixel-scientists/grants/contracts';
+import { formatMoney } from '@pixel-scientists/domain/platform';
+import { listApplications, withdrawApplication } from '@pixel-scientists/grants/contracts';
 import type {
   ApplicantStatus,
   ApplicationList,
   ApplicationSummary,
 } from '@pixel-scientists/grants/contracts';
-import { Button, Dialog, EmptyState, Link, Tag, buttonClassName } from '@pixel-scientists/ui';
-import type { TagTone } from '@pixel-scientists/ui';
+import { Button, Dialog, EmptyState, Link, buttonClassName } from '@pixel-scientists/ui';
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 
 import { callApi } from '../api.ts';
 import { ReadPage, homeCrumb } from '../party/parts.tsx';
 import { useRead } from '../party/useRead.ts';
-import { PROGRAMMES_PATH, applicationPath, submittedPath } from '../paths.ts';
+import { PROGRAMMES_PATH, applicationPath, outcomePath, submittedPath } from '../paths.ts';
 import { closingTime, dateOf } from './format.ts';
 import { ApplyScreen, Block } from './parts.tsx';
+import { StatusTag } from './status.tsx';
 
 const TITLE = 'Your applications';
 const breadcrumbs = [homeCrumb, { label: TITLE }];
 
-const tones: Record<ApplicantStatus, TagTone> = {
-  in_progress: 'info',
-  submitted: 'info',
-  under_review: 'info',
-  awarded: 'success',
-  waitlisted: 'warning',
-  not_funded: 'neutral',
-  withdrawn: 'neutral',
-};
-
-/** What each status means for the applicant. Nothing here hints at a decision before it is released. */
+/**
+ * What each status means for the applicant. A decision is mentioned only
+ * once it is released, so nothing here hints at one before that.
+ */
 const notes: Partial<Record<ApplicantStatus, string>> = {
   in_progress: 'Not sent yet. Everything you have written is saved.',
   submitted: 'We have your application. We will email you when there is news.',
   under_review: 'We are reading your application. We will email you when there is news.',
+  awarded: 'Your application was successful. Read your outcome to see what happens next.',
+  waitlisted: 'You are on our waiting list. Read your outcome to see what this means.',
+  not_funded:
+    'We could not offer you a grant this time. Read your outcome to see what you can do next.',
   withdrawn: 'You withdrew this application.',
 };
 
@@ -153,19 +148,30 @@ interface CardProps {
   onWithdrawn: () => void;
 }
 
-function Card({ application, status, onWithdrawn }: CardProps) {
-  const { round, organisation } = application;
-  const facts: (readonly [string, string])[] = [
+type Fact = readonly [term: string, value: string];
+
+/** What to show about an application, by where it stands. An award shows its amount. */
+function factsOf(application: ApplicationSummary, status: ApplicantStatus): Fact[] {
+  const { round, organisation, submittedAt, outcome } = application;
+  if (status === 'in_progress') {
+    return [
+      ['Organisation', organisation.name],
+      ['Last saved', dateOf(application.updatedAt)],
+      ['Closes', closingTime(round.closesAt, round.timeZone)],
+    ];
+  }
+  return [
     ['Organisation', organisation.name],
-    ...(status === 'in_progress'
-      ? [
-          ['Last saved', dateOf(application.updatedAt)] as const,
-          ['Closes', closingTime(round.closesAt, round.timeZone)] as const,
-        ]
-      : application.submittedAt === null
-        ? []
-        : [['Sent', dateOf(application.submittedAt)] as const]),
+    ...(submittedAt === null ? [] : [['Sent', dateOf(submittedAt)] satisfies Fact]),
+    ...(outcome?.result === 'accepted'
+      ? [['Amount awarded', formatMoney(outcome.amount)] satisfies Fact]
+      : []),
   ];
+}
+
+function Card({ application, status, onWithdrawn }: CardProps) {
+  const { round } = application;
+  const facts = factsOf(application, status);
   const action =
     status === 'in_progress' ? (
       <Link
@@ -181,7 +187,14 @@ function Card({ application, status, onWithdrawn }: CardProps) {
       >
         See what happens next <span className="sr-only">for {nameOf(application)}</span>
       </Link>
-    ) : null;
+    ) : application.outcome === null ? null : (
+      <Link
+        to={outcomePath(application.id)}
+        className={buttonClassName('secondary', 'w-full sm:w-auto')}
+      >
+        Read your outcome <span className="sr-only">for {nameOf(application)}</span>
+      </Link>
+    );
 
   return (
     <li className="flex flex-col gap-5 rounded-lg border border-divider bg-surface p-5 shadow-(--shadow-raised) sm:p-6">
@@ -193,7 +206,7 @@ function Card({ application, status, onWithdrawn }: CardProps) {
           </h3>
         </div>
         <span>
-          <Tag tone={tones[status]}>{applicantStatuses[status]}</Tag>
+          <StatusTag status={status} />
         </span>
       </div>
       <dl className="flex flex-col gap-2 sm:grid sm:grid-cols-3 sm:gap-x-6">
