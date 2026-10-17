@@ -9,6 +9,7 @@ import { useId } from 'react';
  * was, and the last one says why it stays.
  */
 export function Arrange({
+  id,
   name,
   position,
   count,
@@ -16,6 +17,8 @@ export function Arrange({
   onMove,
   onRemove,
 }: {
+  /** Names the move buttons `<id>-up` and `<id>-down`, for a list whose buttons move with their items. */
+  id?: string;
   /** What the buttons act on, for a screen reader: "Organisation name". */
   name: string;
   /** From 0. */
@@ -32,6 +35,7 @@ export function Arrange({
     <div className="flex flex-col gap-2 border-t border-divider pt-4">
       <div className="flex flex-wrap gap-2">
         <Button
+          id={id === undefined ? undefined : `${id}-up`}
           variant="quiet"
           aria-disabled={position === 0 || undefined}
           onClick={() => {
@@ -41,6 +45,7 @@ export function Arrange({
           Move up<span className="sr-only"> {name}</span>
         </Button>
         <Button
+          id={id === undefined ? undefined : `${id}-down`}
           variant="quiet"
           aria-disabled={position === count - 1 || undefined}
           onClick={() => {

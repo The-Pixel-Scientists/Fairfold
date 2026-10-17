@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { Input, FormField } from '@pixel-scientists/ui';
+import { useState } from 'react';
 import type { ReactNode } from 'react';
 
 /** What a person typed into a box that takes a whole number: nothing, or the digits. */
@@ -42,6 +43,48 @@ export function Limit({
         className="max-w-32 tabular-nums"
         onChange={(event) => {
           onChange(wholeNumber(event.currentTarget.value));
+        }}
+      />
+    </FormField>
+  );
+}
+
+/**
+ * A limit that is a whole number from 0 to `max`, which a question always has.
+ * An empty box counts as 0, and the form's own rules say whether 0 will do.
+ */
+export function Count({
+  id,
+  label,
+  hint,
+  value,
+  max,
+  error,
+  onChange,
+}: {
+  id: string;
+  label: ReactNode;
+  hint?: string;
+  value: number;
+  max: number;
+  error: string | undefined;
+  onChange: (value: number) => void;
+}) {
+  const [text, setText] = useState(String(value));
+  // What was typed stays as typed while it means the value; a value set from elsewhere replaces it.
+  const shown = (text === '' ? 0 : Number(text)) === value ? text : String(value);
+  return (
+    <FormField id={id} label={label} hint={hint} error={error}>
+      <Input
+        value={shown}
+        inputMode="numeric"
+        autoComplete="off"
+        className="max-w-32 tabular-nums"
+        onChange={(event) => {
+          const digits = event.currentTarget.value.replace(/\D/g, '');
+          const next = digits === '' ? '' : String(Math.min(Number(digits), max));
+          setText(next);
+          onChange(next === '' ? 0 : Number(next));
         }}
       />
     </FormField>
