@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { getApplication } from '@pixel-scientists/grants/contracts';
+import { getApplication, listAttachments } from '@pixel-scientists/grants/contracts';
+import type { Application, AttachmentView } from '@pixel-scientists/grants/contracts';
 import { useCallback } from 'react';
 
 import { callApi } from '../api.ts';
@@ -45,6 +46,25 @@ export function useApplicationRead(applicationId: string) {
   const read = useCallback(async () => {
     await afterSaves(applicationId);
     return callApi(getApplication, { params: { applicationId } });
+  }, [applicationId]);
+  return useRead(read);
+}
+
+/** An application with the files attached to its file questions. */
+export interface ApplicationWithFiles {
+  application: Application;
+  files: AttachmentView[];
+}
+
+/** As `useApplicationRead()`, with the application's files, read together so one retry reads both. */
+export function useApplicationFilesRead(applicationId: string) {
+  const read = useCallback(async (): Promise<ApplicationWithFiles> => {
+    await afterSaves(applicationId);
+    const [application, { attachments }] = await Promise.all([
+      callApi(getApplication, { params: { applicationId } }),
+      callApi(listAttachments, { params: { applicationId } }),
+    ]);
+    return { application, files: attachments };
   }, [applicationId]);
   return useRead(read);
 }
