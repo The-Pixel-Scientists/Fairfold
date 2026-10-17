@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 
 import { setUpConsoleTests } from '../testing/render.tsx';
 import { actionButton, editor, openDraft, questionButton, sectionButton } from './builder.ts';
+import { budgetDraft } from './fixtures.ts';
 
 setUpConsoleTests();
 
@@ -134,5 +135,56 @@ describe('the preview of a draft', () => {
     expect(panel.getByText('Section 3: Enter at least 1 character.')).toBeTruthy();
     expect(panel.getByText('Section 3, question 1: Enter at least 1 character.')).toBeTruthy();
     expect(panel.queryByText('Section 1 of 3')).toBeNull();
+  });
+});
+
+describe('the preview of a table and a file question', () => {
+  const PDF = 'application/pdf';
+
+  async function openBudgetPreview(user: ReturnType<typeof userEvent.setup>) {
+    await openDraft({}, budgetDraft);
+    await preview(user);
+    return within(screen.getByRole('tabpanel', { name: 'Preview' }));
+  }
+
+  it('shows the table as applicants fill it in, with the fewest rows to start, its own name for a row and a total', async () => {
+    const user = userEvent.setup();
+    const panel = await openBudgetPreview(user);
+
+    expect(panel.getByRole('button', { name: 'Add another cost' })).toBeTruthy();
+    expect(panel.getByText('Cost 1')).toBeTruthy();
+    await user.type(panel.getByRole('textbox', { name: /^Cost/ }), '1200');
+
+    expect(panel.getByText('£1,200')).toBeTruthy();
+  });
+
+  it('shows the file question with its limits, and says that uploading is switched off', async () => {
+    const user = userEvent.setup();
+    const panel = await openBudgetPreview(user);
+
+    expect(panel.getByText(/Uploading is switched off in the preview/)).toBeTruthy();
+    expect(panel.getByText('Sign-off by your trustees is not needed.')).toBeTruthy();
+    expect(
+      panel.getByText('PDF or OpenDocument spreadsheet, up to 5 MB. You can attach up to 2 files.'),
+    ).toBeTruthy();
+  });
+
+  it('checks a file that is chosen against the limits, and sends none, whatever its type', async () => {
+    const user = userEvent.setup({ applyAccept: false });
+    const panel = await openBudgetPreview(user);
+    const input = document.getElementById('f_accounts');
+    if (!(input instanceof HTMLInputElement)) throw new Error('Expected the file input.');
+
+    await user.upload(input, new File(['hello'], 'notes.txt', { type: 'text/plain' }));
+    expect(
+      (await panel.findAllByText('notes.txt: The file must be a PDF or OpenDocument spreadsheet.'))
+        .length,
+    ).toBeGreaterThan(0);
+
+    await user.upload(input, new File(['%PDF-1.7 accounts'], 'accounts.pdf', { type: PDF }));
+    expect(
+      (await panel.findAllByText('accounts.pdf: Uploading is switched off in the preview.')).length,
+    ).toBeGreaterThan(0);
+    expect(panel.queryByRole('list', { name: 'Files for Latest accounts' })).toBeNull();
   });
 });

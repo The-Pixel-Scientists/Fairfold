@@ -3,22 +3,44 @@
 // The form as an applicant sees it, a section at a time, with the same
 // renderer and the same engine: conditions show and hide questions as they
 // are answered, and an answer that stops applicants stops them. Answers are
-// kept only until the page closes.
+// kept only until the page closes, and no file is sent: a file question shows
+// its limits and checks a chosen file against them, and that is all.
 
+import { ProblemError } from '@pixel-scientists/domain/api';
+import { fileTypeLabels, sniffFileType } from '@pixel-scientists/domain/files';
 import {
   checkEligibility,
+  checkFile,
   countCharacters,
   countWords,
+  fieldsOf,
   tableTotals,
   visibleFields,
 } from '@pixel-scientists/domain/forms';
 import type { Answers, FormDefinition } from '@pixel-scientists/domain/forms';
 import { formatMoney } from '@pixel-scientists/domain/platform';
 import { Button, EligibilityStop, FormSection, SectionProgress, Tag } from '@pixel-scientists/ui';
-import type { FormHelpers } from '@pixel-scientists/ui';
+import type { FileHelpers, FormFiles, FormHelpers } from '@pixel-scientists/ui';
 import { useEffect, useRef, useState } from 'react';
 
-const helpers: FormHelpers = { countWords, countCharacters, formatMoney, tableTotals };
+const helpers: FormHelpers & FileHelpers = {
+  countWords,
+  countCharacters,
+  formatMoney,
+  tableTotals,
+  fileTypeLabels,
+  sniffFileType,
+  checkFile,
+};
+
+/** A form with nowhere to send files: choosing one is refused, in words that say why. */
+const noUploads: FormFiles = {
+  files: [],
+  hrefFor: () => '',
+  onUpload: () =>
+    Promise.reject(new ProblemError(403, 'Uploading is switched off in the preview.')),
+  onRemove: () => undefined,
+};
 
 export function Preview({ definition }: { definition: FormDefinition }) {
   const [answers, setAnswers] = useState<Answers>({});
@@ -55,6 +77,12 @@ export function Preview({ definition }: { definition: FormDefinition }) {
         <Tag tone="info">Preview</Tag>
         <span>This is how applicants see the form. Nothing you enter here is saved.</span>
       </p>
+      {fieldsOf(definition).some((field) => field.type === 'file') && (
+        <p className="text-body text-muted">
+          Uploading is switched off in the preview. You can choose a file to check it against the
+          limits, but nothing is sent.
+        </p>
+      )}
       <SectionProgress current={index + 1} total={sections.length} />
       <FormSection
         key={section.id}
@@ -62,6 +90,7 @@ export function Preview({ definition }: { definition: FormDefinition }) {
         visible={visible}
         answers={answers}
         helpers={helpers}
+        files={noUploads}
         onChange={(fieldId, value) => {
           setAnswers((current) => {
             const rest = Object.fromEntries(
