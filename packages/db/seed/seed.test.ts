@@ -251,6 +251,24 @@ describe('the applications scenario', () => {
     expect(reviews.filter(({ scores }) => scores.length > 0)).toHaveLength(3);
   });
 
+  it('records an award within the range and a decline, on submissions that were not withdrawn', () => {
+    const decided = submitted.filter(({ decision }) => decision !== undefined);
+    expect(
+      decided.map(({ organisation, stage, decision }) => [organisation.name, stage, decision]),
+    ).toEqual([
+      ['Brook Street Youth Club', 'Intake', { outcome: 'declined' }],
+      ['Friends of Elm Park', 'Decision', { outcome: 'accepted', amountMinor: 18_000_00 }],
+    ]);
+    for (const { withdrawnAt } of decided) expect(withdrawnAt).toBeUndefined();
+    const award = decided.flatMap(({ decision }) =>
+      decision?.outcome === 'accepted' ? [decision.amountMinor] : [],
+    );
+    for (const amount of award) {
+      expect(amount).toBeGreaterThanOrEqual(round?.awardMinMinor ?? Infinity);
+      expect(amount).toBeLessThanOrEqual(round?.awardMaxMinor ?? 0);
+    }
+  });
+
   it('gives each applicant an .example address of their own', () => {
     if (!northfield) throw new Error('The scenario has no Northfield.');
     const emails = submitted.map(({ applicant }) => applicantEmailOf(northfield, applicant));

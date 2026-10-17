@@ -6,8 +6,8 @@
 // each tenant in turn and writes that tenant's rows, all in one transaction.
 // Actor columns stay null, as for anything the system does, except where the
 // schema needs a member: the programme manager publishes forms, moves
-// applications on and fills reviewer pools, and applicants start, check and
-// submit their own.
+// applications on, fills reviewer pools and records decisions, and
+// applicants start, check and submit their own.
 
 import { argon2Sync, randomBytes, randomUUID } from 'node:crypto';
 
@@ -63,6 +63,11 @@ export interface Organisation {
   readonly postcode: string;
 }
 
+/** A recorded decision, never released by the seed: an award has its amount in pence. */
+export type Decision =
+  | { readonly outcome: 'accepted'; readonly amountMinor: number }
+  | { readonly outcome: 'waitlisted' | 'declined' };
+
 /**
  * A submitted application, from an applicant with an account who is a
  * contact for their organisation. Its eligibility is checked when it
@@ -80,6 +85,8 @@ export interface Application {
   readonly withdrawnAt?: string;
   readonly stage: string;
   readonly reviews?: readonly Review[];
+  /** Recorded by the programme manager a day after the application reached its stage. */
+  readonly decision?: Decision;
 }
 
 export interface Template {
@@ -475,14 +482,27 @@ async function writeApplications(
         moved_by: stage === 0 ? own.membership : manager,
       });
     }
-    const assignedAt = new Date(closes.getTime() + (reached + 1) * DAY);
+    const dayAfter = new Date(closes.getTime() + (reached + 1) * DAY);
     for (const review of application.reviews ?? []) {
       await writeReview(writer, review, {
         round: written.id,
         application: applicationId,
         stage: stageId,
         criteria: written.criteria[reached] ?? [],
-        assignedAt,
+        assignedAt: dayAfter,
+      });
+    }
+    const { decision } = application;
+    if (decision) {
+      const amount = decision.outcome === 'accepted' ? decision.amountMinor : null;
+      await insert('grants.decision', {
+        tenant_id: tenantId,
+        application_id: applicationId,
+        outcome: decision.outcome,
+        amount_minor: amount,
+        currency: amount === null ? null : 'GBP',
+        recorded_at: dayAfter,
+        recorded_by: manager,
       });
     }
   }

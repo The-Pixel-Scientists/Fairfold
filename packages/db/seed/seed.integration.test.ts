@@ -7,8 +7,9 @@
 // membership and a person; and Northfield's round is set up as configured,
 // with its published form. `applications` adds applicants, their
 // organisations and their applications, with each application's
-// eligibility check and stage history, and the round's reviewer pool with
-// its assignments and scores. A database that has had a tenant is refused.
+// eligibility check and stage history, the round's reviewer pool with its
+// assignments and scores, and two recorded decisions, neither released. A
+// database that has had a tenant is refused.
 
 import { randomBytes } from 'node:crypto';
 
@@ -49,6 +50,7 @@ const TENANT_TABLES = [
   'grants.reviewer',
   'grants.assignment',
   'grants.score',
+  'grants.decision',
 ];
 
 /** `scenario` under slugs no earlier run has used. */
@@ -82,6 +84,9 @@ async function expectOwnRowsOnly(tenants: readonly SeededTenant[]): Promise<void
 const counts = ({ rows }: SeededTenant) =>
   Object.fromEntries(Object.entries(rows).map(([table, ids]) => [table, ids.length]));
 
+/** Writing a scenario hashes a password with Argon2id for each member, which takes seconds. */
+const SEED_TIMEOUT = 120_000;
+
 const scenario = unused(configured);
 let northfield: SeededTenant;
 let eastmoor: SeededTenant;
@@ -91,7 +96,7 @@ beforeAll(async () => {
     writeScenario(client, scenario, PASSWORD),
   );
   [northfield, eastmoor] = seeded as [SeededTenant, SeededTenant];
-});
+}, SEED_TIMEOUT);
 
 describe('the configured scenario', { timeout: 60_000 }, () => {
   it('writes the rows each tenant needs', () => {
@@ -254,7 +259,7 @@ describe('the applications scenario', { timeout: 60_000 }, () => {
       writeScenario(client, withApplications, PASSWORD),
     );
     tenantId = seeded[0]?.id ?? '';
-  });
+  }, SEED_TIMEOUT);
 
   it('writes six applicants, their groups and their applications, with checks and history', () => {
     expect(seeded[0] && counts(seeded[0])).toMatchObject({
@@ -271,6 +276,7 @@ describe('the applications scenario', { timeout: 60_000 }, () => {
       'grants.reviewer': 2,
       'grants.assignment': 4,
       'grants.score': 6,
+      'grants.decision': 2,
     });
   });
 
@@ -375,6 +381,34 @@ describe('the applications scenario', { timeout: 60_000 }, () => {
       row('Northfield Allotment Society', 'Priya', [5, 4]),
       row('Northfield Rovers Football Club', 'Owen', [4]),
       row('Northfield Rovers Football Club', 'Priya', null),
+    ]);
+  });
+
+  it('records a decline and an award by the programme manager, and releases neither', async () => {
+    const found = await asRoleIn('app_api', tenantId, async (client) => {
+      const { rows } = await client.query<Record<string, unknown>>(
+        `SELECT o.name, d.outcome, d.amount_minor, d.currency, m.roles AS recorder,
+                d.released_at, d.released_by
+           FROM grants.decision d
+           JOIN grants.application a ON a.id = d.application_id
+           JOIN party.organisation o ON o.id = a.organisation_id
+           JOIN app.membership m ON m.id = d.recorded_by
+          ORDER BY o.name`,
+      );
+      return rows;
+    });
+    const row = (name: string, outcome: string, amount: string | null) => ({
+      name,
+      outcome,
+      amount_minor: amount,
+      currency: amount === null ? null : 'GBP',
+      recorder: ['programme_manager'],
+      released_at: null,
+      released_by: null,
+    });
+    expect(found).toEqual([
+      row('Brook Street Youth Club', 'declined', null),
+      row('Friends of Elm Park', 'accepted', '1800000'),
     ]);
   });
 });

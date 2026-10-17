@@ -8,7 +8,10 @@
 // every question but the optional accounts file, since the seed stores no
 // files. Northfield's two reviewers make up the round's pool, and both are
 // assigned to each application in Review: Owen Hughes has submitted one
-// review and started another, and Priya Shah has scored part of one.
+// review and started another, and Priya Shah has scored part of one. The
+// programme manager has recorded two decisions, released neither: an award
+// of the full £18,000 to Friends of Elm Park, in Decision, and a decline for
+// the late Brook Street Youth Club, still in Intake.
 
 import { base } from './base.ts';
 import { communitySpacesFund } from './configured.ts';
@@ -71,6 +74,7 @@ const submitted: readonly Application[] = [
     startedAt: '2026-10-01T16:45',
     submittedAt: '2026-10-05T17:25',
     stage: 'Intake',
+    decision: { outcome: 'declined' },
   },
   {
     applicant: ['Lena', 'Fischer'],
@@ -157,6 +161,7 @@ const submitted: readonly Application[] = [
     startedAt: '2026-09-07T11:15',
     submittedAt: '2026-09-18T15:30',
     stage: 'Decision',
+    decision: { outcome: 'accepted', amountMinor: 18_000_00 },
   },
   {
     applicant: ['Kwame', 'Mensah'],
