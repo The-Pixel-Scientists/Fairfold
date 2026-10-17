@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import { grantsRoutes } from '@pixel-scientists/grants/console';
 import { AppShell, NotFoundPage, Router, SessionProvider } from '@pixel-scientists/ui';
 import type { PageDefinition, RouteDefinition } from '@pixel-scientists/ui';
 import { Suspense, lazy } from 'react';
@@ -19,6 +20,7 @@ import SignInPage from './auth/SignInPage.tsx';
 import SignUpPage from './auth/SignUpPage.tsx';
 import { TenantLook } from './platform/settings/look.tsx';
 import { productName, titleSuffix } from './product.ts';
+import { memberRoutes } from './shell/memberRoutes.tsx';
 import { TenantProvider, tenantSlugOf } from './tenant.ts';
 
 /**
@@ -41,7 +43,7 @@ export const topLevelRoutes: readonly RouteDefinition[] = [
 
 /** Pages under `/<slug>/`, which the router sees without the slug. */
 export const tenantRoutes: readonly RouteDefinition[] = [
-  { path: '/', title: 'Programmes', load: () => import('./pages/ProgrammesPage.tsx') },
+  ...memberRoutes(grantsRoutes),
   {
     path: '/settings',
     title: 'General settings',

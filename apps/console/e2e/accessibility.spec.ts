@@ -53,9 +53,18 @@ for (const variant of variants) {
     for (const target of pages) {
       const tag = target.gallery ? '@gallery ' : '';
       test(`@a11y ${tag}${target.name} has no axe violations`, async ({ page }) => {
-        if (target.signedIn) await stubSignedIn(page);
+        if (target.signedIn) {
+          await stubSignedIn(
+            page,
+            {},
+            { 'GET /console/programmes': { status: 200, body: { programmes: [] } } },
+          );
+        }
         await page.goto(target.path);
-        await expect(page.getByRole('heading', { level: 1, name: target.heading })).toBeVisible();
+        // A development server compiles a page the first time it is opened, which can take longer than five seconds.
+        await expect(page.getByRole('heading', { level: 1, name: target.heading })).toBeVisible({
+          timeout: 30_000,
+        });
 
         await expectNoViolations(page);
         await expectNoHorizontalScroll(page);
