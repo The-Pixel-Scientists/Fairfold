@@ -14,8 +14,13 @@ import {
   ConditionalExample,
   EligibilityExample,
   EmptyQuestionsExample,
+  EmptyTableExample,
+  FilledTableExample,
+  LimitTableExample,
   ProblemQuestionsExample,
+  ProblemTableExample,
   SaveStatusExample,
+  TableAnswerExample,
 } from './FormExamples.tsx';
 
 const checkAnswers = () => screen.getByText('Check answers');
@@ -289,6 +294,89 @@ describe('answers to read', () => {
     expect(blind.textContent).not.toContain('Northfield');
     expect(within(blind).getByText('What will you do with the money?')).toBeTruthy();
     expect(within(blind).getByRole('heading', { name: 'About your organisation' })).toBeTruthy();
+  });
+});
+
+const cost = (row: number, name: string) =>
+  within(screen.getByRole('group', { name: `Cost ${String(row)}` })).getByLabelText(name);
+
+describe('table questions', () => {
+  it('asks for a first row, and adds up the costs as they are entered, with the engine total', async () => {
+    const user = userEvent.setup({ delay: null });
+    render(<EmptyTableExample />);
+
+    fireEvent.click(checkAnswers());
+    expect(within(problemSummary()).getByRole('link').textContent).toBe(
+      formMessages.rowsAtLeast(1, 'cost'),
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Add the first cost' }));
+    expect(document.activeElement).toBe(cost(1, 'Item'));
+    await user.type(cost(1, 'Item'), 'Hall hire');
+    await user.selectOptions(cost(1, 'Type of cost'), 'Venue');
+    await user.type(cost(1, 'Cost'), '1,250.50');
+    await user.click(screen.getByRole('button', { name: 'Add another cost' }));
+    await user.type(cost(2, 'Item'), 'Tea');
+    await user.selectOptions(cost(2, 'Type of cost'), 'Supplies');
+    await user.type(cost(2, 'Cost'), '49.50');
+
+    expect(screen.getByText('Total cost').nextElementSibling?.textContent).toBe('£1,300');
+    fireEvent.click(checkAnswers());
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByText(/Your answers are valid/)).toBeTruthy();
+  });
+
+  it('shows a filled budget with its total, valid as it stands', () => {
+    render(<FilledTableExample />);
+
+    expect(screen.getAllByRole('group', { name: /^Cost / })).toHaveLength(3);
+    expect(screen.getByText('Total cost: £12,500').getAttribute('role')).toBe('status');
+    fireEvent.click(checkAnswers());
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('shows the engine message beside each cell, in the summary, and links to the cell', () => {
+    render(<ProblemTableExample />);
+
+    fireEvent.click(checkAnswers());
+
+    const cost1 = formMessages.cell('cost 1');
+    const texts = within(problemSummary())
+      .getAllByRole('link')
+      .map((link) => link.textContent);
+    expect(texts).toEqual([
+      formMessages.chooseCell('cost 1'),
+      cost1.amountAtLeast({ amountMinor: 100, currency: 'GBP' }),
+      formMessages.enterCell('cost 2'),
+      formMessages.cell('cost 2').amountInPounds,
+      formMessages.emptyRow('cost 3'),
+    ]);
+    for (const message of texts) {
+      expect(screen.getAllByText(message).length).toBeGreaterThanOrEqual(2);
+    }
+    expect(cost(2, 'Cost').getAttribute('aria-invalid')).toBe('true');
+    expect(screen.getByText('Total cost').nextElementSibling?.textContent).toBe(
+      'Not worked out yet',
+    );
+
+    fireEvent.click(within(problemSummary()).getByRole('link', { name: texts[3] }));
+    expect(document.activeElement).toBe(cost(2, 'Cost'));
+  });
+
+  it('swaps the way to add a row for words at the most rows', () => {
+    render(<LimitTableExample />);
+
+    expect(screen.getByText('You can add up to 3 costs.')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /^Add/ })).toBeNull();
+  });
+
+  it('shows the answer as a table with its total in the footer, and a table with no rows as not answered', () => {
+    render(<TableAnswerExample />);
+
+    const table = screen.getByRole('table', { name: 'Budget' });
+    expect(within(table).getAllByRole('row')).toHaveLength(5);
+    expect(table.querySelector('tfoot')?.textContent).toBe('Total£12,500');
+    expect(screen.getByText('Other funding').nextElementSibling?.textContent).toBe('Not answered');
   });
 });
 

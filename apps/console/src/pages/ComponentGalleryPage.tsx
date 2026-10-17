@@ -27,8 +27,13 @@ import {
   ConditionalExample,
   EligibilityExample,
   EmptyQuestionsExample,
+  EmptyTableExample,
+  FilledTableExample,
+  LimitTableExample,
   ProblemQuestionsExample,
+  ProblemTableExample,
   SaveStatusExample,
+  TableAnswerExample,
 } from './FormExamples.tsx';
 import { DataExamples } from './gallery/DataExamples.tsx';
 import { LayoutExamples } from './gallery/LayoutExamples.tsx';
@@ -256,6 +261,26 @@ export default function ComponentGalleryPage() {
 
       <Section title="Answers to read">
         <AnswerExample />
+      </Section>
+
+      <Section title="Table question with no rows">
+        <EmptyTableExample />
+      </Section>
+
+      <Section title="Table question filled in">
+        <FilledTableExample />
+      </Section>
+
+      <Section title="Table question with problems">
+        <ProblemTableExample />
+      </Section>
+
+      <Section title="Table question at its row limit">
+        <LimitTableExample />
+      </Section>
+
+      <Section title="Table answer to read">
+        <TableAnswerExample />
       </Section>
 
       <Section title="Save status">
