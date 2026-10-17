@@ -115,3 +115,124 @@ test('@gallery shows the three save messages', async ({ page }) => {
     'Not saved. Check your connection and try again',
   ]);
 });
+
+test('@gallery adds a table row with the keyboard, moves focus into it, and adds up the total', async ({
+  page,
+}) => {
+  const scope = example(page, 'Table question with no rows');
+  const add = scope.getByRole('button', { name: 'Add the first cost' });
+
+  await add.focus();
+  await page.keyboard.press('Enter');
+  const row = scope.getByRole('group', { name: 'Cost 1' });
+  await expect(row.getByRole('textbox', { name: 'Item' })).toBeFocused();
+  await page.keyboard.type('Hall hire');
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Tab');
+  await page.keyboard.type('£1,250');
+
+  await expect(row.getByRole('combobox', { name: 'Type of cost' })).not.toHaveValue('');
+  await expect(scope.getByText('Total cost', { exact: true }).locator('..')).toHaveText(
+    'Total cost£1,250',
+  );
+  await expect(scope.getByRole('button', { name: 'Add another cost' })).toBeVisible();
+});
+
+test('@gallery tells a screen reader the new total once typing stops, in a polite live region', async ({
+  page,
+}) => {
+  const scope = example(page, 'Table question filled in');
+  const status = scope.locator('[role="status"]', { hasText: 'Total cost' });
+
+  await expect(status).toHaveText('Total cost: £12,500');
+  await scope
+    .getByRole('group', { name: 'Cost 3' })
+    .getByRole('textbox', { name: 'Cost' })
+    .fill('1000');
+  await expect(status).toHaveText('Total cost: £11,080', { timeout: 5000 });
+});
+
+test('@gallery removes a table row and moves focus to the same place in the next row, then to the add button', async ({
+  page,
+}) => {
+  const scope = example(page, 'Table question filled in');
+
+  await scope.getByRole('button', { name: 'Remove cost 2' }).click();
+  await expect(scope.getByRole('group', { name: 'Cost 3' })).toHaveCount(0);
+  await expect(scope.getByRole('textbox', { name: 'Item' }).nth(1)).toHaveValue('Refreshments');
+  await expect(scope.getByRole('button', { name: 'Remove cost 2' })).toBeFocused();
+
+  await page.keyboard.press('Enter');
+  await expect(scope.getByRole('button', { name: 'Add another cost' })).toBeFocused();
+});
+
+test('@gallery moves focus to a table cell when its message in the error summary is chosen', async ({
+  page,
+}) => {
+  const scope = example(page, 'Table question with problems');
+  await scope.getByRole('button', { name: 'Check answers' }).click();
+  await expect(summaryIn(scope)).toBeFocused();
+
+  await summaryIn(scope)
+    .getByRole('link', { name: /Enter the amount for cost 2 in pounds/ })
+    .click();
+  await expect(
+    scope.getByRole('group', { name: 'Cost 2' }).getByRole('textbox', { name: 'Cost' }),
+  ).toBeFocused();
+  await summaryIn(scope)
+    .getByRole('link', { name: /Fill in cost 3 or remove it/ })
+    .click();
+  await expect(scope.getByRole('group', { name: 'Budget (required)' })).toBeFocused();
+});
+
+test('@gallery shows a table question at its row limit in words, with no way to add another', async ({
+  page,
+}) => {
+  const scope = example(page, 'Table question at its row limit');
+
+  await expect(scope.getByText('You can add up to 3 costs.')).toBeVisible();
+  await expect(scope.getByRole('button', { name: /^Add/ })).toHaveCount(0);
+});
+
+test('@gallery lays a row side by side on a wide screen and one field to a line on a phone', async ({
+  page,
+}) => {
+  const scope = example(page, 'Table question filled in');
+  const row = scope.getByRole('group', { name: 'Cost 1' });
+  const item = row.getByRole('textbox', { name: 'Item' });
+  const cost = row.getByRole('textbox', { name: 'Cost' });
+  const top = async (field: typeof item) => (await field.boundingBox())?.y ?? 0;
+
+  const legend = row.getByText('Cost 1', { exact: true });
+  const height = async () => (await legend.boundingBox())?.height ?? 0;
+
+  expect(await top(item)).toBe(await top(cost));
+  expect(await height()).toBeLessThanOrEqual(1);
+
+  await page.setViewportSize({ width: 320, height: 640 });
+  expect(await top(cost)).toBeGreaterThan(await top(item));
+  expect(await height()).toBeGreaterThan(8);
+});
+
+test('@gallery reads a table answer as a table that scrolls in its own region on a phone, not the page', async ({
+  page,
+}) => {
+  const scope = example(page, 'Table answer to read');
+  const table = scope.getByRole('table', { name: 'Budget' });
+
+  await expect(table.getByRole('columnheader')).toHaveText(['Item', 'Type of cost', 'Cost']);
+  await expect(table.getByRole('rowheader', { name: 'Total' })).toBeVisible();
+  await expect(scope.getByText('Not answered', { exact: true })).toBeVisible();
+
+  await page.setViewportSize({ width: 320, height: 640 });
+  const region = scope.getByRole('region', { name: 'Budget' });
+  expect(await region.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    ),
+  ).toBeLessThanOrEqual(0);
+  await region.focus();
+  await expect(region).toBeFocused();
+});

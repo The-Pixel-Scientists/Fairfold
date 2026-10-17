@@ -97,4 +97,35 @@ export const galleryStates: GalleryState[] = [
       ).toBeVisible();
     },
   },
+  {
+    name: 'a table question with rows added',
+    open: async (page) => {
+      await openGallery(page);
+      const scope = example(page, 'Table question with no rows');
+      await scope.getByRole('button', { name: 'Add the first cost' }).click();
+      await scope.getByRole('button', { name: 'Add another cost' }).click();
+      await scope.getByRole('textbox', { name: 'Cost' }).first().fill('1250');
+      await expect(scope.getByRole('group', { name: 'Cost 2' })).toBeVisible();
+    },
+  },
+  {
+    name: 'a table question with no rows, checked',
+    open: async (page) => {
+      await openGallery(page);
+      const scope = example(page, 'Table question with no rows');
+      await scope.getByRole('button', { name: 'Check answers' }).click();
+      await expect(summaryIn(scope)).toBeFocused();
+      await expect(summaryIn(scope).getByRole('link')).toHaveCount(1);
+    },
+  },
+  {
+    name: 'a table question with problems, beside each cell and in the summary',
+    open: async (page) => {
+      await openGallery(page);
+      const scope = example(page, 'Table question with problems');
+      await scope.getByRole('button', { name: 'Check answers' }).click();
+      await expect(summaryIn(scope)).toBeFocused();
+      await expect(summaryIn(scope).getByRole('link')).toHaveCount(5);
+    },
+  },
 ];
