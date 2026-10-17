@@ -277,7 +277,7 @@ describe('programmes', () => {
       [{ title: '   ' }, 'body.title', programmeMessages.programmeTitle],
       [{ title: 'x'.repeat(121) }, 'body.title', undefined],
       [{ summary: '' }, 'body.summary', programmeMessages.programmeSummary],
-      [{ title: 'Fund‮evil' }, 'body.title', programmeMessages.hiddenCharacters],
+      [{ title: 'Fund\u202Eevil' }, 'body.title', programmeMessages.hiddenCharacters],
       [{ description: 'Fund\u0000' }, 'body.description', programmeMessages.hiddenCharactersText],
       [{ status: 'archived' }, 'body.status', undefined],
       [{ tenantId: t.tenantB.id }, 'body.tenantId', undefined],

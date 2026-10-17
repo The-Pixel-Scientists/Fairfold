@@ -280,7 +280,11 @@ describe('saving a draft', () => {
       ],
       [form({ ...title, label: '' }), 'body.definition.sections.0.fields.0.label', ''],
       [form({ ...title, label: '   ' }), 'body.definition.sections.0.fields.0.label', ''],
-      [form({ ...title, label: 'Name‮evil' }), 'body.definition.sections.0.fields.0.label', ''],
+      [
+        form({ ...title, label: 'Name\u202Eevil' }),
+        'body.definition.sections.0.fields.0.label',
+        '',
+      ],
       [form({ ...title, colour: 'red' }), 'body.definition.sections.0.fields.0.colour', ''],
       [
         form(

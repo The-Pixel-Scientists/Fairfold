@@ -194,7 +194,7 @@ describe('saving the templates', () => {
         programmeMessages.hiddenCharacters,
       ],
       [
-        { ...defaultEmailTemplates, accepted: { ...accepted, body: 'Hi‮' } },
+        { ...defaultEmailTemplates, accepted: { ...accepted, body: 'Hi\u202E' } },
         'body.accepted.body',
         programmeMessages.hiddenCharactersText,
       ],
