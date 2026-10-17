@@ -172,4 +172,178 @@ describe('AnswerView', () => {
 
     expect(screen.getByRole('heading', { level: 2, name: 'Title' })).toBeTruthy();
   });
+
+  describe('a table answer', () => {
+    const pounds = (amount: number) => ({ amountMinor: amount * 100, currency: 'GBP' });
+    const kinds = [
+      { value: 'staff', label: 'Staff' },
+      { value: 'venue', label: 'Venue' },
+    ];
+    const budget = question({
+      id: 'f_budget',
+      type: 'table',
+      label: 'Budget',
+      rowNoun: 'cost',
+      minRows: 0,
+      maxRows: 20,
+      columns: [
+        { id: 'c_item', type: 'short_text', label: 'Item', required: true },
+        { id: 'c_kind', type: 'dropdown', label: 'Type of cost', required: false, options: kinds },
+        { id: 'c_n', type: 'number', label: 'Sessions', required: false, wholeNumber: false },
+        {
+          id: 'c_cost',
+          type: 'currency',
+          label: 'Cost',
+          required: true,
+          currency: 'GBP',
+          total: true,
+        },
+      ],
+    });
+    const answer = [
+      { c_item: 'Venue hire', c_kind: 'venue', c_n: 48, c_cost: pounds(2880) },
+      { c_item: 'Session leader', c_kind: 'staff', c_cost: pounds(7200) },
+    ];
+
+    function table() {
+      return screen.getByRole('table', { name: 'Budget' });
+    }
+
+    it('shows a table whose caption is the question, with a heading for each column', () => {
+      show([budget], { f_budget: answer }, [budget], undefined);
+
+      expect(
+        within(table())
+          .getAllByRole('columnheader')
+          .map((heading) => heading.textContent),
+      ).toEqual(['Item', 'Type of cost', 'Sessions', 'Cost']);
+      expect(table().querySelector('caption')?.textContent).toBe('Budget');
+    });
+
+    it('shows one row for each answer row, with each cell as people read it', () => {
+      show([budget], { f_budget: answer });
+
+      const body = table().querySelector('tbody') as HTMLElement;
+      const rows = within(body)
+        .getAllByRole('row')
+        .map((row) =>
+          within(row)
+            .getAllByRole('cell')
+            .map((cell) => cell.textContent),
+        );
+      expect(rows).toEqual([
+        ['Venue hire', 'Venue', '48', '£2,880'],
+        ['Session leader', 'Staff', '–Not answered', '£7,200'],
+      ]);
+    });
+
+    it('puts the totals in the footer, under the column they add up', () => {
+      show([budget], { f_budget: answer });
+
+      const foot = table().querySelector('tfoot') as HTMLElement;
+      const cells = within(foot).getAllByRole('cell');
+      expect(within(foot).getByRole('rowheader').textContent).toBe('Total');
+      expect(cells.map((cell) => cell.textContent)).toEqual(['', '', '£10,080']);
+    });
+
+    it('right-aligns numbers and amounts, in figures that line up', () => {
+      show([budget], { f_budget: answer });
+
+      const [first] = within(table().querySelector('tbody') as HTMLElement).getAllByRole('row');
+      const cells = within(first as HTMLElement).getAllByRole('cell');
+      expect(cells.map((cell) => cell.className.includes('text-end'))).toEqual([
+        false,
+        false,
+        true,
+        true,
+      ]);
+      expect(cells[3]?.className).toContain('tabular-nums');
+      const headings = within(table()).getAllByRole('columnheader');
+      expect(headings.map((heading) => heading.className.includes('text-end'))).toEqual([
+        false,
+        false,
+        true,
+        true,
+      ]);
+    });
+
+    it('puts the question above a table that needs the whole width', () => {
+      show([budget], { f_budget: answer });
+
+      const term = screen.getByText('Budget', { selector: 'dt' });
+      expect(term.parentElement?.className).not.toContain('sm:grid');
+      expect(term.nextElementSibling?.contains(table())).toBe(true);
+    });
+
+    it('scrolls a wide table inside a named region that the keyboard can reach', () => {
+      show([budget], { f_budget: answer });
+
+      const region = screen.getByRole('region', { name: 'Budget' });
+      expect(region.getAttribute('tabindex')).toBe('0');
+      expect(region.className).toContain('overflow-x-auto');
+      expect(region.contains(table())).toBe(true);
+    });
+
+    it('says "Not answered" when there are no rows, and for anything that is not a list of rows', () => {
+      const { unmount } = show([budget], { f_budget: [] });
+      expect(screen.queryByRole('table')).toBeNull();
+      expect(answerTo('Budget')).toBe('Not answered');
+      unmount();
+
+      show([budget], { f_budget: 'lots' });
+      expect(screen.queryByRole('table')).toBeNull();
+      expect(answerTo('Budget')).toBe('Not answered');
+    });
+
+    it('says a cell is not answered, to a screen reader, where it is empty or does not fit its column', () => {
+      show([budget], {
+        f_budget: [{ c_item: 'Hall', c_kind: 'moon', c_n: 'many', c_cost: 'lots' }],
+      });
+
+      const body = table().querySelector('tbody') as HTMLElement;
+      const cells = within(body).getAllByRole('cell');
+      expect(cells.map((cell) => cell.textContent)).toEqual([
+        'Hall',
+        'moon',
+        '–Not answered',
+        '–Not answered',
+      ]);
+    });
+
+    it('shows no totals row without the totals helper, and never an unchecked sum', () => {
+      render(
+        <AnswerView
+          sections={[{ id: 's_one', title: 'About you', fields: [budget] }]}
+          visible={[budget]}
+          answers={{ f_budget: answer }}
+          helpers={{ formatMoney: (money) => helpers.formatMoney(money) }}
+        />,
+      );
+
+      expect(table().querySelector('tfoot')).toBeNull();
+    });
+
+    it('shows no total for a column that is not totalled, and no footer at all when none is', () => {
+      const plain = question({
+        id: 'f_plain',
+        type: 'table',
+        label: 'People',
+        rowNoun: 'person',
+        minRows: 0,
+        maxRows: 5,
+        columns: [{ id: 'c_name', type: 'short_text', label: 'Name', required: true }],
+      });
+      show([plain], { f_plain: [{ c_name: 'Ada' }] });
+
+      expect(screen.getByRole('table', { name: 'People' }).querySelector('tfoot')).toBeNull();
+    });
+
+    it('shows a table only to the audience that is given the field', () => {
+      show([budget], { f_budget: answer }, []);
+
+      expect(screen.queryByRole('table')).toBeNull();
+      expect(screen.queryByText('Venue hire')).toBeNull();
+      expect(screen.queryByText('Budget')).toBeNull();
+    });
+  });
 });
