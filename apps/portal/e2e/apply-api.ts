@@ -167,10 +167,25 @@ const round = {
 
 const ORGANISATION_NAME = 'Eastmere Community Garden';
 
+/** A released decision as the API tells the applicant: the outcome and, for an award, the amount. */
+export type Outcome =
+  | { result: 'accepted'; amount: { amountMinor: number; currency: 'GBP' } }
+  | { result: 'waitlisted' }
+  | { result: 'declined' };
+
 /** One of the applicant's applications as the API holds it. */
 export interface Application {
   id: string;
-  status: 'in_progress' | 'submitted' | 'under_review' | 'withdrawn';
+  status:
+    | 'in_progress'
+    | 'submitted'
+    | 'under_review'
+    | 'awarded'
+    | 'waitlisted'
+    | 'not_funded'
+    | 'withdrawn';
+  /** Null until the decision is released. */
+  outcome: Outcome | null;
   answers: Answers;
   answersVersion: number;
   updatedAt: string;
@@ -182,6 +197,7 @@ export interface Application {
 export const draft = (overrides: Partial<Application> = {}): Application => ({
   id: APPLICATION_ID,
   status: 'in_progress',
+  outcome: null,
   answers: {},
   answersVersion: 1,
   updatedAt: '2026-10-20T10:36:00.000Z',
@@ -213,7 +229,7 @@ const summaryOf = (application: Application, organisation: { id: string; name: s
   status: application.status,
   updatedAt: application.updatedAt,
   submittedAt: application.submittedAt,
-  outcome: null,
+  outcome: application.outcome,
 });
 
 /** The answers as the API builds them: the saved ones, with the ids of the files attached to each shown file question. */
