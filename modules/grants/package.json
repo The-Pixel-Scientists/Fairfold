@@ -12,7 +12,14 @@
     "./portal": "./src/portal/index.ts"
   },
   "dependencies": {
+    "@pixel-scientists/db": "workspace:*",
     "@pixel-scientists/domain": "workspace:*",
+    "@pixel-scientists/party": "workspace:*",
     "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@pixel-scientists/ui": "workspace:*",
+    "@types/react": "19.3.0",
+    "react": "19.3.0"
   }
 }
