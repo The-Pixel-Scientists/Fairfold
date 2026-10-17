@@ -3,10 +3,11 @@
 // Password sign-in to a tenant's console or portal (ADR 0010). The attempt
 // is charged to its limits first, and a delayed attempt is refused without
 // checking the password. An unknown address costs a dummy hash, and every
-// failure gets the same problem. Success gives the charge back and issues a
-// session for the resolved app with the slug's tenant active: a console
-// session waits for MFA, a portal one needs none. A portal sign-in with no
-// membership in the tenant makes the person an applicant there.
+// failure gets the same problem. Success issues a session for the resolved
+// app with the slug's tenant active: a console session waits for MFA, which
+// gives the charge back when it completes, and a portal one needs none and
+// gives it back now. A portal sign-in with no membership in the tenant makes
+// the person an applicant there.
 
 import {
   chargeRateLimits,
@@ -120,7 +121,8 @@ export function signInRoutes(deps: RouteDependencies): Route[] {
         mfa = totp === undefined ? 'enrol' : 'verify';
       }
       const { token, event } = await deps.auth.transaction().execute(async (trx) => {
-        await refundSignIn(trx, client);
+        // A console sign-in's charge is given back only once MFA completes.
+        if (mfa === 'not_required') await refundSignIn(trx, client);
         return {
           token: await issueSession(trx, {
             userId,
@@ -141,7 +143,8 @@ export function signInRoutes(deps: RouteDependencies): Route[] {
       });
 
       // The new session is the source of its tenant from here on.
-      const session = await sessionContext(deps.api, hashToken(token));
+      const tokenHash = hashToken(token);
+      const session = await sessionContext(deps.api, tokenHash);
       if (session === undefined) throw new Error('The new session could not be read.');
       if (app === 'portal') await joinAsApplicant(deps, session.tenant, userId, requestId);
       await copyAuthEvent(deps, event, session.tenant);
@@ -154,6 +157,7 @@ export function signInRoutes(deps: RouteDependencies): Route[] {
         mfa: session.mfaState,
         expiresAt: session.expiresAt,
         reauthenticatedAt: session.reauthenticatedAt,
+        tokenHash,
       });
     }),
   ];
