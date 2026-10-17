@@ -5,7 +5,7 @@
 
 import type { FormField, Question } from '@pixel-scientists/domain/forms';
 
-import type { EditableType } from './draft.ts';
+import type { ColumnType, EditableType } from './draft.ts';
 
 /** The types a manager can choose, with what an applicant does for each. */
 export const questionTypes = [
@@ -50,17 +50,39 @@ export const questionTypes = [
     label: 'UK address',
     note: 'Applicants enter an address in separate boxes, with a postcode that is checked.',
   },
+  {
+    value: 'table',
+    label: 'Table',
+    note: 'Applicants add rows of answers, such as the costs in a budget. You choose the columns.',
+  },
+  {
+    value: 'file',
+    label: 'File upload',
+    note: 'Applicants attach files, such as their latest accounts. You choose the types and sizes.',
+  },
 ] as const satisfies readonly { value: EditableType; label: string; note: string }[];
 
-/** What the outline calls a type, including those the builder cannot edit yet. */
+/** What the outline calls a type. */
 export function typeLabel(type: FormField['type']): string {
-  const found = questionTypes.find((item) => item.value === type);
-  if (found !== undefined) return found.label;
-  return type === 'content'
-    ? 'Text for applicants to read'
-    : type === 'table'
-      ? 'Table'
-      : 'File upload';
+  return questionTypes.find((item) => item.value === type)?.label ?? 'Text for applicants to read';
+}
+
+/** The types a table's column can be, in the words of the questions of the same type. */
+export const columnTypes = [
+  { value: 'short_text', label: 'Short text' },
+  { value: 'number', label: 'Number' },
+  { value: 'currency', label: 'Amount in pounds' },
+  { value: 'dropdown', label: 'Choose one from a list' },
+] as const satisfies readonly { value: ColumnType; label: string }[];
+
+/** A megabyte, as the form's own messages count it. */
+export const MB = 1024 * 1024;
+
+/** A size limit in words, rounded down to a tenth of a megabyte, as the form's own messages say it. */
+export function sizeInWords(bytes: number): string {
+  return bytes >= MB
+    ? `${String(Math.floor((bytes * 10) / MB) / 10)} MB`
+    : `${String(Math.floor(bytes / 1024))} KB`;
 }
 
 interface Viewing {

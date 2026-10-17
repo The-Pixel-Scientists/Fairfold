@@ -474,8 +474,8 @@ describe('stopping applicants', () => {
   });
 });
 
-describe('a question the builder cannot change yet', () => {
-  it('can still be moved, removed and shown to others, and says its settings are not here', async () => {
+describe('a question with columns', () => {
+  it('can be moved, removed and shown to others like any other, and says what it is in the list', async () => {
     const user = userEvent.setup();
     await openDraft(
       {},
@@ -507,10 +507,7 @@ describe('a question the builder cannot change yet', () => {
     await user.click(questionButton('Costs'));
 
     const panel = within(editor());
-    expect(
-      panel.getByText('You cannot change the settings of this type of question here yet.'),
-    ).toBeTruthy();
-    expect(panel.queryByRole('combobox', { name: 'Type' })).toBeNull();
+    expect(panel.getByRole('combobox', { name: 'Type' })).toHaveProperty('value', 'table');
     expect(panel.getByRole('combobox', { name: 'Who sees the answer' })).toBeTruthy();
     expect(questionButton('Costs').textContent).toContain('Table');
     await user.click(actionButton('Move down', 'Costs'));

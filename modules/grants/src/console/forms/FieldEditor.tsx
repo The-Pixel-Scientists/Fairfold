@@ -19,8 +19,10 @@ import { Choices } from './Choices.tsx';
 import { Conditions } from './Conditions.tsx';
 import { withType } from './draft.ts';
 import { Eligibility } from './Eligibility.tsx';
+import { FileSettings } from './FileSettings.tsx';
 import { Limit, Settings } from './Settings.tsx';
 import type { Errors } from './Settings.tsx';
+import { TableSettings } from './TableSettings.tsx';
 import { questionTypes, viewingOf, viewings } from './words.ts';
 
 export interface FieldEditorProps {
@@ -49,6 +51,9 @@ function Visibility({
   onChange: (question: Question) => void;
 }) {
   const viewing = viewingOf(question.audiences);
+  // Files are never kept out of sight of staff and reviewers by being counted only in totals.
+  const choices =
+    question.type === 'file' ? viewings.filter((item) => item.value !== 'totals') : viewings;
   return (
     <Settings heading="Privacy">
       <Field
@@ -60,7 +65,7 @@ function Visibility({
         <Select
           value={viewing.value}
           onChange={(event) => {
-            const next = viewings.find((item) => item.value === event.currentTarget.value);
+            const next = choices.find((item) => item.value === event.currentTarget.value);
             if (next === undefined) return;
             onChange({
               ...question,
@@ -68,7 +73,7 @@ function Visibility({
             });
           }}
         >
-          {viewings.map((item) => (
+          {choices.map((item) => (
             <option key={item.value} value={item.value}>
               {item.label}
             </option>
@@ -132,11 +137,14 @@ function TypeSettings({
   ) {
     return <Choices question={question} errors={errors} onChange={onChange} />;
   }
+  if (question.type === 'table') {
+    return <TableSettings question={question} errors={errors} onChange={onChange} />;
+  }
+  if (question.type === 'file') {
+    return <FileSettings question={question} errors={errors} onChange={onChange} />;
+  }
   return null;
 }
-
-/** What the builder cannot change about a type of question yet, so a person is not left looking for it. */
-const notEditable = 'You cannot change the settings of this type of question here yet.';
 
 export function FieldEditor({
   field,
@@ -184,7 +192,6 @@ export function FieldEditor({
     );
   }
 
-  const editable = questionTypes.some(({ value }) => value === field.type);
   const note = questionTypes.find(({ value }) => value === field.type)?.note;
   return (
     <Panel title="Edit question">
@@ -208,25 +215,21 @@ export function FieldEditor({
           }}
         />
       </Field>
-      {editable ? (
-        <Field id="field-type" label="Type" hint={note} error={errors.get('type')}>
-          <Select
-            value={field.type}
-            onChange={(event) => {
-              const type = questionTypes.find(({ value }) => value === event.currentTarget.value);
-              if (type !== undefined) onChange(withType(field, type.value));
-            }}
-          >
-            {questionTypes.map((type) => (
-              <option key={type.value} value={type.value}>
-                {type.label}
-              </option>
-            ))}
-          </Select>
-        </Field>
-      ) : (
-        <p className="text-body text-muted">{notEditable}</p>
-      )}
+      <Field id="field-type" label="Type" hint={note} error={errors.get('type')}>
+        <Select
+          value={field.type}
+          onChange={(event) => {
+            const type = questionTypes.find(({ value }) => value === event.currentTarget.value);
+            if (type !== undefined) onChange(withType(field, type.value));
+          }}
+        >
+          {questionTypes.map((type) => (
+            <option key={type.value} value={type.value}>
+              {type.label}
+            </option>
+          ))}
+        </Select>
+      </Field>
       <CheckboxGroup
         id="field-required"
         legend="Required"

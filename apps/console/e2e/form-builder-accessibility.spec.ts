@@ -175,14 +175,6 @@ const states: State[] = [
     },
   },
   {
-    name: 'a question the builder cannot change yet',
-    stub: rich,
-    open: async (page) => {
-      await openRich(page, /Costs/);
-      await expect(page.getByText(/You cannot change the settings of this type/)).toBeVisible();
-    },
-  },
-  {
     name: 'a draft with problems',
     stub: (page) => stubForms(page, withDraft()),
     open: async (page) => {

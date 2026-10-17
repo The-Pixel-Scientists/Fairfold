@@ -363,6 +363,7 @@ function DraftEditor({
             />
           ) : (
             <FieldEditor
+              key={field.id}
               field={field}
               sources={conditionSources(definition, field.id)}
               position={fieldIndex}
