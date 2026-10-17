@@ -2,10 +2,10 @@
 #
 # Checks for every pull request and every push to main (ADRs 0001 and 0002):
 # typecheck, lint, formatting and unit tests; migrations and database tests
-# on PostgreSQL 16; end-to-end and axe tests against the dev servers and
-# production builds; the stack's release images, with the same tests run
-# against them; licences; pnpm audit; Semgrep; gitleaks; Trivy; and SBOMs
-# from Syft. Every night, `pnpm check` runs on Windows, and the licence
+# on PostgreSQL 16; end-to-end and axe tests, in shards, against the dev
+# servers and production builds; the stack's release images, with the same
+# tests run against them; licences; pnpm audit; Semgrep; gitleaks; Trivy; and
+# SBOMs from Syft. Every night, `pnpm check` runs on Windows, and the licence
 # check, pnpm audit and Trivy run again, so a new advisory against an
 # unchanged lockfile is caught.
 #
@@ -118,11 +118,17 @@ jobs:
       - name: Run the roles, schema lint, tenant and round-trip tests
         run: pnpm test:db
 
+  # Playwright splits the specs between the shards, a whole file at a time.
+  # Add a shard when the slowest one passes about 45 minutes.
   e2e:
-    name: End-to-end and accessibility tests
+    name: End-to-end and accessibility tests (${{ matrix.shard }} of ${{ strategy.job-total }})
     if: github.event_name != 'schedule'
     runs-on: ubuntu-24.04
     timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     container:
       image: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
       options: --ipc=host
@@ -142,12 +148,14 @@ jobs:
         run: corepack enable
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Run the specs against the dev servers, production builds and gallery build
-        run: pnpm test:e2e
+      - name: Run the shard's specs against the dev servers, production builds and gallery build
+        env:
+          SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
+        run: pnpm test:e2e --shard="$SHARD"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: failure()
         with:
-          name: e2e-report
+          name: e2e-report-${{ matrix.shard }}
           path: |
             playwright-report/
             test-results/
