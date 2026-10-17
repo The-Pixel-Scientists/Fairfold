@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// The columns the auth module reads and writes (migrations 0002 to 0004).
-// The auth tables are reached as app_auth; the app tables as app_api,
-// inside withTenant().
+// The columns the auth module reads and writes (migrations 0002 to 0004,
+// and 0015). The auth tables are reached as app_auth; the app tables as
+// app_api, inside withTenant().
 
 import type { Generated } from '@pixel-scientists/db';
 import type { AuthEventCode } from '@pixel-scientists/domain/auth';
@@ -61,6 +61,20 @@ export type TenantTables = {
     user_id: string;
     roles: string[];
     status: Generated<string>;
+    created_by: string | null;
+    updated_by: string | null;
+  };
+  'app.invitation': {
+    tenant_id: string;
+    id: string;
+    email: string;
+    roles: string[];
+    token_hash: Buffer;
+    expires_at: Generated<Date>;
+    status: Generated<'pending' | 'accepted' | 'revoked'>;
+    accepted_membership_id: string | null;
+    created_by: string | null;
+    updated_by: string | null;
   };
   'app.tenant': { id: string; slug: string; name: string; status: string };
   'app.tenant_module': { module: string; enabled: boolean };
