@@ -6,7 +6,14 @@
 // production content security policy.
 
 import { expect, test } from '../../../scripts/e2e/fixtures.ts';
-import { example, openGallery, summaryIn, TOO_LONG } from './forms-gallery-states.ts';
+import {
+  example,
+  openGallery,
+  pdfFile,
+  programFile,
+  summaryIn,
+  TOO_LONG,
+} from './forms-gallery-states.ts';
 
 test.beforeEach(async ({ page }) => {
   await openGallery(page);
@@ -235,4 +242,98 @@ test('@gallery reads a table answer as a table that scrolls in its own region on
   ).toBeLessThanOrEqual(0);
   await region.focus();
   await expect(region).toBeFocused();
+});
+
+test('@gallery attaches a file with the keyboard alone, watching it upload, be checked and join the list', async ({
+  page,
+}) => {
+  const scope = example(page, 'File question with no files');
+  const picker = scope.getByLabel('Choose files');
+  const status = scope.locator('[role="status"]', { hasText: /\S/ });
+
+  await picker.focus();
+  const chooser = page.waitForEvent('filechooser');
+  await page.keyboard.press('Space');
+  await (await chooser).setFiles(pdfFile());
+
+  const row = scope.getByRole('listitem');
+  await expect(row.getByRole('progressbar')).toBeVisible();
+  await expect(status).toHaveText('Uploading Accounts 2025 to 2026.pdf');
+  await expect(row.getByText('Checking Accounts 2025 to 2026.pdf for viruses')).toBeVisible();
+  await expect(status).toHaveText('Checking Accounts 2025 to 2026.pdf for viruses');
+  await expect(
+    row.getByRole('link', { name: /^Download Accounts 2025 to 2026\.pdf, PDF, / }),
+  ).toBeVisible({
+    timeout: 8000,
+  });
+  await expect(status).toHaveText('Accounts 2025 to 2026.pdf added');
+  await expect(row.getByText(/Checking/)).toHaveCount(0);
+});
+
+test('@gallery refuses a file by what is in it, whatever it is called, and goes from the summary to the file input', async ({
+  page,
+}) => {
+  const scope = example(page, 'File question with no files');
+
+  await scope.getByLabel('Choose files').setInputFiles(programFile());
+
+  await expect(summaryIn(scope)).toBeFocused();
+  const message = 'Accounts 2025 to 2026.pdf: The file must be a PDF or Word document.';
+  await expect(scope.getByText(message)).toHaveCount(2);
+  await summaryIn(scope).getByRole('link', { name: message }).click();
+  await expect(scope.getByLabel('Choose files')).toBeFocused();
+  await expect(scope.getByRole('list', { name: 'Files for Latest accounts' })).toHaveCount(0);
+});
+
+test('@gallery shows the server words for a refused file beside the question and in the summary', async ({
+  page,
+}) => {
+  const scope = example(page, 'File question with a refused file');
+
+  await scope.getByLabel('Choose files').setInputFiles(pdfFile());
+
+  await expect(summaryIn(scope)).toBeFocused();
+  await expect(
+    summaryIn(scope).getByText(/This file has a virus in it, so it was not uploaded/),
+  ).toBeVisible();
+  await expect(scope.getByText(/This file has a virus in it/)).toHaveCount(2);
+  await expect(scope.getByLabel('Choose files')).toBeVisible();
+});
+
+test('@gallery gives the file input way to words at the limit, and brings it back with focus on removal', async ({
+  page,
+}) => {
+  const scope = example(page, 'File question at its file limit');
+
+  await expect(scope.getByLabel('Choose files')).toHaveCount(0);
+  await expect(scope.getByText('You have reached the limit of 2 files.')).toBeVisible();
+
+  await scope.getByRole('button', { name: 'Remove Constitution.pdf' }).click();
+  await expect(scope.getByLabel('Choose files')).toBeFocused();
+  await expect(scope.getByText(/reached the limit/)).toHaveCount(0);
+  await expect(scope.locator('[role="status"]', { hasText: 'removed' })).toHaveText(
+    'Constitution.pdf removed',
+  );
+});
+
+test('@gallery lists a file to read with a link and no way to change it', async ({ page }) => {
+  const scope = example(page, 'File question to read');
+
+  await expect(
+    scope.getByRole('link', { name: 'Download Accounts 2025 to 2026.pdf, PDF, 2.1 MB' }),
+  ).toBeVisible();
+  await expect(scope.getByText('No files attached.')).toBeVisible();
+  await expect(scope.getByRole('button')).toHaveCount(0);
+  await expect(scope.getByLabel(/Choose file/)).toHaveCount(0);
+});
+
+test('@gallery keeps a long file name inside the page, whatever the width', async ({ page }) => {
+  const scope = example(page, 'File question at its file limit');
+  const name = scope.getByRole('link', { name: /^Download Northfield_Community_Trust/ });
+
+  await page.setViewportSize({ width: 320, height: 640 });
+
+  await expect(name).toBeVisible();
+  const box = await name.boundingBox();
+  expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(320);
 });

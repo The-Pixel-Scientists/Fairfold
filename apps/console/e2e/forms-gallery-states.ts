@@ -24,6 +24,20 @@ export async function openGallery(page: Page): Promise<void> {
   ).toBeVisible();
 }
 
+/** A file the browser accepts by its first bytes, which are all it looks at. */
+export const pdfFile = (name = 'Accounts 2025 to 2026.pdf') => ({
+  name,
+  mimeType: 'application/pdf',
+  buffer: Buffer.from('%PDF-1.7 a document that starts as every PDF does'),
+});
+
+/** A program that calls itself a PDF, which its bytes show it is not. */
+export const programFile = (name = 'Accounts 2025 to 2026.pdf') => ({
+  name,
+  mimeType: 'application/pdf',
+  buffer: Buffer.from('MZ this is a program, not a document'),
+});
+
 export interface GalleryState {
   name: string;
   /** Opens the gallery and puts the example in this state. */
@@ -126,6 +140,47 @@ export const galleryStates: GalleryState[] = [
       await scope.getByRole('button', { name: 'Check answers' }).click();
       await expect(summaryIn(scope)).toBeFocused();
       await expect(summaryIn(scope).getByRole('link')).toHaveCount(5);
+    },
+  },
+  {
+    name: 'a file question with a file on its way up',
+    open: async (page) => {
+      await openGallery(page);
+      const scope = example(page, 'File question uploading a file');
+      await scope.getByLabel('Choose files').setInputFiles(pdfFile());
+      await expect(
+        scope.getByRole('progressbar', { name: 'Uploading Accounts 2025 to 2026.pdf, 45%' }),
+      ).toBeVisible();
+    },
+  },
+  {
+    name: 'a file question with a file being checked for viruses',
+    open: async (page) => {
+      await openGallery(page);
+      const scope = example(page, 'File question checking a file');
+      await scope.getByLabel('Choose files').setInputFiles(pdfFile());
+      await expect(
+        scope.getByRole('listitem').getByText('Checking Accounts 2025 to 2026.pdf for viruses'),
+      ).toBeVisible();
+    },
+  },
+  {
+    name: 'a file question with a refused file, beside the question and in the summary',
+    open: async (page) => {
+      await openGallery(page);
+      const scope = example(page, 'File question with a refused file');
+      await scope.getByLabel('Choose files').setInputFiles(pdfFile());
+      await expect(summaryIn(scope)).toBeFocused();
+      await expect(summaryIn(scope).getByRole('link')).toHaveCount(1);
+    },
+  },
+  {
+    name: 'a file question with a file the browser would not send',
+    open: async (page) => {
+      await openGallery(page);
+      const scope = example(page, 'File question with no files');
+      await scope.getByLabel('Choose files').setInputFiles(programFile());
+      await expect(summaryIn(scope)).toBeFocused();
     },
   },
 ];
