@@ -78,6 +78,40 @@ export interface GrantsConflictDeclaration {
   tenant_id: string;
 }
 
+export interface GrantsDecision {
+  amount_minor: Int8 | null;
+  application_id: string;
+  created_at: Generated<Timestamp>;
+  created_by: string | null;
+  currency: string | null;
+  id: Generated<string>;
+  outcome: string;
+  recorded_at: Generated<Timestamp>;
+  recorded_by: string;
+  released_at: Timestamp | null;
+  released_by: string | null;
+  tenant_id: string;
+  updated_at: Generated<Timestamp>;
+  updated_by: string | null;
+}
+
+export interface GrantsDecisionEmail {
+  attempts: Generated<number>;
+  created_at: Generated<Timestamp>;
+  created_by: string | null;
+  decision_id: string;
+  error_code: string | null;
+  id: Generated<string>;
+  last_attempt_at: Timestamp | null;
+  recipient_person_id: string;
+  sent_at: Timestamp | null;
+  status: Generated<string>;
+  template_version_id: string;
+  tenant_id: string;
+  updated_at: Generated<Timestamp>;
+  updated_by: string | null;
+}
+
 export interface GrantsEligibilityResult {
   application_id: string;
   checked_at: Generated<Timestamp>;
@@ -125,6 +159,18 @@ export interface GrantsProgramme {
   summary: string;
   tenant_id: string;
   title: string;
+  updated_at: Generated<Timestamp>;
+  updated_by: string | null;
+}
+
+export interface GrantsPublisherSetting {
+  created_at: Generated<Timestamp>;
+  created_by: string | null;
+  funder_identifier: string;
+  funder_name: string;
+  id: Generated<string>;
+  identifier_prefix: string;
+  tenant_id: string;
   updated_at: Generated<Timestamp>;
   updated_by: string | null;
 }
@@ -215,10 +261,13 @@ export interface DB {
   'grants.application_file': GrantsApplicationFile;
   'grants.assignment': GrantsAssignment;
   'grants.conflict_declaration': GrantsConflictDeclaration;
+  'grants.decision': GrantsDecision;
+  'grants.decision_email': GrantsDecisionEmail;
   'grants.eligibility_result': GrantsEligibilityResult;
   'grants.email_template_version': GrantsEmailTemplateVersion;
   'grants.form_version': GrantsFormVersion;
   'grants.programme': GrantsProgramme;
+  'grants.publisher_setting': GrantsPublisherSetting;
   'grants.reviewer': GrantsReviewer;
   'grants.round': GrantsRound;
   'grants.rubric_criterion': GrantsRubricCriterion;

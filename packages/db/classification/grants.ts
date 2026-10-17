@@ -10,9 +10,14 @@
 // statuses, times, late flag, eligibility outcomes and file links (ADR
 // 0047). Reviewer pools, assignments, conflict declarations and scores are
 // internal, but for a score's comment, which is personal: a reviewer's
-// words about an applicant. Everything is kept while the tenant is a
-// customer: applications, scores and sent emails refer to the set-up, and
-// erasure anonymises a person in place (ADR 0017).
+// words about an applicant. Decisions (outcome, amount and dates included,
+// since a tenant publishes awards through 360Giving by its own choice) and
+// their emails' links, statuses and error codes are internal; the
+// publisher's 360Giving details are public. Everything is kept while the
+// tenant is a customer: applications, scores and sent emails refer to the
+// set-up, an email row as long as its decision, since it records who was
+// told what and when (ADR 0020), and erasure anonymises a person in place
+// (ADR 0017).
 
 import type { ClassificationRegistry, FieldClassification } from '../classification.ts';
 
@@ -169,5 +174,33 @@ export const grants: ClassificationRegistry = {
     criterion_id: internal,
     score: internal,
     comment: personal,
+  },
+  'grants.decision': {
+    ...keyAndActors,
+    application_id: internal,
+    outcome: internal,
+    amount_minor: internal,
+    currency: internal,
+    recorded_at: internal,
+    recorded_by: internal,
+    released_at: internal,
+    released_by: internal,
+  },
+  'grants.decision_email': {
+    ...keyAndActors,
+    decision_id: internal,
+    recipient_person_id: internal,
+    template_version_id: internal,
+    status: internal,
+    error_code: internal,
+    attempts: internal,
+    last_attempt_at: internal,
+    sent_at: internal,
+  },
+  'grants.publisher_setting': {
+    ...keyAndActors,
+    funder_identifier: shown,
+    funder_name: shown,
+    identifier_prefix: shown,
   },
 };
