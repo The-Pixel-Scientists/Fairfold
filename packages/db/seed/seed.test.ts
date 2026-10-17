@@ -9,7 +9,12 @@ import {
   questionsOf,
   validateAnswers,
 } from '@pixel-scientists/domain/forms';
-import { brandColourSchema, defaultTheme, slugSchema } from '@pixel-scientists/domain/platform';
+import {
+  brandColourSchema,
+  defaultTheme,
+  permissionsFor,
+  slugSchema,
+} from '@pixel-scientists/domain/platform';
 import { tenantNameSchema } from '@pixel-scientists/domain/platform/settings';
 import { describe, expect, it } from 'vitest';
 
@@ -175,10 +180,16 @@ describe('the applications scenario', () => {
   const round = northfield?.programmes?.[0]?.rounds[0];
   const submitted = northfield ? applicationsOf(northfield) : [];
 
-  it('is configured, with a round that has closed and six applications in it', () => {
+  it('is configured, with a round that has closed, a pool and six applications in it', () => {
     expect(eastmoor).toBe(configured[1]);
     const configuredRound = configured[0]?.programmes?.[0]?.rounds[0];
-    expect({ ...round, opensAt: '', closesAt: '', applications: [] }).toEqual({
+    expect({
+      ...round,
+      opensAt: '',
+      closesAt: '',
+      reviewers: undefined,
+      applications: [],
+    }).toEqual({
       ...configuredRound,
       opensAt: '',
       closesAt: '',
@@ -215,6 +226,29 @@ describe('the applications scenario', () => {
       expect(checkEligibility(form, answers)).toEqual({ status: 'eligible' });
       expect(answers).toHaveProperty('f_budget.0.c_item');
     }
+  });
+
+  it("pools Northfield's two reviewers, who review each application in Review", () => {
+    const reviewers = (northfield?.staff ?? [])
+      .filter(([, , role]) => permissionsFor([role], 'console').includes('grants.reviews.score'))
+      .map(([givenName, familyName]) => [givenName, familyName]);
+    expect(round?.reviewers).toEqual(reviewers);
+    const criteria = round?.stages.find(({ name }) => name === 'Review')?.criteria ?? [];
+    for (const { stage, reviews = [] } of submitted) {
+      expect(reviews.map(({ reviewer }) => reviewer)).toEqual(stage === 'Review' ? reviewers : []);
+      for (const { scores, submitted: done } of reviews) {
+        if (done) expect(scores).toHaveLength(criteria.length);
+        else expect(scores.length).toBeLessThan(criteria.length);
+        for (const [score, comment] of scores) {
+          expect(score).toBeGreaterThanOrEqual(1);
+          expect(score).toBeLessThanOrEqual(5);
+          expect(comment.length).toBeLessThanOrEqual(2000);
+        }
+      }
+    }
+    const reviews = submitted.flatMap(({ reviews = [] }) => reviews);
+    expect(reviews.filter(({ submitted: done }) => done)).toHaveLength(1);
+    expect(reviews.filter(({ scores }) => scores.length > 0)).toHaveLength(3);
   });
 
   it('gives each applicant an .example address of their own', () => {

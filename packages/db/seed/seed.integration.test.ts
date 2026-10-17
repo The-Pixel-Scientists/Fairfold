@@ -7,8 +7,8 @@
 // membership and a person; and Northfield's round is set up as configured,
 // with its published form. `applications` adds applicants, their
 // organisations and their applications, with each application's
-// eligibility check and stage history. A database that has had a tenant is
-// refused.
+// eligibility check and stage history, and the round's reviewer pool with
+// its assignments and scores. A database that has had a tenant is refused.
 
 import { randomBytes } from 'node:crypto';
 
@@ -46,6 +46,9 @@ const TENANT_TABLES = [
   'grants.application',
   'grants.eligibility_result',
   'grants.stage_transition',
+  'grants.reviewer',
+  'grants.assignment',
+  'grants.score',
 ];
 
 /** `scenario` under slugs no earlier run has used. */
@@ -265,6 +268,9 @@ describe('the applications scenario', { timeout: 60_000 }, () => {
       'grants.application': 6,
       'grants.eligibility_result': 6,
       'grants.stage_transition': 10,
+      'grants.reviewer': 2,
+      'grants.assignment': 4,
+      'grants.score': 6,
     });
   });
 
@@ -333,6 +339,42 @@ describe('the applications scenario', { timeout: 60_000 }, () => {
       row('Northfield Repair Cafe', 'withdrawn', 'Intake'),
       row('Northfield Rovers Football Club', 'submitted', 'Review'),
       row('Westgate Village Hall', 'submitted', 'Intake'),
+    ]);
+  });
+
+  it("assigns the pool's reviewers to the applications in Review, with draft and submitted scores", async () => {
+    const found = await asRoleIn('app_api', tenantId, async (client) => {
+      const { rows } = await client.query<Record<string, unknown>>(
+        `SELECT o.name, p.given_name AS reviewer, s.name AS stage, x.status,
+                x.submitted_at IS NOT NULL AS submitted,
+                (SELECT array_agg(sc.score ORDER BY c.position)
+                   FROM grants.score sc JOIN grants.rubric_criterion c ON c.id = sc.criterion_id
+                  WHERE sc.assignment_id = x.id) AS scores
+           FROM grants.assignment x
+           JOIN grants.reviewer r
+             ON r.round_id = x.round_id AND r.membership_id = x.reviewer_membership_id
+           JOIN app.membership m ON m.id = r.membership_id
+           JOIN party.person p ON p.user_id = m.user_id
+           JOIN grants.application a ON a.id = x.application_id
+           JOIN party.organisation o ON o.id = a.organisation_id
+           JOIN grants.stage s ON s.id = x.stage_id
+          ORDER BY o.name, p.given_name`,
+      );
+      return rows;
+    });
+    const row = (name: string, reviewer: string, scores: number[] | null, submitted = false) => ({
+      name,
+      reviewer,
+      stage: 'Review',
+      status: submitted ? 'submitted' : 'assigned',
+      submitted,
+      scores,
+    });
+    expect(found).toEqual([
+      row('Northfield Allotment Society', 'Owen', [4, 3, 4], true),
+      row('Northfield Allotment Society', 'Priya', [5, 4]),
+      row('Northfield Rovers Football Club', 'Owen', [4]),
+      row('Northfield Rovers Football Club', 'Priya', null),
     ]);
   });
 });

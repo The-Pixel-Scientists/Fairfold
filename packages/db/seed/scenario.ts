@@ -5,8 +5,9 @@
 // forced row-level security binds like any app role (ADR 0003), so it sets
 // each tenant in turn and writes that tenant's rows, all in one transaction.
 // Actor columns stay null, as for anything the system does, except where the
-// schema needs a member: the programme manager publishes forms and moves
-// applications on, and applicants start, check and submit their own.
+// schema needs a member: the programme manager publishes forms, moves
+// applications on and fills reviewer pools, and applicants start, check and
+// submit their own.
 
 import { argon2Sync, randomBytes, randomUUID } from 'node:crypto';
 
@@ -37,7 +38,21 @@ export interface Round {
   readonly stages: readonly { readonly name: string; readonly criteria?: readonly Criterion[] }[];
   /** Version 1 of the application form, published the day before the round opens. */
   readonly form?: unknown;
+  /** Staff in the round's reviewer pool, by given and family name, added when it closes. */
+  readonly reviewers?: readonly (readonly [givenName: string, familyName: string])[];
   readonly applications?: readonly Application[];
+}
+
+/**
+ * A pool reviewer's assignment to an application at the stage it reached,
+ * made a day after it got there, with the scores saved so far, in the order
+ * of the stage's criteria. A submitted review scores every criterion, and
+ * the database gives it the time the seed runs as its submission time.
+ */
+export interface Review {
+  readonly reviewer: readonly [givenName: string, familyName: string];
+  readonly scores: readonly (readonly [score: number, comment: string])[];
+  readonly submitted?: boolean;
 }
 
 export interface Organisation {
@@ -64,6 +79,7 @@ export interface Application {
   readonly submittedAt: string;
   readonly withdrawnAt?: string;
   readonly stage: string;
+  readonly reviews?: readonly Review[];
 }
 
 export interface Template {
@@ -187,11 +203,13 @@ interface Writer {
   readonly password: string;
   /** The first membership that may set up forms and move applications on. */
   readonly manager: string | undefined;
+  /** Staff memberships by given and family name. */
+  readonly staff: ReadonlyMap<string, string>;
 }
 
 /** An account with a password, a membership with `role` and a person: their ids. */
 async function addAccount(
-  writer: Omit<Writer, 'manager'>,
+  writer: Omit<Writer, 'manager' | 'staff'>,
   [givenName, familyName]: readonly [string, string, ...unknown[]],
   email: string,
   role: Role,
@@ -240,9 +258,11 @@ async function writeTenant(
   const writer = { client, insert, tenant, tenantId, password };
   let settingsManager: string | undefined;
   let manager: string | undefined;
+  const staff = new Map<string, string>();
   for (const member of tenant.staff) {
     const role = member[2];
     const { membership } = await addAccount(writer, member, emailOf(tenant, member), role);
+    staff.set(`${member[0]} ${member[1]}`, membership);
     const granted = permissionsFor([role], 'console');
     if (granted.includes('platform.settings.manage')) settingsManager ??= membership;
     if (MANAGER.every((permission) => granted.includes(permission))) manager ??= membership;
@@ -256,7 +276,7 @@ async function writeTenant(
     });
   }
   for (const programme of tenant.programmes ?? []) {
-    await writeProgramme({ ...writer, manager }, programme);
+    await writeProgramme({ ...writer, manager, staff }, programme);
   }
   return { id: tenantId, slug: tenant.slug, rows };
 }
@@ -306,6 +326,7 @@ async function writeProgramme(writer: Writer, programme: Programme): Promise<voi
       late_policy: round.latePolicy,
     });
     const stages: string[] = [];
+    const criteria: string[][] = [];
     for (const [stageIndex, stage] of round.stages.entries()) {
       const stageId = await insert('grants.stage', {
         tenant_id: tenantId,
@@ -314,8 +335,10 @@ async function writeProgramme(writer: Writer, programme: Programme): Promise<voi
         position: stageIndex + 1,
       });
       stages.push(stageId);
+      const stageCriteria: string[] = [];
+      criteria.push(stageCriteria);
       for (const [index, { label, guidance, weight }] of (stage.criteria ?? []).entries()) {
-        await insert('grants.rubric_criterion', {
+        const criterionId = await insert('grants.rubric_criterion', {
           tenant_id: tenantId,
           stage_id: stageId,
           label,
@@ -323,21 +346,30 @@ async function writeProgramme(writer: Writer, programme: Programme): Promise<voi
           weight,
           position: index + 1,
         });
+        stageCriteria.push(criterionId);
       }
     }
     if (round.form !== undefined) {
-      await writeApplications(writer, round, { id: roundId, stages });
+      await writeApplications(writer, round, { id: roundId, stages, criteria });
     }
   }
 }
 
 const DAY = 24 * 60 * 60 * 1000;
 
-/** Publish `round`'s form, then write its applications. */
+/** What writing a round's applications needs of the round as written. */
+interface WrittenRound {
+  readonly id: string;
+  readonly stages: readonly string[];
+  /** Each stage's criteria, in order. */
+  readonly criteria: readonly (readonly string[])[];
+}
+
+/** Publish `round`'s form, fill its reviewer pool, then write its applications. */
 async function writeApplications(
   writer: Writer,
   round: Round,
-  written: { readonly id: string; readonly stages: readonly string[] },
+  written: WrittenRound,
 ): Promise<void> {
   const { client, insert, tenant, tenantId, manager } = writer;
   const parsed = parseDefinition(round.form);
@@ -355,6 +387,15 @@ async function writeApplications(
     published_at: new Date(opens.getTime() - DAY),
     published_by: manager,
   });
+  for (const name of round.reviewers ?? []) {
+    await insert('grants.reviewer', {
+      tenant_id: tenantId,
+      round_id: written.id,
+      membership_id: staffMember(writer, name),
+      added_at: closes,
+      added_by: manager,
+    });
+  }
 
   for (const application of round.applications ?? []) {
     const { applicant, organisation, answers } = application;
@@ -434,5 +475,68 @@ async function writeApplications(
         moved_by: stage === 0 ? own.membership : manager,
       });
     }
+    const assignedAt = new Date(closes.getTime() + (reached + 1) * DAY);
+    for (const review of application.reviews ?? []) {
+      await writeReview(writer, review, {
+        round: written.id,
+        application: applicationId,
+        stage: stageId,
+        criteria: written.criteria[reached] ?? [],
+        assignedAt,
+      });
+    }
+  }
+}
+
+function staffMember(
+  { staff, tenant }: Writer,
+  [givenName, familyName]: readonly string[],
+): string {
+  const membership = staff.get(`${givenName} ${familyName}`);
+  if (membership === undefined) {
+    throw new Error(`${tenant.name} has no staff member ${givenName} ${familyName}.`);
+  }
+  return membership;
+}
+
+/** Assign the reviewer, save their scores, and submit them if the review is submitted. */
+async function writeReview(
+  writer: Writer,
+  review: Review,
+  at: {
+    readonly round: string;
+    readonly application: string;
+    readonly stage: string;
+    readonly criteria: readonly string[];
+    readonly assignedAt: Date;
+  },
+): Promise<void> {
+  const { client, insert, tenantId } = writer;
+  const complete = review.scores.length === at.criteria.length;
+  if (review.scores.length > at.criteria.length || (review.submitted && !complete)) {
+    throw new Error('A review scores at most every criterion, and a submitted one all of them.');
+  }
+  const assignmentId = await insert('grants.assignment', {
+    tenant_id: tenantId,
+    round_id: at.round,
+    application_id: at.application,
+    reviewer_membership_id: staffMember(writer, review.reviewer),
+    stage_id: at.stage,
+    created_at: at.assignedAt,
+  });
+  for (const [index, [score, comment]] of review.scores.entries()) {
+    await insert('grants.score', {
+      tenant_id: tenantId,
+      assignment_id: assignmentId,
+      stage_id: at.stage,
+      criterion_id: at.criteria[index],
+      score,
+      comment,
+    });
+  }
+  if (review.submitted) {
+    await client.query("UPDATE grants.assignment SET status = 'submitted' WHERE id = $1", [
+      assignmentId,
+    ]);
   }
 }

@@ -6,7 +6,9 @@
 // synthetic groups across its three stages. One was submitted late, which
 // the round's policy accepts and flags, and one was withdrawn. Each answers
 // every question but the optional accounts file, since the seed stores no
-// files.
+// files. Northfield's two reviewers make up the round's pool, and both are
+// assigned to each application in Review: Owen Hughes has submitted one
+// review and started another, and Priya Shah has scored part of one.
 
 import { base } from './base.ts';
 import { communitySpacesFund } from './configured.ts';
@@ -15,6 +17,9 @@ import type { Application, Organisation, Scenario } from './scenario.ts';
 /** An organisation in Northfield. */
 const group = (name: string, legalForm: string, addressLine1: string, postcode: string) =>
   ({ name, legalForm, addressLine1, town: 'Northfield', postcode }) satisfies Organisation;
+
+const OWEN = ['Owen', 'Hughes'] as const;
+const PRIYA = ['Priya', 'Shah'] as const;
 
 const pounds = (amount: number) => ({ amountMinor: amount * 100, currency: 'GBP' });
 
@@ -87,6 +92,24 @@ const submitted: readonly Application[] = [
     startedAt: '2026-09-08T09:30',
     submittedAt: '2026-09-21T12:10',
     stage: 'Review',
+    reviews: [
+      {
+        reviewer: OWEN,
+        scores: [
+          [4, 'The waiting list and the letters from the day centre show real demand.'],
+          [3, 'The plan is sound, but the timetable for the paths looks tight.'],
+          [4, 'Costs are explained, and members are giving their labour.'],
+        ],
+        submitted: true,
+      },
+      {
+        reviewer: PRIYA,
+        scores: [
+          [5, 'Strong evidence of need from members who use wheelchairs.'],
+          [4, 'A clear plan with the council already agreeing the layout.'],
+        ],
+      },
+    ],
   },
   {
     applicant: ['Samir', 'Haddad'],
@@ -107,6 +130,13 @@ const submitted: readonly Application[] = [
     startedAt: '2026-09-10T20:00',
     submittedAt: '2026-10-02T21:40',
     stage: 'Review',
+    reviews: [
+      {
+        reviewer: OWEN,
+        scores: [[4, 'Girls teams train later because there is one changing room.']],
+      },
+      { reviewer: PRIYA, scores: [] },
+    ],
   },
   {
     applicant: ['Joan', 'Whitfield'],
@@ -166,6 +196,7 @@ export const applications: Scenario = base.map((tenant) =>
                 ...autumn,
                 opensAt: '2026-09-07T09:00',
                 closesAt: '2026-10-05T17:00',
+                reviewers: [OWEN, PRIYA],
                 applications: submitted,
               },
             ],
