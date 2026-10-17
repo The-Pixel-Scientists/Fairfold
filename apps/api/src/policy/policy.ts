@@ -23,7 +23,13 @@ import {
 } from '@pixel-scientists/domain/platform';
 
 import { recordAudit, recordRead, type AuditActor } from '../audit/writer.ts';
-import type { MemberContext, RequestContext, RequestSession } from '../context.ts';
+import type {
+  MemberContext,
+  OwnTransaction,
+  RequestAudit,
+  RequestContext,
+  RequestSession,
+} from '../context.ts';
 import type { InTenant, TenantTransaction } from '../database.ts';
 import { recordConfigVersion } from '../platform/config-versions.ts';
 import { ApiError } from '../problems.ts';
@@ -94,6 +100,11 @@ export function checkSession(
   }
 }
 
+const auditOf = (tx: TenantTransaction, actor: AuditActor): RequestAudit => ({
+  record: (event) => recordAudit(tx, actor, event),
+  read: (entity) => recordRead(tx, actor, entity),
+});
+
 export interface MemberRequest {
   readonly route: Extract<RouteContract, { audience: 'console' | 'portal' }>;
   readonly context: RequestContext;
@@ -105,7 +116,8 @@ export interface MemberRequest {
  * Runs `run` in the session's tenant transaction, as a member who may make
  * this request, or throws. The tenant is the session's own, so row-level
  * security shows only that tenant's memberships and module switches. The
- * handler's own work is in the same transaction and commits with it.
+ * handler's own work is in the same transaction and commits with it. Work it
+ * queues with afterCommit() runs in order once that transaction has committed.
  */
 export async function asMember<T>(
   inTenant: InTenant,
@@ -115,7 +127,8 @@ export async function asMember<T>(
   const { session } = context;
   if (session === null || context.app === null) throw refuse(401, 'no_session');
 
-  return inTenant(session.tenant, async (tx) => {
+  const afterCommit: (() => Promise<void>)[] = [];
+  const result = await inTenant(session.tenant, async (tx) => {
     const db = tx.$extendTables<PolicyTables>();
 
     const membership = await db
@@ -154,13 +167,15 @@ export async function asMember<T>(
       membershipId: membership.id,
       requestId: context.requestId,
     };
+    const own: OwnTransaction = (work) =>
+      inTenant(session.tenant, (own) => work(own, auditOf(own, actor)));
     return run(tx, {
       ...context,
       app: session.app,
       session,
-      audit: {
-        record: (event) => recordAudit(tx, actor, event),
-        read: (entity) => recordRead(tx, actor, entity),
+      audit: auditOf(tx, actor),
+      afterCommit: (work) => {
+        afterCommit.push(() => work(own));
       },
       config: {
         record: (entityType, entityId, diff) =>
@@ -169,4 +184,6 @@ export async function asMember<T>(
       membership: { id: membership.id, permissions },
     });
   });
+  for (const work of afterCommit) await work();
+  return result;
 }

@@ -83,6 +83,21 @@ const release = defineRoute({
   responses: { 200: done },
 });
 
+const afterCommit = (path: string) =>
+  defineRoute({
+    method: 'GET',
+    path,
+    audience: 'console',
+    module: 'platform',
+    permission: 'platform.settings.manage',
+    scope: 'tenant',
+    summary: 'Run work after the request commits',
+    responses: { 200: z.object({ after: z.boolean() }) },
+  });
+
+const queued = afterCommit('/console/queued');
+const failing = afterCommit('/console/queued-then-fails');
+
 const profile = defineRoute({
   method: 'GET',
   path: '/portal/profile',
@@ -108,6 +123,7 @@ let tenantB: TestTenant;
 const people: Record<string, Person> = {};
 /** Which review each reviewer is assigned, for the assigned_review scope rule. */
 const assigned = new Map<string, string>();
+let afterCommitRuns = 0;
 const reviewOfAnotherReviewer = randomUUID();
 const ownReview = randomUUID();
 
@@ -169,6 +185,32 @@ beforeAll(async () => {
       route(programmes, () => Promise.resolve({ ok: true })),
       route(review, () => Promise.resolve({ ok: true })),
       route(release, () => Promise.resolve({ ok: true })),
+      route(queued, async ({ context }) => {
+        const entityId = randomUUID();
+        await context.audit.record({ action: 'platform.theme.changed', entityId });
+        const answer = { after: false };
+        // Another transaction cannot see the event until the request commits.
+        context.afterCommit(async (own) => {
+          const rows = await own((tx) =>
+            tx
+              .$extendTables<{ 'app.audit_event': { entity_id: string } }>()
+              .selectFrom('app.audit_event')
+              .select('entity_id')
+              .where('entity_id', '=', entityId)
+              .execute(),
+          );
+          answer.after = rows.length === 1;
+          afterCommitRuns++;
+        });
+        return answer;
+      }),
+      route(failing, ({ context }) => {
+        context.afterCommit(() => {
+          afterCommitRuns++;
+          return Promise.resolve();
+        });
+        return Promise.reject(new Error('The handler failed.'));
+      }),
       route(profile, ({ context }) => Promise.resolve({ membershipId: context.membership.id })),
     ],
   });
@@ -298,5 +340,16 @@ describe('the policy against the database', () => {
     expect((await post(asPerson('admin', tenantA, { recentAuthAt: new Date() }))).statusCode).toBe(
       403,
     );
+  });
+
+  it('runs queued work after the request commits, and drops it when the request fails', async () => {
+    afterCommitRuns = 0;
+    const ran = await get('/console/queued', asPerson('admin', tenantA));
+    expect(ran.json()).toEqual({ after: true });
+    expect(afterCommitRuns).toBe(1);
+
+    const failed = await get('/console/queued-then-fails', asPerson('admin', tenantA));
+    expect(failed.statusCode).toBe(500);
+    expect(afterCommitRuns).toBe(1);
   });
 });

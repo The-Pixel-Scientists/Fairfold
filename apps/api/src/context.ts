@@ -11,6 +11,7 @@ import type { ConfigDiff, ConfigEntityType } from '@pixel-scientists/domain/plat
 import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
 
 import type { AuditEvent } from './audit/writer.ts';
+import type { TenantTransaction } from './database.ts';
 
 /** Where the session stands on MFA, as in the session the apps read. */
 export type MfaState = 'enrol' | 'verify' | 'complete' | 'not_required';
@@ -59,12 +60,27 @@ export interface RequestConfig {
   ): Promise<void>;
 }
 
+/**
+ * Runs `work` in a transaction of its own, as the acting member, with the
+ * audit writer bound to it. Each call commits on its own.
+ */
+export type OwnTransaction = <T>(
+  work: (tx: TenantTransaction, audit: RequestAudit) => Promise<T>,
+) => Promise<T>;
+
 /** The context of a console or portal route, after the policy has let the caller in. */
 export interface MemberContext extends RequestContext {
   readonly app: App;
   readonly session: RequestSession;
   readonly audit: RequestAudit;
   readonly config: RequestConfig;
+  /**
+   * Queues `work` to run once the request's transaction has committed, and
+   * only then, before the response is sent. A failure of the request's
+   * transaction drops it. The handler's answer is encoded after the work
+   * has run, so the work may complete it.
+   */
+  afterCommit(work: (own: OwnTransaction) => Promise<void>): void;
   readonly membership: {
     readonly id: string;
     /** What the caller's roles give in this app, from the role map. */
