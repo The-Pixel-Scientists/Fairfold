@@ -136,6 +136,14 @@ export function submitHandlers(deps: ApplicationDependencies) {
     const { applicationId } = input.params;
     const application = await lockOwn(tx, deps, userId, applicationId);
     if (application.status !== 'submitted') throw deps.refuse(409, refusals.notSubmitted);
+    // A released decision stands. Only that one is read, so an unreleased one stays private.
+    const decided = await applicationsDb(tx)
+      .selectFrom('grants.decision')
+      .select('application_id')
+      .where('application_id', '=', applicationId)
+      .where('released_at', 'is not', null)
+      .executeTakeFirst();
+    if (decided !== undefined) throw deps.refuse(409, refusals.decided);
 
     await applicationsDb(tx)
       .updateTable('grants.application')

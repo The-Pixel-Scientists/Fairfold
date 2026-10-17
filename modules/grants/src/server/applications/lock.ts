@@ -21,6 +21,7 @@ export const refusals = {
   exists: 'This organisation has already started an application for this round.',
   notSubmitted: 'Only a submitted application can be withdrawn.',
   fileAnswer: 'Add files to this question by uploading them, not with the answers.',
+  decided: 'This application has an outcome, so it can no longer be withdrawn.',
   notEligible: 'Check you can apply before you submit.',
 } as const;
 

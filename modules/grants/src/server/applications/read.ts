@@ -10,7 +10,9 @@ import { checkEligibility, type Answers } from '@pixel-scientists/domain/forms';
 import { organisationSummaries, personIdForUser } from '@pixel-scientists/party/server';
 
 import {
+  applicantOutcome,
   applicantStatus,
+  type ApplicantDecision,
   type Application,
   type ApplicationSummary,
 } from '../../contracts/index.ts';
@@ -67,10 +69,42 @@ async function organisationNames(
   return new Map(summaries.map(({ id, name }) => [id, name]));
 }
 
+/**
+ * The decisions of these applications that have been released. An unreleased
+ * decision is never read here, so nothing about one can reach an applicant
+ * (ADR 0004, architecture rule 8).
+ */
+async function releasedDecisions(
+  tx: Tx,
+  applicationIds: readonly string[],
+): Promise<ReadonlyMap<string, ApplicantDecision>> {
+  if (applicationIds.length === 0) return new Map();
+  const rows = await applicationsDb(tx)
+    .selectFrom('grants.decision')
+    .select(['application_id', 'outcome', 'amount_minor'])
+    .where('application_id', 'in', applicationIds)
+    .where('released_at', 'is not', null)
+    .execute();
+  return new Map(
+    rows.map((row) => [
+      row.application_id,
+      {
+        outcome: row.outcome,
+        amount:
+          row.amount_minor === null
+            ? null
+            : { amountMinor: Number(row.amount_minor), currency: 'GBP' as const },
+        released: true,
+      },
+    ]),
+  );
+}
+
 function toSummary(
   row: SummaryRow,
   first: ReadonlyMap<string, string>,
   names: ReadonlyMap<string, string>,
+  decision: ApplicantDecision | undefined,
 ): ApplicationSummary {
   return {
     id: row.id,
@@ -88,11 +122,11 @@ function toSummary(
     status: applicantStatus({
       status: row.status,
       inFirstStage: row.stage_id !== null && row.stage_id === first.get(row.round_id),
-      decision: null,
+      decision: decision ?? null,
     }),
     updatedAt: row.updated_at.toISOString(),
     submittedAt: row.submitted_at?.toISOString() ?? null,
-    outcome: null,
+    outcome: applicantOutcome(decision ?? null),
   };
 }
 
@@ -107,7 +141,11 @@ export async function readApplications(tx: Tx, userId: string): Promise<Applicat
     .execute();
   const first = await firstStages(tx, [...new Set(rows.map((row) => row.round_id))]);
   const names = await organisationNames(tx, [...new Set(rows.map((row) => row.organisation_id))]);
-  return rows.map((row) => toSummary(row, first, names));
+  const decisions = await releasedDecisions(
+    tx,
+    rows.map((row) => row.id),
+  );
+  return rows.map((row) => toSummary(row, first, names, decisions.get(row.id)));
 }
 
 /**
@@ -154,8 +192,9 @@ export async function readApplication(
   const first = await firstStages(tx, [row.round_id]);
   const names = await organisationNames(tx, [row.organisation_id]);
   const answers = await answersWithFiles(tx, row.id, row.answers);
+  const decision = (await releasedDecisions(tx, [row.id])).get(row.id);
   return {
-    ...toSummary(row, first, names),
+    ...toSummary(row, first, names, decision),
     form: { id: row.form_id, definition },
     answers: projectedAnswers(definition, answers, 'applicant'),
     answersVersion: row.answers_version,
