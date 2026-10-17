@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// The auth routes (S02-01's contracts): sign-up, sign-in, reading the
-// session and signing out, and what the other auth routes share. The MFA,
-// step-up and switch routes are in their own files.
+// The auth routes (S02-01's contracts): sign-up, sign-in, password reset,
+// reading the session and signing out, and what the other auth routes
+// share. The MFA, step-up and switch routes are in their own files.
 
 import {
   sessionContext,
@@ -27,6 +27,8 @@ import { ApiError } from '../problems.ts';
 import { route, type Route } from '../routes/register.ts';
 import { clearedCookie, hashToken, sessionCookie } from './cookies.ts';
 import { copyAuthEvent, recordAuthEvent, type CopyDependencies } from './events.ts';
+import { requestResetRoute } from './password-reset.ts';
+import { completeResetRoute } from './password-reset-complete.ts';
 import { detailsOf, revoke } from './sessions.ts';
 import type { AuthSettings } from './settings.ts';
 import { signInRoutes } from './sign-in.ts';
@@ -190,6 +192,8 @@ export function authRoutes(deps: RouteDependencies): Route[] {
   return [
     ...signUpRoutes(deps),
     ...signInRoutes(deps),
+    requestResetRoute(deps),
+    completeResetRoute(deps),
 
     route(getSession, async ({ context }) => {
       const session = sessionOf(context);
