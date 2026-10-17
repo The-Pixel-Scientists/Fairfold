@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// The text checks in migrations 0009 and 0012 copy line() and paragraphs() in
-// modules/grants/src/contracts/programme/text.ts (S04-01): no character
-// that hides or reorders text, a line break allowed in paragraphs only, and
-// nothing that trim() removes at either end. packages/db cannot import a
-// module, so the contract's two patterns are copied here. This checks that
-// every column's copy of each pattern is the same, then runs it over every
-// Unicode code point, in the middle and at each end of a value.
+// The text checks in migrations 0009, 0012 and 0013 copy line() and
+// paragraphs() in modules/grants/src/contracts/programme/text.ts (S04-01):
+// no character that hides or reorders text, a line break allowed in
+// paragraphs only, and nothing that trim() removes at either end.
+// packages/db cannot import a module, so the contract's two patterns are
+// copied here. This checks that every column's copy of each pattern is the
+// same, then runs it over every Unicode code point, in the middle and at
+// each end of a value.
 
 import { beforeAll, describe, expect, it } from 'vitest';
 
@@ -20,6 +21,7 @@ const LINE_CHECKS = [
   'email_template_version_subject_text',
   'programme_summary_text',
   'programme_title_text',
+  'publisher_setting_funder_name_text',
   'round_title_text',
   'rubric_criterion_label_text',
   'stage_name_text',
@@ -91,7 +93,7 @@ async function refusedByDatabase(pattern: string): Promise<string[]> {
   return rows.map((row) => row.found);
 }
 
-describe('the text checks in migrations 0009 and 0012', { timeout: 120_000 }, () => {
+describe('the text checks in migrations 0009, 0012 and 0013', { timeout: 120_000 }, () => {
   it('give every line column one pattern, and every paragraphs column another', () => {
     expect([...patterns.keys()].sort()).toEqual([...LINE_CHECKS, ...TEXT_CHECKS].sort());
     expect(new Set(LINE_CHECKS.map((name) => patterns.get(name))).size).toBe(1);
