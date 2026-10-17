@@ -31,7 +31,7 @@ export function switchTenantRoutes(deps: RouteDependencies): Route[] {
       const { ip: address, userAgent } = deps.client(requestId);
       const ip = plainAddress(address);
       const switched = await deps.auth.transaction().execute(async (trx) => {
-        const current = await lockSession(trx, tokenHash);
+        const current = await lockSession(trx, session.userId, tokenHash);
         if (current === undefined) return undefined;
         return {
           token: await rotateSession(trx, current, { tenantId: target.tenantId, ip, userAgent }),

@@ -2,8 +2,8 @@
 //
 // Setting up an authenticator app and completing a console sign-in with it
 // (ADR 0010). Enrol and confirm need a session waiting for enrolment, verify
-// one waiting for a code. Each attempt locks its session first, so attempts
-// in one session take turns. Every attempt is charged to sign-in's limits
+// one waiting for a code. Each attempt locks its user, then its session, so
+// attempts in one session take turns. Every attempt is charged to sign-in's limits
 // first (S02-08), and a delayed one is refused without checking the code or
 // counting on the session. A right code completes the session as a new one,
 // with a new id and token, and gives back its own charge and the sign-in's,
@@ -76,7 +76,9 @@ async function completeWithCode(
   if (charged.refused) throw tooMany(deps, requestId, charged.retryAfter);
 
   const outcome = await deps.auth.transaction().execute(async (trx) => {
-    const current = await lockSession(trx, detailsOf(session).tokenHash);
+    // Confirming also sets two_factor_enabled, so it locks the user for that update.
+    const lock = use === 'confirm' ? 'no key update' : 'share';
+    const current = await lockSession(trx, userId, detailsOf(session).tokenHash, lock);
     if (current === undefined) return undefined;
     const db = trx.$extendTables<AuthTables>();
     if (await useCode(trx, key, userId, code, use)) {

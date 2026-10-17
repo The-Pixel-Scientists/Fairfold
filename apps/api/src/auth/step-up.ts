@@ -6,7 +6,8 @@
 // policy accepts for 5 minutes (S02-05). The attempt is charged to sign-in's
 // limits first, and a delayed one is refused without checking either. The
 // code is checked only after the password, so a wrong password never spends
-// one.
+// one. The password is checked again, under the session's lock, against the
+// hash as it is then (sessions.ts).
 
 import { chargeRateLimits, refundSignIn, SIGN_IN_SCOPES } from '@pixel-scientists/db';
 import { stepUp } from '@pixel-scientists/domain/auth';
@@ -17,7 +18,7 @@ import { copyAuthEvent, recordAuthEvent } from './events.ts';
 import { plainAddress } from './limits.ts';
 import { verifyNothing, verifyPassword } from './passwords.ts';
 import { answerWithSession, sessionOf, type RouteDependencies } from './routes.ts';
-import { detailsOf, lockSession, rotateSession } from './sessions.ts';
+import { currentPassword, detailsOf, lockSession, rotateSession } from './sessions.ts';
 import { tooMany } from './sign-up.ts';
 import type { AuthTables } from './tables.ts';
 import { useCode, type TotpKey } from './totp.ts';
@@ -54,9 +55,11 @@ export function stepUpRoutes(deps: RouteDependencies, totpKey: () => Promise<Tot
 
       const details = { requestId, userId, tenant, ...client };
       const outcome = await deps.auth.transaction().execute(async (trx) => {
-        const current = await lockSession(trx, detailsOf(session).tokenHash);
+        const current = await lockSession(trx, userId, detailsOf(session).tokenHash);
         if (current === undefined) return undefined;
-        if (matched && (await useCode(trx, key, userId, code, 'verify'))) {
+        // A password that a reset has replaced since it was checked does not count.
+        const confirmed = matched && (await currentPassword(trx, userId)) === account?.password;
+        if (confirmed && (await useCode(trx, key, userId, code, 'verify'))) {
           await refundSignIn(trx, client);
           const token = await rotateSession(trx, current, {
             reauthenticated: true,
@@ -65,7 +68,7 @@ export function stepUpRoutes(deps: RouteDependencies, totpKey: () => Promise<Tot
           });
           return { token, events: [await recordAuthEvent(trx, 'step_up_completed', details)] };
         }
-        const failed = matched
+        const failed = confirmed
           ? await recordAuthEvent(trx, 'mfa_code_failed', { ...details, reason: 'step_up' })
           : await recordAuthEvent(trx, 'sign_in_failed', { ...details, reason: 'step_up' });
         const events = [failed];

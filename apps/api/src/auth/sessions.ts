@@ -7,6 +7,12 @@
 // session with a new token, and the one it replaces is revoked in the same
 // transaction, so the session id changes. A replacement locks the old
 // session first, so two requests cannot both replace it.
+//
+// Every transaction that issues a session locks the user's row first, shared,
+// and revoking all of a user's sessions locks it exclusively (ADR 0010). So a
+// session is either committed before a revocation reads the sessions, and
+// revoked by it, or issued after the revocation commits, by a transaction
+// that then sees its changes, such as a new password.
 
 import { sessionContext, touchSession, type Kysely, type Transaction } from '@pixel-scientists/db';
 import type { App } from '@pixel-scientists/domain/platform';
@@ -101,10 +107,56 @@ export interface NewSession {
 }
 
 /**
+ * How a transaction locks a user's row: 'share' to issue sessions, 'update'
+ * to revoke them all, and 'no key update' to issue sessions and also update
+ * the row, so two such transactions take turns rather than deadlock.
+ */
+export type UserLock = 'share' | 'no key update' | 'update';
+
+/** Lock the user's row until `trx` ends, as app_auth, and say whether the user is active. */
+export async function lockUser(
+  trx: Transaction<unknown>,
+  userId: string,
+  mode: UserLock,
+): Promise<boolean> {
+  const query = trx
+    .$extendTables<AuthTables>()
+    .selectFrom('auth.user')
+    .select('status')
+    .where('id', '=', userId);
+  const locked =
+    mode === 'share'
+      ? query.forShare()
+      : mode === 'update'
+        ? query.forUpdate()
+        : query.forNoKeyUpdate();
+  return (await locked.executeTakeFirst())?.status === 'active';
+}
+
+/** The user's password hash as it is now, in `trx`, if they have one. Read after lockUser(). */
+export async function currentPassword(
+  trx: Transaction<unknown>,
+  userId: string,
+): Promise<string | undefined> {
+  const account = await trx
+    .$extendTables<AuthTables>()
+    .selectFrom('auth.account')
+    .select('password')
+    .where('user_id', '=', userId)
+    .where('provider_id', '=', 'credential')
+    .executeTakeFirst();
+  return account?.password;
+}
+
+/**
  * Issue a session in `trx`, as app_auth, and return its token for the
- * cookie. The token itself is never stored.
+ * cookie. The token itself is never stored. The caller locks the user first
+ * (lockUser or lockSession); taking it here as well makes sure of it.
  */
 export async function issueSession(trx: Transaction<unknown>, next: NewSession): Promise<string> {
+  if (!(await lockUser(trx, next.userId, 'share'))) {
+    throw new Error('A session cannot be issued to a user who is not active.');
+  }
   if (next.replaces !== undefined) await revoke(trx, next.replaces);
   const token = newToken();
   const { reauthenticated } = next;
@@ -136,11 +188,17 @@ export type StoredSession = Pick<
   readonly ip_address: string;
 };
 
-/** The unrevoked session whose token hashes to `tokenHash`, locked until `trx` ends. */
+/**
+ * The unrevoked session of the active user `userId` whose token hashes to
+ * `tokenHash`, locked until `trx` ends, after the user (lockUser) with `mode`.
+ */
 export async function lockSession(
   trx: Transaction<unknown>,
+  userId: string,
   tokenHash: Buffer,
+  mode: Exclude<UserLock, 'update'> = 'share',
 ): Promise<StoredSession | undefined> {
+  if (!(await lockUser(trx, userId, mode))) return undefined;
   return trx
     .$extendTables<AuthTables>()
     .selectFrom('auth.session')
@@ -156,6 +214,7 @@ export async function lockSession(
       eb.fn<string>('host', ['ip_address']).as('ip_address'),
     ])
     .where('token_hash', '=', tokenHash)
+    .where('user_id', '=', userId)
     .where('revoked_at', 'is', null)
     .forUpdate()
     .executeTakeFirst();
@@ -204,11 +263,16 @@ export async function revoke(trx: Transaction<unknown>, tokenHash: Buffer): Prom
     .execute();
 }
 
-/** Revoke every live session of a user, or those active in one tenant, in `trx`, as app_auth. */
+/**
+ * Revoke every live session of a user, or those active in one tenant, in
+ * `trx`, as app_auth. It locks the user first, so no session is being issued
+ * meanwhile.
+ */
 export async function revokeAll(
   trx: Transaction<unknown>,
   target: { readonly userId: string; readonly tenantId?: string },
 ): Promise<number> {
+  await lockUser(trx, target.userId, 'update');
   let query = trx
     .$extendTables<AuthTables>()
     .updateTable('auth.session')
