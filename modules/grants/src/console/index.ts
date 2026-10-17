@@ -2,7 +2,7 @@
 //
 // The grants module's staff screens: the routes the console adds under a
 // funder's address, and the pages they put in its navigation. Programme
-// set-up is here; later grants screens extend both lists.
+// set-up and the form builder are here; later grants screens extend both lists.
 
 import { idSchema } from '@pixel-scientists/domain';
 import type { Permission } from '@pixel-scientists/domain/platform';
@@ -77,6 +77,18 @@ export const grantsRoutes: readonly RouteDefinition[] = [
     title: 'Rubric',
     params: ids,
     load: () => import('./programme/RubricPage.tsx'),
+  },
+  {
+    path: '/rounds/:roundId/form',
+    title: 'Application form',
+    params: ids,
+    load: () => import('./forms/FormPage.tsx'),
+  },
+  {
+    path: '/rounds/:roundId/form/:formVersionId',
+    title: 'Form version',
+    params: ids,
+    load: () => import('./forms/FormEditorPage.tsx'),
   },
 ];
 
