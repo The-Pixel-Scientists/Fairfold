@@ -9,9 +9,13 @@ import type { FieldProblem } from '@pixel-scientists/domain/platform';
 import { listAuditEvents } from '@pixel-scientists/domain/platform/audit-log';
 import {
   applicationRoutes,
+  assessmentRoutes,
+  assignReviewersAutomatically,
   FORM_DEFINITION_MAX_BYTES,
   formRoutes,
   programmeRoutes,
+  reviewRoutes,
+  spreadRoutes,
   submissionRoutes,
 } from '@pixel-scientists/grants/contracts';
 import { grantsHandlers, grantsResolvers } from '@pixel-scientists/grants/server';
@@ -21,6 +25,7 @@ import { partyHandlers, partyResolvers } from '@pixel-scientists/party/server';
 import type { PublicTenants, TenantTransaction } from './database.ts';
 import { listAuditEventsHandler } from './platform/audit-log/index.ts';
 import { insertConfigVersion, readConfigHistory } from './platform/config-versions.ts';
+import { membersWith } from './platform/members.ts';
 import { settingsRoutes } from './platform/settings/index.ts';
 import { settingsTables } from './platform/settings/tables.ts';
 import type { ScopeResolvers } from './policy/index.ts';
@@ -60,6 +65,7 @@ export function composeModules(deps: { publicTenants: PublicTenants }): Composed
     tenantTimeZone,
     recordConfig: insertConfigVersion,
     configHistory: readConfigHistory,
+    membersWith,
   });
   return {
     routes: [
@@ -109,6 +115,21 @@ export function composeModules(deps: { publicTenants: PublicTenants }): Composed
       route(submissionRoutes.listSubmissions, grants.listSubmissions),
       route(submissionRoutes.getSubmission, grants.getSubmission),
       route(submissionRoutes.moveSubmissionsToStage, grants.moveSubmissionsToStage),
+      route(assessmentRoutes.getReviewerPool, grants.getReviewerPool),
+      route(assessmentRoutes.listReviewerCandidates, grants.listReviewerCandidates),
+      route(assessmentRoutes.addReviewers, grants.addReviewers),
+      route(assessmentRoutes.removeReviewer, grants.removeReviewer),
+      route(assessmentRoutes.listAssignments, grants.listAssignments),
+      route(assessmentRoutes.assignReviewers, grants.assignReviewers),
+      route(assessmentRoutes.removeAssignment, grants.removeAssignment),
+      route(assignReviewersAutomatically, grants.assignReviewersAutomatically),
+      route(spreadRoutes.getScoreSpread, grants.getScoreSpread),
+      route(spreadRoutes.getSubmissionScores, grants.getSubmissionScores),
+      route(reviewRoutes.listReviews, grants.listReviews),
+      route(reviewRoutes.getReview, grants.getReview),
+      route(reviewRoutes.declareConflict, grants.declareConflict),
+      route(reviewRoutes.saveReviewScores, grants.saveReviewScores),
+      route(reviewRoutes.submitReview, grants.submitReview),
     ],
     resolvers: { ...partyResolvers, ...grantsResolvers },
   };

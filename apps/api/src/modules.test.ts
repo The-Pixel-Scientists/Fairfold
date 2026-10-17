@@ -16,8 +16,12 @@ import {
 } from '@pixel-scientists/domain/platform/settings';
 import {
   applicationRoutes,
+  assessmentRoutes,
+  assignReviewersAutomatically,
   formRoutes,
   programmeRoutes,
+  reviewRoutes,
+  spreadRoutes,
   submissionRoutes,
 } from '@pixel-scientists/grants/contracts';
 import { partyRoutes } from '@pixel-scientists/party/contracts';
@@ -52,6 +56,10 @@ describe('composeModules', () => {
       ...Object.values(formRoutes),
       ...Object.values(applicationRoutes),
       ...Object.values(submissionRoutes),
+      ...Object.values(assessmentRoutes),
+      assignReviewersAutomatically,
+      ...Object.values(spreadRoutes),
+      ...Object.values(reviewRoutes),
     ]);
   });
 
@@ -64,6 +72,10 @@ describe('composeModules', () => {
         ...Object.values(formRoutes),
         ...Object.values(applicationRoutes),
         ...Object.values(submissionRoutes),
+        ...Object.values(assessmentRoutes),
+        assignReviewersAutomatically,
+        ...Object.values(spreadRoutes),
+        ...Object.values(reviewRoutes),
       ].map((contract) => contract.scope),
     );
 

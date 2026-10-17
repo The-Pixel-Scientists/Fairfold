@@ -6,6 +6,7 @@
 export {
   grantsHandlers,
   grantsResolvers,
+  type AssessmentDependencies,
   type ConfigHistoryRow,
   type GrantsContext,
   type GrantsDependencies,
