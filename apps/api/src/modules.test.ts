@@ -14,7 +14,7 @@ import {
   updateTheme,
   uploadLogo,
 } from '@pixel-scientists/domain/platform/settings';
-import { programmeRoutes } from '@pixel-scientists/grants/contracts';
+import { formRoutes, programmeRoutes } from '@pixel-scientists/grants/contracts';
 import { partyRoutes } from '@pixel-scientists/party/contracts';
 import { describe, expect, it } from 'vitest';
 
@@ -44,15 +44,18 @@ describe('composeModules', () => {
       getLogo,
       ...Object.values(partyRoutes),
       ...Object.values(programmeRoutes),
+      ...Object.values(formRoutes),
     ]);
   });
 
   it('resolves every scope rule the module routes use, and none that is the platform’s', () => {
     const { resolvers } = composeModules({ publicTenants });
     const used = new Set(
-      [...Object.values(partyRoutes), ...Object.values(programmeRoutes)].map(
-        (contract) => contract.scope,
-      ),
+      [
+        ...Object.values(partyRoutes),
+        ...Object.values(programmeRoutes),
+        ...Object.values(formRoutes),
+      ].map((contract) => contract.scope),
     );
 
     expect(Object.keys(resolvers).sort()).toEqual(

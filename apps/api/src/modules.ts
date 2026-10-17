@@ -7,7 +7,11 @@
 
 import type { FieldProblem } from '@pixel-scientists/domain/platform';
 import { listAuditEvents } from '@pixel-scientists/domain/platform/audit-log';
-import { programmeRoutes } from '@pixel-scientists/grants/contracts';
+import {
+  FORM_DEFINITION_MAX_BYTES,
+  formRoutes,
+  programmeRoutes,
+} from '@pixel-scientists/grants/contracts';
 import { grantsHandlers } from '@pixel-scientists/grants/server';
 import { partyRoutes } from '@pixel-scientists/party/contracts';
 import { partyHandlers, partyResolvers } from '@pixel-scientists/party/server';
@@ -26,6 +30,9 @@ export interface ComposedModules {
   readonly routes: readonly Route[];
   readonly resolvers: ScopeResolvers;
 }
+
+/** Room for a definition at its limit, written with spaces, in a request; the contract's schema checks the size itself. */
+const FORM_BODY_LIMIT_BYTES = 2 * FORM_DEFINITION_MAX_BYTES;
 
 /** A record the caller may not reach reads exactly as a missing one does. */
 const notFound = (): Error => new ApiError(404, undefined, { reason: 'not_found' });
@@ -82,6 +89,12 @@ export function composeModules(deps: { publicTenants: PublicTenants }): Composed
       route(programmeRoutes.setEmailTemplates, grants.setEmailTemplates),
       route(programmeRoutes.getProgrammeHistory, grants.getProgrammeHistory),
       route(programmeRoutes.getRoundHistory, grants.getRoundHistory),
+      route(formRoutes.listFormVersions, grants.listFormVersions),
+      route(formRoutes.createFormDraft, grants.createFormDraft),
+      route(formRoutes.getFormVersion, grants.getFormVersion),
+      route(formRoutes.saveFormDraft, grants.saveFormDraft, { bodyLimit: FORM_BODY_LIMIT_BYTES }),
+      route(formRoutes.publishFormDraft, grants.publishFormDraft),
+      route(formRoutes.discardFormDraft, grants.discardFormDraft),
     ],
     resolvers: partyResolvers,
   };
