@@ -18,7 +18,7 @@ import { buildApp } from '../src/app.ts';
 import { loadConfig } from '../src/config.ts';
 import { openDatabase } from '../src/database.ts';
 import { createLogger } from '../src/logger.ts';
-import { composeModules } from '../src/modules.ts';
+import { composeModules, type Mail } from '../src/modules.ts';
 import { addMember, type Member } from './settings-api.ts';
 import { smtpTestSettings, testAuth, testSession } from './support.ts';
 
@@ -163,7 +163,7 @@ export const storedVersions = (tenant: TestTenant, entityType: string, entityId:
  * second one with a name on a person record (`ada`), a reviewer, an
  * administrator and an applicant. In tenant B: a programme manager.
  */
-export async function startProgrammeApi(port: string) {
+export async function startProgrammeApi(port: string, mail?: Mail) {
   const { database: settings } = loadConfig({
     ...process.env,
     ...smtpTestSettings,
@@ -178,7 +178,7 @@ export async function startProgrammeApi(port: string) {
     checkDatabase: () => database.check(),
     inTenant: database.inTenant,
     auth: auth.module,
-    ...composeModules({ publicTenants: database.publicTenants }),
+    ...composeModules({ publicTenants: database.publicTenants, mail }),
   });
 
   const [tenantA, tenantB] = await Promise.all([createTestTenant(), createTestTenant()]);
@@ -203,6 +203,7 @@ export async function startProgrammeApi(port: string) {
     url: string,
     payload?: unknown,
     app: 'console' | 'portal' = member?.app ?? 'console',
+    recentAuthAt: Date | null = null,
   ) =>
     api.inject({
       method,
@@ -212,7 +213,12 @@ export async function startProgrammeApi(port: string) {
         : {
             headers: auth.as({
               app,
-              session: testSession({ app, userId: member.userId, tenant: member.tenant.id }),
+              session: testSession({
+                app,
+                userId: member.userId,
+                tenant: member.tenant.id,
+                recentAuthAt,
+              }),
             }),
           }),
       ...(payload === undefined ? {} : { payload: payload as object }),

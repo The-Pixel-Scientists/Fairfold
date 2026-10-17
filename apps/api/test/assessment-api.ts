@@ -14,6 +14,7 @@ import type {
 import type { LightMyRequestResponse } from 'fastify';
 import { expect } from 'vitest';
 
+import type { Mail } from '../src/modules.ts';
 import { addPerson } from '../../../packages/db/test/party/fixtures.ts';
 import { asMigratorIn } from '../../../packages/db/test/tenants.ts';
 import {
@@ -71,8 +72,8 @@ export async function noContent(response: Promise<LightMyRequestResponse>): Prom
   expect(answered.statusCode, answered.body).toBe(204);
 }
 
-export async function startAssessmentApi(port: string) {
-  const t = await startApplicationsApi(port);
+export async function startAssessmentApi(port: string, mail?: Mail) {
+  const t = await startApplicationsApi(port, mail);
   const [grace, alan, edsger] = await Promise.all([
     addMember(t.tenantA, 'console', 'reviewer'),
     addMember(t.tenantA, 'console', 'reviewer'),
