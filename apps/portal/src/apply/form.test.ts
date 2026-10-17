@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import { formDefinitionSchema } from '@pixel-scientists/domain/forms';
 import type { Answers } from '@pixel-scientists/domain/forms';
 import { describe, expect, it } from 'vitest';
 
-import { completeAnswers, definition } from '../testing/apply.ts';
+import { FILE_ID, attachment, completeAnswers, definition } from '../testing/apply.ts';
 import {
   ELIGIBILITY_SCREEN,
   controlId,
@@ -20,6 +21,7 @@ import {
   stopsOf,
   timeWords,
   toFix,
+  withFiles,
 } from './form.ts';
 
 const titles = (screens: { title: string }[]) => screens.map(({ title }) => title);
@@ -34,11 +36,10 @@ describe('screensOf', () => {
     expect(sections[0]?.fields.map(({ id }) => id)).not.toContain('f_charity');
   });
 
-  it('leaves out file questions, which the screens do not draw yet', () => {
-    const fields = screensOf(definition).flatMap((screen) => screen.fields.map(({ id }) => id));
+  it('draws file questions with the others', () => {
+    const budget = screensOf(definition).find(({ id }) => id === 's_budget');
 
-    expect(fields).not.toContain('f_accounts');
-    expect(fields).toContain('f_costs');
+    expect(budget?.fields.map(({ id }) => id)).toEqual(['f_costs', 'f_accounts']);
   });
 });
 
@@ -55,11 +56,62 @@ describe('shownScreens', () => {
   });
 });
 
-describe('problemsOf', () => {
-  it('does not ask for a file, which the server adds', () => {
-    const problems = problemsOf(definition, completeAnswers, 'submit');
+describe('withFiles', () => {
+  it('answers a file question with the ids of its files, in the order attached', () => {
+    const second = attachment({ id: '7c9e6679-7425-40de-944b-e07fc1f90ae7' });
 
-    expect(problems).toEqual([]);
+    const answers = withFiles(definition, completeAnswers, [attachment(), second]);
+
+    expect(answers['f_accounts']).toEqual([FILE_ID, second.id]);
+  });
+
+  it('leaves a question with no files unanswered, whatever the answers held', () => {
+    const answers = withFiles(definition, { ...completeAnswers, f_accounts: [FILE_ID] }, []);
+
+    expect(Object.hasOwn(answers, 'f_accounts')).toBe(false);
+  });
+
+  it('ignores a file on another question', () => {
+    const answers = withFiles(definition, completeAnswers, [attachment({ fieldId: 'f_other' })]);
+
+    expect(Object.hasOwn(answers, 'f_accounts')).toBe(false);
+  });
+
+  it('does not answer a question that is not shown', () => {
+    const hidden = formDefinitionSchema.parse({
+      sections: [
+        {
+          id: 's_files',
+          title: 'Files',
+          fields: [
+            { id: 'f_lease', type: 'yes_no', label: 'Do you lease the building?' },
+            {
+              id: 'f_accounts',
+              type: 'file',
+              label: 'A copy of the lease',
+              conditions: [{ field: 'f_lease', equals: true }],
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(withFiles(hidden, { f_lease: false }, [attachment()])).toEqual({ f_lease: false });
+    expect(withFiles(hidden, { f_lease: true }, [attachment()])).toEqual({
+      f_lease: true,
+      f_accounts: [FILE_ID],
+    });
+  });
+});
+
+describe('problemsOf', () => {
+  it('asks for a required file until one is attached', () => {
+    expect(problemsOf(definition, completeAnswers, 'submit')).toEqual([
+      { field: 'f_accounts', message: 'Upload a file for this question.' },
+    ]);
+    expect(
+      problemsOf(definition, withFiles(definition, completeAnswers, [attachment()]), 'submit'),
+    ).toEqual([]);
   });
 
   it('names what is missing and what is wrong', () => {
@@ -174,6 +226,19 @@ describe('toFix', () => {
     expect(fixes.find(({ label }) => label === 'Project summary')).toMatchObject({
       controlId: 'f_summary',
     });
+  });
+
+  it('points at a missing file by the id of its input, on the screen that asks for it', () => {
+    const fixes = toFix(screensOf(definition), problemsOf(definition, completeAnswers, 'submit'));
+
+    expect(fixes).toMatchObject([
+      {
+        screen: { title: 'Budget' },
+        label: 'Your latest accounts',
+        controlId: 'f_accounts',
+        message: 'Upload a file for this question.',
+      },
+    ]);
   });
 
   it('points at the first box of an address, and at the part that is wrong', () => {

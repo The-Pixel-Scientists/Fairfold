@@ -4,6 +4,7 @@
 // (docs/CONTENT-STYLE.md): short sentences, buttons that say what happens, no
 // apology or blame, and nothing that hints at an outcome.
 
+import type { AttachmentView } from '@pixel-scientists/grants/contracts';
 import { screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
@@ -14,6 +15,7 @@ import {
   application,
   applicationList,
   applicationServer,
+  attachment,
   completeAnswers,
   openRoundList,
   round,
@@ -34,9 +36,9 @@ async function settled() {
 }
 
 const home = `/northfield/applications/${APPLICATION_ID}`;
-const reads = (start = application()) => ({
+const reads = (start = application(), files: AttachmentView[] = []) => ({
   ...signedIn,
-  ...applicationServer(start).handlers,
+  ...applicationServer(start, files).handlers,
   'GET /portal/rounds': openRoundList(round),
   [`GET /portal/rounds/${ROUND_ID}`]: roundDetail(),
   'GET /portal/organisations': organisationList(organisation()),
@@ -87,13 +89,29 @@ const screens = [
   ],
   ['a section', `${home}/sections/s_about`, reads(eligible)],
   ['the budget', `${home}/sections/s_budget`, reads(eligible)],
+  [
+    'the budget, with a file attached',
+    `${home}/sections/s_budget`,
+    reads(eligible, [attachment()]),
+  ],
   ['a section, locked', `${home}/sections/s_about`, reads()],
   ['check your answers, with things to fix', `${home}/check`, reads(eligible)],
-  ['check your answers, ready', `${home}/check`, reads(application({ answers: completeAnswers }))],
+  [
+    'check your answers, ready',
+    `${home}/check`,
+    reads(application({ answers: completeAnswers }), [attachment()]),
+  ],
   [
     'application submitted',
     `${home}/submitted`,
     reads(application({ status: 'submitted', submittedAt: '2026-10-21T12:00:00.000Z' })),
+  ],
+  [
+    'application submitted, with a file',
+    `${home}/submitted`,
+    reads(application({ status: 'submitted', submittedAt: '2026-10-21T12:00:00.000Z' }), [
+      attachment(),
+    ]),
   ],
 ] as const;
 

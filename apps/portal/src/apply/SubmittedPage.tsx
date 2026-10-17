@@ -6,14 +6,17 @@
 
 import { applicantStatuses } from '@pixel-scientists/grants/contracts';
 import type { Application } from '@pixel-scientists/grants/contracts';
-import { Link, buttonClassName, useParams } from '@pixel-scientists/ui';
+import { AnswerView, Link, buttonClassName, useParams } from '@pixel-scientists/ui';
 
 import { useFunderName } from '../funder.tsx';
 import { APPLICATIONS_PATH, applicationPath } from '../paths.ts';
+import { downloadHref } from './files.ts';
 import { dateAndTimeOf } from './format.ts';
+import { helpers } from './helpers.ts';
 import { ApplyPage, ApplyScreen, Block } from './parts.tsx';
 import type { View } from './parts.tsx';
-import { useApplicationRead } from './reads.ts';
+import { useApplicationFilesRead } from './reads.ts';
+import type { ApplicationWithFiles } from './reads.ts';
 import { crumbs, loadingApplication, nameOf, noApplication } from './views.tsx';
 
 const steps = [
@@ -107,6 +110,29 @@ function Steps() {
   );
 }
 
+/** The files that were sent, by question, each a link to download it. Nothing when there are none. */
+function SentFiles({ application, files }: ApplicationWithFiles) {
+  const asked = new Set(files.map(({ fieldId }) => fieldId));
+  const sections = application.form.definition.sections.map((section) => ({
+    ...section,
+    fields: section.fields.filter((field) => asked.has(field.id)),
+  }));
+  if (files.length === 0) return null;
+  return (
+    <Block title="Files you sent">
+      <AnswerView
+        sections={sections}
+        visible={sections.flatMap(({ fields }) => fields)}
+        answers={{}}
+        helpers={helpers}
+        files={files}
+        hrefFor={(id) => downloadHref(application.id, id)}
+        headingLevel="h3"
+      />
+    </Block>
+  );
+}
+
 const toApplications = (
   <div>
     <Link to={APPLICATIONS_PATH} className={buttonClassName('secondary', 'w-full sm:w-auto')}>
@@ -115,7 +141,8 @@ const toApplications = (
   </div>
 );
 
-function submittedView(application: Application): View {
+function submittedView(loaded: ApplicationWithFiles): View {
+  const { application } = loaded;
   const { status } = application;
   if (status === 'in_progress') {
     return {
@@ -148,6 +175,7 @@ function submittedView(application: Application): View {
       body: (
         <>
           <Sent application={application} />
+          <SentFiles {...loaded} />
           <Steps />
           {toApplications}
         </>
@@ -170,7 +198,7 @@ function submittedView(application: Application): View {
 
 function Submitted() {
   const { applicationId = '' } = useParams();
-  const { read, retry } = useApplicationRead(applicationId);
+  const { read, retry } = useApplicationFilesRead(applicationId);
   return (
     <ApplyPage
       read={read}

@@ -21,6 +21,7 @@ import { useState } from 'react';
 import { callApi } from '../api.ts';
 import { useFunderName } from '../funder.tsx';
 import { applicationPath, eligibilityPath, sectionPath, submittedPath } from '../paths.ts';
+import { downloadHref } from './files.ts';
 import {
   ELIGIBILITY_SCREEN,
   problemsOf,
@@ -28,12 +29,14 @@ import {
   shownIds,
   shownScreens,
   toFix,
+  withFiles,
 } from './form.ts';
 import type { Screen as QuestionScreen } from './form.ts';
 import { helpers } from './helpers.ts';
 import { ApplyPage, ApplyScreen, Block } from './parts.tsx';
 import type { View } from './parts.tsx';
-import { useApplicationRead } from './reads.ts';
+import { useApplicationFilesRead } from './reads.ts';
+import type { ApplicationWithFiles } from './reads.ts';
 import { crumbs, loadingApplication, noApplication, notDraft } from './views.tsx';
 
 const screenPath = (application: Application, screen: QuestionScreen): string =>
@@ -70,14 +73,14 @@ function refusalOf(error: unknown): Refusal {
   };
 }
 
-function Answers({ application, reload }: { application: Application; reload: () => void }) {
+function Answers({ application, files, reload }: ApplicationWithFiles & { reload: () => void }) {
   const navigate = useNavigate();
   const funder = useFunderName();
   const [pending, setPending] = useState(false);
   const [refusal, setRefusal] = useState<Refusal | null>(null);
 
   const { definition } = application.form;
-  const { answers } = application;
+  const answers = withFiles(definition, application.answers, files);
   const screens = shownScreens(definition, answers);
   const shown = shownIds(definition, answers);
   const eligibility = checkEligibility(definition, answers);
@@ -142,6 +145,8 @@ function Answers({ application, reload }: { application: Application; reload: ()
                 visible={visibleFields(definition, answers)}
                 answers={answers}
                 helpers={helpers}
+                files={files}
+                hrefFor={(id) => downloadHref(application.id, id)}
                 headingLevel="h2"
               />
               <div>
@@ -219,7 +224,7 @@ function Answers({ application, reload }: { application: Application; reload: ()
   );
 }
 
-function checkView(application: Application, reload: () => void): View {
+function checkView({ application, files }: ApplicationWithFiles, reload: () => void): View {
   if (application.status !== 'in_progress') return notDraft(application);
   return {
     heading: {
@@ -232,20 +237,20 @@ function checkView(application: Application, reload: () => void): View {
         </p>
       ),
     },
-    body: <Answers application={application} reload={reload} />,
+    body: <Answers application={application} files={files} reload={reload} />,
   };
 }
 
 function Check() {
   const { applicationId = '' } = useParams();
-  const { read, retry } = useApplicationRead(applicationId);
+  const { read, retry } = useApplicationFilesRead(applicationId);
   return (
     <ApplyPage
       read={read}
       retry={retry}
       loading={loadingApplication}
       missing={noApplication}
-      view={(application) => checkView(application, retry)}
+      view={(loaded) => checkView(loaded, retry)}
     />
   );
 }

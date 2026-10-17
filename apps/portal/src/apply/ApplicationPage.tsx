@@ -5,7 +5,6 @@
 // sections wait for it.
 
 import { checkEligibility } from '@pixel-scientists/domain/forms';
-import type { Application } from '@pixel-scientists/grants/contracts';
 import {
   Link,
   Meter,
@@ -25,19 +24,21 @@ import {
   shownIds,
   shownScreens,
   statusOf,
+  withFiles,
 } from './form.ts';
 import { ApplyPage, ApplyScreen, Block } from './parts.tsx';
 import type { View } from './parts.tsx';
-import { useApplicationRead } from './reads.ts';
+import { useApplicationFilesRead } from './reads.ts';
+import type { ApplicationWithFiles } from './reads.ts';
 import { crumbs, loadingApplication, noApplication, notDraft } from './views.tsx';
 
 const questionsWord = (count: number) =>
   `${String(count)} ${count === 1 ? 'question' : 'questions'}`;
 
 /** The task list: eligibility first, then the sections, which wait until the applicant can apply. */
-function tasksOf(application: Application): TaskItem[] {
+function tasksOf({ application, files }: ApplicationWithFiles): TaskItem[] {
   const { definition } = application.form;
-  const { answers } = application;
+  const answers = withFiles(definition, application.answers, files);
   const shown = shownIds(definition, answers);
   const problems = problemsOf(definition, answers, 'submit');
   const eligibility = checkEligibility(definition, answers);
@@ -79,9 +80,10 @@ function tasksOf(application: Application): TaskItem[] {
   });
 }
 
-function overviewView(application: Application): View {
+function overviewView(loaded: ApplicationWithFiles): View {
+  const { application } = loaded;
   if (application.status !== 'in_progress') return notDraft(application);
-  const items = tasksOf(application);
+  const items = tasksOf(loaded);
   const completed = items.filter(({ status }) => status === 'completed').length;
   const next = items.find(({ to, status }) => to !== undefined && status !== 'completed');
   const { round } = application;
@@ -168,7 +170,7 @@ function overviewView(application: Application): View {
 
 function Overview() {
   const { applicationId = '' } = useParams();
-  const { read, retry } = useApplicationRead(applicationId);
+  const { read, retry } = useApplicationFilesRead(applicationId);
   return (
     <ApplyPage
       read={read}

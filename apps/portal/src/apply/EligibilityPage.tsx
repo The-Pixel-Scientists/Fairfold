@@ -33,7 +33,9 @@ function eligibilityView(application: Application, reload: () => void): View {
       ),
     };
   }
-  return { body: <QuestionsScreen application={application} screen={screen} reload={reload} /> };
+  return {
+    body: <QuestionsScreen application={application} screen={screen} files={[]} reload={reload} />,
+  };
 }
 
 function Eligibility() {

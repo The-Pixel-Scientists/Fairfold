@@ -4,15 +4,17 @@
 // form. Answers save as they change and when the person leaves, and say so.
 // "Save and continue" never blocks on a question left empty, since the check
 // page lists those, but it does not move on from an answer that cannot be saved.
+// Files are sent as they are chosen and do not wait for, or hold up, a save.
 
 import { checkEligibility, visibleFields } from '@pixel-scientists/domain/forms';
 import { checkApplicationEligibility } from '@pixel-scientists/grants/contracts';
-import type { Application, Eligibility } from '@pixel-scientists/grants/contracts';
+import type { Application, AttachmentView, Eligibility } from '@pixel-scientists/grants/contracts';
 import {
   Breadcrumbs,
   Button,
   EligibilityStop,
   FormSection,
+  Meter,
   SaveStatus,
   SectionProgress,
   useLeaveGuard,
@@ -22,7 +24,17 @@ import { useState } from 'react';
 
 import { callApi } from '../api.ts';
 import { applicationPath, checkPath, sectionPath } from '../paths.ts';
-import { ELIGIBILITY_SCREEN, problemsOf, questionOf, shownScreens } from './form.ts';
+import { useFiles } from './files.ts';
+import {
+  ELIGIBILITY_SCREEN,
+  isAnswered,
+  problemsOf,
+  questionOf,
+  questionsOn,
+  shownIds,
+  shownScreens,
+  withFiles,
+} from './form.ts';
 import type { Screen } from './form.ts';
 import { helpers } from './helpers.ts';
 import { PageTitle, useArrivalFocus } from './parts.tsx';
@@ -32,17 +44,20 @@ import { crumbs } from './views.tsx';
 export interface QuestionsScreenProps {
   application: Application;
   screen: Screen;
+  /** The files attached when the page loaded. */
+  files: readonly AttachmentView[];
   /** Reads the application again, to show the latest saved answers. */
   reload: () => void;
 }
 
 type Stopped = Extract<Eligibility, { status: 'stopped' }>;
 
-export function QuestionsScreen({ application, screen, reload }: QuestionsScreenProps) {
+export function QuestionsScreen({ application, screen, files, reload }: QuestionsScreenProps) {
   const navigate = useNavigate();
   const autosave = useAutosave(application);
+  const attached = useFiles(application.id, files);
   const { definition } = application.form;
-  const { answers } = autosave;
+  const answers = withFiles(definition, autosave.answers, attached.form.files);
   const eligibility = screen.id === ELIGIBILITY_SCREEN;
   const [attempt, setAttempt] = useState(0);
   const [pending, setPending] = useState(false);
@@ -52,11 +67,17 @@ export function QuestionsScreen({ application, screen, reload }: QuestionsScreen
 
   const unsaved = autosave.stale || autosave.held.length > 0 || autosave.status.status === 'failed';
   useLeaveGuard(
-    unsaved,
-    'Some of your answers are not saved. If you leave this page, you may lose them.',
+    unsaved || attached.uploading,
+    attached.uploading
+      ? 'A file is still uploading. If you leave this page, it will not be added.'
+      : 'Some of your answers are not saved. If you leave this page, you may lose them.',
   );
 
   const ids = new Set(screen.fields.map(({ id }) => id));
+  const documents = questionsOn(screen, shownIds(definition, answers)).filter(
+    ({ type }) => type === 'file',
+  );
+  const added = documents.filter(({ id }) => isAnswered(answers[id])).length;
   const mode = eligibility ? 'submit' : 'draft';
   const found = () =>
     problemsOf(definition, answers, mode).filter((problem) => ids.has(questionOf(problem)));
@@ -120,6 +141,14 @@ export function QuestionsScreen({ application, screen, reload }: QuestionsScreen
       <div className="flex flex-col gap-5">
         <Breadcrumbs items={crumbs(application, screen.title)} />
         {step && <SectionProgress current={step.current} total={step.total} />}
+        {documents.length > 1 && (
+          <Meter
+            label="Documents added"
+            value={added}
+            max={documents.length}
+            valueText={`${String(added)} of ${String(documents.length)}`}
+          />
+        )}
       </div>
       <form
         noValidate
@@ -141,12 +170,19 @@ export function QuestionsScreen({ application, screen, reload }: QuestionsScreen
           problems={attempt > 0 ? found() : []}
           attempt={attempt}
           helpers={helpers}
+          files={attached.form}
           headingLevel="h1"
           onChange={(fieldId, value) => {
             setRefused(null);
             autosave.change(fieldId, value);
           }}
         />
+
+        {attached.removeFailed && (
+          <p role="alert" className="max-w-prose text-body font-medium text-danger">
+            We could not remove the file. Check your connection and try again.
+          </p>
+        )}
 
         {stop && <EligibilityStop explanation={stop.explanation} fieldId={stop.fieldId} />}
 
@@ -195,7 +231,9 @@ export function QuestionsScreen({ application, screen, reload }: QuestionsScreen
               </p>
             )}
             <p className="text-sm text-muted">
-              We save your answers as you type. You can leave at any time.
+              We save your answers as you type
+              {documents.length > 0 && ', and each file as soon as it uploads'}. You can leave at
+              any time.
             </p>
           </div>
           {message && (

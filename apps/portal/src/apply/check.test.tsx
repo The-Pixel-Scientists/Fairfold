@@ -2,6 +2,7 @@
 //
 // Check your answers, submitting, and the confirmation.
 
+import type { AttachmentView } from '@pixel-scientists/grants/contracts';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
@@ -11,6 +12,7 @@ import {
   APPLICATION_ID,
   application,
   applicationServer,
+  attachment,
   completeAnswers,
 } from '../testing/apply.ts';
 import { signedIn } from '../testing/party.ts';
@@ -22,8 +24,8 @@ const home = `/northfield/applications/${APPLICATION_ID}`;
 const SUBMIT = `POST /portal/applications/${APPLICATION_ID}/submit`;
 const h1 = (name: string) => screen.findByRole('heading', { level: 1, name });
 
-function open(path: string, start = application()) {
-  const server = applicationServer(start);
+function open(path: string, start = application(), files: AttachmentView[] = []) {
+  const server = applicationServer(start, files);
   const sent = stubApi({ ...signedIn, ...server.handlers });
   openPortal(path);
   return { server, sent };
@@ -57,6 +59,10 @@ describe('check your answers', () => {
       [
         'Costs of the project: Add at least 1 cost.',
         `/applications/${APPLICATION_ID}/sections/s_budget#f_costs`,
+      ],
+      [
+        'Your latest accounts: Upload a file for this question.',
+        `/applications/${APPLICATION_ID}/sections/s_budget#f_accounts`,
       ],
     ]);
     expect(screen.queryByRole('button', { name: 'Submit application' })).toBeNull();
@@ -103,7 +109,7 @@ describe('check your answers', () => {
 
   it('offers to submit when nothing is missing, and shows the confirmation after', async () => {
     const user = userEvent.setup();
-    const { server, sent } = open(check, application({ answers: completeAnswers }));
+    const { server, sent } = open(check, application({ answers: completeAnswers }), [attachment()]);
 
     expect(await h1('Check your answers')).toBeTruthy();
     expect(
@@ -125,7 +131,7 @@ describe('check your answers', () => {
 
   it('says so, and offers the latest answers, when the answers changed since the page opened', async () => {
     const user = userEvent.setup();
-    const { server } = open(check, application({ answers: completeAnswers }));
+    const { server } = open(check, application({ answers: completeAnswers }), [attachment()]);
     await screen.findByRole('button', { name: 'Submit application' });
     server.update({ answersVersion: 4 });
 
@@ -144,7 +150,7 @@ describe('check your answers', () => {
 
   it('shows the API’s words when it refuses an application, and says the answers are saved', async () => {
     const user = userEvent.setup();
-    const server = applicationServer(application({ answers: completeAnswers }));
+    const server = applicationServer(application({ answers: completeAnswers }), [attachment()]);
     stubApi({
       ...signedIn,
       ...server.handlers,
@@ -162,7 +168,7 @@ describe('check your answers', () => {
 
   it('says it could not send when the connection fails', async () => {
     const user = userEvent.setup();
-    const server = applicationServer(application({ answers: completeAnswers }));
+    const server = applicationServer(application({ answers: completeAnswers }), [attachment()]);
     stubApi({ ...signedIn, ...server.handlers, [SUBMIT]: problem(503, 'Busy.') });
     openPortal(check);
 

@@ -5,8 +5,9 @@
 // arranges its results for the screens. Eligibility questions are drawn first,
 // on a screen of their own, and the form's sections follow.
 //
-// File questions are left out until the portal draws them: the server adds
-// their answers, so they are never sent, and they are not checked here.
+// A file question's answer is the ids of the files attached to it. The server
+// adds them from its list of files, so they are never sent: `withFiles()` adds
+// them to the answers from the list the screens hold, for the checks.
 
 import { projectAnswers, validateAnswers, visibleFields } from '@pixel-scientists/domain/forms';
 import type { SaveAnswersInput } from '@pixel-scientists/grants/contracts';
@@ -17,16 +18,13 @@ import type {
   ValidationMode,
 } from '@pixel-scientists/domain/forms';
 
-/** A field the portal draws. */
-export type DrawnField = Exclude<FormField, { type: 'file' }>;
-
 /** One screen of questions: the eligibility questions, or one of the form's sections. */
 export interface Screen {
   /** `ELIGIBILITY_SCREEN`, or the section's id. */
   id: string;
   title: string;
   introduction?: string | undefined;
-  fields: DrawnField[];
+  fields: FormField[];
 }
 
 export const ELIGIBILITY_SCREEN = 'eligibility';
@@ -35,8 +33,6 @@ export interface Problem {
   field: string;
   message: string;
 }
-
-const isDrawn = (field: FormField): field is DrawnField => field.type !== 'file';
 
 const hasEligibility = (field: FormField): boolean =>
   'eligibility' in field && field.eligibility !== undefined;
@@ -60,13 +56,12 @@ export function isAnswered(value: unknown): boolean {
 export function screensOf(definition: FormDefinition): Screen[] {
   const eligibility = definition.sections
     .flatMap((section) => section.fields)
-    .filter(hasEligibility)
-    .filter(isDrawn);
+    .filter(hasEligibility);
   const sections = definition.sections.map(({ id, title, introduction, fields }) => ({
     id,
     title,
     introduction,
-    fields: fields.filter((field): field is DrawnField => isDrawn(field) && !hasEligibility(field)),
+    fields: fields.filter((field) => !hasEligibility(field)),
   }));
   return [
     ...(eligibility.length === 0
@@ -95,28 +90,48 @@ export function shownScreens(definition: FormDefinition, answers: Answers): Scre
   return screensOf(definition).filter((screen) => screen.fields.some(({ id }) => shown.has(id)));
 }
 
-function fileIds(definition: FormDefinition): Set<string> {
-  return new Set(
-    definition.sections.flatMap((section) =>
-      section.fields.filter((field) => field.type === 'file').map(({ id }) => id),
-    ),
+function fileIds(definition: FormDefinition): string[] {
+  return definition.sections.flatMap((section) =>
+    section.fields.filter((field) => field.type === 'file').map(({ id }) => id),
   );
 }
 
-/** The engine's problems with the answers, less any about file questions. */
+/**
+ * The answers with each shown file question's answer set to the ids of the
+ * files attached to it, and left out when it has none. A file on a question
+ * that is not shown is not an answer, as on the server.
+ */
+export function withFiles(
+  definition: FormDefinition,
+  answers: Answers,
+  files: readonly { id: string; fieldId: string }[],
+): Answers {
+  const shown = shownIds(definition, answers);
+  const asked = fileIds(definition);
+  const attached = asked
+    .filter((field) => shown.has(field))
+    .map((field): [string, string[]] => [
+      field,
+      files.filter(({ fieldId }) => fieldId === field).map(({ id }) => id),
+    ])
+    .filter(([, ids]) => ids.length > 0);
+  return {
+    ...Object.fromEntries(Object.entries(answers).filter(([id]) => !asked.includes(id))),
+    ...Object.fromEntries(attached),
+  };
+}
+
+/** The engine's problems with the answers, which hold file ids as `withFiles()` makes them. */
 export function problemsOf(
   definition: FormDefinition,
   answers: Answers,
   mode: ValidationMode,
 ): Problem[] {
-  const files = fileIds(definition);
-  return validateAnswers(definition, answers, mode).filter(
-    (problem) => !files.has(questionOf(problem)),
-  );
+  return validateAnswers(definition, answers, mode);
 }
 
 /** The questions on a screen that are shown for these answers. */
-export function questionsOn(screen: Screen, shown: ReadonlySet<string>): DrawnField[] {
+export function questionsOn(screen: Screen, shown: ReadonlySet<string>): FormField[] {
   return screen.fields.filter((field) => field.type !== 'content' && shown.has(field.id));
 }
 
@@ -157,7 +172,7 @@ export function savable(
   answers: Answers,
   saved: Answers,
 ): { body: SaveAnswersInput['answers']; held: string[] } {
-  const files = fileIds(definition);
+  const files = new Set(fileIds(definition));
   const given = Object.fromEntries(
     Object.entries(projectAnswers(definition, answers, 'applicant')).filter(
       ([id, value]) => !files.has(id) && isAnswered(value),

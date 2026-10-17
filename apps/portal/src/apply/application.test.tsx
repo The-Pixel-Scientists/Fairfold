@@ -11,8 +11,10 @@ import {
   APPLICATION_ID,
   application,
   applicationServer,
+  attachment,
   completeAnswers,
 } from '../testing/apply.ts';
+import type { AttachmentView } from '@pixel-scientists/grants/contracts';
 import { signedIn } from '../testing/party.ts';
 import { openPortal, setUpPortalTests } from '../testing/render.tsx';
 
@@ -21,8 +23,8 @@ setUpPortalTests();
 const home = `/northfield/applications/${APPLICATION_ID}`;
 const h1 = (name: string) => screen.findByRole('heading', { level: 1, name });
 
-function open(path: string, start = application()) {
-  const server = applicationServer(start);
+function open(path: string, start = application(), files: AttachmentView[] = []) {
+  const server = applicationServer(start, files);
   const sent = stubApi({ ...signedIn, ...server.handlers });
   openPortal(path);
   return { server, sent };
@@ -89,7 +91,7 @@ describe('the application as a task list', () => {
   });
 
   it('offers to check the answers once every section is complete', async () => {
-    open(home, application({ answers: completeAnswers }));
+    open(home, application({ answers: completeAnswers }), [attachment()]);
 
     await tasks();
     expect(
@@ -131,6 +133,7 @@ describe('the application as a task list', () => {
     stubApi({
       ...signedIn,
       [`GET /portal/applications/${APPLICATION_ID}`]: problem(404, 'Not found.'),
+      [`GET /portal/applications/${APPLICATION_ID}/files`]: problem(404, 'Not found.'),
     });
     openPortal(home);
 

@@ -15,12 +15,15 @@ import {
   applicationListSchema,
   applicationSchema,
   applicationSummarySchema,
+  attachmentListSchema,
+  attachmentViewSchema,
   openRoundDetailSchema,
   openRoundListSchema,
 } from '@pixel-scientists/grants/contracts';
 import type {
   Application,
   ApplicationSummary,
+  AttachmentView,
   SaveAnswersInput,
 } from '@pixel-scientists/grants/contracts';
 
@@ -167,7 +170,7 @@ export function application(overrides: Changes = {}): Application {
   });
 }
 
-/** Answers that are all well, apart from the file the screens do not draw yet. */
+/** Answers that are all well, apart from the accounts file, which is a file question. */
 export const completeAnswers: Answers = {
   f_charity: true,
   f_name: 'Eastmere Community Garden',
@@ -177,6 +180,21 @@ export const completeAnswers: Answers = {
   f_people: 40,
   f_costs: [{ c_item: 'Hall hire', c_cost: { amountMinor: 288_000, currency: 'GBP' } }],
 };
+
+export const FILE_ID = '0f8fad5b-d9cb-469f-a165-70867728950e';
+
+/** A file attached to the accounts question, checked against the contract. */
+export function attachment(overrides: Partial<AttachmentView> = {}): AttachmentView {
+  return attachmentViewSchema.parse({
+    id: FILE_ID,
+    fieldId: 'f_accounts',
+    name: 'accounts-2026.pdf',
+    type: 'application/pdf',
+    bytes: 2_202_010,
+    uploadedAt: '2026-10-20T10:30:00.000Z',
+    ...overrides,
+  });
+}
 
 /** One of the applicant's applications, as the list shows it. */
 export function summary(overrides: Partial<ApplicationSummary> = {}): ApplicationSummary {
@@ -189,6 +207,8 @@ export const applicationList = (...applications: ApplicationSummary[]): Reply =>
 export interface ApplicationServer {
   /** The application as the API holds it. */
   current: Application;
+  /** The files attached to it, as the list route answers them. */
+  files: AttachmentView[];
   /** Changes it, as another window or the staff would. */
   update: (changes: Changes) => void;
   /** The body of each save it accepted. */
@@ -202,9 +222,13 @@ export interface ApplicationServer {
  * on old answers, as the real one does), checking eligibility, submitting and
  * withdrawing, all through the form engine the server uses.
  */
-export function applicationServer(start: Application = application()): ApplicationServer {
+export function applicationServer(
+  start: Application = application(),
+  files: AttachmentView[] = [],
+): ApplicationServer {
   const server: ApplicationServer = {
     current: start,
+    files,
     update: (changes) => {
       server.current = application({ ...server.current, ...changes });
     },
@@ -216,6 +240,16 @@ export function applicationServer(start: Application = application()): Applicati
 
   server.handlers = {
     [`GET ${base}`]: () => ok(server.current),
+    [`GET ${base}/files`]: () => ok(attachmentListSchema.parse({ attachments: server.files })),
+    ...Object.fromEntries(
+      files.map(({ id }) => [
+        `DELETE ${base}/files/${id}`,
+        () => {
+          server.files = server.files.filter((file) => file.id !== id);
+          return { status: 204 };
+        },
+      ]),
+    ),
     [`PUT ${base}/answers`]: (body) => {
       const input = body as SaveAnswersInput;
       if (input.basedOn !== server.current.answersVersion) {
@@ -233,9 +267,13 @@ export function applicationServer(start: Application = application()): Applicati
       if (basedOn !== server.current.answersVersion) {
         return problem(409, 'These answers have changed since you opened them.');
       }
-      const problems = validateAnswers(definition, server.current.answers, 'submit').filter(
-        ({ field }) => !field.startsWith('f_accounts'),
-      );
+      // As the server checks it: the saved answers, with the ids of the files attached.
+      const attached = server.files.map(({ id }) => id);
+      const answers = {
+        ...server.current.answers,
+        ...(attached.length > 0 && { f_accounts: attached }),
+      };
+      const problems = validateAnswers(definition, answers, 'submit');
       if (
         problems.length > 0 ||
         checkEligibility(definition, server.current.answers).status !== 'eligible'

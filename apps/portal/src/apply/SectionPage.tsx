@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { checkEligibility } from '@pixel-scientists/domain/forms';
-import type { Application } from '@pixel-scientists/grants/contracts';
 import { Link, buttonClassName, useParams } from '@pixel-scientists/ui';
 
 import { applicationPath, eligibilityPath } from '../paths.ts';
@@ -9,10 +8,15 @@ import { ELIGIBILITY_SCREEN, screensOf } from './form.ts';
 import { ApplyPage, ApplyScreen } from './parts.tsx';
 import type { View } from './parts.tsx';
 import { QuestionsScreen } from './QuestionsScreen.tsx';
-import { useApplicationRead } from './reads.ts';
+import { useApplicationFilesRead } from './reads.ts';
+import type { ApplicationWithFiles } from './reads.ts';
 import { crumbs, loadingApplication, noApplication, notDraft } from './views.tsx';
 
-function sectionView(application: Application, sectionId: string, reload: () => void): View {
+function sectionView(
+  { application, files }: ApplicationWithFiles,
+  sectionId: string,
+  reload: () => void,
+): View {
   if (application.status !== 'in_progress') return notDraft(application);
   const { definition } = application.form;
   const screen = screensOf(definition).find(({ id }) => id === sectionId);
@@ -56,21 +60,27 @@ function sectionView(application: Application, sectionId: string, reload: () => 
   }
   return {
     body: (
-      <QuestionsScreen key={screen.id} application={application} screen={screen} reload={reload} />
+      <QuestionsScreen
+        key={screen.id}
+        application={application}
+        screen={screen}
+        files={files}
+        reload={reload}
+      />
     ),
   };
 }
 
 function Section() {
   const { applicationId = '', sectionId = '' } = useParams();
-  const { read, retry } = useApplicationRead(applicationId);
+  const { read, retry } = useApplicationFilesRead(applicationId);
   return (
     <ApplyPage
       read={read}
       retry={retry}
       loading={loadingApplication}
       missing={noApplication}
-      view={(application) => sectionView(application, sectionId, retry)}
+      view={(loaded) => sectionView(loaded, sectionId, retry)}
     />
   );
 }
