@@ -11,6 +11,7 @@ import {
   applicationRoutes,
   assessmentRoutes,
   assignReviewersAutomatically,
+  decisionRoutes,
   FORM_DEFINITION_MAX_BYTES,
   formRoutes,
   programmeRoutes,
@@ -18,7 +19,7 @@ import {
   spreadRoutes,
   submissionRoutes,
 } from '@pixel-scientists/grants/contracts';
-import { grantsHandlers, grantsResolvers } from '@pixel-scientists/grants/server';
+import { grantsHandlers, grantsResolvers, type MailSender } from '@pixel-scientists/grants/server';
 import { partyRoutes } from '@pixel-scientists/party/contracts';
 import { partyHandlers, partyResolvers } from '@pixel-scientists/party/server';
 
@@ -57,7 +58,22 @@ const tenantTimeZone = async (tx: TenantTransaction, tenant: string): Promise<st
       .executeTakeFirstOrThrow()
   ).timezone;
 
-export function composeModules(deps: { publicTenants: PublicTenants }): ComposedModules {
+/** What a module that sends email needs: the sender, and the portal origin its emails link to. */
+export interface Mail {
+  readonly sender: MailSender;
+  readonly portalOrigin: string;
+}
+
+/** For callers that send no email: every send fails with a code, and nothing leaves the process. */
+const noMail: Mail = {
+  sender: { send: () => Promise.resolve({ sent: false, code: 'connection_failed' }) },
+  portalOrigin: 'https://portal.invalid',
+};
+
+export function composeModules(deps: {
+  publicTenants: PublicTenants;
+  mail?: Mail;
+}): ComposedModules {
   const party = partyHandlers({ notFound });
   const grants = grantsHandlers({
     notFound,
@@ -66,6 +82,7 @@ export function composeModules(deps: { publicTenants: PublicTenants }): Composed
     recordConfig: insertConfigVersion,
     configHistory: readConfigHistory,
     membersWith,
+    ...(deps.mail ?? noMail),
   });
   return {
     routes: [
@@ -130,6 +147,12 @@ export function composeModules(deps: { publicTenants: PublicTenants }): Composed
       route(reviewRoutes.declareConflict, grants.declareConflict),
       route(reviewRoutes.saveReviewScores, grants.saveReviewScores),
       route(reviewRoutes.submitReview, grants.submitReview),
+      route(decisionRoutes.listDecisions, grants.listDecisions),
+      route(decisionRoutes.recordDecision, grants.recordDecision),
+      route(decisionRoutes.recordDecisions, grants.recordDecisions),
+      route(decisionRoutes.previewDecisionEmail, grants.previewDecisionEmail),
+      route(decisionRoutes.releaseDecisions, grants.releaseDecisions),
+      route(decisionRoutes.sendDecisionEmails, grants.sendDecisionEmails),
     ],
     resolvers: { ...partyResolvers, ...grantsResolvers },
   };

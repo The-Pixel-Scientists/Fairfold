@@ -8,6 +8,8 @@ export {
   grantsResolvers,
   type AssessmentDependencies,
   type ConfigHistoryRow,
+  type DecisionDependencies,
   type GrantsContext,
   type GrantsDependencies,
+  type MailSender,
 } from './routes.ts';

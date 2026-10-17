@@ -18,6 +18,7 @@ import {
   applicationRoutes,
   assessmentRoutes,
   assignReviewersAutomatically,
+  decisionRoutes,
   formRoutes,
   programmeRoutes,
   reviewRoutes,
@@ -60,6 +61,7 @@ describe('composeModules', () => {
       assignReviewersAutomatically,
       ...Object.values(spreadRoutes),
       ...Object.values(reviewRoutes),
+      ...Object.values(decisionRoutes),
     ]);
   });
 
@@ -76,6 +78,7 @@ describe('composeModules', () => {
         assignReviewersAutomatically,
         ...Object.values(spreadRoutes),
         ...Object.values(reviewRoutes),
+        ...Object.values(decisionRoutes),
       ].map((contract) => contract.scope),
     );
 

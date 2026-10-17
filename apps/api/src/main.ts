@@ -48,7 +48,7 @@ async function main(): Promise<void> {
 
   const logger = createLogger({ level: config.logLevel });
   const database = openDatabase(config.database, logger);
-  // The auth emails go through the configured mail server (S02-16b).
+  // The auth and module emails go through the configured mail server (S02-16b).
   const sender = createSender(config.smtp, logger, createSmtpTransport(config.smtp));
   // Better Auth refuses to start beside its own environment variables.
   let auth;
@@ -73,7 +73,10 @@ async function main(): Promise<void> {
       checkDatabase: () => database.check(),
       inTenant: database.inTenant,
       auth,
-      ...composeModules({ publicTenants: database.publicTenants }),
+      ...composeModules({
+        publicTenants: database.publicTenants,
+        mail: { sender, portalOrigin: authSettings.origins.portal },
+      }),
       trustProxy: config.trustProxy,
     });
   } catch (error) {
