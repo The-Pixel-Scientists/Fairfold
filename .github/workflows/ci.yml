@@ -45,10 +45,11 @@ env:
   # The browsers for @playwright/test 1.63.0. The e2e job's container names
   # the same image, as a job container cannot read this.
   PLAYWRIGHT_IMAGE: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
-  # Rules Semgrep loaded on 2026-10-04: 333 in all, 18 of them ours. Raise
-  # these when rules are added; lower them only with a reason in review.
+  # Rules Semgrep loaded on 2026-10-04: 333 in all, 18 of them ours, and 2 of
+  # ours added since. Raise these when rules are added; lower them only with a
+  # reason in review.
   SEMGREP_MINIMUM_RULES: 300
-  SEMGREP_PROJECT_RULES: 18
+  SEMGREP_PROJECT_RULES: 20
   GITHUB_OIDC_ISSUER: https://token.actions.githubusercontent.com
 
 jobs:
@@ -109,8 +110,25 @@ jobs:
         run: corepack enable
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Start PostgreSQL 16 from the development Compose file
-        run: docker compose --file infra/compose/compose.dev.yaml up --detach --wait postgres
+      # The API's storage and scanner tests need SeaweedFS and clamd. clamd
+      # uses the signatures in its image, never a download, and takes about a
+      # minute to load them. As in the stack, a VBA macro is a match (ADR 0047).
+      - name: Start PostgreSQL 16, SeaweedFS and ClamAV from the development Compose file
+        run: |
+          docker compose --file infra/compose/compose.dev.yaml --file - \
+            up --detach --wait --wait-timeout 300 postgres seaweedfs clamav <<'EOF'
+          services:
+            clamav:
+              environment:
+                CLAMAV_NO_FRESHCLAMD: 'true'
+                CLAMD_CONF_AlertOLE2Macros: 'yes'
+              healthcheck:
+                test: [CMD, clamdcheck.sh]
+                interval: 5s
+                start_period: 5m
+          EOF
+      - name: Create the bucket for the storage tests
+        run: node scripts/dev.ts bucket
       - name: Migrate up, down and up again, as migrator
         run: pnpm db:migrate && pnpm db:rollback && pnpm db:migrate
       - name: Check the generated database types match the migrations
