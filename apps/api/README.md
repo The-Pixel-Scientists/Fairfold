@@ -231,3 +231,17 @@ pnpm test:unit -- apps/api -u
 
 `pnpm test:unit -- apps/api` runs these tests. None needs a database: the
 readiness check is tested with a fake database check.
+
+`GET /console/warehouse/snapshot` (`src/platform/warehouse/`) lets a tenant admin
+download one PostgreSQL load script of the tenant's warehouse tables (ADR 0016).
+It is built inside the request and its transaction from the party and grants
+contributions plus the platform's `date` table, and writes only the columns
+`warehouseColumns()` allows under the classification map, so no personal or
+special category value is emitted. Load it with
+`psql -v ON_ERROR_STOP=1 -f warehouse-snapshot-<date>.sql`. The script is UTF-8
+and begins with `SET client_encoding = 'UTF8'`, so it loads the same under any
+client encoding or locale (a Windows terminal's WIN1252, for one). Values are escaped
+for `COPY`'s text format in `escape.ts`. A script over 50 MB is refused with a
+400 that asks the admin to contact the operator. `platform.warehouse.exported`
+records the rows in each table, keyed by the classified column of the table's
+key (`countField()`).
