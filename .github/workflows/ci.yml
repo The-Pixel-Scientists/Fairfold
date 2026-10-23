@@ -183,7 +183,7 @@ jobs:
     name: Stack in containers, with end-to-end and accessibility tests
     if: github.event_name != 'schedule'
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -198,20 +198,56 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Build the release images, migrate, and wait for /health/ready
         run: pnpm stack
-      # The journey and @api specs sign in as the seed's staff.
-      - name: Fill the stack with synthetic data
-        if: hashFiles('packages/db/seed/seed.ts') != ''
-        run: pnpm stack seed
       # Every spec, the @api specs and the journey project included, with the
       # stack's Mailpit and its secrets folder, for the seed password, at hand.
-      - name: Run the specs against the stack
-        run: >-
-          docker run --rm --network host --ipc host
-          --volume "$PWD:$PWD" --workdir "$PWD"
-          --volume "$HOME/.tps:/root/.tps:ro"
-          --env CI --env TPS_E2E_STACK=1
-          "$PLAYWRIGHT_IMAGE"
-          node node_modules/@playwright/test/cli.js test
+      # The specs sign in as the seed's staff. Those that sign in as its
+      # programme manager get the manager's address, the stack's random seed
+      # password and an authenticator key set up now, all synthetic and none a
+      # repository secret. Each code works once, so each of their spec files
+      # runs on its own and starts on a fresh code. The builder journeys add
+      # programmes the outcome journey's applicant would see beside the
+      # seed's, so the outcome journey goes first. The submissions journey
+      # needs the applications scenario's submissions, so it runs next, on a
+      # fresh stack. The programme set-up journey starts from a manager with
+      # no programmes, so it runs last, on the base scenario. The patterns
+      # match spec file names, and a run whose pattern matches no test fails.
+      - name: Fill the stack with synthetic data and run the specs against it
+        env:
+          MANAGER_JOURNEYS: outcome-journey\.spec\.ts form-builder-journey\.spec\.ts forms-builder-table-file-journey\.spec\.ts
+          SUBMISSIONS_JOURNEY: submissions-journey\.spec\.ts
+          PROGRAMME_JOURNEY: programme-journey\.spec\.ts
+        run: |
+          names=$(node scripts/dev-names.ts)
+          project=$(jq --raw-output .stackProject <<< "$names")
+          port=$(jq --raw-output .ports.stackConsole <<< "$names")
+          seed() {
+            pnpm stack seed "$1"
+            TPS_SEED_PASSWORD_FILE="$HOME/.tps/stack/$project/TPS_STACK_SEED_PASSWORD" \
+              node packages/db/seed/manager.ts "$port" "$RUNNER_TEMP/e2e-manager"
+          }
+          specs() {
+            docker run --rm --network host --ipc host \
+              --volume "$PWD:$PWD" --workdir "$PWD" \
+              --volume "$HOME/.tps:/root/.tps:ro" \
+              --env CI --env TPS_E2E_STACK=1 --env-file "$RUNNER_TEMP/e2e-manager" \
+              "$PLAYWRIGHT_IMAGE" \
+              node node_modules/@playwright/test/cli.js test "$@"
+          }
+          reseed() {
+            pnpm stack down --volumes
+            pnpm stack
+            seed "$1"
+          }
+          seed configured
+          specs --grep-invert "$SUBMISSIONS_JOURNEY|$PROGRAMME_JOURNEY|${MANAGER_JOURNEYS// /|}"
+          for journey in $MANAGER_JOURNEYS; do
+            sleep $((31 - $(date +%s) % 30))
+            specs --grep "$journey" --workers 1
+          done
+          reseed applications
+          specs --grep "$SUBMISSIONS_JOURNEY"
+          reseed base
+          specs --grep "$PROGRAMME_JOURNEY"
       - name: Install cosign
         run: |
           bash .github/scripts/fetch-tool.sh \
