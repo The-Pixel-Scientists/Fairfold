@@ -133,6 +133,17 @@ describe('Dialog', () => {
     });
   });
 
+  it('is wider for details, and still fits a narrow screen', async () => {
+    const { rerender } = render(<Dialog open onOpenChange={() => undefined} title="Details" />);
+    expect((await screen.findByRole('dialog')).className).toContain('max-w-md');
+
+    rerender(<Dialog open onOpenChange={() => undefined} title="Details" wide />);
+
+    const dialog = screen.getByRole('dialog');
+    expect(dialog.className).toContain('max-w-2xl');
+    expect(dialog.className).toContain('w-[calc(100%-1rem)]');
+  });
+
   it('asks its owner, which can keep it open', async () => {
     const user = userEvent.setup();
     render(
