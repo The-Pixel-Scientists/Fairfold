@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
 // The auth plugin in the built app, with no database: requests here carry no
-// session cookie, so nothing connects. Hosts, origins, bodies, CORS, and the
-// rule that no Better Auth endpoint answers.
+// session cookie, so nothing connects. Hosts, origins, bodies (raw uploads
+// too), CORS, and the rule that no Better Auth endpoint answers.
 
 import { connect } from 'node:net';
 
 import { authRoutes } from '@pixel-scientists/domain/auth';
+import { attachmentRoutes } from '@pixel-scientists/grants/contracts';
 import type { FastifyInstance } from 'fastify';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -14,6 +15,7 @@ import { captureLogs } from '../../test/support.ts';
 import { buildApp } from '../app.ts';
 import { ConfigError, Secret } from '../config.ts';
 import { createLogger } from '../logger.ts';
+import { route, type Route } from '../routes/register.ts';
 import { newToken } from './cookies.ts';
 import { createAuth, loadAuthSettings, type Auth } from './index.ts';
 
@@ -45,7 +47,9 @@ afterEach(async () => {
   }
 });
 
-async function start(options: { trustProxy?: string[]; settings?: Record<string, string> } = {}) {
+async function start(
+  options: { trustProxy?: string[]; settings?: Record<string, string>; routes?: Route[] } = {},
+) {
   const logs = captureLogs();
   const logger = createLogger({ level: 'info', destination: logs.stream });
   const auth = createAuth(loadAuthSettings(options.settings ?? env), { database, log: logger });
@@ -54,6 +58,9 @@ async function start(options: { trustProxy?: string[]; settings?: Record<string,
     checkDatabase: () => Promise.resolve(),
     auth,
     ...(options.trustProxy === undefined ? {} : { trustProxy: options.trustProxy }),
+    ...(options.routes === undefined
+      ? {}
+      : { routes: options.routes, resolvers: { own_application: () => Promise.resolve(true) } }),
   });
   opened.push({ app, auth });
   return { app, auth, logs };
@@ -271,6 +278,69 @@ describe('the request guard', () => {
     expect(
       Object.keys(preflight.headers).filter((name) => name.startsWith('access-control-')),
     ).toEqual([]);
+  });
+});
+
+describe('a raw upload', () => {
+  const upload = route(attachmentRoutes.uploadAttachment, () =>
+    Promise.reject(new Error('No upload reaches its handler without a session.')),
+  );
+  const url =
+    '/api/portal/applications/0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b/fields/f_accounts/files';
+  const send = (headers: Record<string, string>, to = url) =>
+    ({
+      method: 'POST',
+      url: to,
+      headers: { host: 'apply.example.org', 'file-name': 'accounts.pdf', ...headers },
+      payload: Buffer.from('%PDF-1.7'),
+    }) as const;
+  const octets = { 'content-type': 'application/octet-stream' };
+
+  /** Why the guard or the route refused the last request, from its log line. */
+  const reason = (logs: ReturnType<typeof captureLogs>) =>
+    logs.lines().findLast((line) => line.msg === 'The request was refused')?.reason;
+
+  it('reaches its route from its own origin, which then wants a session', async () => {
+    const { app } = await start({ routes: [upload] });
+    const response = await app.inject(send({ ...octets, origin: PORTAL }));
+    expect(response.statusCode).toBe(401);
+  });
+
+  it('is still refused from another origin, or with none', async () => {
+    const { app, logs } = await start({ routes: [upload] });
+    for (const origin of [CONSOLE, 'https://evil.example', undefined]) {
+      const response = await app.inject(
+        send({ ...octets, ...(origin === undefined ? {} : { origin }) }),
+      );
+      expect(response.statusCode, origin).toBe(403);
+      expect(reason(logs), origin).toBe('origin');
+    }
+  });
+
+  it('is refused in any other content type', async () => {
+    const { app, logs } = await start({ routes: [upload] });
+    for (const type of [
+      'text/plain',
+      'application/x-octet-stream',
+      'multipart/form-data; boundary=x',
+    ]) {
+      const response = await app.inject(send({ 'content-type': type, origin: PORTAL }));
+      expect(response.statusCode, type).toBe(415);
+      expect(reason(logs), type).toBe('not_json');
+    }
+  });
+
+  it('is refused as application/octet-stream on any other route', async () => {
+    const { app, logs } = await start({ routes: [upload] });
+    for (const [to, host, origin] of [
+      ['/api/auth/sign-out', 'apply.example.org', PORTAL],
+      ['/api/auth/sign-out', 'console.example.org', CONSOLE],
+      ['/api/portal/no-such-route', 'apply.example.org', PORTAL],
+    ] as const) {
+      const response = await app.inject(send({ ...octets, host, origin }, to));
+      expect(response.statusCode, to).toBe(415);
+      expect(reason(logs), to).toBe('not_json');
+    }
   });
 });
 
