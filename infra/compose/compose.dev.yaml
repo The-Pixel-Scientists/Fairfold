@@ -110,8 +110,8 @@ services:
       CLAMD_CONF_MaxFileSize: 100M
       CLAMD_CONF_MaxScanSize: 400M
       # Milliseconds. A scan that runs longer is stopped and reported, not
-      # passed.
-      CLAMD_CONF_MaxScanTime: '120000'
+      # passed. The API gives up 5 seconds later (ADR 0047).
+      CLAMD_CONF_MaxScanTime: '20000'
     ports:
       - 127.0.0.1:53310:3310
     volumes:
