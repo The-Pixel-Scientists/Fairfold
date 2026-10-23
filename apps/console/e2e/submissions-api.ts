@@ -91,7 +91,7 @@ const definition = formDefinitionSchema.parse({
 });
 
 /** One submission in full. */
-function detail(summary: SubmissionSummary) {
+export function detail(summary: SubmissionSummary) {
   const moved = summary.stage.id !== ids.intake;
   return {
     ...summary,
