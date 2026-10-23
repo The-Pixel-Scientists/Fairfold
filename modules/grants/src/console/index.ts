@@ -2,8 +2,8 @@
 //
 // The grants module's staff screens: the routes the console adds under a
 // funder's address, and the pages they put in its navigation. Programme
-// set-up, the form builder, submissions and assessment are here; later grants screens
-// extend both lists.
+// set-up, the form builder, submissions, assessment and decisions are here;
+// later grants screens extend both lists.
 
 import { idSchema } from '@pixel-scientists/domain';
 import type { Permission } from '@pixel-scientists/domain/platform';
@@ -115,6 +115,18 @@ export const grantsRoutes: readonly RouteDefinition[] = [
     title: 'Score spread',
     params: ids,
     load: () => import('./assessment/SpreadPage.tsx'),
+  },
+  {
+    path: '/rounds/:roundId/decisions',
+    title: 'Decisions',
+    params: ids,
+    load: () => import('./decisions/DecisionsPage.tsx'),
+  },
+  {
+    path: '/rounds/:roundId/decisions/release',
+    title: 'Release decisions',
+    params: ids,
+    load: () => import('./decisions/ReleasePage.tsx'),
   },
   {
     path: REVIEWS_PATH,

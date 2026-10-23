@@ -4,6 +4,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
+import { api as decisionApi, list as decisionList } from '../decisions/fixtures.ts';
 import {
   api as submissionApi,
   detail,
@@ -39,6 +40,7 @@ const detailReads = (assignments: readonly object[] = [], extra = {}) => ({
   [submissionApi.list()]: okReply(page([one])),
   [submissionApi.assignments(one.id)]: ok({ assignments }),
   [api.pool]: ok({ reviewers: pool }),
+  [decisionApi.list]: ok(decisionList([])),
   ...extra,
 });
 

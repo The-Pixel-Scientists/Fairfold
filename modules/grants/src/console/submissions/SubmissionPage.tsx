@@ -5,6 +5,7 @@ import { PageHeader, Tabs, Tag, useLoad, useSearch, WhenLoaded } from '@pixel-sc
 import { submissionQuerySchema } from '../../contracts/index.ts';
 import type { Submission, SubmissionQuery } from '../../contracts/index.ts';
 import { AssignmentsPanel } from '../assessment/AssignmentsPanel.tsx';
+import { DecisionPanel } from '../decisions/DecisionPanel.tsx';
 import { formatMoment } from '../programme/format.ts';
 import { useParam } from '../programme/Page.tsx';
 import { Aside } from './detail/Aside.tsx';
@@ -83,6 +84,7 @@ function Detail({ submissionId }: { submissionId: string }) {
             />
             <div className="flex flex-col gap-5">
               <AssignmentsPanel submission={submission} />
+              <DecisionPanel submission={submission} />
               <Aside submission={submission} />
             </div>
           </div>
