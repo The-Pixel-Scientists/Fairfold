@@ -14,6 +14,7 @@ import {
   updateTheme,
   uploadLogo,
 } from '@pixel-scientists/domain/platform/settings';
+import { teamRoutes } from '@pixel-scientists/domain/platform/team';
 import {
   applicationRoutes,
   assessmentRoutes,
@@ -43,6 +44,7 @@ describe('composeModules', () => {
 
     expect(routes.map((route) => route.contract)).toEqual([
       listAuditEvents,
+      ...Object.values(teamRoutes),
       getSettings,
       updateSettings,
       getTheme,

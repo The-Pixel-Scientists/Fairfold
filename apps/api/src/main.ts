@@ -79,6 +79,7 @@ async function main(): Promise<void> {
       auth,
       ...composeModules({
         publicTenants: database.publicTenants,
+        auth,
         mail: { sender, portalOrigin: authSettings.origins.portal },
       }),
       trustProxy: config.trustProxy,

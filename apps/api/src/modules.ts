@@ -31,6 +31,7 @@ import { insertConfigVersion, readConfigHistory } from './platform/config-versio
 import { membersWith } from './platform/members.ts';
 import { settingsRoutes } from './platform/settings/index.ts';
 import { settingsTables } from './platform/settings/tables.ts';
+import { teamRoutes, type TeamAuth } from './platform/team/index.ts';
 import type { ScopeResolvers } from './policy/index.ts';
 import { ApiError } from './problems.ts';
 import { publicRoutes } from './public/index.ts';
@@ -72,8 +73,18 @@ const noMail: Mail = {
   portalOrigin: 'https://portal.invalid',
 };
 
+/** For callers with no auth module: the team routes fail, and nothing is invited or signed out. */
+const missingAuth = (): Promise<never> =>
+  Promise.reject(new Error('The API was built without the auth module.'));
+const noAuth: TeamAuth = {
+  createInvitation: missingAuth,
+  revokeSessionsForMembership: missingAuth,
+};
+
 export function composeModules(deps: {
   publicTenants: PublicTenants;
+  /** The auth module, for the team routes. */
+  auth?: TeamAuth;
   mail?: Mail;
 }): ComposedModules {
   const party = partyHandlers({ notFound });
@@ -89,6 +100,7 @@ export function composeModules(deps: {
   return {
     routes: [
       route(listAuditEvents, listAuditEventsHandler),
+      ...teamRoutes(deps.auth ?? noAuth),
       ...settingsRoutes,
       ...publicRoutes(deps.publicTenants),
       route(partyRoutes.getProfile, party.getProfile),
