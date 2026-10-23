@@ -2,7 +2,7 @@
 
 import { LOGO_MAX_HEIGHT, LOGO_MAX_WIDTH, messages } from '@pixel-scientists/domain/platform';
 import { removeLogo, uploadLogo } from '@pixel-scientists/domain/platform/settings';
-import type { ThemeTokens } from '@pixel-scientists/domain/platform/settings';
+import type { ThemeSettings } from '@pixel-scientists/domain/platform/settings';
 import {
   Button,
   FormField,
@@ -22,9 +22,9 @@ import { useTenantLook } from './look.tsx';
 import { SettingsCard } from './SettingsFrame.tsx';
 
 export interface LogoSectionProps {
-  theme: ThemeTokens;
+  theme: ThemeSettings;
   name: string;
-  onChanged: (theme: ThemeTokens) => void;
+  onChanged: (theme: ThemeSettings) => void;
 }
 
 /** The words for a refused upload or removal: the API's for the file, or for the whole request. */
@@ -59,7 +59,7 @@ export function LogoSection({ theme, name, onChanged }: LogoSectionProps) {
     else setChosen(read);
   }
 
-  async function change(action: () => Promise<ThemeTokens>, saved: string) {
+  async function change(action: () => Promise<ThemeSettings>, saved: string) {
     if (pending) return;
     setPending(true);
     setProblem(null);
