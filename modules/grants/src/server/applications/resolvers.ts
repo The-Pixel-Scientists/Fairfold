@@ -19,6 +19,9 @@ export interface ScopeCheck {
   readonly input: { readonly params: unknown };
 }
 
+/** The application in the path, whatever else the path names (a field or a file). */
+const applicationParams = getApplication.params.loose();
+
 export const grantsResolvers = {
   /** A round taking applications, by the database's clock. */
   open_round: async ({ tx, input }: ScopeCheck): Promise<boolean> => {
@@ -30,7 +33,7 @@ export const grantsResolvers = {
   /** An application whose applicant is the session's person. */
   own_application: async ({ tx, userId, input }: ScopeCheck): Promise<boolean> => {
     if (input.params === undefined) return true;
-    const params = getApplication.params.safeParse(input.params);
+    const params = applicationParams.safeParse(input.params);
     if (!params.success) return false;
     const personId = await personIdForUser(tx, userId);
     if (personId === null) return false;

@@ -35,11 +35,13 @@ export interface LockedApplication {
   readonly definition: FormDefinition;
 }
 
+/** With `lock` false, the application is read without waiting for other requests on it. */
 export async function lockOwn(
   tx: Tx,
   deps: ApplicationDependencies,
   userId: string,
   applicationId: string,
+  lock = true,
 ): Promise<LockedApplication> {
   const personId = await personIdForUser(tx, userId);
   const row =
@@ -50,7 +52,7 @@ export async function lockOwn(
           .select(['id', 'status', 'answers', 'answers_version', 'form_version_id', 'round_id'])
           .where('id', '=', applicationId)
           .where('applicant_person_id', '=', personId)
-          .forUpdate()
+          .$if(lock, (query) => query.forUpdate())
           .executeTakeFirst();
   const version = row === undefined ? undefined : await findVersion(tx, row.form_version_id);
   const definition = definitionOf(version?.definition ?? null);

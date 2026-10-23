@@ -50,11 +50,20 @@ type ApplicationTables = {
     updated_by: string;
   };
   'grants.application_file': {
+    tenant_id: string;
+    id: Generated<string>;
     application_id: string;
     file_id: string;
     field_id: string;
-    created_at: Date;
+    created_by: string;
+    created_at: Generated<Date>;
+  };
+  'app.file': {
     id: string;
+    name: string;
+    content_type: string;
+    size_bytes: string;
+    created_at: Date;
   };
   'grants.decision': {
     application_id: string;

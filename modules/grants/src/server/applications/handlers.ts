@@ -141,10 +141,9 @@ export function applicationHandlers(deps: ApplicationDependencies) {
     checkDraft(deps, application, basedOn);
 
     const { definition } = application;
-    const problems = [
-      ...fileProblems(definition, answers),
-      ...validateAnswers(definition, answers, 'draft'),
-    ];
+    const forbidden = fileProblems(definition, answers);
+    const problems =
+      forbidden.length > 0 ? forbidden : validateAnswers(definition, answers, 'draft');
     if (problems.length > 0) throw deps.refuse(400, messages.fixFields, problems);
 
     const saved = await applicationsDb(tx)
