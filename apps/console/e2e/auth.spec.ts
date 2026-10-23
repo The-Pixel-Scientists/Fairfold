@@ -344,6 +344,7 @@ test.describe('the console shell', () => {
     await expect(page.getByRole('banner')).toContainText('Northfield Foundation');
     await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('link')).toHaveText([
       'Programmes',
+      'Submissions',
     ]);
     await expect(page.getByRole('button', { name: 'Switch funder' })).toHaveCount(0);
   });
