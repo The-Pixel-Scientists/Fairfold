@@ -62,7 +62,9 @@ export async function download360Giving(
   const file = JSON.parse(await textOf(download)) as { grants: Record<string, unknown>[] };
   expect(file.grants).toHaveLength(grants);
   await expect(
-    panel.getByText(new RegExp(`^Saved ${String(grants)} grants? to ${name}$`)),
+    panel.getByText(`Saved ${String(grants)} ${grants === 1 ? 'grant' : 'grants'} to ${name}`, {
+      exact: true,
+    }),
   ).toBeVisible();
   return { name, file };
 }

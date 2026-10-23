@@ -31,7 +31,7 @@ const comment = (criterion: string) =>
 const heading = () => screen.findByRole('heading', { level: 1, name: 'Application 3F2A9C1B' });
 const score = (criterion: string, value: number) =>
   within(
-    screen.getByRole('radiogroup', { name: new RegExp(`^${criterion}`) }),
+    screen.getByRole('radiogroup', { name: (label) => label.startsWith(criterion) }),
   ).getByRole<HTMLInputElement>('radio', { name: String(value) });
 
 describe('the scoring workspace', () => {

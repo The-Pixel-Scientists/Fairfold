@@ -23,7 +23,7 @@ const answerTo = (page: Page, label: string) =>
     .locator('dd');
 
 const download = (page: Page, name: string) =>
-  page.getByRole('link', { name: new RegExp(`^Download ${name},`) });
+  page.getByRole('link', { name: `Download ${name},` });
 
 async function openSubmission(page: Page): Promise<void> {
   const { id } = await stubFiles(page);
