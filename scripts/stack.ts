@@ -19,6 +19,11 @@
 // only. Compose copies each into only the containers that use it. The seed
 // password stays in that folder; the seed reads it from there.
 //
+// SeaweedFS takes one random key per S3 identity (admin, write and read) and
+// four random keys its own servers sign their requests with. This script
+// builds its identities and security files from them, and Compose gives the
+// API the write and read keys only, and the bucket job the admin key.
+//
 // The console and portal reach the API over a network of their own, `web`,
 // which this script makes before Compose starts so that it can tell the API
 // to trust the forwarding headers of that network's addresses only.
@@ -40,7 +45,17 @@ const SECRETS = [
   'TPS_STACK_APP_AUTH_PASSWORD',
   'TPS_STACK_APP_QUEUE_PASSWORD',
   'TPS_STACK_AUTH_SECRET',
+  'TPS_STACK_STORAGE_ADMIN_SECRET_KEY',
+  'TPS_STACK_STORAGE_WRITE_SECRET_KEY',
+  'TPS_STACK_STORAGE_READ_SECRET_KEY',
+  'TPS_STACK_STORAGE_JWT_WRITE_KEY',
+  'TPS_STACK_STORAGE_JWT_READ_KEY',
+  'TPS_STACK_STORAGE_JWT_FILER_WRITE_KEY',
+  'TPS_STACK_STORAGE_JWT_FILER_READ_KEY',
 ] as const;
+
+/** The bucket compose.stack.yaml creates and the API uses. */
+const STACK_BUCKET = 'tps-files';
 
 /** The database compose.stack.yaml migrates. */
 const STACK_DATABASE = 'tps';
@@ -68,6 +83,51 @@ export function seedEnvironment(
     TPS_DB_MIGRATOR_PASSWORD_FILE: join(secrets, 'TPS_STACK_MIGRATOR_PASSWORD'),
     TPS_SEED_PASSWORD_FILE: join(secrets, 'TPS_STACK_SEED_PASSWORD'),
   };
+}
+
+/** A generated secret, which loadSecrets() has always made. */
+function secret(secrets: Readonly<Record<string, string>>, name: string): string {
+  const value = secrets[name];
+  if (!value) throw new Error(`${name} is missing.`);
+  return value;
+}
+
+/**
+ * SeaweedFS's S3 identities (ADR 0047): admin may only create the bucket,
+ * write may only write under clean/, and read may only read there. The
+ * access key ids match compose.stack.yaml.
+ */
+export function storageIdentities(secrets: Readonly<Record<string, string>>): string {
+  const identity = (name: string, purpose: string, action: string) => ({
+    name,
+    credentials: [
+      { accessKey: name, secretKey: secret(secrets, `TPS_STACK_STORAGE_${purpose}_SECRET_KEY`) },
+    ],
+    actions: [action],
+  });
+  return JSON.stringify({
+    identities: [
+      identity('tps-admin', 'ADMIN', `Admin:${STACK_BUCKET}`),
+      identity('tps-write', 'WRITE', `Write:${STACK_BUCKET}/clean/*`),
+      identity('tps-read', 'READ', `Read:${STACK_BUCKET}/clean/*`),
+    ],
+  });
+}
+
+/** SeaweedFS's security.toml: the keys its master, volume and filer sign requests with. */
+export function storageSecurity(secrets: Readonly<Record<string, string>>): string {
+  const tables = {
+    'jwt.signing': 'WRITE',
+    'jwt.signing.read': 'READ',
+    'jwt.filer_signing': 'FILER_WRITE',
+    'jwt.filer_signing.read': 'FILER_READ',
+  };
+  return Object.entries(tables)
+    .map(([table, key]) => {
+      const value = secret(secrets, `TPS_STACK_STORAGE_JWT_${key}_KEY`);
+      return `[${table}]\nkey = "${value}"\n`;
+    })
+    .join('');
 }
 
 /** The address Docker published a port on, as `docker compose port` prints it. */
@@ -105,6 +165,8 @@ function loadSecrets(): Record<string, string> {
     ensureSecretFile(path);
     values[name] = readFileSync(path, 'utf8');
   }
+  values['TPS_STACK_STORAGE_IDENTITIES'] = storageIdentities(values);
+  values['TPS_STACK_STORAGE_SECURITY'] = storageSecurity(values);
   return values;
 }
 
