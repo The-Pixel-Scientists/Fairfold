@@ -139,6 +139,7 @@ export const api = {
   list: (search = '') => `GET /console/submissions${search}`,
   one: (id: string) => `GET /console/submissions/${id}`,
   files: (id: string) => `GET /console/submissions/${id}/files`,
+  assignments: (id: string) => `GET /console/submissions/${id}/assignments`,
   move: (stageId: string) => `POST /console/stages/${stageId}/submissions`,
 } as const;
 

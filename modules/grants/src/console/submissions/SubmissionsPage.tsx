@@ -19,6 +19,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { submissionQuerySchema } from '../../contracts/index.ts';
 import type { SubmissionPage, SubmissionQuery } from '../../contracts/index.ts';
+import { AssignActions } from '../assessment/AssignActions.tsx';
+import { reviewersPath, spreadPath } from '../assessment/paths.ts';
 import { Filters } from './Filters.tsx';
 import { loadProgrammes } from './loaders.ts';
 import { MoveDialog } from './MoveDialog.tsx';
@@ -70,6 +72,8 @@ function Results({
 }: ResultsProps) {
   const navigate = useNavigate();
   const canMove = useCan('grants.applications.triage');
+  const canAssign = useCan('grants.reviews.assign');
+  const canChoose = canMove || canAssign;
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [moving, setMoving] = useState(false);
   const [notice, setNotice] = useState('');
@@ -108,7 +112,7 @@ function Results({
           ? countOf(page.total)
           : `Showing ${String(page.submissions.length)} on this page, ${countOf(page.total)} in all`}
       </p>
-      {canMove && (
+      {canChoose && (
         <BulkActionBar
           count={chosen.length}
           noun={noun}
@@ -116,14 +120,23 @@ function Results({
             setSelected(new Set());
           }}
         >
-          <Button
-            disabled={chosen.length === 0}
-            onClick={() => {
-              setMoving(true);
+          {canMove && (
+            <Button
+              disabled={chosen.length === 0}
+              onClick={() => {
+                setMoving(true);
+              }}
+            >
+              Move to stage
+            </Button>
+          )}
+          <AssignActions
+            chosen={chosen}
+            onDone={(message) => {
+              setNotice(message);
+              setSelected(new Set());
             }}
-          >
-            Move to stage
-          </Button>
+          />
         </BulkActionBar>
       )}
       <p
@@ -137,7 +150,7 @@ function Results({
       <SubmissionTable
         submissions={page.submissions}
         search={search}
-        {...(canMove && {
+        {...(canChoose && {
           selection: {
             selected,
             onSelectedChange: setSelected,
@@ -190,6 +203,7 @@ function Submissions({ query }: { query: SubmissionQuery }) {
   const navigate = useNavigate();
   const { state, reload } = useSubmissionPage(query);
   const options = useLoad(loadProgrammes);
+  const canAssign = useCan('grants.reviews.assign');
   const [help, setHelp] = useState(false);
   const [turnedTo, setTurnedTo] = useState<string | null>(null);
   const arrived = useCallback(() => {
@@ -211,13 +225,25 @@ function Submissions({ query }: { query: SubmissionQuery }) {
         title="Submissions"
         description="Everything applicants have submitted, where each one stands and what needs doing next."
         actions={
-          <Button
-            onClick={() => {
-              setHelp(true);
-            }}
-          >
-            Keyboard shortcuts
-          </Button>
+          <>
+            {canAssign && query.roundId !== undefined && (
+              <>
+                <Link to={reviewersPath(query.roundId)} className={buttonClassName()}>
+                  Reviewers
+                </Link>
+                <Link to={spreadPath(query.roundId)} className={buttonClassName()}>
+                  Score spread
+                </Link>
+              </>
+            )}
+            <Button
+              onClick={() => {
+                setHelp(true);
+              }}
+            >
+              Keyboard shortcuts
+            </Button>
+          </>
         }
       />
       <Filters

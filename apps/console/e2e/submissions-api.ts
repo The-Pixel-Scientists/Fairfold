@@ -214,11 +214,12 @@ export async function stubSubmissions(
           sent.push({ key: `GET /console${path}${url.search}`, body: undefined });
           return list(held, url.searchParams);
         }
-        const one = /^\/submissions\/([^/]+)(\/files)?$/.exec(path);
+        const one = /^\/submissions\/([^/]+)(\/files|\/assignments)?$/.exec(path);
         if (request.method() === 'GET' && one) {
           sent.push({ key: `GET /console${path}`, body: undefined });
           const found = held.find((item) => item.id === one[1]);
           if (found === undefined) return problem(404, 'There is no submission with this address.');
+          if (one[2] === '/assignments') return ok({ assignments: [] });
           return ok(one[2] === undefined ? detail(found) : { attachments: [] });
         }
         const move = /^\/stages\/([^/]+)\/submissions$/.exec(path);

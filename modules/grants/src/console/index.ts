@@ -2,13 +2,14 @@
 //
 // The grants module's staff screens: the routes the console adds under a
 // funder's address, and the pages they put in its navigation. Programme
-// set-up, the form builder and submissions are here; later grants screens
+// set-up, the form builder, submissions and assessment are here; later grants screens
 // extend both lists.
 
 import { idSchema } from '@pixel-scientists/domain';
 import type { Permission } from '@pixel-scientists/domain/platform';
 import type { Params, RouteDefinition, SearchSchema } from '@pixel-scientists/ui';
 
+import { REVIEWS_PATH } from './assessment/paths.ts';
 import { NEW_PROGRAMME_PATH, PROGRAMMES_PATH } from './programme/paths.ts';
 import { SUBMISSIONS_PATH } from './submissions/paths.ts';
 
@@ -103,10 +104,34 @@ export const grantsRoutes: readonly RouteDefinition[] = [
     params: ids,
     load: () => import('./submissions/SubmissionPage.tsx'),
   },
+  {
+    path: '/rounds/:roundId/reviewers',
+    title: 'Reviewers',
+    params: ids,
+    load: () => import('./assessment/ReviewersPage.tsx'),
+  },
+  {
+    path: '/rounds/:roundId/score-spread',
+    title: 'Score spread',
+    params: ids,
+    load: () => import('./assessment/SpreadPage.tsx'),
+  },
+  {
+    path: REVIEWS_PATH,
+    title: 'My reviews',
+    load: () => import('./assessment/MyReviewsPage.tsx'),
+  },
+  {
+    path: '/reviews/:assignmentId',
+    title: 'Review',
+    params: ids,
+    load: () => import('./assessment/ReviewPage.tsx'),
+  },
 ];
 
 /** What the console's navigation lists for grants, each shown only to a session that holds its permission. */
 export const grantsNavigation = [
   { to: PROGRAMMES_PATH, label: 'Programmes', permission: 'grants.programmes.manage' },
   { to: SUBMISSIONS_PATH, label: 'Submissions', permission: 'grants.applications.read' },
+  { to: REVIEWS_PATH, label: 'My reviews', permission: 'grants.reviews.score' },
 ] as const satisfies readonly { to: string; label: string; permission: Permission }[];

@@ -34,6 +34,7 @@ const reads = (submission = one, list = page([summary(2), summary(1), summary(3)
   [api.stages]: ok({ stages }),
   [api.one(submission.id)]: ok(submission),
   [api.files(submission.id)]: ok({ attachments: [] }),
+  [api.assignments(submission.id)]: ok({ assignments: [] }),
   [api.list()]: ok(list),
 });
 
@@ -334,6 +335,7 @@ describe('moving through the list', () => {
       ...reads(one, page([summary(1), summary(3)])),
       [api.one(next.id)]: ok(next),
       [api.files(next.id)]: ok({ attachments: [] }),
+      [api.assignments(next.id)]: ok({ assignments: [] }),
     });
     openConsole(PATH);
 
@@ -357,6 +359,7 @@ describe('when a submission cannot be shown', () => {
         return reads === 1 ? problem(404, 'There is no submission with this address.') : ok(one);
       },
       [api.files(one.id)]: ok({ attachments: [] }),
+      [api.assignments(one.id)]: ok({ assignments: [] }),
       [api.stages]: ok({ stages }),
     });
     openConsole(PATH);
