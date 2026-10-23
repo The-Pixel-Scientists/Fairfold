@@ -42,6 +42,7 @@ import { warehouseSnapshotHandler } from './platform/warehouse/index.ts';
 import type { ScopeResolvers } from './policy/index.ts';
 import { ApiError } from './problems.ts';
 import { publicRoutes } from './public/index.ts';
+import type { PublicLog } from './public/tenants.ts';
 import { route, type Route } from './routes/register.ts';
 
 export interface ComposedModules {
@@ -93,6 +94,7 @@ export function composeModules(deps: {
   /** The auth module, for the team routes. */
   auth?: TeamAuth;
   mail?: Mail;
+  log?: PublicLog;
 }): ComposedModules {
   const party = partyHandlers({ notFound });
   const grants = grantsHandlers({
@@ -113,7 +115,7 @@ export function composeModules(deps: {
         getWarehouseSnapshot,
         warehouseSnapshotHandler({ contributions: [partyWarehouse, grantsWarehouse] }),
       ),
-      ...publicRoutes(deps.publicTenants),
+      ...publicRoutes(deps.publicTenants, deps.log),
       route(partyRoutes.getProfile, party.getProfile),
       route(partyRoutes.updateProfile, party.updateProfile),
       route(partyRoutes.recordConsent, party.recordConsent),

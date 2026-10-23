@@ -6,10 +6,10 @@ import { getLogo, getPublicTenant, getThemeCss } from '@pixel-scientists/domain/
 
 import type { PublicTenants } from '../database.ts';
 import { route, type Route } from '../routes/register.ts';
-import { publicHandlers } from './tenants.ts';
+import { publicHandlers, type PublicLog } from './tenants.ts';
 
-export function publicRoutes(tenants: PublicTenants): readonly Route[] {
-  const handlers = publicHandlers(tenants);
+export function publicRoutes(tenants: PublicTenants, log?: PublicLog): readonly Route[] {
+  const handlers = publicHandlers(tenants, log);
   return [
     route(getPublicTenant, handlers.getPublicTenantHandler),
     route(getThemeCss, handlers.getThemeCssHandler),
