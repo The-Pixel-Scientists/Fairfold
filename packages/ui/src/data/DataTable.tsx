@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { useId } from 'react';
-import type { ReactNode } from 'react';
+import { useId, useLayoutEffect, useRef, useState } from 'react';
+import type { KeyboardEvent, ReactNode } from 'react';
 
+import { Checkbox } from '../Checkbox.tsx';
 import { cx } from '../cx.ts';
 
 export interface Column<Row> {
@@ -25,6 +26,15 @@ export interface SortState {
   direction: 'ascending' | 'descending';
 }
 
+/** Tick boxes for choosing rows, to act on several at once. */
+export interface RowSelection<Row> {
+  /** The `rowKey` of each row chosen. */
+  selected: ReadonlySet<string>;
+  onSelectedChange: (selected: ReadonlySet<string>) => void;
+  /** Names a row's box by what ticking it chooses, such as "Select Riverside Lunch Club". */
+  label: (row: Row) => string;
+}
+
 export interface DataTableProps<Row> {
   /** Names the table, such as "Applications in the Spring round". */
   caption: string;
@@ -40,7 +50,16 @@ export interface DataTableProps<Row> {
   onSortChange?: (sort: SortState) => void;
   /** Shown in place of the rows when there are none: what is empty and what to do next. */
   empty?: ReactNode;
+  /** Adds a box to each row and one in the heading that chooses every row shown. Space chooses the focused row. */
+  selection?: RowSelection<Row>;
+  /** Called when Enter is pressed on a focused row. Give a row a link as well, for a pointer. */
+  onOpenRow?: (row: Row) => void;
+  /** Called when "?" is pressed on a focused row, to show the keyboard shortcuts. */
+  onHelp?: () => void;
 }
+
+/** What a person can Tab to inside a row. */
+const CONTROLS = 'a[href], button, input, select, textarea';
 
 const cell = 'px-3 py-2 whitespace-nowrap';
 
@@ -86,8 +105,90 @@ export function DataTable<Row>({
   sort,
   onSortChange,
   empty,
+  selection,
+  onOpenRow,
+  onHelp,
 }: DataTableProps<Row>) {
   const captionId = useId();
+  const body = useRef<HTMLTableSectionElement>(null);
+  const [current, setCurrent] = useState(0);
+  const roving = selection !== undefined || onOpenRow !== undefined;
+  const active = Math.min(current, Math.max(rows.length - 1, 0));
+  const keys = rows.map(rowKey);
+  const chosen = keys.filter((key) => selection?.selected.has(key));
+
+  // Roving focus: Tab stops at the focused row, then at what is inside it, and skips every other row's controls.
+  useLayoutEffect(() => {
+    if (!roving) return;
+    body.current?.querySelectorAll<HTMLElement>(':scope > tr[data-row]').forEach((row, index) => {
+      for (const control of row.querySelectorAll<HTMLElement>(CONTROLS)) {
+        if (index !== active) {
+          control.tabIndex = -1;
+          control.dataset['roving'] = '';
+        } else if (control.dataset['roving'] !== undefined) {
+          control.removeAttribute('tabindex');
+          delete control.dataset['roving'];
+        }
+      }
+    });
+  });
+
+  function focusRow(index: number) {
+    const target = body.current?.querySelectorAll<HTMLElement>(':scope > tr[data-row]')[index];
+    target?.focus();
+  }
+
+  function toggle(key: string, on: boolean) {
+    if (!selection) return;
+    const next = new Set(selection.selected);
+    if (on) next.add(key);
+    else next.delete(key);
+    selection.onSelectedChange(next);
+  }
+
+  function handleKey(event: KeyboardEvent<HTMLTableRowElement>, index: number, row: Row) {
+    // Keys pressed on a link or box inside the row are theirs.
+    if (event.target !== event.currentTarget) return;
+    const last = rows.length - 1;
+    const key = keys[index] ?? '';
+    switch (event.key) {
+      case 'ArrowDown':
+        event.preventDefault();
+        focusRow(Math.min(index + 1, last));
+        break;
+      case 'ArrowUp':
+        event.preventDefault();
+        focusRow(Math.max(index - 1, 0));
+        break;
+      case 'Home':
+        event.preventDefault();
+        focusRow(0);
+        break;
+      case 'End':
+        event.preventDefault();
+        focusRow(last);
+        break;
+      case 'Enter':
+        if (onOpenRow) {
+          event.preventDefault();
+          onOpenRow(row);
+        }
+        break;
+      case ' ':
+        if (selection) {
+          event.preventDefault();
+          toggle(key, !selection.selected.has(key));
+        }
+        break;
+      case '?':
+        if (onHelp) {
+          event.preventDefault();
+          onHelp();
+        }
+        break;
+      default:
+    }
+  }
 
   return (
     <div
@@ -110,6 +211,24 @@ export function DataTable<Row>({
         </caption>
         <thead>
           <tr className="border-b border-edge/40">
+            {selection && (
+              <th scope="col" className={cx(cell, 'w-0')}>
+                <Checkbox
+                  label="Select all on this page"
+                  labelHidden
+                  checked={rows.length > 0 && chosen.length === rows.length}
+                  indeterminate={chosen.length > 0 && chosen.length < rows.length}
+                  onCheckedChange={(on) => {
+                    const next = new Set(selection.selected);
+                    for (const key of keys) {
+                      if (on) next.add(key);
+                      else next.delete(key);
+                    }
+                    selection.onSelectedChange(next);
+                  }}
+                />
+              </th>
+            )}
             {columns.map((column) => {
               const direction = sort?.key === column.key ? sort.direction : undefined;
               const end = column.align === 'end';
@@ -151,12 +270,40 @@ export function DataTable<Row>({
             })}
           </tr>
         </thead>
-        <tbody>
-          {rows.map((row) => (
+        <tbody ref={body}>
+          {rows.map((row, index) => (
             <tr
-              key={rowKey(row)}
-              className="border-b border-divider transition-colors duration-(--motion-fast) ease-standard hover:bg-sunken/60"
+              key={keys[index]}
+              data-row=""
+              {...(roving && {
+                tabIndex: index === active ? 0 : -1,
+                onFocus: () => {
+                  setCurrent(index);
+                },
+                onKeyDown: (event: KeyboardEvent<HTMLTableRowElement>) => {
+                  handleKey(event, index, row);
+                },
+              })}
+              className={cx(
+                'border-b border-divider transition-colors duration-(--motion-fast) ease-standard',
+                selection?.selected.has(keys[index] ?? '')
+                  ? 'bg-accent-soft/60'
+                  : 'hover:bg-sunken/60',
+                roving && '-outline-offset-2',
+              )}
             >
+              {selection && (
+                <td className={cx(cell, 'w-0')}>
+                  <Checkbox
+                    label={selection.label(row)}
+                    labelHidden
+                    checked={selection.selected.has(keys[index] ?? '')}
+                    onCheckedChange={(on) => {
+                      toggle(keys[index] ?? '', on);
+                    }}
+                  />
+                </td>
+              )}
               {columns.map((column) => {
                 const className = cx(
                   cell,
@@ -176,7 +323,7 @@ export function DataTable<Row>({
           ))}
           {rows.length === 0 && empty !== undefined && (
             <tr>
-              <td colSpan={columns.length} className="px-3 py-8">
+              <td colSpan={columns.length + (selection ? 1 : 0)} className="px-3 py-8">
                 {empty}
               </td>
             </tr>
