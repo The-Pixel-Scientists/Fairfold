@@ -41,6 +41,39 @@ unset. The plain variable is for development and tests. Setting both is an error
 | `TPS_LOG_LEVEL`                         | No                                                 | `fatal`, `error`, `warn`, `info` (the default), `debug`, `trace` or `silent`                                                                                                                                                           |
 | `TPS_DEV`                               | No                                                 | `1` for development: the listener binds to `127.0.0.1`, and the fixed development passwords are accepted, but only against a database server on this machine                                                                           |
 
+The file service (`src/platform/files`, ADR 0047) needs these as well. All are
+required, with no fallback; a secret may be given as `_FILE` like the others.
+
+| Variable | Meaning |
+| --- | --- |
+| `TPS_STORAGE_ENDPOINT` | Address of the S3-compatible store: `http` or `https`, host and port only. Every storage call goes there and nowhere else |
+| `TPS_STORAGE_REGION`, `TPS_STORAGE_BUCKET` | Signing region and the deployment's bucket (path-style) |
+| `TPS_STORAGE_WRITE_ACCESS_KEY_ID`, `TPS_STORAGE_WRITE_SECRET_ACCESS_KEY` | The key that writes `clean/`. Used only to put an object |
+| `TPS_STORAGE_READ_ACCESS_KEY_ID`, `TPS_STORAGE_READ_SECRET_ACCESS_KEY` | The key that reads `clean/`. Used only to get an object |
+| `TPS_CLAMD_HOST`, `TPS_CLAMD_PORT` | The scanner |
+| `TPS_CLAMD_TIMEOUT_MS` | How long a scan may take, 1000 to 25000. clamd stops at 20 seconds |
+| `TPS_FILES_MAX_STORES` | Uploads scanned at once in this process, 1 to 9 (the database pool has 10 connections). Another upload gets a 503 with `Retry-After: 5` |
+
+## Files
+
+A handler stores and sends files only through `context.files`, which is bound
+to the request's transaction and acting member:
+
+- `store({ name, bytes, allowedTypes, maxBytes })` checks size, name, type and
+  extension, inserts a pending `app.file` row, scans with clamd, and writes
+  `clean/<tenant id>/<file id>` only for a clean file. It returns `{ file }` or
+  `{ refusal }` and audits `platform.file.uploaded` or `platform.file.refused`.
+  A handler that answers a refusal with an error rolls the row and event back.
+- `send(fileId, { audit })` reads the row under row-level security and streams
+  the object with ADR 0047's headers. A missing, unclean or other tenant's file
+  is the usual 404. `audit` writes `platform.file.downloaded`.
+
+A route with a raw upload body (`{ raw: ['application/octet-stream'], maxBytes }`)
+is checked in full, including its permission and scope rule, and its
+`File-Name` header is decoded, before the body is read. The handler's
+`input.body` is `{ name, bytes }`. A route that answers raw bytes may return a
+stream. Nothing outside `src/platform/files` reads the storage keys.
+
 ## Endpoints
 
 | Route               | Meaning                                                                                                                                                          |

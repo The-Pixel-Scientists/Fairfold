@@ -21,6 +21,15 @@ export const smtpTestSettings = {
   TPS_SMTP_FROM: 'grants@example.org',
 } as const;
 
+/** The file service's settings, as the db project's profile sets them (scripts/dev-env.ts). */
+export const fileTestSettings = (): Record<string, string> =>
+  Object.fromEntries(
+    Object.entries(process.env).filter(
+      (entry): entry is [string, string] =>
+        /^TPS_(?:STORAGE|CLAMD|FILES)_/.test(entry[0]) && entry[1] !== undefined,
+    ),
+  );
+
 export type LogLine = Record<string, unknown> & { level: string; msg?: string };
 
 /** A log destination that keeps what is written, so a test can read the lines. */

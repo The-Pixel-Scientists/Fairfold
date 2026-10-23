@@ -12,6 +12,7 @@ import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
 
 import type { AuditEvent } from './audit/writer.ts';
 import type { TenantTransaction } from './database.ts';
+import type { RequestFiles } from './platform/files/index.ts';
 
 /** Where the session stands on MFA, as in the session the apps read. */
 export type MfaState = 'enrol' | 'verify' | 'complete' | 'not_required';
@@ -68,8 +69,8 @@ export type OwnTransaction = <T>(
   work: (tx: TenantTransaction, audit: RequestAudit) => Promise<T>,
 ) => Promise<T>;
 
-/** The context of a console or portal route, after the policy has let the caller in. */
-export interface MemberContext extends RequestContext {
+/** What the policy builds for a console or portal route, once it has let the caller in. */
+export interface PolicyContext extends RequestContext {
   readonly app: App;
   readonly session: RequestSession;
   readonly audit: RequestAudit;
@@ -86,6 +87,11 @@ export interface MemberContext extends RequestContext {
     /** What the caller's roles give in this app, from the role map. */
     readonly permissions: ReadonlySet<Permission>;
   };
+}
+
+/** The context of a console or portal route: the policy's, and the file service bound to the request. */
+export interface MemberContext extends PolicyContext {
+  readonly files: RequestFiles;
 }
 
 export interface SessionRead {
