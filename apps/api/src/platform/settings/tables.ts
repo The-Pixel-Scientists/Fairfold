@@ -24,6 +24,8 @@ type SettingsTables = {
     preset: Preset;
     logo: Buffer | null;
     logo_type: LogoType | null;
+    /** Unchecked jsonb: parse it with tokenSetSchema before use. Written as JSON text. */
+    tokens: { __select__: unknown; __insert__: string | null; __update__: string | null };
     updated_by: string;
   };
   'app.tenant_module': {
