@@ -44,15 +44,15 @@ unset. The plain variable is for development and tests. Setting both is an error
 The file service (`src/platform/files`, ADR 0047) needs these as well. All are
 required, with no fallback; a secret may be given as `_FILE` like the others.
 
-| Variable | Meaning |
-| --- | --- |
-| `TPS_STORAGE_ENDPOINT` | Address of the S3-compatible store: `http` or `https`, host and port only. Every storage call goes there and nowhere else |
-| `TPS_STORAGE_REGION`, `TPS_STORAGE_BUCKET` | Signing region and the deployment's bucket (path-style) |
-| `TPS_STORAGE_WRITE_ACCESS_KEY_ID`, `TPS_STORAGE_WRITE_SECRET_ACCESS_KEY` | The key that writes `clean/`. Used only to put an object |
-| `TPS_STORAGE_READ_ACCESS_KEY_ID`, `TPS_STORAGE_READ_SECRET_ACCESS_KEY` | The key that reads `clean/`. Used only to get an object |
-| `TPS_CLAMD_HOST`, `TPS_CLAMD_PORT` | The scanner |
-| `TPS_CLAMD_TIMEOUT_MS` | How long a scan may take, 1000 to 25000. clamd stops at 20 seconds |
-| `TPS_FILES_MAX_STORES` | Uploads scanned at once in this process, 1 to 9 (the database pool has 10 connections). Another upload gets a 503 with `Retry-After: 5` |
+| Variable                                                                 | Meaning                                                                                                                                 |
+| ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `TPS_STORAGE_ENDPOINT`                                                   | Address of the S3-compatible store: `http` or `https`, host and port only. Every storage call goes there and nowhere else               |
+| `TPS_STORAGE_REGION`, `TPS_STORAGE_BUCKET`                               | Signing region and the deployment's bucket (path-style)                                                                                 |
+| `TPS_STORAGE_WRITE_ACCESS_KEY_ID`, `TPS_STORAGE_WRITE_SECRET_ACCESS_KEY` | The key that writes `clean/`. Used only to put an object                                                                                |
+| `TPS_STORAGE_READ_ACCESS_KEY_ID`, `TPS_STORAGE_READ_SECRET_ACCESS_KEY`   | The key that reads `clean/`. Used only to get an object                                                                                 |
+| `TPS_CLAMD_HOST`, `TPS_CLAMD_PORT`                                       | The scanner                                                                                                                             |
+| `TPS_CLAMD_TIMEOUT_MS`                                                   | How long a scan may take, 1000 to 25000. clamd stops at 20 seconds                                                                      |
+| `TPS_FILES_MAX_STORES`                                                   | Uploads scanned at once in this process, 1 to 9 (the database pool has 10 connections). Another upload gets a 503 with `Retry-After: 5` |
 
 ## Files
 
@@ -120,6 +120,22 @@ The public tenant routes (`/api/public/tenants/:slug`, `/theme.css` and
 `/logo`) need no session and set no tenant: they call the two public functions
 of ADR 0019. An unknown, suspended or malformed slug gets the same 404. The
 stylesheet is built by `themeCss()` from validated tokens only.
+
+The team routes (`src/platform/team/`) let a tenant admin list members and
+pending invitations, invite, revoke an invitation, change roles, suspend,
+reinstate and remove, all under `platform.members.manage` with step-up on every
+change. A change locks the team's memberships, so concurrent changes run one at
+a time; refuses the admin's own membership and any change that would leave no
+active member who can manage the team (409); and, for a suspension, a removal or
+a role change, ends the member's sessions in this tenant through the auth module.
+Applicants are not on the team, so their membership ids answer 404. Member names
+and addresses come from the party module.
+
+`pnpm tenant:create --slug <slug> --name <name> --admin-email <address>`
+(`src/operator/`) makes a tenant as `app_worker`, records
+`platform.tenant.created` with the actor `operator`, and emails the first
+administrator's invitation. It checks the arguments with the shared schemas before
+it connects and prints the tenant's id and slug, never a token or a link.
 
 A handler writes a configuration version for a change to settings, a theme or
 a module switch with `context.config.record(entityType, entityId, diff)`, in
