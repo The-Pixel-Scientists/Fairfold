@@ -15,6 +15,7 @@ import {
   uploadLogo,
 } from '@pixel-scientists/domain/platform/settings';
 import { teamRoutes } from '@pixel-scientists/domain/platform/team';
+import { getWarehouseSnapshot } from '@pixel-scientists/domain/warehouse';
 import {
   applicationRoutes,
   assessmentRoutes,
@@ -53,6 +54,7 @@ describe('composeModules', () => {
       removeLogo,
       listModules,
       switchModule,
+      getWarehouseSnapshot,
       getPublicTenant,
       getThemeCss,
       getLogo,

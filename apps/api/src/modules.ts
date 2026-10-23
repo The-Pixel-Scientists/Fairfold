@@ -7,6 +7,7 @@
 
 import type { FieldProblem } from '@pixel-scientists/domain/platform';
 import { listAuditEvents } from '@pixel-scientists/domain/platform/audit-log';
+import { getWarehouseSnapshot } from '@pixel-scientists/domain/warehouse';
 import {
   applicationRoutes,
   assessmentRoutes,
@@ -21,9 +22,14 @@ import {
   spreadRoutes,
   submissionRoutes,
 } from '@pixel-scientists/grants/contracts';
-import { grantsHandlers, grantsResolvers, type MailSender } from '@pixel-scientists/grants/server';
+import {
+  grantsHandlers,
+  grantsResolvers,
+  grantsWarehouse,
+  type MailSender,
+} from '@pixel-scientists/grants/server';
 import { partyRoutes } from '@pixel-scientists/party/contracts';
-import { partyHandlers, partyResolvers } from '@pixel-scientists/party/server';
+import { partyHandlers, partyResolvers, partyWarehouse } from '@pixel-scientists/party/server';
 
 import type { PublicTenants, TenantTransaction } from './database.ts';
 import { listAuditEventsHandler } from './platform/audit-log/index.ts';
@@ -32,6 +38,7 @@ import { membersWith } from './platform/members.ts';
 import { settingsRoutes } from './platform/settings/index.ts';
 import { settingsTables } from './platform/settings/tables.ts';
 import { teamRoutes, type TeamAuth } from './platform/team/index.ts';
+import { warehouseSnapshotHandler } from './platform/warehouse/index.ts';
 import type { ScopeResolvers } from './policy/index.ts';
 import { ApiError } from './problems.ts';
 import { publicRoutes } from './public/index.ts';
@@ -102,6 +109,10 @@ export function composeModules(deps: {
       route(listAuditEvents, listAuditEventsHandler),
       ...teamRoutes(deps.auth ?? noAuth),
       ...settingsRoutes,
+      route(
+        getWarehouseSnapshot,
+        warehouseSnapshotHandler({ contributions: [partyWarehouse, grantsWarehouse] }),
+      ),
       ...publicRoutes(deps.publicTenants),
       route(partyRoutes.getProfile, party.getProfile),
       route(partyRoutes.updateProfile, party.updateProfile),
