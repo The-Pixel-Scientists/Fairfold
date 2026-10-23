@@ -206,15 +206,20 @@ jobs:
       # repository secret. Each code works once, so each of their spec files
       # runs on its own and starts on a fresh code. The builder journeys add
       # programmes the outcome journey's applicant would see beside the
-      # seed's, so the outcome journey goes first. The submissions journey
-      # needs the applications scenario's submissions, so it runs next, on a
-      # fresh stack. The programme set-up journey starts from a manager with
-      # no programmes, so it runs last, on the base scenario. The patterns
-      # match spec file names, and a run whose pattern matches no test fails.
+      # seed's, so the outcome journey goes first, and the file download
+      # journey, which sends one more application, last. The submissions
+      # journey needs the applications scenario's submissions, so it runs
+      # next, on a fresh stack. It moves five to Review, which the assessment
+      # journey's reviewer needs to have reviews not yet started, and the
+      # decisions journey follows them. The programme set-up journey starts
+      # from a manager with no programmes, so it runs last, on the base
+      # scenario. The patterns match spec file names, and a run whose
+      # pattern matches no test fails.
       - name: Fill the stack with synthetic data and run the specs against it
         env:
-          MANAGER_JOURNEYS: outcome-journey\.spec\.ts form-builder-journey\.spec\.ts forms-builder-table-file-journey\.spec\.ts
+          MANAGER_JOURNEYS: outcome-journey\.spec\.ts form-builder-journey\.spec\.ts forms-builder-table-file-journey\.spec\.ts submissions-files-journey\.spec\.ts
           SUBMISSIONS_JOURNEY: submissions-journey\.spec\.ts
+          APPLICATIONS_JOURNEYS: assessment-journey\.spec\.ts decisions-journey\.spec\.ts
           PROGRAMME_JOURNEY: programme-journey\.spec\.ts
         run: |
           names=$(node scripts/dev-names.ts)
@@ -238,14 +243,17 @@ jobs:
             pnpm stack
             seed "$1"
           }
+          journeys() {
+            for journey in "$@"; do
+              sleep $((31 - $(date +%s) % 30))
+              specs --grep "$journey" --workers 1
+            done
+          }
           seed configured
-          specs --grep-invert "$SUBMISSIONS_JOURNEY|$PROGRAMME_JOURNEY|${MANAGER_JOURNEYS// /|}"
-          for journey in $MANAGER_JOURNEYS; do
-            sleep $((31 - $(date +%s) % 30))
-            specs --grep "$journey" --workers 1
-          done
+          specs --grep-invert "$SUBMISSIONS_JOURNEY|$PROGRAMME_JOURNEY|${MANAGER_JOURNEYS// /|}|${APPLICATIONS_JOURNEYS// /|}"
+          journeys $MANAGER_JOURNEYS
           reseed applications
-          specs --grep "$SUBMISSIONS_JOURNEY"
+          journeys "$SUBMISSIONS_JOURNEY" $APPLICATIONS_JOURNEYS
           reseed base
           specs --grep "$PROGRAMME_JOURNEY"
       - name: Install cosign

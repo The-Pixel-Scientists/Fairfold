@@ -82,13 +82,17 @@ describe("the CI stack job's patterns for the manager's journeys", () => {
     const runs = [
       ...setting('MANAGER_JOURNEYS').split(' '),
       setting('SUBMISSIONS_JOURNEY'),
+      ...setting('APPLICATIONS_JOURNEYS').split(' '),
       setting('PROGRAMME_JOURNEY'),
     ];
     expect(runs.map(matches)).toEqual([
       ['apps/portal/e2e/outcome-journey.spec.ts'],
       ['apps/console/e2e/form-builder-journey.spec.ts'],
       ['apps/console/e2e/forms-builder-table-file-journey.spec.ts'],
+      ['apps/console/e2e/submissions-files-journey.spec.ts'],
       ['apps/console/e2e/submissions-journey.spec.ts'],
+      ['apps/console/e2e/assessment-journey.spec.ts'],
+      ['apps/console/e2e/decisions-journey.spec.ts'],
       ['apps/console/e2e/programme-journey.spec.ts'],
     ]);
     expect(runs.flatMap(matches).sort()).toEqual(specs.filter(signsIn).sort());
@@ -96,7 +100,7 @@ describe("the CI stack job's patterns for the manager's journeys", () => {
 
   it('keep every one of them out of the run of the other specs', () => {
     expect(ci).toContain(
-      'specs --grep-invert "$SUBMISSIONS_JOURNEY|$PROGRAMME_JOURNEY|${MANAGER_JOURNEYS// /|}"',
+      'specs --grep-invert "$SUBMISSIONS_JOURNEY|$PROGRAMME_JOURNEY|${MANAGER_JOURNEYS// /|}|${APPLICATIONS_JOURNEYS// /|}"',
     );
   });
 });
