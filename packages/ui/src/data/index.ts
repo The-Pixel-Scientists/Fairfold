@@ -2,8 +2,10 @@
 //
 // Data and progress: tables, tabs, task lists, progress, file uploads and reading from the API.
 
+export { BulkActionBar } from './BulkActionBar.tsx';
+export type { BulkActionBarProps } from './BulkActionBar.tsx';
 export { DataTable } from './DataTable.tsx';
-export type { Column, DataTableProps, SortState } from './DataTable.tsx';
+export type { Column, DataTableProps, RowSelection, SortState } from './DataTable.tsx';
 export { FileDrop } from './FileDrop.tsx';
 export type { FileDropItem, FileDropProps, FileStatus } from './FileDrop.tsx';
 export { SectionProgress } from './SectionProgress.tsx';
