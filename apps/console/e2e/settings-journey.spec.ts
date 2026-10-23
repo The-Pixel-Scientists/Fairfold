@@ -2,8 +2,9 @@
 //
 // Demo steps 3 and 4 against the real API: the administrator is refused a
 // colour that fails contrast and offered one that passes, saves it with a
-// preset and a logo and sees the console take them, and checks that Grants is
-// on. It needs the stack (`pnpm stack`, then `pnpm test:stack`) and the
+// preset and a logo and sees the console take them, downloads the look as a
+// stylesheet, changes the accent and saves it, is refused a failing pair, goes
+// back to the preset, and checks that Grants is on. It needs the stack (`pnpm stack`, then `pnpm test:stack`) and the
 // Northfield administrator from the seed's `base` scenario:
 //
 //   TPS_E2E_ADMIN_EMAIL     the administrator's email address
@@ -20,6 +21,7 @@ import type { Page } from '@playwright/test';
 
 import { nextCode } from './auth-totp.ts';
 import { solidPng } from './png.ts';
+import { NEW_ACCENT, stylesheetSteps } from './settings-stylesheet-steps.ts';
 
 const EMAIL = process.env['TPS_E2E_ADMIN_EMAIL'];
 const PASSWORD = process.env['TPS_E2E_ADMIN_PASSWORD'];
@@ -71,7 +73,7 @@ test.describe('the journey against the real API', () => {
   );
   test.setTimeout(240_000);
 
-  test('@api refuses a colour that fails, saves one that passes with a preset and logo, and checks Grants is on', async ({
+  test('@api refuses a colour that fails, saves one that passes with a preset and logo, takes a stylesheet of its own, and checks Grants is on', async ({
     page,
     request,
   }) => {
@@ -132,6 +134,12 @@ test.describe('the journey against the real API', () => {
       .toBe(true);
     const served = await request.get('/api/public/tenants/northfield/logo');
     expect(served.headers()['content-type']).toBe('image/png');
+
+    // The funder's own stylesheet: the API writes its own theme.css from the saved tokens.
+    await stylesheetSteps(page, chosen, async () => {
+      const own = await request.get('/api/public/tenants/northfield/theme.css');
+      expect(await own.text()).toContain(`--color-accent: ${NEW_ACCENT};`);
+    });
 
     // Grants is on for the funder.
     await page
