@@ -7,6 +7,26 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+/** What the tests use of the domain package's tokens (ADR 0046). */
+interface DomainTokens {
+  contrastPairs: readonly { foreground: string; background: string; minimum: number }[];
+  defaultTokens: unknown;
+  fonts: Record<string, { stack: string }>;
+  tokenDefinitions: readonly {
+    path: string;
+    property: string;
+    kind: 'colour' | 'length' | 'font';
+  }[];
+  tokenValue: (tokens: unknown, path: string) => string | number;
+}
+
+// This package does not depend on the domain package, so its tokens are
+// loaded by path. Import them by name once the workspace dependency is added.
+const domainTokens = '../../domain/src/platform/theme-tokens.ts';
+const { contrastPairs, defaultTokens, fonts, tokenDefinitions, tokenValue } = (await import(
+  /* @vite-ignore */ domainTokens
+)) as DomainTokens;
+
 const tokensCss = readFileSync(join(import.meta.dirname, 'tokens.css'), 'utf8');
 const stylesCss = readFileSync(join(import.meta.dirname, 'styles.css'), 'utf8');
 const schemeJs = readFileSync(join(import.meta.dirname, 'public', 'scheme.js'), 'utf8');
@@ -53,39 +73,20 @@ function colour(scheme: keyof typeof schemes, name: string): string {
   return value;
 }
 
-const surfaces = ['canvas', 'surface', 'sunken'];
+/** The custom property name without `--color-`, for a domain colour key such as `colorAccentHover`. */
+const cssName = (key: string) => {
+  const token = tokenDefinitions.find((definition) => definition.path === `light.${key}`);
+  if (token === undefined) throw new Error(`There is no token ${key}.`);
+  return token.property.slice('--color-'.length);
+};
 
-/** Text and the surfaces it appears on: 4.5:1 (WCAG 1.4.3). */
-const textPairs: [foreground: string, backgrounds: string[]][] = [
-  ['ink', [...surfaces, 'accent-soft', 'danger-soft', 'success-soft', 'warning-soft', 'info-soft']],
-  ['muted', [...surfaces, 'accent-soft']],
-  ['accent', [...surfaces, 'accent-soft']],
-  ['on-accent', ['accent', 'accent-hover']],
-  ['danger', [...surfaces, 'danger-soft']],
-  ['on-danger', ['danger', 'danger-hover']],
-  ['success', ['surface', 'success-soft']],
-  ['warning', ['surface', 'warning-soft']],
-  ['info', ['surface', 'info-soft']],
-];
-
-/** Borders, the focus ring and filled controls against what surrounds them: 3:1 (WCAG 1.4.11). */
-const uiPairs: [foreground: string, backgrounds: string[]][] = [
-  ['edge', surfaces],
-  [
-    'focus',
-    [...surfaces, 'accent-soft', 'danger-soft', 'success-soft', 'warning-soft', 'info-soft'],
-  ],
-  ['accent', surfaces],
-  ['danger', surfaces],
-];
-
-/** Colours that are decoration only, so they need no contrast of their own. */
-const decorative = new Set(['divider']);
-
-const pairs = (list: typeof textPairs) =>
-  (['light', 'dark'] as const).flatMap((scheme) =>
-    list.flatMap(([fg, bgs]) => bgs.map((bg) => [scheme, fg, bg] as const)),
-  );
+/** The domain package's list of pairs, so a funder's look meets the bar the default look does. */
+const pairs = (['light', 'dark'] as const).flatMap((scheme) =>
+  contrastPairs.map(
+    ({ foreground, background, minimum }) =>
+      [scheme, cssName(foreground), cssName(background), minimum] as const,
+  ),
+);
 
 describe('colour tokens', () => {
   it('reads every colour as a six-digit hex value', () => {
@@ -99,39 +100,56 @@ describe('colour tokens', () => {
     expect([...schemes.dark.keys()].sort()).toEqual([...schemes.light.keys()].sort());
   });
 
-  it.each(pairs(textPairs))(
-    '%s: text colour %s on %s has a contrast ratio of at least 4.5:1',
-    (scheme, foreground, background) => {
+  it.each(pairs)(
+    '%s: %s on %s has a contrast ratio of at least %s:1',
+    (scheme, foreground, background, minimum) => {
       expect(
         contrast(colour(scheme, foreground), colour(scheme, background)),
-      ).toBeGreaterThanOrEqual(4.5);
+      ).toBeGreaterThanOrEqual(minimum);
     },
   );
 
-  it.each(pairs(uiPairs))(
-    '%s: interface colour %s on %s has a contrast ratio of at least 3:1',
-    (scheme, foreground, background) => {
-      expect(
-        contrast(colour(scheme, foreground), colour(scheme, background)),
-      ).toBeGreaterThanOrEqual(3);
-    },
-  );
-
-  it('checks every colour token, so a new colour cannot skip the test', () => {
-    const checked = new Set<string>();
-    for (const [foreground, backgrounds] of [...textPairs, ...uiPairs]) {
-      checked.add(foreground);
-      for (const background of backgrounds) checked.add(background);
-    }
+  it('checks every colour token but the divider, so a new colour cannot skip the test', () => {
+    const checked = new Set(
+      pairs.flatMap(([, foreground, background]) => [foreground, background]),
+    );
     for (const name of schemes.light.keys()) {
-      if (!decorative.has(name)) expect(checked, `--color-${name} is not checked`).toContain(name);
+      if (name !== 'divider') expect(checked, `--color-${name} is not checked`).toContain(name);
     }
+    expect(checked).not.toContain('divider');
   });
 
   it('measures contrast the way WCAG does', () => {
     expect(contrast('#000000', '#ffffff')).toBeCloseTo(21, 5);
     expect(contrast('#777777', '#ffffff')).toBeCloseTo(4.48, 2);
     expect(contrast('#ffffff', '#ffffff')).toBeCloseTo(1, 5);
+  });
+});
+
+/** The first value a stretch of the tokens file gives a custom property. */
+function declared(css: string, property: string): string {
+  const match = new RegExp(String.raw`(?<![\w-])${property}:\s*([^;]+);`).exec(css);
+  if (match?.[1] === undefined) throw new Error(`${property} is not declared.`);
+  return match[1].replace(/\s+/g, ' ').trim();
+}
+
+describe('default tokens', () => {
+  // ADR 0046: tokens.css and the domain package's defaults are one look, written twice.
+  it.each(tokenDefinitions.map((token) => [token.path, token] as const))(
+    'gives %s the same value in tokens.css and in defaultTokens',
+    (path, token) => {
+      const value = tokenValue(defaultTokens, path);
+      const css = declared(path.startsWith('dark.') ? darkCss : lightCss, token.property);
+      if (token.kind === 'font') expect(css).toBe(fonts[String(value)]?.stack);
+      else if (token.kind === 'colour') expect(css.toLowerCase()).toBe(value);
+      else expect(css === '0' ? 0 : Number.parseFloat(css)).toBe(value);
+    },
+  );
+
+  it('writes every length in tokens.css in rem, as a stylesheet does', () => {
+    for (const token of tokenDefinitions.filter(({ kind }) => kind === 'length')) {
+      expect(declared(lightCss, token.property)).toMatch(/^(?:0|[\d.]+rem)$/);
+    }
   });
 });
 
