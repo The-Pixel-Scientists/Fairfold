@@ -1,12 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
 // `pnpm dev` (ADR 0005): start the development services in Compose if they
-// are not running, prepare and migrate this worktree's database, then run
-// the API, console and portal on this machine with reload, on this
-// worktree's ports (dev-names.ts). The API gets the `api` profile of
-// dev-env.ts. The console and portal get no TPS_ variable but the
-// API's address, so their Vite servers proxy `/api` to it on their own
-// origin. Ctrl+C stops the apps and leaves the services running.
+// are not running, create this worktree's bucket if it is missing, prepare
+// and migrate this worktree's database, then run the API, console and
+// portal on this machine with reload, on this worktree's ports
+// (dev-names.ts). The API gets the `api` profile of dev-env.ts. The console
+// and portal get no TPS_ variable but the API's address, so their Vite
+// servers proxy `/api` to it on their own origin. Ctrl+C stops the apps and
+// leaves the services running.
+//
+//   node scripts/dev.ts          services, bucket, database and apps
+//   node scripts/dev.ts bucket   only create the bucket, for CI
 
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { readFileSync } from 'node:fs';
@@ -14,7 +18,7 @@ import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { createInterface } from 'node:readline';
 
-import { developmentEnvironment, viteEnvironment } from './dev-env.ts';
+import { developmentEnvironment, ensureDevBucket, viteEnvironment } from './dev-env.ts';
 import { currentDevNames, repositoryRoot } from './dev-names.ts';
 
 interface App {
@@ -68,6 +72,11 @@ function stop(child: ChildProcess): void {
   }
 }
 
+if (process.argv[2] === 'bucket') {
+  ensureDevBucket();
+  process.exit(0);
+}
+
 runOrExit('docker', [
   'compose',
   '--file',
@@ -76,6 +85,7 @@ runOrExit('docker', [
   '--detach',
   '--wait',
 ]);
+ensureDevBucket();
 runOrExit(process.execPath, [
   'scripts/dev-env.ts',
   'database-admin',
