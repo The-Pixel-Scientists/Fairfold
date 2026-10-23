@@ -33,6 +33,21 @@ describe('visibleItems', () => {
     expect(visibleItems({ permissions: [] }, items)).toEqual([]);
   });
 
+  it('keeps an item that has two permissions for a session that holds either', () => {
+    const data = [
+      {
+        to: '/data',
+        label: 'Data',
+        permission: 'platform.warehouse.export',
+        or: 'grants.data.export',
+      },
+    ] as const;
+    for (const permissions of [['platform.warehouse.export'], ['grants.data.export']]) {
+      expect(visibleItems({ permissions }, data)).toHaveLength(1);
+    }
+    expect(visibleItems({ permissions: ['platform.audit.read'] }, data)).toEqual([]);
+  });
+
   it('gives every console page the permission that opens it', () => {
     for (const item of navigationItems) expect(item.permission).toMatch(/^[a-z]+\.[a-z]+\.[a-z]+$/);
   });
