@@ -6,6 +6,7 @@
 
 import { applicationHandlers } from './applications/handlers.ts';
 import { grantsResolvers as applicationResolvers } from './applications/resolvers.ts';
+import { attachmentHandlers } from './attachments/handlers.ts';
 import { assessmentHandlers } from './assessment/handlers.ts';
 import type { AssessmentDependencies } from './assessment/context.ts';
 import { assessmentResolvers } from './assessment/resolvers.ts';
@@ -39,6 +40,7 @@ export function grantsHandlers(
     ...programmeSetUpHandlers(deps),
     ...formHandlers(deps),
     ...applicationHandlers(deps),
+    ...attachmentHandlers(deps),
     ...submissionHandlers(deps),
     ...assessmentHandlers(deps),
     ...decisionHandlers(deps),
