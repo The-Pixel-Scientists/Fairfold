@@ -1,0 +1,22 @@
+// The journey specs and their helpers (task S10-05), which run on Node.js under Playwright. The
+// DOM library types the callbacks that Playwright runs in the browser. They read the apps' own
+// step helpers and the module contracts, so those are listed as references.
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "../node_modules/.cache/tsc/e2e",
+    "tsBuildInfoFile": "../node_modules/.cache/tsc/e2e/tsconfig.tsbuildinfo",
+    "lib": ["es2024", "dom", "dom.iterable"],
+    "types": ["node"]
+  },
+  "include": ["**/*.ts"],
+  "references": [
+    { "path": "../tsconfig.tooling.json" },
+    { "path": "../packages/domain" },
+    { "path": "../packages/db" },
+    { "path": "../modules/party/tsconfig.server.json" },
+    { "path": "../modules/grants/tsconfig.server.json" },
+    { "path": "../apps/console/tsconfig.node.json" },
+    { "path": "../apps/portal/tsconfig.node.json" }
+  ]
+}
