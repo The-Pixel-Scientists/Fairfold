@@ -128,9 +128,17 @@ describe('colour tokens', () => {
 
 /** The first value a stretch of the tokens file gives a custom property. */
 function declared(css: string, property: string): string {
-  const match = new RegExp(String.raw`(?<![\w-])${property}:\s*([^;]+);`).exec(css);
-  if (match?.[1] === undefined) throw new Error(`${property} is not declared.`);
-  return match[1].replace(/\s+/g, ' ').trim();
+  const needle = `${property}:`;
+  for (let at = css.indexOf(needle); at !== -1; at = css.indexOf(needle, at + 1)) {
+    if (/[\w-]/.test(css.charAt(at - 1))) continue; // part of a longer name
+    const end = css.indexOf(';', at);
+    if (end === -1) break;
+    return css
+      .slice(at + needle.length, end)
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+  throw new Error(`${property} is not declared.`);
 }
 
 describe('default tokens', () => {

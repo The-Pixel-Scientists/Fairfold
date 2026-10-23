@@ -33,7 +33,7 @@ export async function filterToGrantsAndDates(page: Page, from: string, to: strin
   await page.getByLabel('From').fill(from);
   await page.getByLabel('To').fill(to);
   await page.getByRole('button', { name: 'Apply filters' }).click();
-  await expect(page).toHaveURL(new RegExp(`\\?module=grants&from=${from}&to=${to}$`));
+  await expect(page).toHaveURL((url) => url.search === `?module=grants&from=${from}&to=${to}`);
   await expect(page.getByRole('combobox', { name: 'Module' })).toHaveValue('grants');
   await expect(auditRows(page).first()).toBeVisible();
 }

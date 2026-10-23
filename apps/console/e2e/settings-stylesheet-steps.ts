@@ -23,8 +23,17 @@ export const accent = (page: Page) =>
   );
 
 /** The first declaration of a token, which is the light scheme's, set to a value. */
-export const withLight = (stylesheet: string, property: string, value: string) =>
-  stylesheet.replace(new RegExp(`(${property}:\\s*)#[0-9a-f]{6}`), `$1${value}`);
+export const withLight = (stylesheet: string, property: string, value: string) => {
+  let done = false;
+  return stylesheet.replace(
+    /(--[\w-]+)(:\s*)#[0-9a-f]{6}/g,
+    (match, name: string, colon: string) => {
+      if (done || name !== property) return match;
+      done = true;
+      return `${name}${colon}${value}`;
+    },
+  );
+};
 
 export const summary = (page: Page) => page.getByRole('alert', { name: 'There is a problem' });
 
@@ -89,8 +98,11 @@ export async function stylesheetSteps(
   const line = failing.split('\n').findIndex((row) => row.includes('--color-muted:')) + 1;
   await chooseStylesheet(page, failing);
   await expect(summary(page)).toBeFocused();
-  await expect(summary(page).getByRole('link').first()).toHaveText(
-    new RegExp(`^Line ${String(line)}: In the light scheme, muted on `),
+  await expect
+    .poll(async () => (await summary(page).getByRole('link').first().textContent())?.trim())
+    .toMatch(/^Line \d+: In the light scheme, muted on /);
+  await expect(summary(page).getByRole('link').first()).toContainText(
+    `Line ${String(line)}: In the light scheme, muted on `,
   );
   await expect(page.getByText(/^Ready to save/)).toHaveCount(0);
   await expect.poll(() => accent(page)).toBe(NEW_ACCENT);
