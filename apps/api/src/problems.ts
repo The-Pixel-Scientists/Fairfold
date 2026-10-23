@@ -18,12 +18,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
 import { setResponseHeaders } from './headers.ts';
 import { SafeError } from './serialize-error.ts';
-import {
-  fieldProblems,
-  MAX_FIELD_PROBLEMS,
-  type FieldProblem,
-  type ValidationEntry,
-} from './validation-problems.ts';
+import { fieldProblems, type FieldProblem, type ValidationEntry } from './validation-problems.ts';
 
 export const PROBLEM_CONTENT_TYPE = 'application/problem+json; charset=utf-8';
 
@@ -64,6 +59,9 @@ export class ApiError extends SafeError {
     this.headers = options.headers;
   }
 }
+
+/** Room for every problem a handler found, such as each failing contrast pair of a token set. */
+const MAX_THROWN_PROBLEMS = 200;
 
 const SERVER_ERROR_DETAIL =
   'Something went wrong on our side. Try again in a few minutes. If it keeps happening, give support the request id.';
@@ -153,7 +151,7 @@ function describe(error: unknown): Failure {
     return {
       status: error.status,
       detail: error.detail,
-      errors: error.errors.slice(0, MAX_FIELD_PROBLEMS),
+      errors: error.errors.slice(0, MAX_THROWN_PROBLEMS),
       headers: keptHeaders(error),
       unexpected: error.status >= 500,
       ...(error.reason === undefined ? {} : { reason: error.reason }),

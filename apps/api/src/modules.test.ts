@@ -9,9 +9,11 @@ import {
   getThemeCss,
   listModules,
   removeLogo,
+  removeThemeTokens,
   switchModule,
   updateSettings,
   updateTheme,
+  updateThemeTokens,
   uploadLogo,
 } from '@pixel-scientists/domain/platform/settings';
 import { teamRoutes } from '@pixel-scientists/domain/platform/team';
@@ -50,6 +52,8 @@ describe('composeModules', () => {
       updateSettings,
       getTheme,
       updateTheme,
+      updateThemeTokens,
+      removeThemeTokens,
       uploadLogo,
       removeLogo,
       listModules,
