@@ -2,12 +2,14 @@
 //
 // The grants module's staff screens: the routes the console adds under a
 // funder's address, and the pages they put in its navigation. Programme
-// set-up, the form builder, submissions, assessment and decisions are here;
-// later grants screens extend both lists.
+// set-up, the form builder, submissions, assessment and decisions are here,
+// and the 360Giving file for the console's Data page; later grants screens
+// extend both lists.
 
 import { idSchema } from '@pixel-scientists/domain';
 import type { Permission } from '@pixel-scientists/domain/platform';
 import type { Params, RouteDefinition, SearchSchema } from '@pixel-scientists/ui';
+import { lazy } from 'react';
 
 import { REVIEWS_PATH } from './assessment/paths.ts';
 import { NEW_PROGRAMME_PATH, PROGRAMMES_PATH } from './programme/paths.ts';
@@ -147,3 +149,6 @@ export const grantsNavigation = [
   { to: SUBMISSIONS_PATH, label: 'Submissions', permission: 'grants.applications.read' },
   { to: REVIEWS_PATH, label: 'My reviews', permission: 'grants.reviews.score' },
 ] as const satisfies readonly { to: string; label: string; permission: Permission }[];
+
+/** The 360Giving part of the Data page, for a member with `grants.data.export`. Its code loads when the page shows it. */
+export const ThreeSixtyGivingSection = lazy(() => import('./export/ThreeSixtyGivingSection.tsx'));
