@@ -119,7 +119,24 @@ It checks permissions, never role names, in this order:
 The public tenant routes (`/api/public/tenants/:slug`, `/theme.css` and
 `/logo`) need no session and set no tenant: they call the two public functions
 of ADR 0019. An unknown, suspended or malformed slug gets the same 404. The
-stylesheet is built by `themeCss()` from validated tokens only.
+stylesheet is built by `themeCss()` from validated tokens only: the tenant's
+own tokens when it has saved them, and its preset look when it has none or they
+no longer pass the checks, in which case the code `theme_tokens_invalid` is
+logged and the tokens never reach the response.
+
+A tenant admin saves their own design tokens with `PUT /console/settings/theme/tokens`
+and goes back to the preset with `DELETE` on the same path, or by saving a
+preset or brand colour, which clears the tokens in the same transaction. The
+save parses the body again with `tokenSetSchema` and `checkTokens()` and answers
+400 with every problem by token path (`body.tokens.light.colorInk`). The version
+and the `platform.theme.changed` event name each changed token, with null where
+none was set. Stored tokens that no longer pass the checks are not in use, so
+clearing them (by removal, or by saving a preset or brand colour) writes the event
+with the marker `{ before: 'unusable', after: null }` under
+`app.tenant_theme.tokens`, never the failing values. A save that leaves the
+tokens alone, such as a logo change, neither clears them nor records that.
+Clearing writes no configuration version, because the diff schema for
+`platform.theme` has no entry for tokens that are not in use.
 
 The team routes (`src/platform/team/`) let a tenant admin list members and
 pending invitations, invite, revoke an invitation, change roles, suspend,
