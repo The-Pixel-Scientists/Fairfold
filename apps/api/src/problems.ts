@@ -40,12 +40,19 @@ export class ApiError extends SafeError {
   readonly errors: readonly FieldProblem[];
   /** Why a request was refused, as a code for the log. Never sent. */
   readonly reason: string | undefined;
+  /** Headers to send with the problem; only `Retry-After` and `Allow` are kept. */
+  readonly headers: Readonly<Record<string, string>> | undefined;
 
   /** With no `detail`, the plain text for the status. */
   constructor(
     status: number,
     detail?: string,
-    options: { errors?: readonly FieldProblem[]; cause?: unknown; reason?: string } = {},
+    options: {
+      errors?: readonly FieldProblem[];
+      cause?: unknown;
+      reason?: string;
+      headers?: Readonly<Record<string, string>>;
+    } = {},
   ) {
     const text = detail ?? detailFor(status, undefined);
     super(text, options.cause === undefined ? undefined : { cause: options.cause });
@@ -54,6 +61,7 @@ export class ApiError extends SafeError {
     this.detail = text;
     this.errors = options.errors ?? [];
     this.reason = options.reason;
+    this.headers = options.headers;
   }
 }
 
@@ -146,6 +154,7 @@ function describe(error: unknown): Failure {
       status: error.status,
       detail: error.detail,
       errors: error.errors.slice(0, MAX_FIELD_PROBLEMS),
+      headers: keptHeaders(error),
       unexpected: error.status >= 500,
       ...(error.reason === undefined ? {} : { reason: error.reason }),
     };
