@@ -19,6 +19,7 @@ import SignedOutPage from './auth/SignedOutPage.tsx';
 import SignInPage from './auth/SignInPage.tsx';
 import SignUpPage from './auth/SignUpPage.tsx';
 import { AUDIT_LOG_PATH } from './platform/audit-log/paths.ts';
+import { DATA_PATH } from './platform/data/paths.ts';
 import { TenantLook } from './platform/settings/look.tsx';
 import { INVITATION_PATH, TEAM_PATH } from './platform/team/paths.ts';
 import { productName, titleSuffix } from './product.ts';
@@ -52,6 +53,7 @@ export const tenantRoutes: readonly RouteDefinition[] = [
       title: 'Audit log',
       load: () => import('./platform/audit-log/AuditLogPage.tsx'),
     },
+    { path: DATA_PATH, title: 'Data', load: () => import('./platform/data/DataPage.tsx') },
     { path: TEAM_PATH, title: 'Team', load: () => import('./platform/team/TeamPage.tsx') },
   ]),
   // Outside the member screen: the person has an account but no membership until they accept.
