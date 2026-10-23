@@ -3,6 +3,8 @@
 // Test helpers for the settings screens: an administrator's session and the
 // API's usual answers. Not part of the app.
 
+import { defaultTokens } from '@pixel-scientists/domain/platform';
+import type { TokenSet } from '@pixel-scientists/domain/platform';
 import { screen } from '@testing-library/react';
 
 import { consoleSession } from '../../testing/api.ts';
@@ -15,7 +17,7 @@ export const SESSION = 'GET /auth/session';
 export const ok = (body: unknown): Reply => ({ status: 200, body });
 
 export const theme = (
-  change: Partial<{ brandColour: string; preset: string; hasLogo: boolean }> = {},
+  change: Partial<{ brandColour: string; preset: string; hasLogo: boolean; tokens: TokenSet }> = {},
 ) => ({
   brandColour: '#1f4bb8',
   preset: 'standard',
@@ -29,6 +31,12 @@ export const publicTenant = (
 ) => ({
   name,
   theme: theme(change),
+});
+
+/** The standard look with one light colour changed, which still passes every contrast pair. */
+export const greenTokens = (): TokenSet => ({
+  ...defaultTokens,
+  light: { ...defaultTokens.light, colorAccent: '#0b5d3b' },
 });
 
 export const heading = (name: string) => screen.findByRole('heading', { level: 1, name });
