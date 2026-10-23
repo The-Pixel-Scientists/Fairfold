@@ -37,6 +37,7 @@ export function ApplicationTab({
         helpers={helpers}
         files={files}
         hrefFor={(id) => downloadHref(submission.id, id)}
+        noFiles="No files uploaded"
         headingLevel="h2"
       />
     </div>

@@ -41,6 +41,8 @@ export interface AnswerViewProps {
   files?: readonly AttachedFile[];
   /** Where a file downloads from. Without it a file shows as its name. */
   hrefFor?: (id: string) => string;
+  /** What a file question with no files says. Defaults to "Not answered". */
+  noFiles?: string;
   /** The heading level of each section's title. Defaults to h3. */
   headingLevel?: 'h2' | 'h3' | 'h4';
 }
@@ -146,6 +148,7 @@ export function AnswerView({
   helpers,
   files,
   hrefFor,
+  noFiles = 'Not answered',
   headingLevel: Heading = 'h3',
 }: AnswerViewProps) {
   const shown = new Set(visible.map((field) => field.id));
@@ -177,7 +180,11 @@ export function AnswerView({
                   >
                     <dt className="break-words text-body text-muted">{field.label}</dt>
                     <dd className={cx('min-w-0 text-body text-ink', beside && 'sm:col-span-2')}>
-                      {answer ?? <span className="text-muted">Not answered</span>}
+                      {answer ?? (
+                        <span className="text-muted">
+                          {field.type === 'file' ? noFiles : 'Not answered'}
+                        </span>
+                      )}
                     </dd>
                   </div>
                 );
