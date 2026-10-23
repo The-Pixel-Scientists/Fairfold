@@ -17,6 +17,9 @@ import { expectNoHorizontalScroll, expectNoViolations, variants } from './auth-a
 /** Each page loads its code when it is first opened, which a busy machine or a development server's first compile can slow past five seconds. */
 const expect = strictExpect.configure({ timeout: 15_000 });
 
+/** Enough events for two pages of the log. */
+const LOADED_EVENTS = 150;
+
 const busy = problem(503, 'The service is busy. Try again in a minute.');
 
 /** A request that is never answered, so the page stays on its loading state. */
@@ -57,13 +60,16 @@ const states: State[] = [
   },
   {
     name: 'the audit log with all its events loaded',
+    // One more page ends the list. The 250-event crowd and its three pages are checked in audit-log.spec.ts; here the scan only needs the end state, and a smaller table keeps it inside the time limit.
+    stub: (page) => stubAuditLog(page, crowd(LOADED_EVENTS)),
     open: async (page) => {
       await page.goto('/northfield/audit-log');
       await waitForRows(page);
       await page.getByRole('button', { name: 'Load more events' }).click();
-      await waitForRows(page, 200);
-      await page.getByRole('button', { name: 'Load more events' }).click();
-      await waitForRows(page, 250);
+      await waitForRows(page, LOADED_EVENTS);
+      await expect(
+        page.getByText(`Showing all ${LOADED_EVENTS} events, newest first.`),
+      ).toBeVisible();
     },
   },
   {
