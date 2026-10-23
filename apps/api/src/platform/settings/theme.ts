@@ -151,12 +151,13 @@ export async function saveTheme(
       after: Object.fromEntries(tokenDiff.map(({ token, to }) => [token, to])),
     };
   }
-  // Tokens that no longer pass are not in use, so clearing them changes no look and no version
-  // diff, but it still changes stored data when the column is set to NULL: the audit event
-  // records that with a marker, never the failing values.
-  const clearsStale = change.tokens === null && before.tokensStored && before.tokens === null;
-  if (clearsStale) changes['app.tenant_theme.tokens'] = { before: 'unusable', after: null };
-  if (diff.length === 0 && !clearsStale) return settings(before);
+  // Tokens that no longer pass are not in use, but clearing them still changes stored data: the
+  // version and the audit event record it with a marker, never the failing values.
+  if (change.tokens === null && before.tokensStored && before.tokens === null) {
+    diff.push({ field: 'tokens', from: 'unusable', to: null });
+    changes['app.tenant_theme.tokens'] = { before: 'unusable', after: null };
+  }
+  if (diff.length === 0) return settings(before);
 
   const set = {
     brand_colour: brandColour,
@@ -180,7 +181,7 @@ export async function saveTheme(
     .returning('id')
     .executeTakeFirstOrThrow();
 
-  if (diff.length > 0) await context.config.record('platform.theme', saved.id, diff);
+  await context.config.record('platform.theme', saved.id, diff);
   await context.audit.record({ action: 'platform.theme.changed', entityId: saved.id, changes });
   return { brandColour, preset, hasLogo: logo !== null, tokens };
 }

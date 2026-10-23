@@ -6,6 +6,8 @@
 // diff lists each changed field with its old and new values; the logo is
 // recorded by its type and SHA-256 digest, never its bytes. A funder's own
 // tokens are diffed by token, with null where none was set (ADR 0046).
+// Stored tokens that no longer pass the checks are cleared as a whole and
+// recorded by a marker, never their values.
 
 import { z } from 'zod';
 
@@ -48,6 +50,7 @@ export const configDiffSchemas = {
         change('preset', z.enum(presets)),
         change('logo', logo),
         tokenChange,
+        z.strictObject({ field: z.literal('tokens'), from: z.literal('unusable'), to: z.null() }),
       ]),
     )
     .min(1),

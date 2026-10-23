@@ -265,16 +265,24 @@ describe('going back to the preset', () => {
   describe('stored tokens that no longer pass', () => {
     const stale = { ...rounder, light: { ...rounder.light, colorInk: '#eeeeee' } };
     let eventsBefore: number;
+    let versionsBefore: number;
 
     beforeEach(async () => {
       await asMigratorIn(tenantA.id, (client) =>
         client.query('UPDATE app.tenant_theme SET tokens = $1', [JSON.stringify(stale)]),
       );
       eventsBefore = (await events(tenantA, 'platform.theme.changed')).length;
+      versionsBefore = (await versions(tenantA, 'platform.theme')).length;
     });
 
     async function expectClearedEvent() {
       expect(await storedTokens(tenantA)).toEqual([null]);
+      const newVersions = (await versions(tenantA, 'platform.theme')).slice(versionsBefore);
+      expect(newVersions).toHaveLength(1);
+      expect(newVersions[0]).toMatchObject({
+        author_id: adminA.membershipId,
+        diff: { changes: [{ field: 'tokens', from: 'unusable', to: null }] },
+      });
       const written = (await events(tenantA, 'platform.theme.changed')).slice(eventsBefore);
       expect(written).toHaveLength(1);
       expect(written[0]).toMatchObject({ actor_id: adminA.membershipId });
@@ -285,7 +293,7 @@ describe('going back to the preset', () => {
       expect(JSON.stringify(written[0]?.changes)).not.toContain('#eeeeee');
     }
 
-    it('reads as none, and removal records an audit event with a marker', async () => {
+    it('reads as none, and removal records a version and an audit event with a marker', async () => {
       expect(await ok(call(adminA, 'GET', '/theme'))).toMatchObject({ tokens: null });
 
       await ok(call(adminA, 'DELETE', '/theme/tokens'));
@@ -297,6 +305,7 @@ describe('going back to the preset', () => {
       await ok(call(adminA, 'DELETE', '/theme/logo'));
 
       expect(await events(tenantA, 'platform.theme.changed')).toHaveLength(eventsBefore);
+      expect(await versions(tenantA, 'platform.theme')).toHaveLength(versionsBefore);
       expect(await storedTokens(tenantA)).toEqual([stale]);
     });
 

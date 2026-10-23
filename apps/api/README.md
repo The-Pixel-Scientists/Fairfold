@@ -135,8 +135,8 @@ clearing them (by removal, or by saving a preset or brand colour) writes the eve
 with the marker `{ before: 'unusable', after: null }` under
 `app.tenant_theme.tokens`, never the failing values. A save that leaves the
 tokens alone, such as a logo change, neither clears them nor records that.
-Clearing writes no configuration version, because the diff schema for
-`platform.theme` has no entry for tokens that are not in use.
+Clearing also writes a configuration version, with the author and the diff entry
+`{ field: 'tokens', from: 'unusable', to: null }`.
 
 The team routes (`src/platform/team/`) let a tenant admin list members and
 pending invitations, invite, revoke an invitation, change roles, suspend,

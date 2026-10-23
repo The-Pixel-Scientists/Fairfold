@@ -31,6 +31,7 @@ describe('configuration diffs', () => {
         { field: 'token', token: 'radii.radiusSm', from: 0.25, to: 0 },
         { field: 'token', token: 'font', from: 'atkinson', to: 'system' },
         { field: 'token', token: 'type.text2xlLineHeight', from: 2, to: null },
+        { field: 'tokens', from: 'unusable', to: null },
       ],
       'platform.module': [{ field: 'enabled', from: true, to: false }],
     } as const;
@@ -51,6 +52,8 @@ describe('configuration diffs', () => {
         [{ field: 'token', token: 'light.colorInk', from: null, to: 'red' }],
         [{ field: 'token', token: 'font', from: 'atkinson', to: 'Comic Sans' }],
         [{ field: 'token', token: 'font', from: null, to: 'system', css: '} body {' }],
+        [{ field: 'tokens', from: { 'light.colorInk': '#ffffff' }, to: null }],
+        [{ field: 'tokens', from: 'unusable', to: {} }],
       ],
       'platform.module': [[], [{ field: 'enabled', from: 'on', to: 'off' }]],
     };
