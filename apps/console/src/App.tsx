@@ -18,6 +18,7 @@ import SetUpAuthenticatorPage from './auth/SetUpAuthenticatorPage.tsx';
 import SignedOutPage from './auth/SignedOutPage.tsx';
 import SignInPage from './auth/SignInPage.tsx';
 import SignUpPage from './auth/SignUpPage.tsx';
+import { AUDIT_LOG_PATH } from './platform/audit-log/paths.ts';
 import { TenantLook } from './platform/settings/look.tsx';
 import { productName, titleSuffix } from './product.ts';
 import { memberRoutes } from './shell/memberRoutes.tsx';
@@ -43,7 +44,14 @@ export const topLevelRoutes: readonly RouteDefinition[] = [
 
 /** Pages under `/<slug>/`, which the router sees without the slug. */
 export const tenantRoutes: readonly RouteDefinition[] = [
-  ...memberRoutes(grantsRoutes),
+  ...memberRoutes([
+    ...grantsRoutes,
+    {
+      path: AUDIT_LOG_PATH,
+      title: 'Audit log',
+      load: () => import('./platform/audit-log/AuditLogPage.tsx'),
+    },
+  ]),
   {
     path: '/settings',
     title: 'General settings',

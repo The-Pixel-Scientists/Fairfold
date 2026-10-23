@@ -2,6 +2,7 @@
 
 import type { Permission } from '@pixel-scientists/domain/platform';
 import { grantsNavigation } from '@pixel-scientists/grants/console';
+import { AUDIT_LOG_PATH } from '../platform/audit-log/paths.ts';
 import { hasPermission } from '@pixel-scientists/ui';
 import type { SessionData } from '@pixel-scientists/ui';
 
@@ -15,6 +16,7 @@ export interface NavigationItem {
 
 export const navigationItems: readonly NavigationItem[] = [
   ...grantsNavigation,
+  { to: AUDIT_LOG_PATH, label: 'Audit log', permission: 'platform.audit.read' },
   { to: '/settings', label: 'Settings', permission: 'platform.settings.manage' },
 ];
 
