@@ -22,17 +22,22 @@ import {
 
 /**
  * The EICAR antivirus test string, made here from two halves so that no file
- * on disk holds it, where antivirus software would quarantine the file. A PDF
- * header goes first, so the server finds a type it takes and the scanner,
- * not the type check, refuses it.
+ * on disk holds it, where antivirus software would quarantine the file. It is
+ * a stream in a PDF, so the server finds a type it takes and the scanner, not
+ * the type check, refuses it. ClamAV matches EICAR only at the start of what
+ * it scans, so the string cannot follow the PDF header directly; the scanner
+ * finds it when it opens the stream.
  */
 const virus = (): Buffer =>
   Buffer.from(
     [
-      '%PDF-1.7\n',
-      'X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR',
-      '-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*',
-    ].join(''),
+      '%PDF-1.4',
+      '1 0 obj<</Length 68>>stream',
+      'X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR' + '-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*',
+      'endstream endobj',
+      'trailer<</Root 1 0 R>>',
+      '%%EOF',
+    ].join('\n'),
   );
 
 /** A small PDF made up for the test. */
