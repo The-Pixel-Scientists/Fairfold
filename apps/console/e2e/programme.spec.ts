@@ -146,7 +146,9 @@ test.describe('setting up a programme', () => {
       page.getByRole('heading', { level: 2, name: 'You cannot set up programmes' }),
     ).toBeVisible();
     expect(new Set(funder.sent.map(({ key }) => key))).toEqual(new Set(['GET /auth/session']));
-    await expect(page.getByRole('navigation', { name: 'Main' })).toHaveCount(0);
+    await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('link')).toHaveText([
+      'My reviews',
+    ]);
   });
 });
 

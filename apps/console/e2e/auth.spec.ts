@@ -354,7 +354,9 @@ test.describe('the console shell', () => {
     await page.goto('/northfield/');
 
     await expect(h1(page, 'Programmes')).toBeVisible();
-    await expect(page.getByRole('navigation')).toHaveCount(0);
+    await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('link')).toHaveText([
+      'My reviews',
+    ]);
   });
 
   test('signs out, and lands on the signed-out page', async ({ page }) => {
