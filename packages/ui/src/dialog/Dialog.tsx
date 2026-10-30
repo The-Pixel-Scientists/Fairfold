@@ -4,6 +4,7 @@ import { Dialog as Primitive } from 'radix-ui';
 import { useLayoutEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 
+import { cx } from '../cx.ts';
 import { shareStyleNonce } from './nonce.ts';
 
 export interface DialogProps {
@@ -18,6 +19,8 @@ export interface DialogProps {
   children?: ReactNode;
   /** Buttons at the foot. Say what each does. Mark the one to focus first with `data-autofocus`. */
   actions?: ReactNode;
+  /** Makes room for a list or table of details. It still fills a narrow screen. */
+  wide?: boolean;
 }
 
 /** With no description, Radix must be told so, or it warns of a missing one. */
@@ -30,7 +33,15 @@ const noDescription = { 'aria-describedby': undefined } as const;
  * it. Focus lands on the first control, or on the one marked `data-autofocus`.
  * It has no animation, so there is nothing for reduced motion to switch off.
  */
-export function Dialog({ open, onOpenChange, title, description, children, actions }: DialogProps) {
+export function Dialog({
+  open,
+  onOpenChange,
+  title,
+  description,
+  children,
+  actions,
+  wide = false,
+}: DialogProps) {
   const content = useRef<HTMLDivElement>(null);
   const opener = useRef<Element | null>(null);
 
@@ -59,7 +70,10 @@ export function Dialog({ open, onOpenChange, title, description, children, actio
             event.preventDefault();
             target.focus();
           }}
-          className="fixed top-1/2 left-1/2 z-50 flex max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-md -translate-x-1/2 -translate-y-1/2 flex-col gap-4 overflow-y-auto rounded-lg border border-divider bg-surface p-gutter shadow-(--shadow-overlay) animate-rise sm:p-7"
+          className={cx(
+            'fixed top-1/2 left-1/2 z-50 flex max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] -translate-x-1/2 -translate-y-1/2 flex-col gap-4 overflow-y-auto rounded-lg border border-divider bg-surface p-gutter shadow-(--shadow-overlay) animate-rise sm:p-7',
+            wide ? 'max-w-2xl' : 'max-w-md',
+          )}
         >
           <Primitive.Title className="text-lg font-semibold tracking-tight text-ink">
             {title}

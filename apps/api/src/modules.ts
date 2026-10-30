@@ -7,10 +7,12 @@
 
 import type { FieldProblem } from '@pixel-scientists/domain/platform';
 import { listAuditEvents } from '@pixel-scientists/domain/platform/audit-log';
+import { getWarehouseSnapshot } from '@pixel-scientists/domain/warehouse';
 import {
   applicationRoutes,
   assessmentRoutes,
   assignReviewersAutomatically,
+  attachmentRoutes,
   decisionRoutes,
   exportRoutes,
   FORM_DEFINITION_MAX_BYTES,
@@ -20,9 +22,14 @@ import {
   spreadRoutes,
   submissionRoutes,
 } from '@pixel-scientists/grants/contracts';
-import { grantsHandlers, grantsResolvers, type MailSender } from '@pixel-scientists/grants/server';
+import {
+  grantsHandlers,
+  grantsResolvers,
+  grantsWarehouse,
+  type MailSender,
+} from '@pixel-scientists/grants/server';
 import { partyRoutes } from '@pixel-scientists/party/contracts';
-import { partyHandlers, partyResolvers } from '@pixel-scientists/party/server';
+import { partyHandlers, partyResolvers, partyWarehouse } from '@pixel-scientists/party/server';
 
 import type { PublicTenants, TenantTransaction } from './database.ts';
 import { listAuditEventsHandler } from './platform/audit-log/index.ts';
@@ -30,9 +37,12 @@ import { insertConfigVersion, readConfigHistory } from './platform/config-versio
 import { membersWith } from './platform/members.ts';
 import { settingsRoutes } from './platform/settings/index.ts';
 import { settingsTables } from './platform/settings/tables.ts';
+import { teamRoutes, type TeamAuth } from './platform/team/index.ts';
+import { warehouseSnapshotHandler } from './platform/warehouse/index.ts';
 import type { ScopeResolvers } from './policy/index.ts';
 import { ApiError } from './problems.ts';
 import { publicRoutes } from './public/index.ts';
+import type { PublicLog } from './public/tenants.ts';
 import { route, type Route } from './routes/register.ts';
 
 export interface ComposedModules {
@@ -71,9 +81,20 @@ const noMail: Mail = {
   portalOrigin: 'https://portal.invalid',
 };
 
+/** For callers with no auth module: the team routes fail, and nothing is invited or signed out. */
+const missingAuth = (): Promise<never> =>
+  Promise.reject(new Error('The API was built without the auth module.'));
+const noAuth: TeamAuth = {
+  createInvitation: missingAuth,
+  revokeSessionsForMembership: missingAuth,
+};
+
 export function composeModules(deps: {
   publicTenants: PublicTenants;
+  /** The auth module, for the team routes. */
+  auth?: TeamAuth;
   mail?: Mail;
+  log?: PublicLog;
 }): ComposedModules {
   const party = partyHandlers({ notFound });
   const grants = grantsHandlers({
@@ -88,8 +109,13 @@ export function composeModules(deps: {
   return {
     routes: [
       route(listAuditEvents, listAuditEventsHandler),
+      ...teamRoutes(deps.auth ?? noAuth),
       ...settingsRoutes,
-      ...publicRoutes(deps.publicTenants),
+      route(
+        getWarehouseSnapshot,
+        warehouseSnapshotHandler({ contributions: [partyWarehouse, grantsWarehouse] }),
+      ),
+      ...publicRoutes(deps.publicTenants, deps.log),
       route(partyRoutes.getProfile, party.getProfile),
       route(partyRoutes.updateProfile, party.updateProfile),
       route(partyRoutes.recordConsent, party.recordConsent),
@@ -130,6 +156,12 @@ export function composeModules(deps: {
       route(applicationRoutes.checkApplicationEligibility, grants.checkApplicationEligibility),
       route(applicationRoutes.submitApplication, grants.submitApplication),
       route(applicationRoutes.withdrawApplication, grants.withdrawApplication),
+      route(attachmentRoutes.uploadAttachment, grants.uploadAttachment),
+      route(attachmentRoutes.listAttachments, grants.listAttachments),
+      route(attachmentRoutes.removeAttachment, grants.removeAttachment),
+      route(attachmentRoutes.downloadAttachment, grants.downloadAttachment),
+      route(attachmentRoutes.listSubmissionAttachments, grants.listSubmissionAttachments),
+      route(attachmentRoutes.downloadSubmissionAttachment, grants.downloadSubmissionAttachment),
       route(submissionRoutes.listSubmissions, grants.listSubmissions),
       route(submissionRoutes.getSubmission, grants.getSubmission),
       route(submissionRoutes.moveSubmissionsToStage, grants.moveSubmissionsToStage),

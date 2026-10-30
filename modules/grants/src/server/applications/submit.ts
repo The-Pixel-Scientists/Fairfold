@@ -33,7 +33,7 @@ function closingWords(closesAt: Date, zone: string): string {
  * opening time has passed), its closing time, whether the database's clock is
  * past it, and its late policy.
  */
-async function closing(tx: Tx, roundId: string) {
+export async function closing(tx: Tx, roundId: string) {
   return applicationsDb(tx)
     .selectFrom('grants.round as r')
     .innerJoin('grants.programme as p', 'p.id', 'r.programme_id')

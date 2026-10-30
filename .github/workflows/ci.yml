@@ -45,10 +45,11 @@ env:
   # The browsers for @playwright/test 1.63.0. The e2e job's container names
   # the same image, as a job container cannot read this.
   PLAYWRIGHT_IMAGE: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
-  # Rules Semgrep loaded on 2026-10-04: 333 in all, 18 of them ours. Raise
-  # these when rules are added; lower them only with a reason in review.
+  # Rules Semgrep loaded on 2026-10-04: 333 in all, 18 of them ours, and 2 of
+  # ours added since. Raise these when rules are added; lower them only with a
+  # reason in review.
   SEMGREP_MINIMUM_RULES: 300
-  SEMGREP_PROJECT_RULES: 18
+  SEMGREP_PROJECT_RULES: 20
   GITHUB_OIDC_ISSUER: https://token.actions.githubusercontent.com
 
 jobs:
@@ -109,8 +110,25 @@ jobs:
         run: corepack enable
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Start PostgreSQL 16 from the development Compose file
-        run: docker compose --file infra/compose/compose.dev.yaml up --detach --wait postgres
+      # The API's storage and scanner tests need SeaweedFS and clamd. clamd
+      # uses the signatures in its image, never a download, and takes about a
+      # minute to load them. As in the stack, a VBA macro is a match (ADR 0047).
+      - name: Start PostgreSQL 16, SeaweedFS and ClamAV from the development Compose file
+        run: |
+          docker compose --file infra/compose/compose.dev.yaml --file - \
+            up --detach --wait --wait-timeout 300 postgres seaweedfs clamav <<'EOF'
+          services:
+            clamav:
+              environment:
+                CLAMAV_NO_FRESHCLAMD: 'true'
+                CLAMD_CONF_AlertOLE2Macros: 'yes'
+              healthcheck:
+                test: [CMD, clamdcheck.sh]
+                interval: 5s
+                start_period: 5m
+          EOF
+      - name: Create the bucket for the storage tests
+        run: node scripts/dev.ts bucket
       - name: Migrate up, down and up again, as migrator
         run: pnpm db:migrate && pnpm db:rollback && pnpm db:migrate
       - name: Check the generated database types match the migrations
@@ -161,11 +179,32 @@ jobs:
             test-results/
           retention-days: 7
 
+  # The stack's specs took longer than one job may, so they are split. The
+  # specs that need only the configured scenario run in three shards, each on
+  # its own stack, a whole file at a time. The manager journeys run in three
+  # more parts, one for each scenario they need, so none has to reseed. The
+  # release images are scanned once, in the specs' first shard.
   stack:
-    name: Stack in containers, with end-to-end and accessibility tests
+    name: Stack in containers, with end-to-end and accessibility tests (${{ matrix.part }})
     if: github.event_name != 'schedule'
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { part: 'specs, 1 of 3', scenario: configured, shard: 1/3 }
+          - { part: 'specs, 2 of 3', scenario: configured, shard: 2/3 }
+          - { part: 'specs, 3 of 3', scenario: configured, shard: 3/3 }
+          - { part: 'manager journeys', scenario: configured, journeys: MANAGER_JOURNEYS }
+          - { part: 'review journeys', scenario: applications, journeys: REVIEW_JOURNEYS }
+          - { part: 'programme journey', scenario: base, journeys: PROGRAMME_JOURNEY }
+    # Patterns that match spec file names. A run whose pattern matches no
+    # test fails.
+    env:
+      MANAGER_JOURNEYS: outcome-journey\.spec\.ts form-builder-journey\.spec\.ts forms-builder-table-file-journey\.spec\.ts submissions-files-journey\.spec\.ts
+      REVIEW_JOURNEYS: submissions-journey\.spec\.ts assessment-journey\.spec\.ts decisions-journey\.spec\.ts
+      PROGRAMME_JOURNEY: programme-journey\.spec\.ts
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -180,27 +219,61 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Build the release images, migrate, and wait for /health/ready
         run: pnpm stack
-      # The journey and @api specs sign in as the seed's staff.
-      - name: Fill the stack with synthetic data
-        if: hashFiles('packages/db/seed/seed.ts') != ''
-        run: pnpm stack seed
-      # Every spec, the @api specs and the journey project included, with the
-      # stack's Mailpit and its secrets folder, for the seed password, at hand.
-      - name: Run the specs against the stack
-        run: >-
-          docker run --rm --network host --ipc host
-          --volume "$PWD:$PWD" --workdir "$PWD"
-          --volume "$HOME/.tps:/root/.tps:ro"
-          --env CI --env TPS_E2E_STACK=1
-          "$PLAYWRIGHT_IMAGE"
-          node node_modules/@playwright/test/cli.js test
+      # The specs run with the stack's Mailpit and its secrets folder, for the
+      # seed password, at hand. They sign in as the seed's staff. Those that
+      # sign in as its programme manager get the manager's address, the
+      # stack's random seed password and an authenticator key set up now, all
+      # synthetic and none a repository secret. Each code works once, so each
+      # journey file runs on its own and starts on a fresh code.
+      #
+      # A shard runs every spec but the journeys, the @api specs and the
+      # journey project included. The journeys run in order. On the
+      # configured scenario, the builder journeys add programmes the outcome
+      # journey's applicant would see beside the seed's, so the outcome
+      # journey goes first, and the file download journey, which sends one
+      # more application, last. On the applications scenario, the submissions
+      # journey moves five submissions to Review, which the assessment
+      # journey's reviewer needs to have reviews not yet started, and the
+      # decisions journey follows them. The programme set-up journey starts
+      # from a manager with no programmes, so it runs on the base scenario.
+      - name: Fill the stack with synthetic data and run the part's specs against it
+        env:
+          SCENARIO: ${{ matrix.scenario }}
+          SHARD: ${{ matrix.shard }}
+          JOURNEYS: ${{ matrix.journeys }}
+        run: |
+          names=$(node scripts/dev-names.ts)
+          project=$(jq --raw-output .stackProject <<< "$names")
+          port=$(jq --raw-output .ports.stackConsole <<< "$names")
+          specs() {
+            docker run --rm --network host --ipc host \
+              --volume "$PWD:$PWD" --workdir "$PWD" \
+              --volume "$HOME/.tps:/root/.tps:ro" \
+              --env CI --env TPS_E2E_STACK=1 --env-file "$RUNNER_TEMP/e2e-manager" \
+              "$PLAYWRIGHT_IMAGE" \
+              node node_modules/@playwright/test/cli.js test "$@"
+          }
+          pnpm stack seed "$SCENARIO"
+          TPS_SEED_PASSWORD_FILE="$HOME/.tps/stack/$project/TPS_STACK_SEED_PASSWORD" \
+            node packages/db/seed/manager.ts "$port" "$RUNNER_TEMP/e2e-manager"
+          if [ -n "$SHARD" ]; then
+            all="$MANAGER_JOURNEYS $REVIEW_JOURNEYS $PROGRAMME_JOURNEY"
+            specs --shard "$SHARD" --grep-invert "${all// /|}"
+          else
+            for journey in ${!JOURNEYS}; do
+              sleep $((31 - $(date +%s) % 30))
+              specs --grep "$journey" --workers 1
+            done
+          fi
       - name: Install cosign
+        if: matrix.shard == '1/3'
         run: |
           bash .github/scripts/fetch-tool.sh \
             "https://github.com/sigstore/cosign/releases/download/v${COSIGN_VERSION}/cosign-linux-amd64" \
             "$RUNNER_TEMP/tools"
           chmod +x "$RUNNER_TEMP/tools/cosign-linux-amd64"
       - name: Install Trivy and verify its signature
+        if: matrix.shard == '1/3'
         working-directory: ${{ runner.temp }}/tools
         run: |
           archive="trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
@@ -217,6 +290,7 @@ jobs:
       # A finding with no fixed package yet cannot be acted on, so it is left
       # out; one with a fix fails the build until the image is rebuilt on it.
       - name: Scan the release images
+        if: matrix.shard == '1/3'
         run: |
           project=$(node scripts/dev-names.ts | jq --raw-output .stackProject)
           for service in api console portal; do
@@ -230,7 +304,7 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: failure()
         with:
-          name: stack-report
+          name: stack-report-${{ strategy.job-index }}
           path: |
             playwright-report/
             test-results/

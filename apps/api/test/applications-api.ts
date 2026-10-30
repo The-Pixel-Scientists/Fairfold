@@ -7,6 +7,7 @@ import type { Application } from '@pixel-scientists/grants/contracts';
 
 import { asMigratorIn } from '../../../packages/db/test/tenants.ts';
 import type { Mail } from '../src/modules.ts';
+import type { FileService } from '../src/platform/files/index.ts';
 import { question, title } from './forms-api.ts';
 import {
   answer,
@@ -55,8 +56,8 @@ export interface Fixture {
   readonly versionId: string;
 }
 
-export async function startApplicationsApi(port: string, mail?: Mail) {
-  const t = await startProgrammeApi(port, mail);
+export async function startApplicationsApi(port: string, mail?: Mail, files?: FileService) {
+  const t = await startProgrammeApi(port, mail, files);
   const ann = t.applicantA;
   const ben = await addMember(t.tenantA, 'portal', 'applicant');
   const cat = await addMember(t.tenantB, 'portal', 'applicant');

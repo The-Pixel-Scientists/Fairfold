@@ -16,10 +16,16 @@ import { suiteName } from '@pixel-scientists/domain/platform';
 import manifest from '../package.json' with { type: 'json' };
 import type { AuthModule } from './context.ts';
 import type { InTenant } from './database.ts';
+import type { FileService } from './platform/files/index.ts';
 import { withTenantScope, type ScopeResolvers } from './policy/index.ts';
 import { createReadinessCheck, healthRoutes } from './routes/health.ts';
 import { openApiRoutes } from './routes/openapi.ts';
-import { isRegisteredFromContract, registerRoutes, type Route } from './routes/register.ts';
+import {
+  documentRawUploads,
+  isRegisteredFromContract,
+  registerRoutes,
+  type Route,
+} from './routes/register.ts';
 import { createServer } from './server.ts';
 
 export interface AppOptions {
@@ -30,6 +36,8 @@ export interface AppOptions {
   readinessTimeoutMs?: number;
   /** Runs a request's work in one transaction for its tenant. Console and portal routes need it. */
   inTenant?: InTenant;
+  /** Stores and sends files for the handlers' `context.files`. Without it, they fail. */
+  files?: FileService;
   /** Reads sessions and serves the auth routes (S02-07). Without it, nobody is signed in. */
   auth?: AuthModule;
   /** The routes of every module, from their contracts. */
@@ -78,6 +86,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
       tags: [{ name: 'Health', description: 'Probes for the platform that runs the API.' }],
     },
     transform: jsonSchemaTransform,
+    transformObject: documentRawUploads,
   });
 
   await app.register(healthRoutes, {
@@ -92,6 +101,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   const deps = {
     readSession: options.auth?.readSession.bind(options.auth) ?? signedOut,
     inTenant: options.inTenant ?? noDatabase,
+    files: options.files,
     resolvers: withTenantScope(options.resolvers ?? {}),
   };
   // Registering inside a plugin applies the prefix.

@@ -1,6 +1,6 @@
 # ADR 0047: File uploads
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-10-05
 - **Deciders:** Aaron Gardner
 
@@ -293,7 +293,7 @@ The recommendation is to keep scanning in the request for files up to 10 MB.
 
 | Package | Version | Licence | Released | Notes |
 | --- | --- | --- | --- | --- |
-| @smithy/signature-v4 | 5.7.4 | Apache-2.0 | 2026-09-25 | AWS's signer for its SDK; depends on @smithy/core 3.35 and @smithy/types 4.19 (Apache-2.0) and tslib 2.8.1 (0BSD); no install scripts; no advisories in GitHub's database on 5 October 2026 |
+| @smithy/signature-v4 | 5.7.4 | Apache-2.0 | 2026-09-25 | AWS's signer for its SDK; depends on @smithy/core 3.36.0 and @smithy/types 4.19.0 (Apache-2.0) and tslib 2.8.1 (0BSD); no install scripts; no advisories in GitHub's database on 5 October 2026 |
 | @aws-sdk/client-s3 (not chosen) | 3.1146.0 | Apache-2.0 | 2026-10-02 | Active; large tree, including a credential chain |
 | aws4fetch (not chosen) | 1.0.20 | MIT | 2024-08-28 | No release since |
 | aws4 (not chosen) | 1.13.2 | MIT | 2024-08-28 | No release since |

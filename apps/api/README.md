@@ -41,6 +41,39 @@ unset. The plain variable is for development and tests. Setting both is an error
 | `TPS_LOG_LEVEL`                         | No                                                 | `fatal`, `error`, `warn`, `info` (the default), `debug`, `trace` or `silent`                                                                                                                                                           |
 | `TPS_DEV`                               | No                                                 | `1` for development: the listener binds to `127.0.0.1`, and the fixed development passwords are accepted, but only against a database server on this machine                                                                           |
 
+The file service (`src/platform/files`, ADR 0047) needs these as well. All are
+required, with no fallback; a secret may be given as `_FILE` like the others.
+
+| Variable                                                                 | Meaning                                                                                                                                 |
+| ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `TPS_STORAGE_ENDPOINT`                                                   | Address of the S3-compatible store: `http` or `https`, host and port only. Every storage call goes there and nowhere else               |
+| `TPS_STORAGE_REGION`, `TPS_STORAGE_BUCKET`                               | Signing region and the deployment's bucket (path-style)                                                                                 |
+| `TPS_STORAGE_WRITE_ACCESS_KEY_ID`, `TPS_STORAGE_WRITE_SECRET_ACCESS_KEY` | The key that writes `clean/`. Used only to put an object                                                                                |
+| `TPS_STORAGE_READ_ACCESS_KEY_ID`, `TPS_STORAGE_READ_SECRET_ACCESS_KEY`   | The key that reads `clean/`. Used only to get an object                                                                                 |
+| `TPS_CLAMD_HOST`, `TPS_CLAMD_PORT`                                       | The scanner                                                                                                                             |
+| `TPS_CLAMD_TIMEOUT_MS`                                                   | How long a scan may take, 1000 to 25000. clamd stops at 20 seconds                                                                      |
+| `TPS_FILES_MAX_STORES`                                                   | Uploads scanned at once in this process, 1 to 9 (the database pool has 10 connections). Another upload gets a 503 with `Retry-After: 5` |
+
+## Files
+
+A handler stores and sends files only through `context.files`, which is bound
+to the request's transaction and acting member:
+
+- `store({ name, bytes, allowedTypes, maxBytes })` checks size, name, type and
+  extension, inserts a pending `app.file` row, scans with clamd, and writes
+  `clean/<tenant id>/<file id>` only for a clean file. It returns `{ file }` or
+  `{ refusal }` and audits `platform.file.uploaded` or `platform.file.refused`.
+  A handler that answers a refusal with an error rolls the row and event back.
+- `send(fileId, { audit })` reads the row under row-level security and streams
+  the object with ADR 0047's headers. A missing, unclean or other tenant's file
+  is the usual 404. `audit` writes `platform.file.downloaded`.
+
+A route with a raw upload body (`{ raw: ['application/octet-stream'], maxBytes }`)
+is checked in full, including its permission and scope rule, and its
+`File-Name` header is decoded, before the body is read. The handler's
+`input.body` is `{ name, bytes }`. A route that answers raw bytes may return a
+stream. Nothing outside `src/platform/files` reads the storage keys.
+
 ## Endpoints
 
 | Route               | Meaning                                                                                                                                                          |
@@ -86,7 +119,40 @@ It checks permissions, never role names, in this order:
 The public tenant routes (`/api/public/tenants/:slug`, `/theme.css` and
 `/logo`) need no session and set no tenant: they call the two public functions
 of ADR 0019. An unknown, suspended or malformed slug gets the same 404. The
-stylesheet is built by `themeCss()` from validated tokens only.
+stylesheet is built by `themeCss()` from validated tokens only: the tenant's
+own tokens when it has saved them, and its preset look when it has none or they
+no longer pass the checks, in which case the code `theme_tokens_invalid` is
+logged and the tokens never reach the response.
+
+A tenant admin saves their own design tokens with `PUT /console/settings/theme/tokens`
+and goes back to the preset with `DELETE` on the same path, or by saving a
+preset or brand colour, which clears the tokens in the same transaction. The
+save parses the body again with `tokenSetSchema` and `checkTokens()` and answers
+400 with every problem by token path (`body.tokens.light.colorInk`). The version
+and the `platform.theme.changed` event name each changed token, with null where
+none was set. Stored tokens that no longer pass the checks are not in use, so
+clearing them (by removal, or by saving a preset or brand colour) writes the event
+with the marker `{ before: 'unusable', after: null }` under
+`app.tenant_theme.tokens`, never the failing values. A save that leaves the
+tokens alone, such as a logo change, neither clears them nor records that.
+Clearing also writes a configuration version, with the author and the diff entry
+`{ field: 'tokens', from: 'unusable', to: null }`.
+
+The team routes (`src/platform/team/`) let a tenant admin list members and
+pending invitations, invite, revoke an invitation, change roles, suspend,
+reinstate and remove, all under `platform.members.manage` with step-up on every
+change. A change locks the team's memberships, so concurrent changes run one at
+a time; refuses the admin's own membership and any change that would leave no
+active member who can manage the team (409); and, for a suspension, a removal or
+a role change, ends the member's sessions in this tenant through the auth module.
+Applicants are not on the team, so their membership ids answer 404. Member names
+and addresses come from the party module.
+
+`pnpm tenant:create --slug <slug> --name <name> --admin-email <address>`
+(`src/operator/`) makes a tenant as `app_worker`, records
+`platform.tenant.created` with the actor `operator`, and emails the first
+administrator's invitation. It checks the arguments with the shared schemas before
+it connects and prints the tenant's id and slug, never a token or a link.
 
 A handler writes a configuration version for a change to settings, a theme or
 a module switch with `context.config.record(entityType, entityId, diff)`, in
@@ -182,3 +248,17 @@ pnpm test:unit -- apps/api -u
 
 `pnpm test:unit -- apps/api` runs these tests. None needs a database: the
 readiness check is tested with a fake database check.
+
+`GET /console/warehouse/snapshot` (`src/platform/warehouse/`) lets a tenant admin
+download one PostgreSQL load script of the tenant's warehouse tables (ADR 0016).
+It is built inside the request and its transaction from the party and grants
+contributions plus the platform's `date` table, and writes only the columns
+`warehouseColumns()` allows under the classification map, so no personal or
+special category value is emitted. Load it with
+`psql -v ON_ERROR_STOP=1 -f warehouse-snapshot-<date>.sql`. The script is UTF-8
+and begins with `SET client_encoding = 'UTF8'`, so it loads the same under any
+client encoding or locale (a Windows terminal's WIN1252, for one). Values are escaped
+for `COPY`'s text format in `escape.ts`. A script over 50 MB is refused with a
+400 that asks the admin to contact the operator. `platform.warehouse.exported`
+records the rows in each table, keyed by the classified column of the table's
+key (`countField()`).

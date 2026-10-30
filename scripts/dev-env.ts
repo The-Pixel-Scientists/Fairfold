@@ -20,6 +20,10 @@
 // ~/.tps/dev/<database>, one file each, readable by this user only.
 // Commands get the path of the file, never the value.
 //
+// The S3 key pairs come from the seaweedfs-s3 config in the same file:
+// dev-scanner writes and dev-downloads reads (ADR 0047). dev-admin only
+// creates this worktree's bucket (ensureDevBucket) and reaches no command.
+//
 // This is for development only. It sets TPS_DEV=1, and so refuses to
 // run against a database server that is not on this machine: the fixed
 // development passwords must never be set on a shared server.
@@ -61,6 +65,23 @@ const SMTP = [
   'TPS_SMTP_PASSWORD',
   'TPS_SMTP_FROM',
 ] as const;
+/** Storage and scanner settings for the file service (ADR 0047). */
+const FILES = [
+  'TPS_STORAGE_ENDPOINT',
+  'TPS_STORAGE_REGION',
+  'TPS_STORAGE_BUCKET',
+  'TPS_STORAGE_WRITE_ACCESS_KEY_ID',
+  'TPS_STORAGE_WRITE_SECRET_ACCESS_KEY',
+  'TPS_STORAGE_READ_ACCESS_KEY_ID',
+  'TPS_STORAGE_READ_SECRET_ACCESS_KEY',
+  'TPS_CLAMD_HOST',
+  'TPS_CLAMD_PORT',
+  'TPS_CLAMD_TIMEOUT_MS',
+  'TPS_FILES_MAX_STORES',
+] as const;
+
+/** SHA-256 of an empty body, which S3 needs in x-amz-content-sha256. */
+const EMPTY_BODY_SHA256 = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
 
 export const PROFILES = {
   // pnpm db:migrate, db:rollback and db:drop, and the db-admin tests. The
@@ -76,11 +97,18 @@ export const PROFILES = {
     OWN_DATABASES,
   ],
   // Database tests in the db project: the test database only, as the app
-  // roles, with migrator for fixtures. No superuser.
-  'database-tests': [...CONNECTION, 'TPS_TEST_DB_NAME', MIGRATOR_PASSWORD, ...APP_PASSWORDS],
+  // roles, with migrator for fixtures, and the file service's storage and
+  // scanner. No superuser.
+  'database-tests': [
+    ...CONNECTION,
+    'TPS_TEST_DB_NAME',
+    MIGRATOR_PASSWORD,
+    ...APP_PASSWORDS,
+    ...FILES,
+  ],
   // The API in `pnpm dev`: this worktree's database as app_api, and as
   // app_auth for the auth module, on its port, behind the Vite dev servers'
-  // proxies on this machine. Mail goes to Mailpit.
+  // proxies on this machine. Mail goes to Mailpit, files to SeaweedFS and clamd.
   api: [
     ...CONNECTION,
     'TPS_DB_NAME',
@@ -92,6 +120,7 @@ export const PROFILES = {
     CONSOLE_ORIGIN,
     'TPS_PORTAL_ORIGIN',
     ...SMTP,
+    ...FILES,
   ],
   // pnpm db:seed: this worktree's database as migrator. The seed checks the
   // database against the own-database list.
@@ -116,6 +145,12 @@ interface ComposeService {
 
 export interface ComposeConfig {
   services?: Record<string, ComposeService>;
+  configs?: Record<string, { content?: string }>;
+}
+
+interface StorageKey {
+  accessKey: string;
+  secretKey: string;
 }
 
 function readComposeConfig(): ComposeConfig {
@@ -155,6 +190,18 @@ function publishedPort(found: ComposeService, serviceName: string, target: numbe
   return port;
 }
 
+/** The key pair of a SeaweedFS identity in the seaweedfs-s3 config. */
+function storageKey(config: ComposeConfig, name: string): StorageKey {
+  const content = config.configs?.['seaweedfs-s3']?.content;
+  if (!content) throw new Error('The development Compose file has no seaweedfs-s3 config.');
+  const { identities } = JSON.parse(content) as {
+    identities: { name: string; credentials: StorageKey[] }[];
+  };
+  const key = identities.find((identity) => identity.name === name)?.credentials[0];
+  if (!key) throw new Error(`The seaweedfs-s3 config has no ${name} identity.`);
+  return key;
+}
+
 /** Where a worktree keeps its auth secret and seed password. */
 export function secretsFolder(database: string): string {
   return join(homedir(), '.tps', 'dev', database);
@@ -166,6 +213,7 @@ export function developmentValues(
   names: {
     database: string;
     testDatabase: string;
+    bucket: string;
     ports: { api: number; console: number; portal: number };
   },
   secrets: string,
@@ -178,6 +226,10 @@ export function developmentValues(
   const smtpLogin = environmentValue(mailpit, 'mailpit', 'MP_SMTP_AUTH');
   const separator = smtpLogin.indexOf(':');
   if (separator < 1) throw new Error('The mailpit service must set MP_SMTP_AUTH as user:password.');
+  const storagePort = publishedPort(service(config, 'seaweedfs'), 'seaweedfs', 8333);
+  const clamdPort = publishedPort(service(config, 'clamav'), 'clamav', 3310);
+  const writeKey = storageKey(config, 'dev-scanner');
+  const readKey = storageKey(config, 'dev-downloads');
   const values: Record<string, string> = {
     TPS_DEV: '1',
     TPS_API_PORT: String(names.ports.api),
@@ -194,6 +246,18 @@ export function developmentValues(
     TPS_SMTP_USER: smtpLogin.slice(0, separator),
     TPS_SMTP_PASSWORD: smtpLogin.slice(separator + 1),
     TPS_SMTP_FROM: 'no-reply@example.org',
+    TPS_STORAGE_ENDPOINT: `http://${storagePort.host_ip ?? '127.0.0.1'}:${storagePort.published ?? ''}`,
+    TPS_STORAGE_REGION: 'us-east-1',
+    TPS_STORAGE_BUCKET: names.bucket,
+    TPS_STORAGE_WRITE_ACCESS_KEY_ID: writeKey.accessKey,
+    TPS_STORAGE_WRITE_SECRET_ACCESS_KEY: writeKey.secretKey,
+    TPS_STORAGE_READ_ACCESS_KEY_ID: readKey.accessKey,
+    TPS_STORAGE_READ_SECRET_ACCESS_KEY: readKey.secretKey,
+    TPS_CLAMD_HOST: clamdPort.host_ip ?? '127.0.0.1',
+    TPS_CLAMD_PORT: clamdPort.published ?? '',
+    // ADR 0047: the API gives up 5 seconds after clamd's MaxScanTime.
+    TPS_CLAMD_TIMEOUT_MS: '25000',
+    TPS_FILES_MAX_STORES: '4',
     TPS_DB_HOST: postgresPort.host_ip ?? '127.0.0.1',
     TPS_DB_PORT: postgresPort.published ?? '',
     TPS_DB_NAME: names.database,
@@ -285,6 +349,54 @@ export function ensureSecretFile(path: string): void {
   if (existsSync(path)) return;
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
   writeFileSync(path, randomBytes(32).toString('base64url'), { mode: 0o600, flag: 'wx' });
+}
+
+/**
+ * The Docker arguments that ask SeaweedFS, as dev-admin, to create `bucket`.
+ * curl in the SeaweedFS image signs the request; it prints the HTTP status.
+ */
+export function createBucketArgs(config: ComposeConfig, bucket: string): string[] {
+  const admin = storageKey(config, 'dev-admin');
+  return [
+    'compose',
+    '--file',
+    COMPOSE_FILE,
+    'exec',
+    '-T',
+    'seaweedfs',
+    'curl',
+    '--silent',
+    '--show-error',
+    '--output',
+    '/dev/null',
+    '--write-out',
+    '%{http_code}',
+    '--retry',
+    '30',
+    '--retry-connrefused',
+    '--aws-sigv4',
+    'aws:amz:us-east-1:s3',
+    '--user',
+    `${admin.accessKey}:${admin.secretKey}`,
+    '--header',
+    `x-amz-content-sha256: ${EMPTY_BODY_SHA256}`,
+    '--upload-file',
+    '/dev/null',
+    `http://127.0.0.1:8333/${bucket}`,
+  ];
+}
+
+/** Create this worktree's bucket as dev-admin, unless it exists. */
+export function ensureDevBucket(): void {
+  const { bucket } = currentDevNames();
+  const status = execFileSync('docker', createBucketArgs(readComposeConfig(), bucket), {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'inherit'],
+  }).trim();
+  // 409: it exists already.
+  if (status !== '200' && status !== '409') {
+    throw new Error(`Storage answered ${status} when asked to create the bucket ${bucket}.`);
+  }
 }
 
 /** The environment for a command run with `profile` in this worktree. */

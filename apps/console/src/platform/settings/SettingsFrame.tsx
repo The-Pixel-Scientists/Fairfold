@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { Button, EmptyState, Link, LoadingState, PageHeading, useCan } from '@pixel-scientists/ui';
+import { useId } from 'react';
 import type { ReactNode } from 'react';
 
 import { Screen } from '../../auth/Screen.tsx';
@@ -61,9 +62,15 @@ export function SettingsFrame({ title, children }: { title: string; children: Re
 
 /** A settings card: one thing to change, with its own heading and save button. */
 export function SettingsCard({ title, children }: { title: string; children: ReactNode }) {
+  const titleId = useId();
   return (
-    <section className="flex flex-col gap-4 rounded-lg border border-divider bg-surface p-gutter shadow-(--shadow-raised) sm:p-6">
-      <h2 className="text-lg font-semibold tracking-tight text-ink">{title}</h2>
+    <section
+      aria-labelledby={titleId}
+      className="flex flex-col gap-4 rounded-lg border border-divider bg-surface p-gutter shadow-(--shadow-raised) sm:p-6"
+    >
+      <h2 id={titleId} className="text-lg font-semibold tracking-tight text-ink">
+        {title}
+      </h2>
       {children}
     </section>
   );

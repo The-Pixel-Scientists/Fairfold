@@ -7,12 +7,15 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import {
+  createBucketArgs,
   developmentValues,
   ensureSecretFile,
   isLoopbackHost,
+  PROFILES,
   profileEnvironment,
   viteEnvironment,
   type ComposeConfig,
+  type Profile,
 } from './dev-env.ts';
 
 const config: ComposeConfig = {
@@ -33,11 +36,38 @@ const config: ComposeConfig = {
       ports: [{ target: 1025, published: '51025', host_ip: '127.0.0.1' }],
       environment: { MP_SMTP_AUTH: 'smtp-user:smtp-password:for-tests' },
     },
+    seaweedfs: { ports: [{ target: 8333, published: '58333', host_ip: '127.0.0.1' }] },
+    clamav: { ports: [{ target: 3310, published: '53310', host_ip: '127.0.0.1' }] },
   },
+  configs: {
+    'seaweedfs-s3': {
+      content: JSON.stringify({
+        identities: ['dev-admin', 'dev-uploads', 'dev-scanner', 'dev-downloads'].map((name) => ({
+          name,
+          credentials: [{ accessKey: name, secretKey: `${name}-secret-for-tests` }],
+          actions: [],
+        })),
+      }),
+    },
+  },
+};
+const files = {
+  TPS_STORAGE_ENDPOINT: 'http://127.0.0.1:58333',
+  TPS_STORAGE_REGION: 'us-east-1',
+  TPS_STORAGE_BUCKET: 'tps-w',
+  TPS_STORAGE_WRITE_ACCESS_KEY_ID: 'dev-scanner',
+  TPS_STORAGE_WRITE_SECRET_ACCESS_KEY: 'dev-scanner-secret-for-tests',
+  TPS_STORAGE_READ_ACCESS_KEY_ID: 'dev-downloads',
+  TPS_STORAGE_READ_SECRET_ACCESS_KEY: 'dev-downloads-secret-for-tests',
+  TPS_CLAMD_HOST: '127.0.0.1',
+  TPS_CLAMD_PORT: '53310',
+  TPS_CLAMD_TIMEOUT_MS: '25000',
+  TPS_FILES_MAX_STORES: '4',
 };
 const names = {
   database: 'tps_w',
   testDatabase: 'tps_w_test',
+  bucket: 'tps-w',
   ports: { api: 41230, console: 41231, portal: 41232 },
 };
 const secrets = join('home', '.tps', 'dev', 'tps_w');
@@ -62,15 +92,16 @@ describe('profileEnvironment', () => {
     });
   });
 
-  it('gives database-tests no superuser and only the test database', () => {
+  it('gives database-tests no superuser, only the test database, and the file settings', () => {
     const env = profileEnvironment('database-tests', values, [], {}, own);
     expect(env['TPS_DB_SUPERUSER']).toBeUndefined();
     expect(env['TPS_DB_SUPERUSER_PASSWORD']).toBeUndefined();
     expect(env['TPS_DB_NAME']).toBeUndefined();
     expect(env['TPS_TEST_DB_NAME']).toBe('tps_w_test');
+    expect(env).toMatchObject(files);
   });
 
-  it('gives the API its port, database, app passwords, origins, proxies, auth secret file and Mailpit only', () => {
+  it('gives the API its port, database, app passwords, origins, proxies, auth secret file, Mailpit and files only', () => {
     const env = profileEnvironment('api', values, [], {}, own);
     expect(ours(env)).toEqual({
       TPS_DEV: '1',
@@ -90,7 +121,16 @@ describe('profileEnvironment', () => {
       TPS_SMTP_USER: 'smtp-user',
       TPS_SMTP_PASSWORD: 'smtp-password:for-tests',
       TPS_SMTP_FROM: 'no-reply@example.org',
+      ...files,
     });
+  });
+
+  it('gives no profile the storage admin key', () => {
+    for (const profile of Object.keys(PROFILES) as Profile[]) {
+      const env = profileEnvironment(profile, values, [], {}, own);
+      expect(Object.values(env)).not.toContain('dev-admin-secret-for-tests');
+      expect(Object.values(env)).not.toContain('dev-uploads-secret-for-tests');
+    }
   });
 
   it('gives the seed migrator, the seed password file and the own-database list, and no app role', () => {
@@ -159,6 +199,7 @@ describe('profileEnvironment', () => {
       'TPS_DB_APP_WORKER_PASSWORD',
       'TPS_DB_APP_AUTH_PASSWORD',
       'TPS_DB_APP_QUEUE_PASSWORD',
+      ...Object.keys(files),
     ]);
   });
 
@@ -183,6 +224,28 @@ describe('profileEnvironment', () => {
     const shell = { TPS_DEV_DATABASES: 'tps_production' };
     const env = profileEnvironment('database-admin', values, [shell], shell, own);
     expect(env['TPS_DEV_DATABASES']).toBe('tps_w,tps_w_test');
+  });
+});
+
+describe('createBucketArgs', () => {
+  it("creates the worktree's bucket as dev-admin, signed by curl in the SeaweedFS container", () => {
+    const args = createBucketArgs(config, 'tps-w');
+    expect(args.slice(3, 7)).toEqual(['exec', '-T', 'seaweedfs', 'curl']);
+    expect(args.slice(-9)).toEqual([
+      '--aws-sigv4',
+      'aws:amz:us-east-1:s3',
+      '--user',
+      'dev-admin:dev-admin-secret-for-tests',
+      '--header',
+      'x-amz-content-sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+      '--upload-file',
+      '/dev/null',
+      'http://127.0.0.1:8333/tps-w',
+    ]);
+  });
+
+  it('refuses a config without the dev-admin identity', () => {
+    expect(() => createBucketArgs({ configs: {} }, 'tps-w')).toThrow('seaweedfs-s3 config');
   });
 });
 

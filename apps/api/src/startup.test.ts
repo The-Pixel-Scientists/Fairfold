@@ -45,6 +45,10 @@ describe('starting the API', () => {
       'TPS_DB_APP_AUTH_PASSWORD',
       'TPS_CONSOLE_ORIGIN',
       'TPS_PORTAL_ORIGIN',
+      'TPS_STORAGE_ENDPOINT',
+      'TPS_STORAGE_BUCKET',
+      'TPS_CLAMD_HOST',
+      'TPS_FILES_MAX_STORES',
     ]) {
       expect(result.stderr).toContain(`Set ${name}`);
     }

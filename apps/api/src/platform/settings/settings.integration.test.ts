@@ -7,7 +7,7 @@
 
 import { randomUUID } from 'node:crypto';
 
-import { checkTheme, messages } from '@pixel-scientists/domain/platform';
+import { checkTheme, defaultTokens, messages } from '@pixel-scientists/domain/platform';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { createTestTenant, type TestTenant } from '../../../../../packages/db/test/tenants.ts';
@@ -61,6 +61,8 @@ describe('who may use the settings routes', () => {
     ['PUT', '', { name: 'Fund', timeZone: 'Europe/London', fiscalYearStartMonth: 4 }],
     ['GET', '/theme', undefined],
     ['PUT', '/theme', { brandColour: '#0b5394', preset: 'rounded' }],
+    ['PUT', '/theme/tokens', { tokens: defaultTokens }],
+    ['DELETE', '/theme/tokens', undefined],
     ['PUT', '/theme/logo', { data: png().toString('base64') }],
     ['DELETE', '/theme/logo', undefined],
     ['GET', '/modules', undefined],
@@ -186,6 +188,7 @@ describe('the theme', () => {
       brandColour: '#1b1d21',
       preset: 'standard',
       hasLogo: false,
+      tokens: null,
     });
   });
 
@@ -228,6 +231,7 @@ describe('the theme', () => {
       brandColour: '#0b5394',
       preset: 'rounded',
       hasLogo: false,
+      tokens: null,
     });
     expect(await ok(call(adminA, 'GET', '/theme'))).toMatchObject({ brandColour: '#0b5394' });
 

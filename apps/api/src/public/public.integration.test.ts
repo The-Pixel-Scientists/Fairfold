@@ -6,7 +6,7 @@
 import { createHash } from 'node:crypto';
 
 import { createDatabase, type Kysely } from '@pixel-scientists/db';
-import { defaultTheme } from '@pixel-scientists/domain/platform';
+import { defaultTheme, defaultTokens, type TokenSet } from '@pixel-scientists/domain/platform';
 import { themeCss } from '@pixel-scientists/domain/platform/settings';
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -36,6 +36,21 @@ let plain: TestTenant;
 let themed: TestTenant;
 let suspended: TestTenant;
 let invalid: TestTenant;
+let tokened: TestTenant;
+let stale: TestTenant;
+/** The codes the public routes logged. */
+const logged: string[] = [];
+
+const ownTokens: TokenSet = {
+  ...defaultTokens,
+  radii: { radiusSm: 0.5, radiusMd: 0.75, radiusLg: 1 },
+  font: 'system',
+};
+// Saved under an older rule: ink as pale as the canvas.
+const failingTokens: TokenSet = {
+  ...ownTokens,
+  light: { ...ownTokens.light, colorInk: '#f7f7f5' },
+};
 
 const LOGO = Buffer.concat([
   Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13]),
@@ -63,7 +78,9 @@ beforeAll(async () => {
   });
   database = openDatabase(settings, createLogger({ level: 'silent' }));
 
-  [plain, themed, suspended, invalid] = await Promise.all([
+  [plain, themed, suspended, invalid, tokened, stale] = await Promise.all([
+    createTestTenant(),
+    createTestTenant(),
     createTestTenant(),
     createTestTenant(),
     createTestTenant(),
@@ -84,6 +101,8 @@ beforeAll(async () => {
     }),
     // Stored by a writer that skipped the contrast check: it must not reach the stylesheet.
     addTheme(invalid, { brand_colour: '#ffffff', preset: 'standard' }),
+    addTheme(tokened, { brand_colour: '#0b5394', preset: 'rounded', tokens: ownTokens }),
+    addTheme(stale, { brand_colour: '#0b5394', preset: 'rounded', tokens: failingTokens }),
   ]);
   await asMigratorIn(suspended.id, (client) =>
     client.query("UPDATE app.tenant SET status = 'suspended' WHERE id = $1", [suspended.id]),
@@ -110,11 +129,20 @@ beforeAll(async () => {
     logger: createLogger({ level: 'silent' }),
     checkDatabase: () => database.check(),
     inTenant: database.inTenant,
-    ...composeModules({ publicTenants: publicTenantsOn(recording) }),
+    ...composeModules({
+      publicTenants: publicTenantsOn(recording),
+      log: { warn: ({ code }) => logged.push(code) },
+    }),
   });
 }, 60_000);
 
 afterAll(async () => {
+  // The migrations test rolls migration 0014 back, which refuses while any committed theme has tokens.
+  for (const tenant of [tokened, stale]) {
+    await asMigratorIn(tenant.id, (client) =>
+      client.query('UPDATE app.tenant_theme SET tokens = NULL'),
+    );
+  }
   await api.close();
   await database.close();
   await recording.destroy();
@@ -173,6 +201,42 @@ describe('the stylesheet', () => {
     expect(response.statusCode).toBe(200);
     expect(response.body).toBe(themeCss(defaultTheme));
     expect(response.body).not.toContain('--color-accent: #ffffff');
+  });
+});
+
+describe('the stylesheet of a tenant with its own tokens', () => {
+  it('is built from them in place of the preset, with only formatted values', async () => {
+    const response = await get(`${tokened.slug}/theme.css`);
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toBe(themeCss({ tokens: ownTokens }));
+    expect(response.body).not.toBe(themeCss({ brandColour: '#0b5394', preset: 'rounded' }));
+    const declaration = /^ {2}--[a-z0-9-]+: (?:#[0-9a-f]{6}|[0-9.]+rem|0|[-'A-Za-z, ]{10,});$/;
+    const lines = response.body.split('\n').filter((line) => line.startsWith(' '));
+    expect(lines.length).toBeGreaterThan(50);
+    expect(
+      lines.every((line) => declaration.test(line)),
+      lines.join('\n'),
+    ).toBe(true);
+    expect(logged).toEqual([]);
+  });
+
+  it('serves the preset look, and logs a code, when stored tokens no longer pass', async () => {
+    const response = await get(`${stale.slug}/theme.css`);
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toBe(themeCss({ brandColour: '#0b5394', preset: 'rounded' }));
+    expect(response.body).not.toContain('#f7f7f5;\n  --color-ink');
+    expect(logged).toEqual(['theme_tokens_invalid']);
+  });
+
+  it('does not put its tokens in the public tenant answer', async () => {
+    const response = await get(tokened.slug);
+
+    expect(response.json()).toEqual({
+      name: 'Test tenant',
+      theme: { brandColour: '#0b5394', preset: 'rounded', hasLogo: false },
+    });
   });
 });
 

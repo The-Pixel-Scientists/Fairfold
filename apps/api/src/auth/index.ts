@@ -12,12 +12,19 @@
 //   - a request whose host is not configured gets 404, except a read of a
 //     probe or the OpenAPI document;
 //   - a request other than GET or HEAD needs `Origin` to be the resolved
-//     app's own origin, and a body only as application/json.
+//     app's own origin, and a body only as application/json, or as
+//     application/octet-stream on a route whose contract takes a raw upload
+//     (ADR 0047).
 //
 // CORS stays off: no route or hook sends an Access-Control-* header.
 
 import { createDatabase, type TenantId, type Transaction } from '@pixel-scientists/db';
-import { apiBasePath } from '@pixel-scientists/domain/api';
+import {
+  apiBasePath,
+  isRawBody,
+  rawUploadContentType,
+  type RouteContract,
+} from '@pixel-scientists/domain/api';
 import type { App } from '@pixel-scientists/domain/platform';
 import type { Invitation } from '@pixel-scientists/domain/platform/team';
 import type { FastifyBaseLogger, FastifyPluginAsync, FastifyRequest } from 'fastify';
@@ -26,7 +33,7 @@ import type { Config } from '../config.ts';
 import type { AuthModule } from '../context.ts';
 import type { Sender } from '../email/sender.ts';
 import { ApiError } from '../problems.ts';
-import { registerRoutes } from '../routes/register.ts';
+import { isRegisteredFromContract, registerRoutes } from '../routes/register.ts';
 import { createBetterAuth, type BetterAuth } from './better-auth.ts';
 import { clientTracker } from './clients.ts';
 import { copyAuthEvent, recordAuthEvent } from './events.ts';
@@ -90,6 +97,18 @@ const JSON_TYPE = /^application\/json\s*(?:;|$)/i;
 
 /** Routes any host may read, by the pattern the router matched: the probes and OpenAPI. */
 const ANY_HOST = new Set(['/health', '/health/ready', '/openapi.json']);
+
+/** Whether the matched route's contract takes a file's bytes as its body (ADR 0047). */
+function takesRawUpload(request: FastifyRequest): boolean {
+  const { config } = request.routeOptions;
+  return (
+    isRegisteredFromContract({ config }) &&
+    'contract' in config &&
+    isRawBody((config.contract as RouteContract).body)
+  );
+}
+
+const mediaType = (type: string): string => (type.split(';', 1)[0] ?? '').trim().toLowerCase();
 
 function hasBody(request: FastifyRequest): boolean {
   const length = request.headers['content-length'];
@@ -212,6 +231,9 @@ export function createAuth(settings: AuthSettings, deps: AuthDependencies): Auth
       return new ApiError(403, undefined, { reason: 'origin' });
     }
     const type = request.headers['content-type'];
+    if (type !== undefined && mediaType(type) === rawUploadContentType && takesRawUpload(request)) {
+      return undefined;
+    }
     if ((hasBody(request) || type !== undefined) && !JSON_TYPE.test(type ?? '')) {
       return new ApiError(415, undefined, { reason: 'not_json' });
     }

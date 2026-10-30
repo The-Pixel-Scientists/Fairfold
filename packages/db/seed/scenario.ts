@@ -199,7 +199,7 @@ function inserter(client: pg.ClientBase, rows: Record<string, string[]>): Insert
 }
 
 /** What the member who publishes forms and moves applications on may do. */
-const MANAGER = ['grants.programmes.manage', 'grants.applications.triage'] as const;
+export const MANAGER = ['grants.programmes.manage', 'grants.applications.triage'] as const;
 
 /** What writing a tenant's rows needs. */
 interface Writer {

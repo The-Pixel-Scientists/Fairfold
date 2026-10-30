@@ -344,6 +344,7 @@ test.describe('the console shell', () => {
     await expect(page.getByRole('banner')).toContainText('Northfield Foundation');
     await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('link')).toHaveText([
       'Programmes',
+      'Submissions',
     ]);
     await expect(page.getByRole('button', { name: 'Switch funder' })).toHaveCount(0);
   });
@@ -353,7 +354,9 @@ test.describe('the console shell', () => {
     await page.goto('/northfield/');
 
     await expect(h1(page, 'Programmes')).toBeVisible();
-    await expect(page.getByRole('navigation')).toHaveCount(0);
+    await expect(page.getByRole('navigation', { name: 'Main' }).getByRole('link')).toHaveText([
+      'My reviews',
+    ]);
   });
 
   test('signs out, and lands on the signed-out page', async ({ page }) => {

@@ -8,6 +8,8 @@ export { AppShell, MAIN_CONTENT_ID } from './AppShell.tsx';
 export type { AppShellProps } from './AppShell.tsx';
 export { Button, buttonClassName } from './Button.tsx';
 export type { ButtonProps, ButtonVariant } from './Button.tsx';
+export { Checkbox } from './Checkbox.tsx';
+export type { CheckboxProps } from './Checkbox.tsx';
 export { CheckboxGroup } from './CheckboxGroup.tsx';
 export type { CheckboxGroupProps, CheckboxOption } from './CheckboxGroup.tsx';
 export { EmptyState } from './EmptyState.tsx';

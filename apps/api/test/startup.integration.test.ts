@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { smtpTestSettings } from './support.ts';
+import { fileTestSettings, smtpTestSettings } from './support.ts';
 
 const MAIN = fileURLToPath(new URL('../src/main.ts', import.meta.url));
 const CONSOLE_HOST = 'console.localhost';
@@ -78,6 +78,7 @@ beforeAll(async () => {
     TPS_CONSOLE_ORIGIN: `http://${CONSOLE_HOST}:${String(port)}`,
     TPS_PORTAL_ORIGIN: `http://portal.localhost:${String(port)}`,
     ...smtpTestSettings,
+    ...fileTestSettings(),
   };
   child = spawn(process.execPath, [MAIN], {
     env: {

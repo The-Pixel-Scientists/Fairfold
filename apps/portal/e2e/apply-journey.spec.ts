@@ -63,18 +63,21 @@ test.describe('an applicant applying, against the real API', () => {
     await page.getByRole('button', { name: 'Sign out' }).click();
     await expect(h1(page, 'You have signed out')).toBeVisible();
 
-    // Second sitting, signed in afresh: the answers are there, and the rest is filled in except the last section.
+    // Second sitting, signed in afresh: the answers are there, and the rest is filled in except the budget.
     await signIn(page, address, PASSWORD);
+    await expect(h1(page, 'Apply for a grant')).toBeVisible();
     await page.goto('/northfield/applications');
     await page.getByRole('link', { name: /^Continue application for / }).click();
-    await expect(page.getByText('In progress').first()).toBeVisible();
+    await expect(
+      page.getByRole('list', { name: 'Application sections' }).getByText('Completed'),
+    ).toHaveCount(2);
     await page.getByRole('link', { name: /^Continue with / }).click();
     // Every section is answered but the budget, which the check page will list as missing.
     for (;;) {
-      const progress = await page.getByText(/^Section \d+ of \d+/).textContent();
-      if ((await h1(page, 'Budget').count()) > 0) break;
-      const [, current, total] = /Section (\d+) of (\d+)/.exec(progress ?? '') ?? ['', '1', '1'];
-      await answerQuestions(page);
+      const progress = (await page.getByText(/^Section \d+ of \d+/).textContent()) ?? '';
+      const [, current, total] = /Section (\d+) of (\d+)/.exec(progress) ?? ['', '1', '1'];
+      if ((await h1(page, 'Budget').count()) === 0) await answerQuestions(page);
+      if (current === total) break;
       await page.getByRole('button', { name: 'Save and continue' }).click();
       await expect(
         page.getByText(`Section ${String(Number(current) + 1)} of ${total}`),
@@ -88,8 +91,10 @@ test.describe('an applicant applying, against the real API', () => {
     await expect(missing).toBeVisible();
     await expect(page.getByRole('button', { name: 'Submit application' })).toHaveCount(0);
     await missing.getByRole('link').first().click();
+    await expect(h1(page, 'Budget')).toBeVisible();
     await answerQuestions(page);
-    await page.getByRole('button', { name: 'Save and check your answers' }).click();
+    await page.getByRole('button', { name: 'Save and come back later' }).click();
+    await page.getByRole('link', { name: 'Check your answers' }).first().click();
     await expect(h1(page, 'Check your answers')).toBeVisible();
     await expect(missing).toHaveCount(0);
     await page.getByRole('button', { name: 'Submit application' }).click();

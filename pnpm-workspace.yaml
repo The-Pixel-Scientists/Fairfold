@@ -55,5 +55,10 @@ auditConfig:
 #   released 30 September 2026). Reached through postcss, css-tree and
 #   @tailwindcss/node, all asking for ^1.2.1. Approved by Aaron Gardner on
 #   15 October 2026.
+# - GHSA-587h-7wmj-h5pm, vite (its bundled launch-editor), high, fixed in
+#   8.3.3 (MIT, released 6 October 2026). Reached through vitest and
+#   @vitest/mocker, which ask for vite 8.3.1. Approved by Aaron Gardner on
+#   21 October 2026.
 overrides:
   source-map-js@<1.2.2: 1.2.2
+  vite@<8.3.3: 8.3.3

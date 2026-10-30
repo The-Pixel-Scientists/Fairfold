@@ -18,12 +18,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
 import { setResponseHeaders } from './headers.ts';
 import { SafeError } from './serialize-error.ts';
-import {
-  fieldProblems,
-  MAX_FIELD_PROBLEMS,
-  type FieldProblem,
-  type ValidationEntry,
-} from './validation-problems.ts';
+import { fieldProblems, type FieldProblem, type ValidationEntry } from './validation-problems.ts';
 
 export const PROBLEM_CONTENT_TYPE = 'application/problem+json; charset=utf-8';
 
@@ -40,12 +35,19 @@ export class ApiError extends SafeError {
   readonly errors: readonly FieldProblem[];
   /** Why a request was refused, as a code for the log. Never sent. */
   readonly reason: string | undefined;
+  /** Headers to send with the problem; only `Retry-After` and `Allow` are kept. */
+  readonly headers: Readonly<Record<string, string>> | undefined;
 
   /** With no `detail`, the plain text for the status. */
   constructor(
     status: number,
     detail?: string,
-    options: { errors?: readonly FieldProblem[]; cause?: unknown; reason?: string } = {},
+    options: {
+      errors?: readonly FieldProblem[];
+      cause?: unknown;
+      reason?: string;
+      headers?: Readonly<Record<string, string>>;
+    } = {},
   ) {
     const text = detail ?? detailFor(status, undefined);
     super(text, options.cause === undefined ? undefined : { cause: options.cause });
@@ -54,8 +56,12 @@ export class ApiError extends SafeError {
     this.detail = text;
     this.errors = options.errors ?? [];
     this.reason = options.reason;
+    this.headers = options.headers;
   }
 }
+
+/** Room for every problem a handler found, such as each failing contrast pair of a token set. */
+const MAX_THROWN_PROBLEMS = 200;
 
 const SERVER_ERROR_DETAIL =
   'Something went wrong on our side. Try again in a few minutes. If it keeps happening, give support the request id.';
@@ -145,7 +151,8 @@ function describe(error: unknown): Failure {
     return {
       status: error.status,
       detail: error.detail,
-      errors: error.errors.slice(0, MAX_FIELD_PROBLEMS),
+      errors: error.errors.slice(0, MAX_THROWN_PROBLEMS),
+      headers: keptHeaders(error),
       unexpected: error.status >= 500,
       ...(error.reason === undefined ? {} : { reason: error.reason }),
     };

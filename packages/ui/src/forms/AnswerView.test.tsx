@@ -417,6 +417,12 @@ describe('AnswerView', () => {
       expect(screen.queryByText('other.pdf')).toBeNull();
     });
 
+    it('says what it is told where there are no files, for a file question only', () => {
+      showFiles({ files: [], noFiles: 'No files uploaded' });
+
+      expect(answerTo('Accounts')).toBe('No files uploaded');
+    });
+
     it('shows only the files it is given, never what the answer holds', () => {
       showFiles({ files: [] });
 

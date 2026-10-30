@@ -102,3 +102,63 @@ rules:
     paths:
       exclude:
         - /apps/api/src/email/
+
+  - id: tps-storage-keys-only-in-files
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      Only apps/api/src/platform/files may import the S3 signer or read the
+      storage key settings. Store and send files through ctx.files (ADR 0047).
+    pattern-either:
+      - patterns:
+          - pattern-either:
+              - pattern: import "$MODULE"
+              - pattern: import $X from "$MODULE"
+              - pattern: import * as $X from "$MODULE"
+              - pattern: import {...} from "$MODULE"
+              - pattern: import type $X from "$MODULE"
+              - pattern: import type {...} from "$MODULE"
+              - pattern: export {...} from "$MODULE"
+              - pattern: export * from "$MODULE"
+              - pattern: import("$MODULE")
+              - pattern: require("$MODULE")
+          - metavariable-regex:
+              metavariable: $MODULE
+              regex: ^['"]?@smithy/signature-v4(/.+)?['"]?$
+      - pattern-regex: \bTPS_STORAGE_(WRITE|READ)_(ACCESS_KEY_ID|SECRET_ACCESS_KEY)(_FILE)?\b|\bstorage_(write|read)_secret_key\b
+    paths:
+      include:
+        - /apps/
+        - /modules/
+        - /packages/
+      exclude:
+        - /apps/api/src/platform/files/
+
+  - id: tps-no-presigned-urls
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      Files are downloaded only through the API, never by a presigned URL
+      (ADR 0047).
+    pattern-either:
+      - patterns:
+          - pattern-either:
+              - pattern: import "$MODULE"
+              - pattern: import $X from "$MODULE"
+              - pattern: import * as $X from "$MODULE"
+              - pattern: import {...} from "$MODULE"
+              - pattern: import type $X from "$MODULE"
+              - pattern: import type {...} from "$MODULE"
+              - pattern: export {...} from "$MODULE"
+              - pattern: export * from "$MODULE"
+              - pattern: import("$MODULE")
+              - pattern: require("$MODULE")
+          - metavariable-regex:
+              metavariable: $MODULE
+              regex: ^['"]?@aws-sdk/(s3-request-presigner|s3-presigned-post)(/.+)?['"]?$
+      - pattern: $SIGNER.presign(...)
+      - pattern: $SIGNER.presignWithCredentials(...)
+    paths:
+      include:
+        - /apps/
+        - /modules/

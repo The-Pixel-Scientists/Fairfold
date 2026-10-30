@@ -8,9 +8,11 @@ import {
   getTheme,
   listModules,
   removeLogo,
+  removeThemeTokens,
   switchModule,
   updateSettings,
   updateTheme,
+  updateThemeTokens,
   uploadLogo,
 } from '@pixel-scientists/domain/platform/settings';
 
@@ -19,12 +21,15 @@ import { LOGO_BODY_LIMIT_BYTES, removeLogoHandler, uploadLogoHandler } from './l
 import { listModulesHandler, switchModuleHandler } from './modules.ts';
 import { getSettingsHandler, updateSettingsHandler } from './tenant.ts';
 import { getThemeHandler, updateThemeHandler } from './theme.ts';
+import { removeThemeTokensHandler, updateThemeTokensHandler } from './tokens.ts';
 
 export const settingsRoutes: readonly Route[] = [
   route(getSettings, getSettingsHandler),
   route(updateSettings, updateSettingsHandler),
   route(getTheme, getThemeHandler),
   route(updateTheme, updateThemeHandler),
+  route(updateThemeTokens, updateThemeTokensHandler),
+  route(removeThemeTokens, removeThemeTokensHandler),
   route(uploadLogo, uploadLogoHandler, { bodyLimit: LOGO_BODY_LIMIT_BYTES }),
   route(removeLogo, removeLogoHandler),
   route(listModules, listModulesHandler),

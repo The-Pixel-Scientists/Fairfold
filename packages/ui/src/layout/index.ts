@@ -6,6 +6,8 @@ export { Breadcrumbs } from './Breadcrumbs.tsx';
 export type { BreadcrumbItem, BreadcrumbsProps } from './Breadcrumbs.tsx';
 export { Meter } from './Meter.tsx';
 export type { MeterProps, MeterTone } from './Meter.tsx';
+export { Notice } from './Notice.tsx';
+export type { NoticeIcon, NoticeProps, NoticeTone } from './Notice.tsx';
 export { PageHeader } from './PageHeader.tsx';
 export type { PageHeaderProps } from './PageHeader.tsx';
 export { Panel } from './Panel.tsx';

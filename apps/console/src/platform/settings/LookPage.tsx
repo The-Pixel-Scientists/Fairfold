@@ -3,9 +3,10 @@
 import { presetLabels, presets } from '@pixel-scientists/domain/platform';
 import type { Preset } from '@pixel-scientists/domain/platform';
 import { getTheme, updateTheme } from '@pixel-scientists/domain/platform/settings';
-import type { ThemeTokens } from '@pixel-scientists/domain/platform/settings';
+import type { ThemeSettings } from '@pixel-scientists/domain/platform/settings';
 import {
   Button,
+  Dialog,
   ErrorSummary,
   FormField,
   Input,
@@ -22,6 +23,7 @@ import { LogoSection } from './LogoSection.tsx';
 import { LookPreview } from './LookPreview.tsx';
 import { useTenantLook } from './look.tsx';
 import { SettingsCard, SettingsFrame, WhenLoaded } from './SettingsFrame.tsx';
+import { StylesheetSection } from './StylesheetSection.tsx';
 import { useLoad } from './useLoad.ts';
 
 const FIELDS = ['brandColour', 'preset'] as const;
@@ -44,21 +46,26 @@ function isPreset(value: string): value is Preset {
 
 interface LookFormProps {
   /** The look as it is saved. */
-  theme: ThemeTokens;
+  theme: ThemeSettings;
   name: string;
-  onSaved: (theme: ThemeTokens) => void;
+  onSaved: (theme: ThemeSettings) => void;
 }
 
 function LookForm({ theme, name, onSaved }: LookFormProps) {
   const slug = useTenantSlug();
   const { refresh } = useTenantLook();
   const input = useRef<HTMLInputElement>(null);
+  const formElement = useRef<HTMLFormElement>(null);
+  // Set once the person has agreed to replace their stylesheet, for the submit that follows.
+  const replaceAgreed = useRef(false);
+  const [asking, setAsking] = useState(false);
   const [colour, setColour] = useState(theme.brandColour);
   const [preset, setPreset] = useState<Preset>(theme.preset);
   const [done, setDone] = useState(false);
   // The colour the API or the browser refused on the last attempt, so its words go once the colour changes.
   const [refused, setRefused] = useState<string | null>(null);
 
+  const replacesStylesheet = Boolean(theme.tokens);
   const dirty = colour.toLowerCase() !== theme.brandColour || preset !== theme.preset;
   useLeaveGuard(dirty);
 
@@ -89,7 +96,20 @@ function LookForm({ theme, name, onSaved }: LookFormProps) {
 
   return (
     <SettingsCard title="Brand colour and preset">
-      <form noValidate onSubmit={form.onSubmit} className="flex flex-col gap-4">
+      <form
+        ref={formElement}
+        noValidate
+        onSubmit={(event) => {
+          if (replacesStylesheet && !replaceAgreed.current) {
+            event.preventDefault();
+            setAsking(true);
+            return;
+          }
+          replaceAgreed.current = false;
+          form.onSubmit(event);
+        }}
+        className="flex flex-col gap-4"
+      >
         <ErrorSummary key={form.attempt} errors={form.errors} />
         <FormField
           id="brandColour"
@@ -163,8 +183,7 @@ function LookForm({ theme, name, onSaved }: LookFormProps) {
         <div className="flex flex-col gap-2">
           <h3 className="text-body font-medium text-ink">Preview</h3>
           <LookPreview
-            brandColour={passes ? colour.toLowerCase() : theme.brandColour}
-            preset={preset}
+            look={{ brandColour: passes ? colour.toLowerCase() : theme.brandColour, preset }}
             slug={slug}
             name={name}
             hasLogo={theme.hasLogo}
@@ -184,18 +203,53 @@ function LookForm({ theme, name, onSaved }: LookFormProps) {
           </p>
         </div>
       </form>
+      <Dialog
+        open={asking}
+        onOpenChange={setAsking}
+        title="Replace your stylesheet?"
+        description="Your look comes from the stylesheet you saved. Saving this preset and brand colour removes the stylesheet. Download it first if you want to keep a copy."
+        actions={
+          <>
+            <Button
+              data-autofocus
+              onClick={() => {
+                setAsking(false);
+              }}
+            >
+              Keep stylesheet
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => {
+                setAsking(false);
+                replaceAgreed.current = true;
+                formElement.current?.requestSubmit();
+              }}
+            >
+              Replace stylesheet
+            </Button>
+          </>
+        }
+      />
     </SettingsCard>
   );
 }
 
-function LookEditor({ initial }: { initial: ThemeTokens }) {
+function LookEditor({ initial }: { initial: ThemeSettings }) {
   const slug = useTenantSlug();
   const { tenant } = useTenantLook();
   const [theme, setTheme] = useState(initial);
 
   return (
     <>
+      {theme.tokens && (
+        <p className="rounded-lg border border-info bg-info-soft p-4 text-body text-ink">
+          Your look comes from a stylesheet you saved. The preset and brand colour below are not in
+          use until you go back to a preset.
+        </p>
+      )}
       <LookForm theme={theme} name={tenant?.name ?? slug} onSaved={setTheme} />
+      <StylesheetSection theme={theme} name={tenant?.name ?? slug} onChanged={setTheme} />
       <LogoSection theme={theme} name={tenant?.name ?? slug} onChanged={setTheme} />
     </>
   );

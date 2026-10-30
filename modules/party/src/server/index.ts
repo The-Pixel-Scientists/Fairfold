@@ -5,7 +5,7 @@
 // request commits or rolls back together. A caller that gets `created: true`
 // from ensurePersonForUser() writes the `party.person.created` audit event.
 // `partyHandlers` and `partyResolvers` are for apps/api/src/modules.ts alone, which registers the
-// routes and the scope rules.
+// routes and the scope rules. `partyWarehouse` feeds the warehouse snapshot.
 
 export {
   contactDetails,
@@ -21,3 +21,4 @@ export {
   type PartyContext,
   type PartyDependencies,
 } from './handlers.ts';
+export { partyWarehouse } from './warehouse.ts';

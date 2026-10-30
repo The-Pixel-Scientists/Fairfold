@@ -4,6 +4,7 @@
 // the test database as app_api, with a session stand-in, two tenants with
 // their staff, and readers for the rows a request left behind.
 
+import { encodeFileNameHeader } from '@pixel-scientists/domain/files';
 import { defaultEmailTemplates } from '@pixel-scientists/grants/contracts';
 import type { LightMyRequestResponse } from 'fastify';
 import { expect } from 'vitest';
@@ -17,6 +18,7 @@ import {
 import { buildApp } from '../src/app.ts';
 import { loadConfig } from '../src/config.ts';
 import { openDatabase } from '../src/database.ts';
+import type { FileService } from '../src/platform/files/index.ts';
 import { createLogger } from '../src/logger.ts';
 import { composeModules, type Mail } from '../src/modules.ts';
 import { addMember, type Member } from './settings-api.ts';
@@ -163,7 +165,7 @@ export const storedVersions = (tenant: TestTenant, entityType: string, entityId:
  * second one with a name on a person record (`ada`), a reviewer, an
  * administrator and an applicant. In tenant B: a programme manager.
  */
-export async function startProgrammeApi(port: string, mail?: Mail) {
+export async function startProgrammeApi(port: string, mail?: Mail, files?: FileService) {
   const { database: settings } = loadConfig({
     ...process.env,
     ...smtpTestSettings,
@@ -177,6 +179,7 @@ export async function startProgrammeApi(port: string, mail?: Mail) {
     logger,
     checkDatabase: () => database.check(),
     inTenant: database.inTenant,
+    files,
     auth: auth.module,
     ...composeModules({ publicTenants: database.publicTenants, mail }),
   });
@@ -197,6 +200,16 @@ export async function startProgrammeApi(port: string, mail?: Mail) {
   };
 
   /** A request as `member` (in `app`, if not the member's own) or signed out. */
+  const sessionHeaders = (
+    member: Member,
+    app: 'console' | 'portal' = member.app,
+    recentAuthAt: Date | null = null,
+  ) =>
+    auth.as({
+      app,
+      session: testSession({ app, userId: member.userId, tenant: member.tenant.id, recentAuthAt }),
+    });
+
   const send = (
     member: Member | undefined,
     method: Method,
@@ -208,20 +221,21 @@ export async function startProgrammeApi(port: string, mail?: Mail) {
     api.inject({
       method,
       url: `/api${url}`,
-      ...(member === undefined
-        ? {}
-        : {
-            headers: auth.as({
-              app,
-              session: testSession({
-                app,
-                userId: member.userId,
-                tenant: member.tenant.id,
-                recentAuthAt,
-              }),
-            }),
-          }),
+      ...(member === undefined ? {} : { headers: sessionHeaders(member, app, recentAuthAt) }),
       ...(payload === undefined ? {} : { payload: payload as object }),
+    });
+
+  /** A raw upload: the file's bytes as the body, its name in the `File-Name` header. */
+  const upload = (member: Member | undefined, url: string, name: string, bytes: Buffer) =>
+    api.inject({
+      method: 'POST',
+      url: `/api${url}`,
+      headers: {
+        'content-type': 'application/octet-stream',
+        'file-name': encodeFileNameHeader(name),
+        ...(member === undefined ? {} : sessionHeaders(member)),
+      },
+      payload: bytes,
     });
 
   /** A programme and a round made by the manager of tenant A, for the tests that need them. */
@@ -241,6 +255,7 @@ export async function startProgrammeApi(port: string, mail?: Mail) {
     tenantB,
     ...members,
     send,
+    upload,
     aProgramme,
     aRound,
     stagesOf,

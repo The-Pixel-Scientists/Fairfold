@@ -10,13 +10,15 @@ import { buildApp } from './app.ts';
 import { loadAuthSettings, createAuth, type AuthSettings } from './auth/index.ts';
 import { ConfigError, loadConfig, type Config } from './config.ts';
 import { openDatabase } from './database.ts';
+import { createFileService, loadFileSettings, type FileSettings } from './platform/files/index.ts';
 import { createSender } from './email/sender.ts';
 import { createSmtpTransport } from './email/transport.ts';
 import { createLogger } from './logger.ts';
 import { composeModules } from './modules.ts';
 
 /** Both groups of settings, with every problem in either reported together. */
-function readSettings(): { config: Config; authSettings: AuthSettings } | undefined {
+function readSettings():
+  { config: Config; authSettings: AuthSettings; fileSettings: FileSettings } | undefined {
   const problems: string[] = [];
   const read = <T>(load: () => T): T | undefined => {
     try {
@@ -31,11 +33,12 @@ function readSettings(): { config: Config; authSettings: AuthSettings } | undefi
   };
   const config = read(() => loadConfig(process.env));
   const authSettings = read(() => loadAuthSettings(process.env));
-  if (config === undefined || authSettings === undefined) {
+  const fileSettings = read(() => loadFileSettings(process.env));
+  if (config === undefined || authSettings === undefined || fileSettings === undefined) {
     process.stderr.write(`${new ConfigError(problems).message}\n`);
     return undefined;
   }
-  return { config, authSettings };
+  return { config, authSettings, fileSettings };
 }
 
 async function main(): Promise<void> {
@@ -44,7 +47,7 @@ async function main(): Promise<void> {
     process.exitCode = 1;
     return;
   }
-  const { config, authSettings } = settings;
+  const { config, authSettings, fileSettings } = settings;
 
   const logger = createLogger({ level: config.logLevel });
   const database = openDatabase(config.database, logger);
@@ -72,9 +75,12 @@ async function main(): Promise<void> {
       logger,
       checkDatabase: () => database.check(),
       inTenant: database.inTenant,
+      files: createFileService(fileSettings),
       auth,
       ...composeModules({
         publicTenants: database.publicTenants,
+        auth,
+        log: logger,
         mail: { sender, portalOrigin: authSettings.origins.portal },
       }),
       trustProxy: config.trustProxy,

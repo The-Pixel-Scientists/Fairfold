@@ -33,6 +33,21 @@ describe('visibleItems', () => {
     expect(visibleItems({ permissions: [] }, items)).toEqual([]);
   });
 
+  it('keeps an item that has two permissions for a session that holds either', () => {
+    const data = [
+      {
+        to: '/data',
+        label: 'Data',
+        permission: 'platform.warehouse.export',
+        or: 'grants.data.export',
+      },
+    ] as const;
+    for (const permissions of [['platform.warehouse.export'], ['grants.data.export']]) {
+      expect(visibleItems({ permissions }, data)).toHaveLength(1);
+    }
+    expect(visibleItems({ permissions: ['platform.audit.read'] }, data)).toEqual([]);
+  });
+
   it('gives every console page the permission that opens it', () => {
     for (const item of navigationItems) expect(item.permission).toMatch(/^[a-z]+\.[a-z]+\.[a-z]+$/);
   });
@@ -55,13 +70,27 @@ describe('the console shell', () => {
     await expectTitle('Programmes – Fairfold Grants console');
   });
 
-  it('leaves out pages the person has no permission for, and the navigation when none is left', async () => {
+  it('leaves out pages the person has no permission for, and keeps the ones they have', async () => {
     stubApi(session(consoleSession({ roles: ['reviewer'] })));
     openConsole('/northfield/');
 
     await heading('Programmes');
 
-    expect(screen.queryByRole('link', { name: 'Programmes' })).toBeNull();
+    const navigation = screen.getByRole('navigation', { name: 'Main' });
+    expect(
+      within(navigation)
+        .getAllByRole('link')
+        .map((link) => link.textContent),
+    ).toEqual(['My reviews']);
+    expect(screen.getByRole('main')).toBeTruthy();
+  });
+
+  it('has no navigation when no page is open to the person', async () => {
+    stubApi(session(consoleSession({ roles: [] })));
+    openConsole('/northfield/');
+
+    await heading('Programmes');
+
     expect(screen.queryByRole('navigation', { name: 'Main' })).toBeNull();
     expect(screen.getByRole('main')).toBeTruthy();
   });

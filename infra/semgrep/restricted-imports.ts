@@ -37,6 +37,29 @@ export * from '@radix-ui/react-dialog';
 // ok: tps-radix-only-in-ui
 import { Button } from '@pixel-scientists/ui';
 
+// ruleid: tps-storage-keys-only-in-files
+import { SignatureV4 } from '@smithy/signature-v4';
+// ruleid: tps-storage-keys-only-in-files
+const writeKey = readSecret(process.env, 'TPS_STORAGE_WRITE_SECRET_ACCESS_KEY');
+// ruleid: tps-storage-keys-only-in-files
+const readKeyId = process.env.TPS_STORAGE_READ_ACCESS_KEY_ID;
+// ruleid: tps-storage-keys-only-in-files
+const writeKeyFile = process.env.TPS_STORAGE_WRITE_SECRET_ACCESS_KEY_FILE;
+// ruleid: tps-storage-keys-only-in-files
+const readKey = await readFile('/run/secrets/storage_read_secret_key', 'utf8');
+// ok: tps-storage-keys-only-in-files
+const bucket = process.env.TPS_STORAGE_BUCKET;
+
+// ruleid: tps-no-presigned-urls
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+// ruleid: tps-no-presigned-urls
+const post = await import('@aws-sdk/s3-presigned-post');
+// ruleid: tps-no-presigned-urls
+const url = await new SignatureV4(options).presign(request);
+// ok: tps-no-presigned-urls
+const signed = await new SignatureV4(options).sign(request);
+
 export { pg, Kysely, Migrator, pool, withTenant, betterAuth, sso, z, nodemailer, smtp, sendEmail };
-export { Dialog, Button };
+export { Dialog, Button, writeKey, readKeyId, writeKeyFile, readKey, bucket };
+export { getSignedUrl, post, url, signed };
 export type { PgBoss, Transporter };

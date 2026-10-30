@@ -24,7 +24,7 @@ import {
 
 import { recordAudit, recordRead, type AuditActor } from '../audit/writer.ts';
 import type {
-  MemberContext,
+  PolicyContext,
   OwnTransaction,
   RequestAudit,
   RequestContext,
@@ -122,7 +122,7 @@ export interface MemberRequest {
 export async function asMember<T>(
   inTenant: InTenant,
   { route, context, input, resolvers }: MemberRequest,
-  run: (tx: TenantTransaction, caller: MemberContext) => Promise<T>,
+  run: (tx: TenantTransaction, caller: PolicyContext) => Promise<T>,
 ): Promise<T> {
   const { session } = context;
   if (session === null || context.app === null) throw refuse(401, 'no_session');
