@@ -10,22 +10,22 @@
     "start": "node src/main.ts"
   },
   "dependencies": {
-    "@fastify/swagger": "9.9.0",
+    "@fastify/swagger": "9.9.2",
     "@pixel-scientists/db": "workspace:*",
     "@pixel-scientists/domain": "workspace:*",
     "@pixel-scientists/grants": "workspace:*",
     "@pixel-scientists/party": "workspace:*",
     "@smithy/signature-v4": "5.7.4",
-    "better-auth": "1.7.6",
-    "fastify": "5.12.5",
+    "better-auth": "1.7.13",
+    "fastify": "5.12.7",
     "fastify-type-provider-zod": "7.0.0",
-    "nodemailer": "10.0.11",
-    "pino": "10.3.1",
-    "zod": "4.6.5"
+    "nodemailer": "10.2.1",
+    "pino": "10.4.0",
+    "zod": "4.6.7"
   },
   "devDependencies": {
-    "@types/node": "24.19.0",
+    "@types/node": "24.19.2",
     "tsx": "4.23.15",
-    "vitest": "5.0.1"
+    "vitest": "5.0.5"
   }
 }
