@@ -4,8 +4,9 @@
 // decisions, permission changes and sensitive reads through it, in the
 // request's own transaction, so an event is written exactly when its change
 // commits. It accepts only action codes from the modules' closed lists
-// (defineAuditActions() in packages/domain), and insertAuditEvent() keeps a
-// value only for a public or internal field (D12).
+// (defineAuditActions() in packages/domain), refuses an action whose
+// module rule gives it a subject (ADR 0027) when the event has none, and
+// insertAuditEvent() keeps a value only for a public or internal field (D12).
 
 import { insertAuditEvent, type AuditChanges, type Transaction } from '@pixel-scientists/db';
 import { idSchema } from '@pixel-scientists/domain';
@@ -14,6 +15,8 @@ import {
   isAuditAction,
   type AuditAction,
 } from '@pixel-scientists/domain/platform';
+import { grantsSubjectRules } from '@pixel-scientists/grants/server';
+import { partySubjectRules } from '@pixel-scientists/party/server';
 
 /** Who acted, from the request context: never from a request body or URL. */
 export type AuditActor =
@@ -32,6 +35,13 @@ export interface AuditEvent {
   readonly subjectPartyId?: string;
 }
 
+/** Actions whose module rule says the event is about a party. */
+const subjectBearing: ReadonlySet<string> = new Set(
+  Object.entries({ ...partySubjectRules, ...grantsSubjectRules })
+    .filter(([, rule]) => !('none' in rule))
+    .map(([action]) => action),
+);
+
 /** Record a change in the transaction's tenant. */
 export async function recordAudit<DB>(
   trx: Transaction<DB>,
@@ -43,6 +53,9 @@ export async function recordAudit<DB>(
   }
   if (event.subjectPartyId !== undefined && !idSchema.safeParse(event.subjectPartyId).success) {
     throw new Error('Audit subject party id is not a UUID.');
+  }
+  if (event.subjectPartyId === undefined && subjectBearing.has(event.action)) {
+    throw new Error('The audit event has no subject.');
   }
   await insertAuditEvent(trx, {
     requestId: actor.requestId,

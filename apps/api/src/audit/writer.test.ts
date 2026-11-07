@@ -66,6 +66,26 @@ describe('recordAudit', () => {
     expect(insertAuditEvent).not.toHaveBeenCalled();
   });
 
+  it.each(['party.person.created', 'grants.application.viewed'])(
+    'refuses %s, which is about a party, without a subject',
+    async (action) => {
+      const refusal = recordAudit(trx, user, {
+        action: action as 'platform.tenant.created',
+        entityId,
+      });
+      await expect(refusal).rejects.toThrow(/^The audit event has no subject\.$/);
+      expect(insertAuditEvent).not.toHaveBeenCalled();
+    },
+  );
+
+  it('records an action whose rule gives it no subject without one', async () => {
+    await recordAudit(trx, user, { action: 'grants.programme.created', entityId });
+    expect(insertAuditEvent).toHaveBeenCalledWith(
+      trx,
+      expect.objectContaining({ action: 'grants.programme.created', subjectPartyId: null }),
+    );
+  });
+
   it('records no membership for the system or the operator', async () => {
     await recordAudit(
       trx,
