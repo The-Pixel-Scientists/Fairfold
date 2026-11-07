@@ -17,6 +17,7 @@
 import type { RouteContract } from '@pixel-scientists/domain/api';
 import {
   permissionsFor,
+  moduleOn,
   switchableModuleIds,
   type ModuleId,
   type Permission,
@@ -141,14 +142,15 @@ export async function asMember<T>(
       .executeTakeFirst();
     if (membership === undefined) throw refuse(403, 'no_membership');
 
-    // A module without a row is on, and only a switchable module can be off.
+    // The platform and party are always on; a switchable module follows its row,
+    // and moduleOn() says what a missing row means.
     if ((switchableModuleIds as readonly ModuleId[]).includes(route.module)) {
       const switched = await db
         .selectFrom('app.tenant_module')
         .select('enabled')
         .where('module', '=', route.module)
         .executeTakeFirst();
-      if (switched?.enabled === false) throw refuse(404, 'module_off');
+      if (!moduleOn(route.module, switched?.enabled)) throw refuse(404, 'module_off');
     }
 
     const permissions = new Set<Permission>(permissionsFor(membership.roles, session.app));

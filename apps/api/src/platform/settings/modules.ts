@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
 // Which switchable modules a tenant uses (ADR 0016). A module with no stored
-// state is on. Switching one writes a configuration version and
+// state follows moduleOn(): grants is on, the wave 1 tools are off. Switching one writes a configuration version and
 // `platform.module.switched_on` or `switched_off`; the policy then answers
 // 404 for the module's routes, and sessions drop its permissions.
 
-import { switchableModuleIds } from '@pixel-scientists/domain/platform';
+import { moduleOn, switchableModuleIds } from '@pixel-scientists/domain/platform';
 import type { listModules, switchModule } from '@pixel-scientists/domain/platform/settings';
 
 import type { TenantTransaction } from '../../database.ts';
@@ -19,7 +19,10 @@ async function readModules(tx: TenantTransaction) {
     .execute();
   const stored = new Map(rows.map((row) => [row.module, row.enabled]));
   return {
-    modules: switchableModuleIds.map((module) => ({ module, enabled: stored.get(module) ?? true })),
+    modules: switchableModuleIds.map((module) => ({
+      module,
+      enabled: moduleOn(module, stored.get(module)),
+    })),
   };
 }
 
@@ -34,7 +37,7 @@ export const switchModuleHandler: Handler<typeof switchModule> = async ({ tx, co
     .where('module', '=', module)
     .forUpdate()
     .executeTakeFirst();
-  const before = current?.enabled ?? true;
+  const before = moduleOn(module, current?.enabled);
   if (before === enabled) return readModules(tx);
 
   const set = { enabled, updated_by: context.membership.id };

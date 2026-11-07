@@ -54,6 +54,11 @@ afterAll(async () => {
 
 const call = (...args: Parameters<SettingsApi['call']>) => app.call(...args);
 const grants = (member: Member) => app.grants(member);
+const wave1 = ['crm', 'assure', 'forms', 'privacy', 'insight'];
+const defaults = [
+  { module: 'grants', enabled: true },
+  ...wave1.map((module) => ({ module, enabled: false })),
+];
 
 describe('who may use the settings routes', () => {
   const requests: [Method, string, object | undefined][] = [
@@ -270,10 +275,15 @@ describe('the theme', () => {
 });
 
 describe('the module switch', () => {
-  it('lists the switchable modules, on unless switched off', async () => {
-    expect(await ok(call(adminA, 'GET', '/modules'))).toEqual({
-      modules: [{ module: 'grants', enabled: true }],
-    });
+  it('lists grants on and the wave 1 tools off for a tenant with no rows', async () => {
+    expect(await ok(call(adminA, 'GET', '/modules'))).toEqual({ modules: defaults });
+  });
+
+  it('answers 404 for a wave 1 route with no row, and writes nothing to switch it off', async () => {
+    expect((await app.wave1(adminA)).statusCode).toBe(404);
+    const off = await call(adminA, 'PATCH', '/modules', { module: 'crm', enabled: false });
+    expect(off.statusCode).toBe(200);
+    expect(await versions(tenantA, 'platform.module')).toEqual([]);
   });
 
   it('switches grants off and on, with a version and an audit event each time', async () => {
@@ -281,11 +291,9 @@ describe('the module switch', () => {
 
     expect(
       await ok(call(adminA, 'PATCH', '/modules', { module: 'grants', enabled: false })),
-    ).toEqual({
-      modules: [{ module: 'grants', enabled: false }],
-    });
+    ).toEqual({ modules: [{ module: 'grants', enabled: false }, ...defaults.slice(1)] });
     expect(await ok(call(adminA, 'GET', '/modules'))).toEqual({
-      modules: [{ module: 'grants', enabled: false }],
+      modules: [{ module: 'grants', enabled: false }, ...defaults.slice(1)],
     });
     expect((await grants(adminA)).statusCode).toBe(404);
     // The settings stay reachable, so a tenant can switch it back on.
@@ -335,9 +343,7 @@ describe('the module switch', () => {
 
     expect((await grants(adminB)).statusCode).toBe(404);
     expect((await grants(adminA)).statusCode).toBe(200);
-    expect(await ok(call(adminA, 'GET', '/modules'))).toEqual({
-      modules: [{ module: 'grants', enabled: true }],
-    });
+    expect(await ok(call(adminA, 'GET', '/modules'))).toEqual({ modules: defaults });
   });
 });
 

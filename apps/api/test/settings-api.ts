@@ -58,6 +58,17 @@ const programmes = defineRoute({
   responses: { 200: z.object({ ok: z.boolean() }) },
 });
 
+const wave1 = defineRoute({
+  method: 'GET',
+  path: '/console/module-off-check',
+  audience: 'console',
+  module: 'crm',
+  permission: 'crm.records.export',
+  scope: 'tenant',
+  summary: 'A route of a wave 1 module',
+  responses: { 200: z.object({ ok: z.boolean() }) },
+});
+
 export async function addMember(
   tenant: TestTenant,
   app: 'console' | 'portal',
@@ -101,7 +112,11 @@ export async function startSettingsApi(port: string) {
     inTenant: database.inTenant,
     auth: auth.module,
     ...composed,
-    routes: [...composed.routes, route(programmes, () => Promise.resolve({ ok: true }))],
+    routes: [
+      ...composed.routes,
+      route(programmes, () => Promise.resolve({ ok: true })),
+      route(wave1, () => Promise.resolve({ ok: true })),
+    ],
   });
 
   const as = (member: Member): Record<string, string> => {
@@ -126,6 +141,9 @@ export async function startSettingsApi(port: string) {
     /** A request to the grants module's route. */
     grants: (member: Member) =>
       api.inject({ url: '/api/console/module-switch-check', headers: as(member) }),
+    /** A request to the wave 1 module's route. */
+    wave1: (member: Member) =>
+      api.inject({ url: '/api/console/module-off-check', headers: as(member) }),
     /** A request to the console settings route, as the administrator's own account in the portal. */
     asPortal: (member: Member) =>
       api.inject({
