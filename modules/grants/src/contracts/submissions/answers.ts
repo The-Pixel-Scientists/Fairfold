@@ -11,14 +11,27 @@ import { projectedAnswersSchemas } from '@pixel-scientists/domain/api';
 import { fieldIdSchema, formDefinitionSchema } from '@pixel-scientists/domain/forms';
 import { z } from 'zod';
 
-import { eligibilityOutcomeSchema, submissionStatusSchema } from '../applications/lists.ts';
+import {
+  eligibilityOutcomeSchema,
+  submissionRouteSchema,
+  submissionStatusSchema,
+} from '../applications/lists.ts';
 
 /** Opaque to the apps: a page's `nextCursor`, sent back to read the next page. */
 export const submissionCursorSchema = z.string().regex(/^[A-Za-z0-9_-]{1,200}$/);
 
 const stageRefSchema = z.object({ id: idSchema, name: z.string() });
 
-/** A submission in the list. `eligibility` is its latest recorded check, null if none. */
+/** A member, named from their person record; `name` is null when it has none. */
+export const memberRefSchema = z.object({ membershipId: idSchema, name: z.string().nullable() });
+
+export type MemberRef = z.infer<typeof memberRefSchema>;
+
+/**
+ * A submission in the list. `eligibility` is its latest recorded check, null
+ * if none; `submissionRoute` says whether staff submitted it for the
+ * applicant, and is `portal` when absent, until the server sends it (S12-15).
+ */
 export const submissionSummarySchema = z.object({
   id: idSchema,
   programme: z.object({ id: idSchema, title: z.string() }),
@@ -29,6 +42,7 @@ export const submissionSummarySchema = z.object({
   submittedAt: z.iso.datetime(),
   late: z.boolean(),
   eligibility: eligibilityOutcomeSchema.nullable(),
+  submissionRoute: submissionRouteSchema.optional(),
 });
 
 export type SubmissionSummary = z.infer<typeof submissionSummarySchema>;
@@ -83,7 +97,10 @@ export type SubmissionEvent = z.infer<typeof submissionEventSchema>;
  * version, which comes with them; the organisation and the applicant who
  * made it, through the party contract; eligibility checks, newest first;
  * and its history, oldest first. Identifiers are as party stores them, each
- * marked verified by staff or not.
+ * marked verified by staff or not. `submittedBy` is the member who submitted
+ * it for the applicant, set exactly when `submissionRoute` is `assisted` and
+ * absent until the server sends it (S12-15); the applicant is still the
+ * organisation and its contact.
  */
 export const submissionSchema = submissionSummarySchema.extend({
   form: z.object({ id: idSchema, version: z.int(), definition: formDefinitionSchema }),
@@ -102,6 +119,7 @@ export const submissionSchema = submissionSummarySchema.extend({
     familyName: z.string().nullable(),
     email: z.string(),
   }),
+  submittedBy: memberRefSchema.nullable().optional(),
   withdrawnAt: z.iso.datetime().nullable(),
   eligibilityChecks: z.array(eligibilityCheckSchema),
   history: z.array(submissionEventSchema),

@@ -12,6 +12,7 @@ import { fieldIdSchema, formDefinitionSchema } from '@pixel-scientists/domain/fo
 import { moneySchema } from '@pixel-scientists/domain/platform';
 import { z } from 'zod';
 
+import { submissionRouteSchema } from './lists.ts';
 import { applicantOutcomeSchema, applicantStatusSchema } from './status.ts';
 
 /** A round taking applications, as the list of rounds shows it. */
@@ -57,7 +58,15 @@ export const eligibilitySchema = z.discriminatedUnion('status', [
 
 export type Eligibility = z.infer<typeof eligibilitySchema>;
 
-/** One of the applicant's applications, as their list shows it. */
+/**
+ * One of the applicant's applications, as their list shows it. `closesAt` is
+ * when this application closes, by effectiveClosingTime(), local to the
+ * round's `timeZone`: later than the round's own when staff gave more time,
+ * and nothing else about the adjustment. `submissionRoute` is `assisted`
+ * when staff submitted it for the applicant; who did is never shown. Until
+ * the server sends them (S12-15), an absent `closesAt` is the round's own and
+ * an absent `submissionRoute` is `portal`.
+ */
 export const applicationSummarySchema = z.object({
   id: idSchema,
   round: z.object({
@@ -68,7 +77,9 @@ export const applicationSummarySchema = z.object({
     timeZone: z.string(),
   }),
   organisation: z.object({ id: idSchema, name: z.string() }),
+  closesAt: z.string().optional(),
   status: applicantStatusSchema,
+  submissionRoute: submissionRouteSchema.optional(),
   /** When the answers were last saved. */
   updatedAt: z.iso.datetime(),
   submittedAt: z.iso.datetime().nullable(),
