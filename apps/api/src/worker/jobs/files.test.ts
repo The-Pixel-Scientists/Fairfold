@@ -11,7 +11,8 @@ vi.mock('../../platform/files/index.ts', () => ({
 
 import type { FilesJobDependencies } from '../../platform/files/index.ts';
 import { filesHandler, filesQueue } from './files.ts';
-import { fanOutQueue, platformHandlers } from './index.ts';
+import { schedules } from '../schedules.ts';
+import { fanOutQueue, fileFanOutQueue, platformHandlers } from './index.ts';
 
 describe('the tenant files job', () => {
   it('is migration 0029’s tenant queue for file work, taking a slot only', () => {
@@ -23,15 +24,22 @@ describe('the tenant files job', () => {
     expect(filesQueue.data.safeParse({ fileName: 'Accounts.pdf' }).success).toBe(false);
   });
 
-  it('is reached from the fan-out, and its handler exists only with the file settings', () => {
-    expect(fanOutQueue.data.safeParse({ target: filesQueue.name }).success).toBe(true);
+  it('is reached from the daily file fan-out only, and both exist only with the file settings', () => {
+    expect(fileFanOutQueue).toMatchObject({ name: 'platform.file_fan_out', kind: 'platform' });
+    expect(fileFanOutQueue.data.safeParse({ target: filesQueue.name }).success).toBe(true);
+    expect(fanOutQueue.data.safeParse({ target: filesQueue.name }).success).toBe(false);
+    const daily = schedules.filter(({ queue }) => queue === fileFanOutQueue);
+    expect(daily).toEqual([
+      { queue: fileFanOutQueue, cron: '0 2 * * *', data: { target: filesQueue.name } },
+    ]);
     const logger = { error: () => undefined };
     const without = platformHandlers(logger).map(({ queue }) => queue.name);
     const withFiles = platformHandlers(logger, {} as FilesJobDependencies).map(
       ({ queue }) => queue.name,
     );
     expect(without).not.toContain(filesQueue.name);
-    expect(withFiles).toContain(filesQueue.name);
+    expect(without).not.toContain(fileFanOutQueue.name);
+    expect(withFiles).toEqual(expect.arrayContaining([filesQueue.name, fileFanOutQueue.name]));
   });
 });
 

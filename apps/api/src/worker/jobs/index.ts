@@ -10,14 +10,16 @@ import { defineFanOut, fanOutHandler } from './fan-out.ts';
 import { filesHandler } from './files.ts';
 import { idempotencyPurgeHandler } from './idempotency-purge.ts';
 
-/** Tenant queues the fan-out may send to; each is registered in app.job_queue. */
+/** Tenant queues the hourly fan-out may send to; each is registered in app.job_queue. */
 export const fanOutQueue = defineFanOut('platform.fan_out', [
   'platform.idempotency_purge',
   'platform.job_request_expiry',
-  'platform.file_scan',
 ]);
 
-/** The files job runs only where the worker has the file settings. */
+/** Migration 0043's daily fan-out, which sends each tenant its files job. */
+export const fileFanOutQueue = defineFanOut('platform.file_fan_out', ['platform.file_scan']);
+
+/** The file jobs run only where the worker has the file settings. */
 export function platformHandlers(
   logger: JobLogger,
   files?: FilesJobDependencies,
@@ -25,6 +27,6 @@ export function platformHandlers(
   return [
     fanOutHandler(fanOutQueue, logger),
     idempotencyPurgeHandler(),
-    ...(files === undefined ? [] : [filesHandler(files)]),
+    ...(files === undefined ? [] : [fanOutHandler(fileFanOutQueue, logger), filesHandler(files)]),
   ];
 }
