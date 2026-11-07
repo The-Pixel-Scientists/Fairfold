@@ -34,6 +34,7 @@ import type { AuthModule } from '../context.ts';
 import type { Sender } from '../email/sender.ts';
 import { ApiError } from '../problems.ts';
 import { isRegisteredFromContract, registerRoutes } from '../routes/register.ts';
+import { authenticatorRoutes } from './authenticators/routes.ts';
 import { createBetterAuth } from './better-auth.ts';
 import { clientTracker } from './clients.ts';
 import { copyAuthEvent, recordAuthEvent } from './events.ts';
@@ -46,6 +47,7 @@ import { revokeDevices } from './limits/devices.ts';
 import { revokeSessionsForMembership, type MembershipChange } from './memberships.ts';
 import { loadCommonPasswords } from './passwords.ts';
 import { mfaRoutes } from './mfa.ts';
+import { passwordChangeRoute } from './password-change/route.ts';
 import { authRoutes, type RouteDependencies } from './routes.ts';
 import { revokeAll, sessionReader } from './sessions.ts';
 import type { AuthSettings } from './settings.ts';
@@ -62,6 +64,12 @@ export {
   type Inviter,
 } from './invitations.ts';
 export type { MembershipChange } from './memberships.ts';
+export {
+  revokeAllForUser,
+  revokeOthersForUser,
+  type RevokeContext,
+  type Revoked,
+} from './authenticators/revoke.ts';
 
 export interface Auth extends AuthModule {
   /**
@@ -203,6 +211,8 @@ export function createAuth(settings: AuthSettings, deps: AuthDependencies): Auth
     ...stepUpRoutes(routeDeps, totpKey),
     ...switchTenantRoutes(routeDeps),
     ...invitationRoutes(routeDeps),
+    ...authenticatorRoutes(routeDeps, totpKey),
+    passwordChangeRoute(routeDeps),
   ];
   const users = auth.$extendTables<AuthTables>();
   const invitations = {
