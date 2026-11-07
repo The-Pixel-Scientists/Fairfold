@@ -172,4 +172,48 @@ describe('insertAuditEvent', () => {
       [true, null],
     ]);
   });
+
+  it("names the job columns for a job's event only, and only for a system event", async () => {
+    const { db, sent } = recording();
+    const trx = db as unknown as Transaction<unknown>;
+    const job = { jobId: 'j', originMembershipId: 'm' };
+    await insertAuditEvent(trx, { ...systemRow, job });
+    await insertAuditEvent(trx, systemRow);
+    expect(
+      sent.map(({ sql, parameters }) => [sql.includes('job_id'), parameters.slice(-2)]),
+    ).toEqual([
+      [true, ['j', 'm']],
+      [false, ['{}', null]],
+    ]);
+    await expect(
+      insertAuditEvent(trx, { ...systemRow, actorKind: 'operator', job }),
+    ).rejects.toThrow(/^Only a system event names a job\.$/);
+    expect(sent).toHaveLength(2);
+  });
 });
+
+const systemRow = {
+  requestId: 'r',
+  actorKind: 'system',
+  actorId: null,
+  action: 'platform.tenant.updated',
+  entityType: 'platform.tenant',
+  entityId: 't',
+  changes: {},
+} as const;
+
+function recording(): { db: Kysely<unknown>; sent: CompiledQuery[] } {
+  const sent: CompiledQuery[] = [];
+  const db = new Kysely<unknown>({
+    dialect: {
+      createAdapter: () => new PostgresAdapter(),
+      createDriver: () => new DummyDriver(),
+      createIntrospector: (kysely) => new PostgresIntrospector(kysely),
+      createQueryCompiler: () => new PostgresQueryCompiler(),
+    },
+    log: (event) => {
+      sent.push(event.query);
+    },
+  });
+  return { db, sent };
+}

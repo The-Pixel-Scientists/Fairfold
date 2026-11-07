@@ -8,6 +8,8 @@
 // module rule gives it a subject (ADR 0027) when the event has none, and
 // insertAuditEvent() keeps a value only for a public or internal field (D12).
 
+import { randomUUID } from 'node:crypto';
+
 import { insertAuditEvent, type AuditChanges, type Transaction } from '@pixel-scientists/db';
 import { idSchema } from '@pixel-scientists/domain';
 import {
@@ -18,10 +20,25 @@ import {
 import { grantsSubjectRules } from '@pixel-scientists/grants/server';
 import { partySubjectRules } from '@pixel-scientists/party/server';
 
-/** Who acted, from the request context: never from a request body or URL. */
+/**
+ * Who acted, from the request context, or for a job from the worker's job
+ * context: never from a request body, URL or job payload a handler chose.
+ */
 export type AuditActor =
   | { readonly kind: 'user'; readonly membershipId: string; readonly requestId: string }
-  | { readonly kind: 'system' | 'operator'; readonly requestId: string };
+  | { readonly kind: 'system' | 'operator'; readonly requestId: string }
+  | JobActor;
+
+/**
+ * A job (ADR 0009): recorded as the system, with the pg-boss job id and the
+ * membership whose request caused it, or null for a scheduled job. The
+ * event gets a request id of its own, never the job id.
+ */
+export interface JobActor {
+  readonly kind: 'job';
+  readonly jobId: string;
+  readonly originMembershipId: string | null;
+}
 
 export interface AuditEvent {
   readonly action: AuditAction;
@@ -57,10 +74,21 @@ export async function recordAudit<DB>(
   if (event.subjectPartyId === undefined && subjectBearing.has(event.action)) {
     throw new Error('The audit event has no subject.');
   }
+  const by =
+    actor.kind === 'job'
+      ? {
+          requestId: randomUUID(),
+          actorKind: 'system' as const,
+          actorId: null,
+          job: { jobId: actor.jobId, originMembershipId: actor.originMembershipId },
+        }
+      : {
+          requestId: actor.requestId,
+          actorKind: actor.kind,
+          actorId: actor.kind === 'user' ? actor.membershipId : null,
+        };
   await insertAuditEvent(trx, {
-    requestId: actor.requestId,
-    actorKind: actor.kind,
-    actorId: actor.kind === 'user' ? actor.membershipId : null,
+    ...by,
     action: event.action,
     entityType: auditEntityType(event.action),
     entityId: event.entityId,
