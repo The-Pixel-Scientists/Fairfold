@@ -21,6 +21,9 @@ export const auth: SchemaCatalogue = {
         rights: [
           'USAGE on schema auth',
           ...['id', 'status'].map((column) => `SELECT on column auth.user.${column}`),
+          ...['user_id', 'password_breached_at'].map(
+            (column) => `SELECT on column auth.account.${column}`,
+          ),
           ...[
             'token_hash',
             'user_id',
@@ -35,6 +38,7 @@ export const auth: SchemaCatalogue = {
           ].map((column) => `SELECT on column auth.session.${column}`),
         ],
         policies: [
+          'auth.account policy session_context_select',
           'auth.session policy session_context_select',
           'auth.user policy session_context_select',
         ],

@@ -98,6 +98,10 @@ export const auth: ClassificationRegistry = {
     tenant_id: accountInternal,
     sso_provider_id: accountInternal,
     sso_issuer: accountInternal,
+    // Account security state: kept with the account, and cleared when a
+    // password passes the breach check or is changed (migration 0034).
+    breach_check_pending_since: accountPersonal,
+    password_breached_at: accountPersonal,
   },
   'auth.verification': {
     id: verification,
