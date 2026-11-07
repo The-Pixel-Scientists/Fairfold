@@ -305,6 +305,78 @@ describe('checkRoute for idempotency (ADR 0028)', () => {
   });
 });
 
+describe('checkRoute for SSO completions (ADR 0010)', () => {
+  const callback = {
+    ...signOut,
+    method: 'GET',
+    path: '/auth/tenants/:slug/sso/oidc/callback',
+    summary: 'Finish an SSO sign-in',
+    session: 'none',
+    params: z.strictObject({ slug: slugSchema }),
+    query: z.strictObject({ state: z.string() }),
+    ssoCompletion: 'oidc_callback',
+    responses: { 303: null },
+  } satisfies RouteContract;
+  const acs = {
+    ...callback,
+    method: 'POST',
+    path: '/auth/tenants/:slug/sso/saml/acs',
+    query: undefined,
+    body: z.strictObject({ SAMLResponse: z.string(), RelayState: z.string() }),
+    ssoCompletion: 'saml_acs',
+  } satisfies RouteContract;
+
+  it('passes a bare 303 from an SSO completion, and the ACS form body', () => {
+    expect(checkRoute(callback)).toEqual([]);
+    expect(checkRoute({ ...callback, ssoCompletion: 'saml_completion' })).toEqual([]);
+    expect(checkRoute(acs)).toEqual([]);
+  });
+
+  it('refuses a redirect from any other route', () => {
+    for (const route of [
+      { ...signOut, responses: { 303: null } },
+      { ...stylesheet, responses: { 303: null } },
+      { ...valid, responses: { 303: null } },
+    ] as RouteContract[]) {
+      expect(checkRoute(route), route.path).toContain(
+        'Response 303 is not a success; errors are always problem details.',
+      );
+    }
+  });
+
+  it('refuses the marker off auth routes, with a session, or with any other answer', () => {
+    const bad: [RouteContract, string][] = [
+      [{ ...valid, ssoCompletion: 'oidc_callback' } as never, 'Only an auth route'],
+      [{ ...callback, ssoCompletion: 'saml_logout' } as never, 'Only an auth route'],
+      [{ ...callback, session: 'any' }, 'needs no session'],
+      [{ ...callback, responses: { 303: z.object({}) } }, 'answers 303'],
+      [{ ...callback, responses: { 302: null } }, 'answers 303'],
+      [{ ...callback, responses: { 303: null, 200: z.object({}) } }, 'answers 303'],
+      [{ ...callback, method: 'POST' }, 'is a GET'],
+      [{ ...acs, method: 'GET', body: undefined }, 'is a POST'],
+    ];
+    for (const [route, problem] of bad) {
+      expect(checkRoute(route).join(' '), problem).toContain(problem);
+    }
+  });
+
+  it('gives only the ACS a form body, of SAMLResponse and RelayState as required text', () => {
+    const form = 'The SAML ACS body is a form of SAMLResponse and RelayState, both text.';
+    for (const body of [
+      undefined,
+      z.strictObject({ SAMLResponse: z.string() }),
+      z.strictObject({ SAMLResponse: z.string(), RelayState: z.string().optional() }),
+      z.strictObject({ SAMLResponse: z.string(), RelayState: z.string(), next: z.string() }),
+      z.strictObject({ SAMLResponse: z.string(), RelayState: z.number() }),
+    ]) {
+      expect(checkRoute({ ...acs, body })).toContain(form);
+    }
+    expect(checkRoute({ ...callback, method: 'POST', body: acs.body })).toContain(
+      'The oidc_callback route is a GET.',
+    );
+  });
+});
+
 describe('idempotencyKeySchema', () => {
   it('takes a version 4 or 7 uuid in either case, as lower case', () => {
     const v4 = '0b7c4a1e-5d2f-4c8e-9a3b-6f1d2e4c8a90';

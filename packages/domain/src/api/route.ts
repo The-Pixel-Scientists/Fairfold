@@ -16,7 +16,7 @@ import { fileTypes } from '../files/types.ts';
 import type { Permission, ScopeRule } from '../platform/access.ts';
 import { moduleIds, type ModuleId } from '../platform/modules.ts';
 import { accessProblems, type AuthSession } from './access-rules.ts';
-import { keysOf, schemaNodes, toJsonSchema } from './json-schema.ts';
+import { isObject, keysOf, list, schemaNodes, toJsonSchema } from './json-schema.ts';
 import {
   exportContentTypes,
   isRawBody,
@@ -104,6 +104,16 @@ interface AuthRoute extends RouteBase {
   readonly permission: null;
   readonly scope: null;
   readonly session: AuthSession;
+  /** Needs re-authentication in the last 5 minutes (ADR 0010); only with a complete session. */
+  readonly stepUp?: boolean;
+  /**
+   * One of the ends of an SSO sign-in (ADR 0010), the only routes that
+   * answer a redirect: `303` with no body, to a `Location` the server sets,
+   * never from a request value. `saml_acs` is the SAML ACS POST, which takes
+   * a form body of `SAMLResponse` and `RelayState` and is the one route
+   * exempt from the Origin check.
+   */
+  readonly ssoCompletion?: SsoCompletion;
 }
 
 interface PublicRoute extends RouteBase {
@@ -113,6 +123,13 @@ interface PublicRoute extends RouteBase {
 }
 
 export type RouteContract = MemberRoute | AuthRoute | PublicRoute;
+
+export const ssoCompletions = ['oidc_callback', 'saml_acs', 'saml_completion'] as const;
+
+export type SsoCompletion = (typeof ssoCompletions)[number];
+
+/** The SAML ACS form fields, sorted: the IdP's response and our own opaque value. */
+const SAML_FORM = 'RelayState,SAMLResponse';
 
 /** A route whose body is JSON or none, and whose every response is JSON or empty: the only kind call() takes. */
 export type JsonRouteContract = RouteContract & {
@@ -148,7 +165,7 @@ export function checkRoute(route: RouteContract): string[] {
   if ((route.method === 'GET' || route.method === 'DELETE') && route.body !== undefined) {
     problems.push(`A ${route.method} route takes no body.`);
   }
-  problems.push(...accessProblems(route), ...markerProblems(route));
+  problems.push(...accessProblems(route), ...markerProblems(route), ...redirectProblems(route));
 
   const pathParams = rest.filter((segment) => segment.startsWith(':')).map((s) => s.slice(1));
   problems.push(...paramProblems(pathParams, route.params));
@@ -171,6 +188,8 @@ export function checkRoute(route: RouteContract): string[] {
   const responses = Object.entries(route.responses);
   if (responses.length === 0) problems.push('The route needs at least one success response.');
   for (const [status, body] of responses) {
+    // A redirect is checked by redirectProblems(); anywhere else it is refused below.
+    if (status === '303' && Object.hasOwn(route, 'ssoCompletion')) continue;
     if (!isRawBody(body)) {
       problems.push(...responseProblems(status, body));
       continue;
@@ -195,6 +214,45 @@ function markerProblems(route: RouteContract): string[] {
   if (route.method !== 'POST') problems.push('Only a POST route is idempotent.');
   if (route.audience === 'auth') problems.push('An auth route is never idempotent.');
   return problems;
+}
+
+/** An SSO completion answers a bare 303 and nothing else, with no session, and only the ACS takes a body. */
+function redirectProblems(route: RouteContract): string[] {
+  if (!Object.hasOwn(route, 'ssoCompletion')) return [];
+  const { audience, ssoCompletion, session } = route as {
+    audience: unknown;
+    ssoCompletion: unknown;
+    session?: unknown;
+  };
+  const problems: string[] = [];
+  if (audience !== 'auth' || !ssoCompletions.some((value) => value === ssoCompletion)) {
+    problems.push(`Only an auth route is an SSO completion: ${ssoCompletions.join(', ')}.`);
+  }
+  if (session !== 'none') problems.push('An SSO completion needs no session.');
+  if (Object.keys(route.responses).join() !== '303' || route.responses[303] !== null) {
+    problems.push('An SSO completion answers 303 with no body, and nothing else.');
+  }
+  const acs = ssoCompletion === 'saml_acs';
+  if (route.method !== (acs ? 'POST' : 'GET')) {
+    problems.push(`The ${String(ssoCompletion)} route is a ${acs ? 'POST' : 'GET'}.`);
+  }
+  if (acs && formFields(route.body) !== SAML_FORM) {
+    problems.push('The SAML ACS body is a form of SAMLResponse and RelayState, both text.');
+  }
+  return problems;
+}
+
+/** A body's fields, sorted, when every one is required text; otherwise null. */
+function formFields(body: RouteContract['body']): string | null {
+  const root = body === undefined || isRawBody(body) ? undefined : toJsonSchema(body, 'input');
+  const properties = root?.['properties'];
+  if (root === undefined || !isObject(properties)) return null;
+  const names = Object.keys(properties).sort();
+  const text = Object.values(properties).every(
+    (node) => isObject(node) && node['type'] === 'string',
+  );
+  const required = list(root['required']);
+  return text && names.every((name) => required.includes(name)) ? names.join() : null;
 }
 
 /** The idempotency key travels in its header, never in a request schema, in any spelling. */
