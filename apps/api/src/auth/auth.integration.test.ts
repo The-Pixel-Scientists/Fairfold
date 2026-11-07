@@ -9,7 +9,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { createDatabase, type Kysely, type TenantId } from '@pixel-scientists/db';
-import { permissionsFor, type Permission } from '@pixel-scientists/domain/platform';
+import { moduleOn, permissionsFor, type Permission } from '@pixel-scientists/domain/platform';
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -152,6 +152,14 @@ describe('reading a session', { timeout: 30_000 }, () => {
   let member: Member;
   beforeAll(async () => {
     member = await addMember(await createTestTenant());
+    await asMigratorIn(member.tenant.id, (client) =>
+      insertRow(client, 'app.tenant_module', {
+        tenant_id: member.tenant.id,
+        module: 'grants',
+        enabled: true,
+        updated_by: member.membershipId,
+      }),
+    );
   });
 
   it("maps a live console session, with the membership's roles and permissions", async () => {
@@ -175,13 +183,17 @@ describe('reading a session', { timeout: 30_000 }, () => {
     expect(body['recentAuthUntil']).not.toBeNull();
   });
 
-  it("gives an administrator of a tenant with no module rows grants' and the platform's permissions only", async () => {
+  it('gives an administrator of a tenant with no module rows only what moduleOn() leaves on', async () => {
     const all = permissionsFor(['tenant_admin'], 'console');
     expect(all.filter((permission) => WAVE_1.test(permission))).not.toEqual([]);
-    const permissions = (await readSession(await addSession(member))).json<{
+    const bare = await addMember(await createTestTenant());
+    const permissions = (await readSession(await addSession(bare))).json<{
       permissions: string[];
     }>().permissions;
-    expect(permissions.some((permission) => permission.startsWith('grants.'))).toBe(true);
+    // ADR 0024: no row means off, so grants too once moduleOn() drops its exception.
+    expect(permissions.some((permission) => permission.startsWith('grants.'))).toBe(
+      moduleOn('grants', undefined),
+    );
     expect(permissions.some((permission) => permission.startsWith('platform.'))).toBe(true);
     expect(permissions.filter((permission) => WAVE_1.test(permission))).toEqual([]);
   });
