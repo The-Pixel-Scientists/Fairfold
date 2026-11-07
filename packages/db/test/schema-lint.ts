@@ -28,7 +28,8 @@
 //   tables.
 //
 // In every schema but PostgreSQL's own, there is no user-defined operator,
-// which could stand in for a built-in one, and no rewrite rule on a table,
+// which could stand in for a built-in one (pg_trgm's in EXTENSION_SCHEMA
+// aside, which privilege-lint.ts checks), and no rewrite rule on a table,
 // since rules run with the table owner's rights. app.current_tenant_id(),
 // which every tenant policy calls, is exactly CURRENT_TENANT_ID_DEFINITION.
 //
@@ -42,7 +43,12 @@ import type pg from 'pg';
 
 import type { ClassificationRegistry, FieldClassification } from '../classification.ts';
 import { APP_ROLES } from './connect.ts';
-import { DEFINER_FUNCTIONS, findPrivilegeProblems, NON_SYSTEM_SCHEMA } from './privilege-lint.ts';
+import {
+  DEFINER_FUNCTIONS,
+  EXTENSION_SCHEMA,
+  findPrivilegeProblems,
+  NON_SYSTEM_SCHEMA,
+} from './privilege-lint.ts';
 
 /** Tables in an application schema without tenant_id, each with its reason. */
 export const NON_TENANT_TABLES: ReadonlyMap<string, string> = new Map(
@@ -305,8 +311,9 @@ export async function findSchemaProblems(
     `SELECT o.oid::pg_catalog.regoperator::text AS operator
        FROM pg_catalog.pg_operator o
        JOIN pg_catalog.pg_namespace n ON n.oid = o.oprnamespace
-      WHERE ${NON_SYSTEM_SCHEMA}
+      WHERE ${NON_SYSTEM_SCHEMA} AND n.nspname <> $1
       ORDER BY 1`,
+    [EXTENSION_SCHEMA],
   );
   for (const { operator } of operators.rows) {
     problems.push(

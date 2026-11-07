@@ -2,15 +2,16 @@
 //
 // The rights checks that ADR 0003 rule 4 and its role table add to the
 // schema lint: grant options, rights outside a role's own schema, default
-// privileges, schema grants to PUBLIC, rights on the audit tables, and the
-// approved definer functions and their owners. The schema-lint test covers
+// privileges, schema grants to PUBLIC, rights on the audit tables, the
+// approved definer functions and their owners, and pg_trgm's schema. The schema-lint test covers
 // the rest, and runs these against the migrated database.
 
 import { describe, expect, it } from 'vitest';
 
+import { classification } from '../classification.ts';
 import { asMigratorRolledBack } from './connect.ts';
 import { findPrivilegeProblems } from './privilege-lint.ts';
-import { EXCEPTED_SCHEMAS } from './schema-lint.ts';
+import { EXCEPTED_SCHEMAS, findSchemaProblems } from './schema-lint.ts';
 
 describe('privilege lint', () => {
   it('reports grant options, rights outside own schemas, default privileges and PUBLIC schema grants', async () => {
@@ -58,6 +59,7 @@ describe('privilege lint', () => {
         'Role app_api holds UPDATE on the audit table app.audit_event.',
         'Role app_api can insert app.audit_event.occurred_at, which the database sets.',
         'Role app_api can insert app.audit_event.retain_until, which the database sets.',
+        'Role app_api can insert app.audit_event.actor_member_kind, which the database sets.',
         'Role app_worker holds DELETE on the audit table app.audit_event.',
         'Role app_worker can insert app.audit_event.occurred_at, which the database sets.',
       ].sort(),
@@ -92,5 +94,44 @@ describe('privilege lint', () => {
         `${owner} is named in auth.account policy lint_extra, which is not approved.`,
       ].sort(),
     );
+  });
+
+  describe('the pg_trgm schema (ADR 0025)', () => {
+    const install = `
+      CREATE SCHEMA ext;
+      CREATE EXTENSION pg_trgm WITH SCHEMA ext;
+      GRANT USAGE ON SCHEMA ext TO app_api, app_worker;
+    `;
+
+    it('accepts pg_trgm in schema ext, its operators and EXECUTE left to PUBLIC included, used by migrator, app_api and app_worker', async () => {
+      const problems = await asMigratorRolledBack(async (client) => {
+        await client.query(install);
+        return findSchemaProblems(client, classification);
+      });
+      expect(problems).toEqual([]);
+    });
+
+    it('reports anything else in it, and any other use of it', async () => {
+      const problems = await asMigratorRolledBack(async (client) => {
+        await client.query(`${install}
+          GRANT USAGE ON SCHEMA ext TO app_auth;
+          GRANT CREATE ON SCHEMA ext TO app_worker;
+          CREATE FUNCTION ext.lint_extra() RETURNS integer LANGUAGE sql RETURN 1;
+          REVOKE EXECUTE ON FUNCTION ext.lint_extra() FROM PUBLIC;
+        `);
+        return findPrivilegeProblems(client, [...EXCEPTED_SCHEMAS.keys()]);
+      });
+      expect(problems.sort()).toEqual(
+        [
+          'function ext.lint_extra() is in schema ext but not part of pg_trgm.',
+          'app_api cannot execute ext.lint_extra().',
+          'app_worker cannot execute ext.lint_extra().',
+          'USAGE on schema ext is held by app_api, app_auth, app_worker, migrator, not app_api, app_worker, migrator.',
+          'app_worker holds CREATE on schema ext, which only its owner may.',
+          'Role app_worker can create objects in schema ext.',
+          'Role app_auth holds USAGE on schema ext, outside its own schema auth.',
+        ].sort(),
+      );
+    });
   });
 });

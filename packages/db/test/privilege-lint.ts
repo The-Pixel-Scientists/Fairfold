@@ -8,7 +8,7 @@
 //   beyond PUBLIC_RIGHTS, and no app role holds TRUNCATE, REFERENCES or
 //   TRIGGER.
 // - No function is executable by PUBLIC, and the app roles can execute
-//   exactly the functions in EXECUTABLE_BY.
+//   exactly the functions in EXECUTABLE_BY, except in EXTENSION_SCHEMA.
 // - A function is SECURITY DEFINER only if DEFINER_FUNCTIONS approves it.
 //   Each approved one pins search_path to pg_catalog, pg_temp and belongs
 //   to its owner role, which owns nothing else and holds exactly the rights
@@ -29,7 +29,9 @@
 //   owner, so nothing a migration creates starts with a grant.
 // - There is no publication: logical replication ignores row-level security.
 // - On each of AUDIT_TABLES, app roles hold no right but INSERT and SELECT,
-//   and cannot insert occurred_at or retain_until (ADR 0003, "Checks").
+//   and cannot insert a column the database sets (ADR 0003, "Checks").
+// - EXTENSION_SCHEMA, if present, holds only pg_trgm's objects, and only
+//   its owner, migrator, app_api and app_worker may use it (ADR 0025).
 //
 // It reads only catalogues that PUBLIC can read, so any role can run it.
 
@@ -174,6 +176,16 @@ export const DEFINER_FUNCTIONS: ReadonlyMap<string, DefinerFunction> = new Map([
   ],
 ]);
 
+/**
+ * The one named exception (ADR 0025): pg_trgm's schema, made by the database
+ * privileges script. Schema USAGE is its access control, since a managed
+ * database may leave EXECUTE on its functions with PUBLIC, so PUBLIC may
+ * execute them and app_api and app_worker must be able to.
+ */
+export const EXTENSION_SCHEMA = 'ext';
+const EXTENSION = 'pg_trgm';
+const EXTENSION_USERS = ['app_api', 'app_worker'];
+
 /** The pinned search_path of every approved definer function, as pg_proc stores it. */
 const DEFINER_CONFIG = 'search_path=pg_catalog, pg_temp';
 
@@ -229,6 +241,7 @@ const DEFAULT_ACL_OBJECTS: Readonly<Record<string, string>> = {
 };
 
 interface FunctionRow {
+  schema: string;
   signature: string;
   definer: boolean;
   owner: string;
@@ -249,6 +262,7 @@ export async function findPrivilegeProblems(
   problems.push(...(await functionProblems(client)));
   problems.push(...(await definerOwnerProblems(client)));
   problems.push(...(await auditTableProblems(client)));
+  problems.push(...(await extensionSchemaProblems(client)));
 
   const publications = await client.query<{ name: string }>(
     'SELECT pubname AS name FROM pg_catalog.pg_publication ORDER BY 1',
@@ -574,7 +588,8 @@ async function auditTableProblems(client: pg.ClientBase): Promise<string[]> {
        FROM t
        JOIN pg_catalog.pg_attribute a ON a.attrelid = t.oid
       CROSS JOIN pg_catalog.unnest($2::text[]) AS r(name)
-      WHERE a.attname IN ('occurred_at', 'retain_until') AND NOT a.attisdropped
+      WHERE a.attname IN ('occurred_at', 'retain_until', 'actor_member_kind')
+        AND NOT a.attisdropped
         AND pg_catalog.has_column_privilege(r.name, a.attrelid, a.attnum, 'INSERT')`,
     [AUDIT_TABLES, APP_ROLES],
   );
@@ -584,7 +599,7 @@ async function auditTableProblems(client: pg.ClientBase): Promise<string[]> {
 /** Functions in every schema but PostgreSQL's own, excepted ones included. */
 async function functionProblems(client: pg.ClientBase): Promise<string[]> {
   const functions = await client.query<FunctionRow>(
-    `SELECT n.nspname || '.' || p.proname
+    `SELECT n.nspname AS schema, n.nspname || '.' || p.proname
               || '(' || pg_catalog.oidvectortypes(p.proargtypes) || ')' AS signature,
             p.prosecdef AS definer, p.proowner::pg_catalog.regrole::text AS owner,
             COALESCE(p.proconfig, '{}') AS config,
@@ -619,6 +634,12 @@ async function functionProblems(client: pg.ClientBase): Promise<string[]> {
     if (approved && row.config.join('; ') !== DEFINER_CONFIG) {
       problems.push(`${signature} does not set only ${DEFINER_CONFIG}.`);
     }
+    if (row.schema === EXTENSION_SCHEMA) {
+      for (const role of EXTENSION_USERS.filter((name) => !row.executable_by.includes(name))) {
+        problems.push(`${role} cannot execute ${signature}.`);
+      }
+      continue;
+    }
     if (row.public_execute) problems.push(`PUBLIC can execute ${signature}.`);
     const actual = [...row.executable_by].sort().join(', ') || 'no app role';
     const expected = [...(EXECUTABLE_BY.get(signature) ?? [])].sort().join(', ') || 'no app role';
@@ -635,6 +656,75 @@ async function functionProblems(client: pg.ClientBase): Promise<string[]> {
         problems.push(`${signature} is listed in ${list} but does not exist.`);
       }
     }
+  }
+  return problems;
+}
+
+/**
+ * EXTENSION_SCHEMA: every object in it belongs to EXTENSION (an implicit
+ * array type through its element type), USAGE is held by exactly its owner,
+ * migrator and EXTENSION_USERS, and CREATE by its owner alone.
+ */
+async function extensionSchemaProblems(client: pg.ClientBase): Promise<string[]> {
+  const rights = await client.query<{ owner: string; grantee: string; privilege: string }>(
+    `SELECT n.nspowner::regrole::text AS owner,
+            CASE WHEN a.grantee = 0 THEN 'PUBLIC' ELSE a.grantee::regrole::text END AS grantee,
+            a.privilege_type AS privilege
+       FROM pg_catalog.pg_namespace n
+      CROSS JOIN LATERAL pg_catalog.aclexplode(
+        COALESCE(n.nspacl, pg_catalog.acldefault('n', n.nspowner))) a
+      WHERE n.nspname = $1`,
+    [EXTENSION_SCHEMA],
+  );
+  // No row: no schema, or one that no role, its owner included, may use.
+  if (rights.rows.length === 0) return [];
+  const objects = await client.query<{ object: string }>(
+    `WITH n AS (SELECT oid FROM pg_catalog.pg_namespace WHERE nspname = $1),
+     o AS (
+       SELECT 'pg_catalog.pg_proc'::pg_catalog.regclass AS classid, oid AS objid
+         FROM pg_catalog.pg_proc WHERE pronamespace IN (SELECT oid FROM n)
+       UNION ALL SELECT 'pg_catalog.pg_operator'::pg_catalog.regclass, oid
+         FROM pg_catalog.pg_operator WHERE oprnamespace IN (SELECT oid FROM n)
+       UNION ALL SELECT 'pg_catalog.pg_opclass'::pg_catalog.regclass, oid
+         FROM pg_catalog.pg_opclass WHERE opcnamespace IN (SELECT oid FROM n)
+       UNION ALL SELECT 'pg_catalog.pg_opfamily'::pg_catalog.regclass, oid
+         FROM pg_catalog.pg_opfamily WHERE opfnamespace IN (SELECT oid FROM n)
+       UNION ALL SELECT 'pg_catalog.pg_class'::pg_catalog.regclass, oid
+         FROM pg_catalog.pg_class WHERE relnamespace IN (SELECT oid FROM n)
+       UNION ALL SELECT 'pg_catalog.pg_type'::pg_catalog.regclass, t.oid
+         FROM pg_catalog.pg_type t
+        WHERE t.typnamespace IN (SELECT oid FROM n)
+          AND NOT EXISTS (SELECT FROM pg_catalog.pg_type e
+                           WHERE e.typarray = t.oid AND e.typnamespace = t.typnamespace)
+     )
+     SELECT pg_catalog.pg_describe_object(o.classid, o.objid, 0) AS object
+       FROM o
+      WHERE NOT EXISTS (
+        SELECT FROM pg_catalog.pg_depend d
+          JOIN pg_catalog.pg_extension x ON x.oid = d.refobjid
+         WHERE d.classid = o.classid AND d.objid = o.objid AND d.deptype = 'e'
+           AND d.refclassid = 'pg_catalog.pg_extension'::pg_catalog.regclass
+           AND x.extname = $2)
+      ORDER BY 1`,
+    [EXTENSION_SCHEMA, EXTENSION],
+  );
+  const problems = objects.rows.map(
+    ({ object }) => `${object} is in schema ${EXTENSION_SCHEMA} but not part of ${EXTENSION}.`,
+  );
+
+  const holders = (privilege: string) => [
+    ...new Set(rights.rows.filter((row) => row.privilege === privilege).map((row) => row.grantee)),
+  ];
+  const owner = rights.rows[0]?.owner;
+  const usage = holders('USAGE').sort().join(', ');
+  const expected = [...new Set([owner, 'migrator', ...EXTENSION_USERS])].sort().join(', ');
+  if (usage !== expected) {
+    problems.push(`USAGE on schema ${EXTENSION_SCHEMA} is held by ${usage}, not ${expected}.`);
+  }
+  for (const grantee of holders('CREATE').filter((name) => name !== owner)) {
+    problems.push(
+      `${grantee} holds CREATE on schema ${EXTENSION_SCHEMA}, which only its owner may.`,
+    );
   }
   return problems;
 }
