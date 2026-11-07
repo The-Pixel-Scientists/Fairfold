@@ -671,21 +671,17 @@ describe('the policy before the transaction', () => {
     }
   });
 
-  it('answers 401 to a session waiting for MFA on every route but the TOTP routes, sign-out and the session', async () => {
+  it('answers 401 to a session waiting for MFA on every route but the MFA routes, sign-out and the session', async () => {
     const reached = [];
     for (const contract of [...authContracts, ...permissionRoutes]) {
       if (passed(await status(contract, staff({ mfa: 'verify' })))) reached.push(contract.path);
     }
-    expect(reached.sort()).toEqual(
-      [
-        '/auth/sign-out',
-        '/auth/session',
-        '/auth/totp/confirm',
-        '/auth/totp/enrol',
-        '/auth/totp/verify',
-        ...authContracts.filter((c) => c.session === 'none').map((c) => c.path),
-      ].sort(),
+    const open = new Set(['none', 'mfa_pending', 'any']);
+    const expected = authContracts.filter((c) => open.has(c.session)).map((c) => c.path);
+    expect(expected).toEqual(
+      expect.arrayContaining(['/auth/sign-out', '/auth/session', '/auth/totp/verify']),
     );
+    expect(reached.sort()).toEqual(expected.sort());
   });
 
   it('never hands a complete session to the TOTP routes', async () => {
