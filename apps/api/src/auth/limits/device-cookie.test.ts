@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { createHmac, randomUUID } from 'node:crypto';
+import { createHmac, randomBytes, randomUUID } from 'node:crypto';
 
 import { describe, expect, it } from 'vitest';
 
@@ -14,7 +14,7 @@ import {
   type DeviceCookie,
 } from './device-cookie.ts';
 
-const SECRET = 'a synthetic auth secret of at least 32 bytes';
+const SECRET = randomBytes(32).toString('base64url');
 const keys = deviceKeys(new Secret(SECRET));
 const now = Date.now();
 const fresh = (): DeviceCookie => ({
