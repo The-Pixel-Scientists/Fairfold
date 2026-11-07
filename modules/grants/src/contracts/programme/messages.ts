@@ -26,6 +26,7 @@ export const programmeMessages = {
   listedOnce: 'List each one only once.',
   scale: 'Enter a lowest score that is less than the highest score.',
   mergeFields: 'Use only the merge fields listed for this email, written like {{given_name}}.',
+  serviceEmailOnly: 'Choose service email. Decision and reminder emails are never marketing.',
 } as const;
 
 export type ProgrammeMessage = (typeof programmeMessages)[keyof typeof programmeMessages];

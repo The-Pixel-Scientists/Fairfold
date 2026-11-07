@@ -6,9 +6,12 @@
 // details, the programme's and the round's, the portal link, and the award
 // amount in the accepted email only. A template naming any other field, or
 // with a `{{` or `}}` that is not part of one, is refused when it is saved.
+// Each template also has a purpose (ADR 0033), and every email grants sends
+// is a service email: it sends no marketing.
 
 import { z } from 'zod';
 
+import type { ReminderKind } from '../reminders/lists.ts';
 import type { Outcome } from './lists.ts';
 import { programmeMessages, says } from './messages.ts';
 import { line, paragraphs } from './text.ts';
@@ -50,6 +53,36 @@ export function mergeFieldsIn(text: string): string[] | null {
   return Array.from(text.matchAll(MERGE_FIELD), (match) => match[1] ?? '');
 }
 
+/**
+ * What a template is for, with the words the console shows. A service email
+ * goes to anyone it concerns who is not suppressed; marketing needs their
+ * consent. The purpose is part of the template's version, so changing it
+ * is recorded like any other change (rule 10).
+ */
+export const templatePurposes = {
+  transactional: 'Service email',
+  marketing: 'Marketing email',
+} as const;
+
+export type TemplatePurpose = keyof typeof templatePurposes;
+
+export const templatePurposeSchema = z.enum(
+  Object.keys(templatePurposes) as [TemplatePurpose, ...TemplatePurpose[]],
+);
+
+/** The purposes each email grants sends may have: its outcome emails and its reminders. */
+export const allowedPurposes = {
+  accepted: ['transactional'],
+  waitlisted: ['transactional'],
+  declined: ['transactional'],
+  draft_closing: ['transactional'],
+  review_overdue: ['transactional'],
+} as const satisfies Record<Outcome | ReminderKind, readonly TemplatePurpose[]>;
+
+export function purposeAllowed(email: Outcome | ReminderKind, purpose: TemplatePurpose): boolean {
+  return (allowedPurposes[email] as readonly TemplatePurpose[]).includes(purpose);
+}
+
 function usesOnlyFieldsFor(outcome: Outcome) {
   const allowed: ReadonlySet<string> = new Set(mergeFieldsFor[outcome]);
   return (text: string) => mergeFieldsIn(text)?.every((name) => allowed.has(name)) ?? false;
@@ -65,10 +98,20 @@ function emailTemplateInput(outcome: Outcome) {
     body: paragraphs(5000)
       .refine((value) => value !== '', { ...says(programmeMessages.body), abort: true })
       .refine(allowed, says(programmeMessages.mergeFields)),
+    purpose: templatePurposeSchema
+      .refine(
+        (purpose) => purposeAllowed(outcome, purpose),
+        says(programmeMessages.serviceEmailOnly),
+      )
+      .optional(),
   });
 }
 
-/** All three templates, saved together. Each one that changed becomes a new version. */
+/**
+ * All three templates, saved together. Each one that changed becomes a new
+ * version. A template sent without a purpose is a service email, which the
+ * server writes to the version, since the column has no default (ADR 0033).
+ */
 export const emailTemplatesInputSchema = z.strictObject({
   accepted: emailTemplateInput('accepted'),
   waitlisted: emailTemplateInput('waitlisted'),
