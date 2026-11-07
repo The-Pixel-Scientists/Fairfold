@@ -143,6 +143,16 @@ configs:
             "actions": ["Read:tps-*/quarantine/*", "Write:tps-*/quarantine/*", "Write:tps-*/clean/*"]
           },
           {
+            "name": "dev-rescan",
+            "credentials": [{ "accessKey": "dev-rescan", "secretKey": "dev-rescan-secret-key-not-a-secret" }],
+            "actions": ["Read:tps-*/clean/*", "Read:tps-*/withheld/*", "Write:tps-*/withheld/*"]
+          },
+          {
+            "name": "dev-removal",
+            "credentials": [{ "accessKey": "dev-removal", "secretKey": "dev-removal-secret-key-not-a-secret" }],
+            "actions": ["List:tps-*/clean/*", "Delete:tps-*/clean/*", "List:tps-*/withheld/*", "Delete:tps-*/withheld/*"]
+          },
+          {
             "name": "dev-downloads",
             "credentials": [{ "accessKey": "dev-downloads", "secretKey": "dev-downloads-secret-key-not-a-secret" }],
             "actions": ["Read:tps-*/clean/*"]

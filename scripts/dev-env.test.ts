@@ -43,7 +43,14 @@ const config: ComposeConfig = {
   configs: {
     'seaweedfs-s3': {
       content: JSON.stringify({
-        identities: ['dev-admin', 'dev-uploads', 'dev-scanner', 'dev-downloads'].map((name) => ({
+        identities: [
+          'dev-admin',
+          'dev-uploads',
+          'dev-scanner',
+          'dev-rescan',
+          'dev-removal',
+          'dev-downloads',
+        ].map((name) => ({
           name,
           credentials: [{ accessKey: name, secretKey: `${name}-secret-for-tests` }],
           actions: [],
@@ -60,6 +67,8 @@ const files = {
   TPS_STORAGE_WRITE_SECRET_ACCESS_KEY: 'dev-scanner-secret-for-tests',
   TPS_STORAGE_READ_ACCESS_KEY_ID: 'dev-downloads',
   TPS_STORAGE_READ_SECRET_ACCESS_KEY: 'dev-downloads-secret-for-tests',
+  TPS_STORAGE_SCANNER_ACCESS_KEY_ID: 'dev-rescan',
+  TPS_STORAGE_SCANNER_SECRET_ACCESS_KEY: 'dev-rescan-secret-for-tests',
   TPS_CLAMD_HOST: '127.0.0.1',
   TPS_CLAMD_PORT: '53310',
   TPS_CLAMD_TIMEOUT_MS: '25000',
