@@ -40,3 +40,5 @@ platform.auth.password_reset_requested: Password reset requested
 platform.auth.password_reset_completed: Password reset completed
 platform.auth.sessions_revoked: Sessions revoked
 platform.auth.invitation_accepted: Invitation accepted
+platform.auth.mfa_removed: MFA removed
+platform.auth.password_changed: Password changed

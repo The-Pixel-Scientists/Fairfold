@@ -101,6 +101,11 @@ describe('migrations', { timeout: 30_000 }, () => {
     });
     const trx = await db.startTransaction().execute();
     try {
+      // Auth events are append-only, and 0023's down refuses while any it
+      // cannot express exist (rollback-0023.test.ts), which the API's tests
+      // leave behind. The round trip starts with none, as a fresh database
+      // does; TRUNCATE, which only the owner may run, is rolled back below.
+      await sql`TRUNCATE auth.audit_copy_pending, auth.audit_event`.execute(trx);
       // After the loop, before[i] is the schema with the first i migrations applied.
       const before = [await snapshot(trx)];
       for (const { name, down } of [...migrations].reverse()) {
