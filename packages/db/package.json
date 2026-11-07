@@ -12,13 +12,13 @@
   },
   "dependencies": {
     "@pixel-scientists/domain": "workspace:*",
-    "kysely": "0.29.6",
-    "pg": "8.23.0"
+    "kysely": "0.29.7",
+    "pg": "8.23.1"
   },
   "devDependencies": {
-    "@types/node": "24.19.0",
+    "@types/node": "24.19.2",
     "@types/pg": "8.23.1",
     "kysely-codegen": "0.20.0",
-    "vitest": "5.0.1"
+    "vitest": "5.0.5"
   }
 }
