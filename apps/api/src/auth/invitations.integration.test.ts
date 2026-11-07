@@ -334,6 +334,15 @@ describe('acceptInvitation', { timeout: 60_000 }, () => {
       'platform.auth.invitation_accepted',
       'platform.membership.created',
     ]);
+    const persons = await rowsIn<{ entity_id: string; subject: string }>(
+      tenant,
+      `SELECT e.entity_id, e.subject_party_id AS subject
+             FROM app.audit_event AS e JOIN party.person AS p ON p.id = e.entity_id
+            WHERE e.action = 'party.person.created' AND e.actor_id = $1 AND p.user_id = $2`,
+      [row?.membership, person.userId],
+    );
+    expect(persons).toHaveLength(1);
+    expect(persons[0]?.subject).toBe(persons[0]?.entity_id);
     expect(
       await migrator('SELECT tenant_id FROM auth.audit_event WHERE user_id = $1 AND code = $2', [
         person.userId,

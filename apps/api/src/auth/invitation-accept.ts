@@ -120,6 +120,7 @@ export function invitationRoutes(deps: RouteDependencies): Route[] {
           await recordAudit(tx, actor, {
             action: 'party.person.created',
             entityId: person.personId,
+            subjectPartyId: person.personId,
             changes: { 'party.person.email': {}, 'party.person.user_id': {} },
           });
         }
