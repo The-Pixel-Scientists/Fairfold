@@ -10,6 +10,7 @@
 import { createHmac, hkdfSync, randomBytes, timingSafeEqual } from 'node:crypto';
 
 import type { Secret } from '../../config.ts';
+import type { AuthSecrets } from '../settings.ts';
 
 const CODE_COUNT = 10;
 /** Crockford base32 in lower case, as backupCodeSchema takes it. */
@@ -23,9 +24,12 @@ export interface BackupCodeKeys {
   readonly keys: ReadonlyMap<number, Buffer>;
 }
 
-export function backupCodeKeys(secret: Secret): BackupCodeKeys {
-  const key = Buffer.from(hkdfSync('sha256', secret.reveal(), '', 'tps-auth-backup-code', 32));
-  return { current: 1, keys: new Map([[1, key]]) };
+/** A key for each version of the auth secret, so older sets work until the version is removed. */
+export function backupCodeKeys({ current, versions }: AuthSecrets): BackupCodeKeys {
+  const derive = (secret: Secret) =>
+    Buffer.from(hkdfSync('sha256', secret.reveal(), '', 'tps-auth-backup-code', 32));
+  const keys = new Map([...versions].map(([version, secret]) => [version, derive(secret)]));
+  return { current, keys };
 }
 
 /** A set of codes as HMACs, under the key of `version`. */

@@ -21,7 +21,8 @@ vi.mock('node:crypto', async (original) => {
 });
 
 const secret = new Secret(newToken());
-const keys = backupCodeKeys(secret);
+const one = (value: Secret) => ({ current: 1, versions: new Map([[1, value]]) });
+const keys = backupCodeKeys(one(secret));
 const USER = '0b9a3c1e-2f4d-4e6a-8b7c-1d2e3f4a5b6c';
 const OTHER = '7c6b5a4f-3e2d-4c1b-9a8f-6e5d4c3b2a1f';
 
@@ -78,6 +79,20 @@ describe('a stored set', () => {
     expect(matchIndex(keys, USER, { ...set, version: 2 }, codes[0] ?? '')).toBe(-1);
   });
 
+  it('still matches under version 1 once version 2 makes new sets', () => {
+    const rotated = backupCodeKeys({
+      current: 2,
+      versions: new Map([
+        [1, secret],
+        [2, new Secret(newToken())],
+      ]),
+    });
+    expect(matchIndex(rotated, USER, set, codes[3] ?? '')).toBe(3);
+    const next = codeSet(rotated, USER, codes);
+    expect(next.version).toBe(2);
+    expect(next.hmacs).not.toEqual(set.hmacs);
+  });
+
   it('cannot be reproduced with the auth secret or another purpose key', () => {
     const [first = ''] = codes;
     const other = [
@@ -89,7 +104,7 @@ describe('a stored set', () => {
       const wrong = { current: 1, keys: new Map([[1, key ?? Buffer.alloc(32)]]) };
       expect(matchIndex(wrong, USER, set, first)).toBe(-1);
     }
-    expect(codeSet(backupCodeKeys(new Secret(newToken())), USER, codes).hmacs).not.toEqual(
+    expect(codeSet(backupCodeKeys(one(new Secret(newToken()))), USER, codes).hmacs).not.toEqual(
       set.hmacs,
     );
   });

@@ -54,7 +54,7 @@ function sendNotice(deps: RouteDependencies, requestId: string, to: string, left
 }
 
 export function backupCodeRoutes(deps: RouteDependencies): Route[] {
-  const keys = backupCodeKeys(deps.settings.secret);
+  const keys = backupCodeKeys(deps.settings.secrets);
 
   return [
     route(generateBackupCodes, async ({ context }) => {

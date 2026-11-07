@@ -11,6 +11,7 @@
 import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from 'node:crypto';
 
 import type { Secret } from '../../config.ts';
+import type { AuthSecrets } from '../settings.ts';
 
 const NONCE_BYTES = 12;
 const TAG_BYTES = 16;
@@ -21,9 +22,12 @@ export interface SsoSecretKeys {
   readonly keys: ReadonlyMap<number, Buffer>;
 }
 
-export function ssoSecretKeys(secret: Secret): SsoSecretKeys {
-  const key = Buffer.from(hkdfSync('sha256', secret.reveal(), '', 'tps-auth-sso-secret', 32));
-  return { current: 1, keys: new Map([[1, key]]) };
+/** A key for each version of the auth secret. */
+export function ssoSecretKeys({ current, versions }: AuthSecrets): SsoSecretKeys {
+  const derive = (secret: Secret) =>
+    Buffer.from(hkdfSync('sha256', secret.reveal(), '', 'tps-auth-sso-secret', 32));
+  const keys = new Map([...versions].map(([version, secret]) => [version, derive(secret)]));
+  return { current, keys };
 }
 
 /** Where a sealed value lives, which it is bound to. */

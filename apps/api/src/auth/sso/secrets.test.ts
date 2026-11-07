@@ -7,7 +7,10 @@ import { describe, expect, it } from 'vitest';
 import { Secret } from '../../config.ts';
 import { openSecret, sealSecret, ssoSecretKeys, type SecretPlace } from './secrets.ts';
 
-const keys = ssoSecretKeys(new Secret('a test secret of at least thirty-two bytes'));
+const ONE = new Secret('a test secret of at least thirty-two bytes');
+const TWO = new Secret('another test secret of at least thirty-two bytes');
+const only = (secret: Secret) => ({ current: 1, versions: new Map([[1, secret]]) });
+const keys = ssoSecretKeys(only(ONE));
 const place: SecretPlace = {
   column: 'client_secret',
   providerId: randomUUID(),
@@ -49,8 +52,24 @@ describe('SSO secrets', () => {
   });
 
   it('derives a key of its own from the auth secret', () => {
-    const other = ssoSecretKeys(new Secret('another test secret of at least thirty-two bytes'));
+    const other = ssoSecretKeys(only(TWO));
     const { sealed } = sealSecret(keys, place, VALUE);
     expect(() => openSecret(other, place, sealed, 1)).toThrow();
+  });
+
+  it('derives a key for every version and seals with the current one', () => {
+    const both = ssoSecretKeys({
+      current: 2,
+      versions: new Map([
+        [1, ONE],
+        [2, TWO],
+      ]),
+    });
+    const old = sealSecret(keys, place, VALUE);
+    expect(openSecret(both, place, old.sealed, 1)).toBe(VALUE);
+    const next = sealSecret(both, place, VALUE);
+    expect(next.keyVersion).toBe(2);
+    expect(() => openSecret(keys, place, next.sealed, 1)).toThrow();
+    expect(openSecret(ssoSecretKeys(only(TWO)), place, next.sealed, 1)).toBe(VALUE);
   });
 });
