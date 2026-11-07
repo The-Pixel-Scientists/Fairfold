@@ -3,7 +3,8 @@
 // Accepting an invitation (ADR 0010). Only a complete console session gets
 // this far, and its active tenant, the one it signed in at, is the only one
 // whose invitations it can see. The token must be pending, unexpired and for
-// the session's own address; any other token gets the same 404.
+// the session's own address, and a member who invited must still be active
+// with the right to invite; any other token gets the same 404.
 //
 // One tenant transaction, as app_api, locks the invitation, then makes the
 // membership with the invited roles, or reinstates a removed one; an active
@@ -16,6 +17,7 @@
 
 import { withTenant, type Transaction } from '@pixel-scientists/db';
 import { acceptInvitation } from '@pixel-scientists/domain/auth';
+import { permissionsFor } from '@pixel-scientists/domain/platform';
 import { ensurePersonForUser } from '@pixel-scientists/party/server';
 
 import { recordAudit } from '../audit/writer.ts';
@@ -29,6 +31,22 @@ import { detailsOf, lockSession, rotateSession } from './sessions.ts';
 import type { TenantTables } from './tables.ts';
 
 const notFound = () => new ApiError(404, undefined, { reason: 'not_found' });
+
+/** Whether the inviting member is still active and may invite, holding their row until commit. */
+async function mayStillInvite(trx: Transaction<unknown>, membershipId: string): Promise<boolean> {
+  const inviter = await trx
+    .$extendTables<TenantTables>()
+    .selectFrom('app.membership')
+    .select('roles')
+    .where('id', '=', membershipId)
+    .where('status', '=', 'active')
+    .forShare()
+    .executeTakeFirst();
+  return (
+    inviter !== undefined &&
+    permissionsFor(inviter.roles, 'console').includes('platform.members.manage')
+  );
+}
 
 /**
  * Give the user a membership with `roles`, made by the inviter: a new one,
@@ -95,6 +113,9 @@ export function invitationRoutes(deps: RouteDependencies): Route[] {
           .forUpdate()
           .executeTakeFirst();
         if (invitation === undefined) throw notFound();
+        if (invitation.created_by !== null && !(await mayStillInvite(tx, invitation.created_by))) {
+          throw notFound();
+        }
         const membership = await joinTeam(tx, userId, invitation);
         if (membership === undefined) throw notFound();
         await db

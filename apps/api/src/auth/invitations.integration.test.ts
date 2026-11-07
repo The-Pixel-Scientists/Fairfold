@@ -421,6 +421,20 @@ describe('acceptInvitation', { timeout: 60_000 }, () => {
     expect(await statusOf(invitation.id)).toBe('pending');
   });
 
+  it('refuses an invitation once its inviter is suspended, removed or no longer an admin', async () => {
+    for (const change of ["status = 'suspended'", "status = 'removed'", "roles = '{reviewer}'"]) {
+      const inviter = await addMembership(tenant, (await addAccount()).userId, ['tenant_admin']);
+      const person = await addAccount();
+      const { invitation, token } = await invite(tenant, inviter, person.email, ['tenant_admin']);
+      await asMigratorIn(tenant.id, (client) =>
+        client.query(`UPDATE app.membership SET ${change} WHERE id = $1`, [inviter]),
+      );
+      const response = await accept(token, await sessionFor(person.userId, tenant));
+      expect(response.statusCode, change).toBe(404);
+      expect(await statusOf(invitation.id)).toBe('pending');
+    }
+  });
+
   it('lets exactly one of two acceptances at once win', async () => {
     const person = await addAccount();
     const { token } = await invite(tenant, admin, person.email);
