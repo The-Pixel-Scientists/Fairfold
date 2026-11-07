@@ -35,3 +35,20 @@ export type EligibilityOutcome = keyof typeof eligibilityOutcomes;
 export const eligibilityOutcomeSchema = z.enum(
   Object.keys(eligibilityOutcomes) as [EligibilityOutcome, ...EligibilityOutcome[]],
 );
+
+/**
+ * How an application was submitted: by the applicant in the portal, or by a
+ * member for them through the alternative route, with the words the console
+ * shows. Set when the application is created and never changed: a `portal`
+ * application never becomes `assisted` (applications/assisted.ts).
+ */
+export const submissionRouteLabels = {
+  portal: 'By the applicant',
+  assisted: 'By staff for the applicant',
+} as const;
+
+export type SubmissionRoute = keyof typeof submissionRouteLabels;
+
+export const submissionRouteSchema = z.enum(
+  Object.keys(submissionRouteLabels) as [SubmissionRoute, ...SubmissionRoute[]],
+);
