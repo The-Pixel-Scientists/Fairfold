@@ -107,6 +107,7 @@ services:
       TPS_DB_APP_WORKER_PASSWORD_FILE: /run/secrets/app_worker_password
       TPS_DB_APP_AUTH_PASSWORD_FILE: /run/secrets/app_auth_password
       TPS_DB_APP_QUEUE_PASSWORD_FILE: /run/secrets/app_queue_password
+      TPS_DB_BACKUP_READER_PASSWORD_FILE: /run/secrets/backup_reader_password
     secrets:
       - { source: postgres_password, <<: *node-secret }
       - { source: migrator_password, <<: *node-secret }
@@ -114,6 +115,7 @@ services:
       - { source: app_worker_password, <<: *node-secret }
       - { source: app_auth_password, <<: *node-secret }
       - { source: app_queue_password, <<: *node-secret }
+      - { source: backup_reader_password, <<: *node-secret }
     networks: [database]
     depends_on:
       postgres:
@@ -321,6 +323,8 @@ secrets:
     environment: TPS_STACK_APP_AUTH_PASSWORD
   app_queue_password:
     environment: TPS_STACK_APP_QUEUE_PASSWORD
+  backup_reader_password:
+    environment: TPS_STACK_BACKUP_READER_PASSWORD
   auth_secret:
     environment: TPS_STACK_AUTH_SECRET
   # Built by stack.ts from the generated keys.

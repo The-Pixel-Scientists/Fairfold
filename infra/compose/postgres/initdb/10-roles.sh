@@ -74,7 +74,7 @@
     '
   }
 
-  for role in MIGRATOR APP_API APP_WORKER APP_AUTH APP_QUEUE; do
+  for role in MIGRATOR APP_API APP_WORKER APP_AUTH APP_QUEUE BACKUP_READER; do
     password=$(read_secret "TPS_DB_${role}_PASSWORD")
     verifier=$(scram_verifier "$password")
     export "TPS_DB_${role}_VERIFIER=$verifier"
@@ -95,6 +95,7 @@ SET log_parameter_max_length_on_error = 0;
 \getenv verifier_app_worker TPS_DB_APP_WORKER_VERIFIER
 \getenv verifier_app_auth TPS_DB_APP_AUTH_VERIFIER
 \getenv verifier_app_queue TPS_DB_APP_QUEUE_VERIFIER
+\getenv verifier_backup_reader TPS_DB_BACKUP_READER_VERIFIER
 \o /dev/null
 -- psql binds each value as it is: a verifier holds no spaces or quotes.
 SELECT pg_catalog.set_config($1, $2, false) \bind tps.scram_verifier_migrator :verifier_migrator \g
@@ -102,12 +103,14 @@ SELECT pg_catalog.set_config($1, $2, false) \bind tps.scram_verifier_app_api :ve
 SELECT pg_catalog.set_config($1, $2, false) \bind tps.scram_verifier_app_worker :verifier_app_worker \g
 SELECT pg_catalog.set_config($1, $2, false) \bind tps.scram_verifier_app_auth :verifier_app_auth \g
 SELECT pg_catalog.set_config($1, $2, false) \bind tps.scram_verifier_app_queue :verifier_app_queue \g
+SELECT pg_catalog.set_config($1, $2, false) \bind tps.scram_verifier_backup_reader :verifier_backup_reader \g
 \o
 \unset verifier_migrator
 \unset verifier_app_api
 \unset verifier_app_worker
 \unset verifier_app_auth
 \unset verifier_app_queue
+\unset verifier_backup_reader
 \i /tps/roles.sql
 SQL
 )

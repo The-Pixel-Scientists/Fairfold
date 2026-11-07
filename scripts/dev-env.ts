@@ -50,6 +50,8 @@ const APP_PASSWORDS = [
   'TPS_DB_APP_AUTH_PASSWORD',
   'TPS_DB_APP_QUEUE_PASSWORD',
 ] as const;
+/** Only the roles script sets it; nothing in development connects as it. */
+const BACKUP_PASSWORD = 'TPS_DB_BACKUP_READER_PASSWORD';
 
 /** Set from the worktree's folder name. Nothing overrides it. */
 const OWN_DATABASES = 'TPS_DEV_DATABASES';
@@ -94,6 +96,7 @@ export const PROFILES = {
     ...SUPERUSER,
     MIGRATOR_PASSWORD,
     ...APP_PASSWORDS,
+    BACKUP_PASSWORD,
     OWN_DATABASES,
   ],
   // Database tests in the db project: the test database only, as the app
@@ -265,7 +268,7 @@ export function developmentValues(
     TPS_DB_SUPERUSER: environmentValue(postgres, 'postgres', 'POSTGRES_USER'),
     TPS_DB_SUPERUSER_PASSWORD: environmentValue(postgres, 'postgres', 'POSTGRES_PASSWORD'),
   };
-  for (const key of [MIGRATOR_PASSWORD, ...APP_PASSWORDS]) {
+  for (const key of [MIGRATOR_PASSWORD, ...APP_PASSWORDS, BACKUP_PASSWORD]) {
     values[key] = environmentValue(postgres, 'postgres', key);
   }
   return values;

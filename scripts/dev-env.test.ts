@@ -30,6 +30,7 @@ const config: ComposeConfig = {
         TPS_DB_APP_WORKER_PASSWORD: 'app-worker-password-for-tests',
         TPS_DB_APP_AUTH_PASSWORD: 'app-auth-password-for-tests',
         TPS_DB_APP_QUEUE_PASSWORD: 'app-queue-password-for-tests',
+        TPS_DB_BACKUP_READER_PASSWORD: 'backup-reader-password-for-tests',
       },
     },
     mailpit: {
@@ -88,6 +89,7 @@ describe('profileEnvironment', () => {
       TPS_DB_NAME: 'tps_w',
       TPS_DB_SUPERUSER_PASSWORD: 'superuser-password-for-tests',
       TPS_DB_APP_QUEUE_PASSWORD: 'app-queue-password-for-tests',
+      TPS_DB_BACKUP_READER_PASSWORD: 'backup-reader-password-for-tests',
       TPS_DEV_DATABASES: 'tps_w,tps_w_test',
     });
   });
