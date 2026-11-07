@@ -62,6 +62,7 @@ export const notKept: ReadonlySet<string> = new Set([
   'app.request_limit.key_hash',
   'app.audit_event.changes',
   'app.job_request.filters',
+  'app.subject_key.wrapped_key',
 ]);
 
 export const app: ClassificationRegistry = {
@@ -229,6 +230,17 @@ export const app: ClassificationRegistry = {
     completed_at: jobRequest,
     expires_at: jobRequest,
   },
+  // A subject's data key for audit values (ADR 0027), wrapped by the
+  // platform key: kept with its party, the key itself gone once destroyed.
+  'app.subject_key': {
+    tenant_id: internal,
+    subject_party_id: internal,
+    id: internal,
+    wrapped_key: internal,
+    kek_version: internal,
+    created_at: internal,
+    destroyed_at: internal,
+  },
 };
 
 /**
@@ -250,4 +262,5 @@ export const appSubjects: SubjectPathRegistry = {
   },
   'app.audit_event': { kind: 'party', column: 'subject_party_id' },
   'app.job_request': { kind: 'join', column: 'requested_by', table: 'app.membership' },
+  'app.subject_key': { kind: 'party', column: 'subject_party_id' },
 };

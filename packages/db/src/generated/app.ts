@@ -152,6 +152,16 @@ export interface AppRetentionPolicy {
   updated_by: string;
 }
 
+export interface AppSubjectKey {
+  created_at: Generated<Timestamp>;
+  destroyed_at: Timestamp | null;
+  id: Generated<string>;
+  kek_version: number | null;
+  subject_party_id: string;
+  tenant_id: string;
+  wrapped_key: Buffer | null;
+}
+
 export interface AppTenant {
   created_at: Generated<Timestamp>;
   fiscal_year_start_month: Generated<number>;
@@ -196,6 +206,7 @@ export interface DB {
   'app.membership': AppMembership;
   'app.request_limit': AppRequestLimit;
   'app.retention_policy': AppRetentionPolicy;
+  'app.subject_key': AppSubjectKey;
   'app.tenant': AppTenant;
   'app.tenant_module': AppTenantModule;
   'app.tenant_theme': AppTenantTheme;

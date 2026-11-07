@@ -88,6 +88,7 @@ export interface PartyOrganisationSnapshot {
 export interface PartyParty {
   created_at: Generated<Timestamp>;
   created_by: string | null;
+  erased_at: Timestamp | null;
   id: Generated<string>;
   kind: string;
   merged_into: string | null;
