@@ -15,11 +15,11 @@
     "@pixel-scientists/db": "workspace:*",
     "@pixel-scientists/domain": "workspace:*",
     "@pixel-scientists/party": "workspace:*",
-    "zod": "4.6.5"
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@pixel-scientists/ui": "workspace:*",
     "@types/react": "19.3.0",
-    "react": "19.3.0"
+    "react": "19.3.1"
   }
 }

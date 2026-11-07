@@ -14,10 +14,10 @@
   "dependencies": {
     "@pixel-scientists/db": "workspace:*",
     "@pixel-scientists/domain": "workspace:*",
-    "zod": "4.6.5"
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@pixel-scientists/ui": "workspace:*",
-    "react": "19.3.0"
+    "react": "19.3.1"
   }
 }

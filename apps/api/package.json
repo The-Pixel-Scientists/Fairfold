@@ -10,21 +10,30 @@
     "start": "node src/main.ts"
   },
   "dependencies": {
-    "@fastify/swagger": "9.9.0",
+    "@better-auth/passkey": "1.7.12",
+    "@fastify/swagger": "9.9.2",
+    "@opentelemetry/api": "1.9.1",
+    "@opentelemetry/exporter-metrics-otlp-http": "0.223.0",
+    "@opentelemetry/exporter-trace-otlp-http": "0.223.0",
+    "@opentelemetry/resources": "2.12.0",
+    "@opentelemetry/sdk-metrics": "2.12.0",
+    "@opentelemetry/sdk-trace": "2.12.0",
+    "@opentelemetry/semantic-conventions": "1.43.0",
     "@pixel-scientists/db": "workspace:*",
     "@pixel-scientists/domain": "workspace:*",
     "@pixel-scientists/grants": "workspace:*",
     "@pixel-scientists/party": "workspace:*",
     "@smithy/signature-v4": "5.7.4",
-    "better-auth": "1.7.6",
-    "fastify": "5.12.5",
+    "better-auth": "1.7.12",
+    "fastify": "5.12.7",
     "fastify-type-provider-zod": "7.0.0",
-    "nodemailer": "10.0.11",
-    "pino": "10.3.1",
-    "zod": "4.6.5"
+    "nodemailer": "10.1.7",
+    "pino": "10.4.0",
+    "undici": "8.12.3",
+    "zod": "4.6.7"
   },
   "devDependencies": {
-    "@types/node": "24.19.0",
+    "@types/node": "26.6.5",
     "tsx": "4.23.15",
     "vitest": "5.0.1"
   }
