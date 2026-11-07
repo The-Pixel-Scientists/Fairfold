@@ -4,7 +4,12 @@ import { describe, expect, it } from 'vitest';
 
 import { noticeText, type AccountNotice } from './notices.ts';
 
-const notices: AccountNotice[] = ['totp_changed', 'totp_removed', 'password_changed'];
+const notices: AccountNotice[] = [
+  'totp_changed',
+  'totp_removed',
+  'password_changed',
+  'passkey_removed',
+];
 
 describe('account change notices', () => {
   it.each(notices)('%s says when, says what to do, and holds no link', (notice) => {
@@ -13,5 +18,10 @@ describe('account change notices', () => {
     expect(text).toContain('13 November 2026 at 09:05 UTC');
     expect(text).toContain('reset your password from the sign-in page');
     expect(text).not.toMatch(/https?:|www\.|sorry/i);
+  });
+
+  it('names the passkey removed', () => {
+    const { text } = noticeText('passkey_removed', new Date(), 'Work laptop');
+    expect(text).toContain('The passkey "Work laptop" was removed');
   });
 });

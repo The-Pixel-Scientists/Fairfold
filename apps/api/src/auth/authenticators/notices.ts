@@ -9,7 +9,8 @@ import { productName } from '@pixel-scientists/domain/platform';
 
 import type { RouteDependencies } from '../routes.ts';
 
-export type AccountNotice = 'totp_changed' | 'totp_removed' | 'password_changed';
+export type AccountNotice =
+  'totp_changed' | 'totp_removed' | 'password_changed' | 'passkey_removed';
 
 const when = new Intl.DateTimeFormat('en-GB', {
   dateStyle: 'long',
@@ -17,8 +18,12 @@ const when = new Intl.DateTimeFormat('en-GB', {
   timeZone: 'UTC',
 });
 
-/** The subject and paragraphs of a notice of a change at `at`. */
-export function noticeText(notice: AccountNotice, at: Date): { subject: string; text: string } {
+/** The subject and paragraphs of a notice of a change at `at`, to the passkey `passkey` if any. */
+export function noticeText(
+  notice: AccountNotice,
+  at: Date,
+  passkey = '',
+): { subject: string; text: string } {
   const time = `${when.format(at)} UTC`;
   const ifNotYou =
     'If you did not do this, reset your password from the sign-in page now and tell the organisation you work with or apply to.';
@@ -30,6 +35,10 @@ export function noticeText(notice: AccountNotice, at: Date): { subject: string; 
     totp_removed: [
       `The authenticator app was removed from your ${productName} account`,
       `The authenticator app was removed from your ${productName} account on ${time}, and you were signed out everywhere.`,
+    ],
+    passkey_removed: [
+      `A passkey was removed from your ${productName} account`,
+      `The passkey "${passkey}" was removed from your ${productName} account on ${time}, and you were signed out everywhere.`,
     ],
     password_changed: [
       `Your ${productName} password was changed`,
@@ -46,6 +55,7 @@ export function sendNotice(
   requestId: string,
   to: string,
   notice: AccountNotice,
+  passkey?: string,
 ): void {
   const at = new Date();
   deps.later(async () => {
@@ -56,6 +66,6 @@ export function sendNotice(
       );
       return;
     }
-    await deps.sender.send({ to, ...noticeText(notice, at), requestId });
+    await deps.sender.send({ to, ...noticeText(notice, at, passkey), requestId });
   });
 }

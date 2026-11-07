@@ -47,6 +47,7 @@ import { identifierKeeper } from './limits.ts';
 import { deviceKeys } from './limits/device-cookie.ts';
 import { revokeDevices } from './limits/devices.ts';
 import { revokeSessionsForMembership, type MembershipChange } from './memberships.ts';
+import { passkeyRoutes } from './passkeys/routes.ts';
 import { loadCommonPasswords } from './passwords.ts';
 import { mfaRoutes } from './mfa.ts';
 import { passwordChangeRoute } from './password-change/route.ts';
@@ -217,6 +218,7 @@ export function createAuth(settings: AuthSettings, deps: AuthDependencies): Auth
     ...authenticatorRoutes(routeDeps, totpKey),
     passwordChangeRoute(routeDeps),
     ...emailChangeRoutes(routeDeps),
+    ...passkeyRoutes(routeDeps),
   ];
   const users = auth.$extendTables<AuthTables>();
   const invitations = {

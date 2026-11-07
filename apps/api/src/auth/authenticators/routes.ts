@@ -107,16 +107,17 @@ async function swapSecret(trx: Transaction<unknown>, userId: string, stored: str
 }
 
 /** After an MFA change commits: copy its events, clear the cookie and email the user. */
-async function finishMfaChange(
+export async function finishMfaChange(
   deps: RouteDependencies,
   context: RequestContext,
   events: readonly AuthEvent[],
   notice: AccountNotice,
+  passkey?: string,
 ): Promise<undefined> {
   const session = sessionOf(context);
   for (const event of events) await copyAuthEvent(deps, event, session.tenant);
   deps.setHeader(context.requestId, 'set-cookie', clearedCookie(session.app));
-  sendNotice(deps, context.requestId, await session.email(), notice);
+  sendNotice(deps, context.requestId, await session.email(), notice, passkey);
   return undefined;
 }
 
