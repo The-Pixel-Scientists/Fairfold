@@ -33,7 +33,37 @@ describe('recordAudit', () => {
       entityType: 'platform.membership',
       entityId,
       changes,
+      subjectPartyId: null,
     });
+  });
+
+  it('records the party the event is about', async () => {
+    const subjectPartyId = '7d3c2b1a-0f9e-4d8c-b7a6-5e4d3c2b1a09';
+    await recordAudit(trx, user, {
+      action: 'platform.membership.roles_changed',
+      entityId,
+      subjectPartyId,
+    });
+    expect(insertAuditEvent).toHaveBeenCalledWith(
+      trx,
+      expect.objectContaining({ entityType: 'platform.membership', subjectPartyId }),
+    );
+  });
+
+  it.each([
+    '',
+    'not-a-uuid',
+    '7d3c2b1a-0f9e-4d8c-b7a6-5e4d3c2b1a09 OR true',
+    'someone@example.org',
+  ])('refuses the subject party id %j without repeating it', async (subjectPartyId) => {
+    const refusal = recordAudit(trx, user, {
+      action: 'platform.membership.roles_changed',
+      entityId,
+      subjectPartyId,
+    });
+    await expect(refusal).rejects.toThrow(/^Audit subject party id is not a UUID\.$/);
+    if (subjectPartyId) await expect(refusal).rejects.not.toThrow(subjectPartyId);
+    expect(insertAuditEvent).not.toHaveBeenCalled();
   });
 
   it('records no membership for the system or the operator', async () => {
@@ -71,6 +101,19 @@ describe('recordRead', () => {
     expect(insertAuditEvent).toHaveBeenCalledWith(
       trx,
       expect.objectContaining({ action: 'platform.warehouse.exported', entityId, changes: {} }),
+    );
+  });
+
+  it('records the party whose data was read', async () => {
+    const subjectPartyId = '7d3c2b1a-0f9e-4d8c-b7a6-5e4d3c2b1a09';
+    await recordRead(trx, user, {
+      action: 'platform.warehouse.exported',
+      entityId,
+      subjectPartyId,
+    });
+    expect(insertAuditEvent).toHaveBeenCalledWith(
+      trx,
+      expect.objectContaining({ action: 'platform.warehouse.exported', subjectPartyId }),
     );
   });
 });

@@ -8,6 +8,7 @@
 // value only for a public or internal field (D12).
 
 import { insertAuditEvent, type AuditChanges, type Transaction } from '@pixel-scientists/db';
+import { idSchema } from '@pixel-scientists/domain';
 import {
   auditEntityType,
   isAuditAction,
@@ -24,6 +25,11 @@ export interface AuditEvent {
   readonly entityId: string;
   /** Keyed by field id, such as `app.membership.roles`. */
   readonly changes?: AuditChanges;
+  /**
+   * The party the event is about (ADR 0027), from the record the handler
+   * loaded: never from a request body or URL.
+   */
+  readonly subjectPartyId?: string;
 }
 
 /** Record a change in the transaction's tenant. */
@@ -35,6 +41,9 @@ export async function recordAudit<DB>(
   if (!isAuditAction(event.action)) {
     throw new Error("Audit action is not in any module's list.");
   }
+  if (event.subjectPartyId !== undefined && !idSchema.safeParse(event.subjectPartyId).success) {
+    throw new Error('Audit subject party id is not a UUID.');
+  }
   await insertAuditEvent(trx, {
     requestId: actor.requestId,
     actorKind: actor.kind,
@@ -43,6 +52,7 @@ export async function recordAudit<DB>(
     entityType: auditEntityType(event.action),
     entityId: event.entityId,
     changes: event.changes ?? {},
+    subjectPartyId: event.subjectPartyId ?? null,
   });
 }
 
@@ -50,7 +60,8 @@ export async function recordAudit<DB>(
 export function recordRead<DB>(
   trx: Transaction<DB>,
   actor: AuditActor,
-  entity: { readonly action: AuditAction; readonly entityId: string },
+  entity: Pick<AuditEvent, 'action' | 'entityId' | 'subjectPartyId'>,
 ): Promise<void> {
-  return recordAudit(trx, actor, { action: entity.action, entityId: entity.entityId });
+  const { action, entityId, subjectPartyId } = entity;
+  return recordAudit(trx, actor, { action, entityId, subjectPartyId });
 }

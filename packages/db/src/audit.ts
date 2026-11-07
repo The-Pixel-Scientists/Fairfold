@@ -42,6 +42,8 @@ export interface AuditEventRow {
   readonly entityType: string;
   readonly entityId: string;
   readonly changes: AuditChanges;
+  /** The party the event is about, in the same tenant (ADR 0027). */
+  readonly subjectPartyId?: string | null;
 }
 
 /**
@@ -81,7 +83,8 @@ function mayKeepValues(field: string): boolean {
 
 /**
  * Insert one event in the transaction's tenant. The database sets its id,
- * occurred_at, retain_until and actor_member_kind.
+ * occurred_at, retain_until and actor_member_kind, and refuses a subject
+ * party from another tenant.
  */
 export async function insertAuditEvent<DB>(
   trx: Transaction<DB>,
@@ -93,8 +96,10 @@ export async function insertAuditEvent<DB>(
   }
   await sql`
     INSERT INTO app.audit_event
-      (tenant_id, request_id, actor_kind, actor_id, action, entity_type, entity_id, changes)
+      (tenant_id, request_id, actor_kind, actor_id, action, entity_type, entity_id, changes,
+       subject_party_id)
     VALUES (app.current_tenant_id(), ${row.requestId}, ${row.actorKind}, ${row.actorId},
-            ${row.action}, ${row.entityType}, ${row.entityId}, ${changes}::jsonb)
+            ${row.action}, ${row.entityType}, ${row.entityId}, ${changes}::jsonb,
+            ${row.subjectPartyId ?? null})
   `.execute(trx);
 }

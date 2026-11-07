@@ -1,6 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import type { Transaction } from 'kysely';
+import {
+  DummyDriver,
+  Kysely,
+  PostgresAdapter,
+  PostgresIntrospector,
+  PostgresQueryCompiler,
+  type CompiledQuery,
+  type Transaction,
+} from 'kysely';
 import { describe, expect, it } from 'vitest';
 
 import { insertAuditEvent, keptChanges } from './audit.ts';
@@ -99,5 +107,39 @@ describe('insertAuditEvent', () => {
         changes: { 'app.tenant.name': { after: name } },
       }),
     ).rejects.toThrow(/^Audit changes are larger than 65,536 bytes\.$/);
+  });
+
+  it('writes the subject party id, or null when there is none', async () => {
+    const sent: CompiledQuery[] = [];
+    const db = new Kysely<unknown>({
+      dialect: {
+        createAdapter: () => new PostgresAdapter(),
+        createDriver: () => new DummyDriver(),
+        createIntrospector: (kysely) => new PostgresIntrospector(kysely),
+        createQueryCompiler: () => new PostgresQueryCompiler(),
+      },
+      log: (event) => {
+        sent.push(event.query);
+      },
+    });
+    const subjectPartyId = '7d3c2b1a-0f9e-4d8c-b7a6-5e4d3c2b1a09';
+    const row = {
+      requestId: 'r',
+      actorKind: 'system',
+      actorId: null,
+      action: 'party.person.updated',
+      entityType: 'party.person',
+      entityId: subjectPartyId,
+      changes: {},
+    } as const;
+    const trx = db as unknown as Transaction<unknown>;
+    await insertAuditEvent(trx, { ...row, subjectPartyId });
+    await insertAuditEvent(trx, row);
+    expect(
+      sent.map(({ sql, parameters }) => [sql.includes('subject_party_id'), parameters.at(-1)]),
+    ).toEqual([
+      [true, subjectPartyId],
+      [true, null],
+    ]);
   });
 });
