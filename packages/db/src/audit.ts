@@ -4,12 +4,15 @@
 // comes from the transaction, and each change keeps its values only when
 // the classification map marks the field public or internal and not
 // structured or free text (D12), and each value is a string, number,
-// boolean or null, or a short list of them. Any other change, and every
-// form field, is recorded by its id alone. A key that is neither a
+// boolean or null, or a short list of them. A theme's logo and tokens are
+// recorded by a derived value of a checked shape, never the stored bytes or
+// document. Any other change, and every form field, is recorded by its id
+// alone. A key that is neither a
 // classified column nor a form field id is refused, and so are changes over
 // 64 KiB. The audit writer in apps/api/src/audit checks the action and the
 // actor before calling this; the database records the actor's member kind.
 
+import { tokenPaths } from '@pixel-scientists/domain/platform';
 import { sql, type Transaction } from 'kysely';
 
 import { classification } from '../classification.ts';
@@ -23,6 +26,9 @@ const FORM_FIELD_ID = /^f_[a-z0-9]{1,32}$/;
 const MAX_LIST_ITEMS = 20;
 /** The most bytes the stored changes may take, as app.audit_event checks. */
 const MAX_CHANGES_BYTES = 65_536;
+/** A SHA-256 digest in lower-case hex. */
+const SHA256_HEX = /^[0-9a-f]{64}$/;
+const TOKEN_PATHS: ReadonlySet<string> = new Set(tokenPaths);
 
 /** One field's change. A value left out, or not kept, is not recorded. */
 export interface FieldChange {
@@ -53,10 +59,39 @@ export interface AuditEventRow {
  */
 export function keptChanges(changes: AuditChanges): Record<string, FieldChange> {
   return Object.fromEntries(
-    Object.entries(changes).map(([field, { before, after }]) => [
-      field,
-      mayKeepValues(field) && [before, after].every(isKeptValue) ? { before, after } : {},
-    ]),
+    Object.entries(changes).map(([field, { before, after }]) => {
+      const isKept = keptValueCheck(field);
+      return [field, isKept && [before, after].every(isKept) ? { before, after } : {}];
+    }),
+  );
+}
+
+/**
+ * Structured columns recorded by a derived value, never their own: a logo by
+ * its SHA-256 digest, and theme tokens by the changed token paths and their
+ * values, or by the marker for stored tokens that no longer pass.
+ */
+const derivedValues: Readonly<Record<string, (value: unknown) => boolean>> = {
+  'app.tenant_theme.logo': (value) => typeof value === 'string' && SHA256_HEX.test(value),
+  'app.tenant_theme.tokens': (value) => value === 'unusable' || isTokenMap(value),
+};
+
+/** The check a field's values must pass to be kept, or null if they never are. */
+function keptValueCheck(field: string): ((value: unknown) => boolean) | null {
+  if (!mayKeepValues(field)) return null;
+  const derived = Object.hasOwn(derivedValues, field) ? derivedValues[field] : undefined;
+  if (derived) return (value) => value === undefined || value === null || derived(value);
+  return notKept.has(field) ? null : isKeptValue;
+}
+
+/** A plain object from known token paths to strings, numbers or null. */
+function isTokenMap(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null) return false;
+  if (Object.getPrototypeOf(value) !== Object.prototype) return false;
+  return Object.entries(value).every(
+    ([path, token]) =>
+      TOKEN_PATHS.has(path) &&
+      (token === null || typeof token === 'string' || typeof token === 'number'),
   );
 }
 
@@ -69,6 +104,7 @@ function isKeptValue(value: unknown): boolean {
   return Array.isArray(value) && value.length <= MAX_LIST_ITEMS && value.every(isPrimitive);
 }
 
+/** Whether the field is a classified public or internal column. */
 function mayKeepValues(field: string): boolean {
   if (FORM_FIELD_ID.test(field)) return false;
   const [, table = '', name = ''] = COLUMN_FIELD_ID.exec(field) ?? [];
@@ -77,7 +113,6 @@ function mayKeepValues(field: string): boolean {
   if (!column) {
     throw new Error('Audit changes are keyed by a classified column id or a form field id.');
   }
-  if (notKept.has(field)) return false;
   return column.sensitivity === 'public' || column.sensitivity === 'internal';
 }
 

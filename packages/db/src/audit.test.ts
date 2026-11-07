@@ -68,6 +68,36 @@ describe('keptChanges, by column and value shape', () => {
     expect(keptChanges({ [field]: { before: 'a', after: 'b' } })).toEqual({ [field]: {} });
   });
 
+  it("keeps a logo's SHA-256 digest, and nothing else for it", () => {
+    const sha256 = 'ab'.repeat(32);
+    const logo = (after: unknown) => keptChanges({ 'app.tenant_theme.logo': { after } });
+    expect(logo(sha256)).toEqual({ 'app.tenant_theme.logo': { after: sha256 } });
+    expect(logo(Buffer.from('png'))).toEqual({ 'app.tenant_theme.logo': {} });
+    expect(logo('AB'.repeat(32))).toEqual({ 'app.tenant_theme.logo': {} });
+    expect(logo('iVBORw0KGgo=')).toEqual({ 'app.tenant_theme.logo': {} });
+  });
+
+  it('keeps changed tokens by path, or the marker for unusable ones', () => {
+    const changes = {
+      'app.tenant_theme.tokens': { before: { font: null }, after: { font: 'system' } },
+    };
+    expect(keptChanges(changes)).toEqual(changes);
+    const cleared = { 'app.tenant_theme.tokens': { before: 'unusable', after: null } };
+    expect(keptChanges(cleared)).toEqual(cleared);
+  });
+
+  it.each([
+    ['an unknown token path', { 'jane.smith': 'x' }],
+    ['a nested value', { font: { name: 'system' } }],
+    ['a list', ['system']],
+    ['another string', 'system'],
+    ['an object with a prototype', Object.create({ font: 'system' }) as object],
+  ])('records tokens by their id alone when the value is %s', (_, after) => {
+    expect(keptChanges({ 'app.tenant_theme.tokens': { after } })).toEqual({
+      'app.tenant_theme.tokens': {},
+    });
+  });
+
   it.each([
     ['an object', { name: 'x' }],
     ['a nested list', [['reviewer']]],
