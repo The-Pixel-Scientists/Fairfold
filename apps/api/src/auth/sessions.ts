@@ -19,7 +19,7 @@ import type { App } from '@pixel-scientists/domain/platform';
 import type { FastifyRequest } from 'fastify';
 
 import type { MfaState, RequestSession, SessionRead } from '../context.ts';
-import { hashToken, newToken, readToken } from './cookies.ts';
+import { hashToken, newToken, readToken, TIMEOUTS } from './cookies.ts';
 import type { AuthTables } from './tables.ts';
 
 /** What readSession() learnt beyond the context, for the auth routes. */
@@ -84,12 +84,6 @@ export function sessionReader(deps: SessionDependencies) {
     return { app, session };
   };
 }
-
-/** How long a session may last at most, by app (ADR 0010). */
-const ABSOLUTE_MS: Readonly<Record<App, number>> = {
-  console: 12 * 3600_000,
-  portal: 24 * 3600_000,
-};
 
 export interface NewSession {
   readonly userId: string;
@@ -169,7 +163,7 @@ export async function issueSession(trx: Transaction<unknown>, next: NewSession):
       app: next.app,
       active_tenant_id: next.tenantId,
       mfa_state: next.mfa,
-      expires_at: next.expiresAt ?? new Date(Date.now() + ABSOLUTE_MS[next.app]),
+      expires_at: next.expiresAt ?? new Date(Date.now() + TIMEOUTS[next.app].absolute * 1000),
       reauthenticated_at: reauthenticated === true ? eb.fn<Date>('now') : reauthenticated || null,
       ip_address: next.ip,
       user_agent: next.userAgent?.slice(0, 1024) ?? null,
