@@ -1,10 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// Sign-in and email counters in auth.rate_limit (migration 0004, ADR 0010,
-// "Sign-in limits and passwords"; no device cookies in MVP1), as app_auth,
-// shared by every API instance. There is no lockout: a limit refuses
-// attempts for a while, and a refused attempt does not count. Run these
-// outside withTenant().
+// Sign-in and email counters in auth.rate_limit (migrations 0004 and 0022,
+// ADR 0010, "Sign-in limits and passwords"), as app_auth, shared by every
+// API instance. There is no lockout: a limit refuses attempts for a while,
+// and a refused attempt does not count. Run these outside withTenant().
+//
+// A sign-in from a browser with a valid device cookie for the account tried
+// counts per identifier and device alone, so failures from other clients
+// never delay it; any other counts per identifier and address, per
+// identifier and per address.
 //
 // An attempt is charged before its outcome is known, in one statement per
 // counter that refuses while a delay runs, so attempts sent at once cannot
@@ -18,12 +22,18 @@ import { isIP } from 'node:net';
 import { sql, type Kysely, type Transaction } from 'kysely';
 
 export type RateLimitScope =
-  'sign_in_identifier_ip' | 'sign_in_identifier' | 'sign_in_ip' | 'email_identifier' | 'email_ip';
+  | 'sign_in_identifier_ip'
+  | 'sign_in_identifier'
+  | 'sign_in_ip'
+  | 'sign_in_identifier_device'
+  | 'email_identifier'
+  | 'email_ip';
 
 const RULES: Readonly<Record<RateLimitScope, { limit: number; window: string }>> = {
   sign_in_identifier_ip: { limit: 5, window: '15 minutes' },
   sign_in_identifier: { limit: 100, window: '1 hour' },
   sign_in_ip: { limit: 50, window: '15 minutes' },
+  sign_in_identifier_device: { limit: 5, window: '15 minutes' },
   email_identifier: { limit: 3, window: '1 hour' },
   email_ip: { limit: 20, window: '1 hour' },
 };
@@ -33,6 +43,7 @@ export const SIGN_IN_SCOPES = [
   'sign_in_identifier',
   'sign_in_ip',
 ] as const;
+const DEVICE_SIGN_IN_SCOPES = ['sign_in_identifier_device'] as const;
 export const EMAIL_SCOPES = ['email_identifier', 'email_ip'] as const;
 
 /** Who an attempt counts against. */
@@ -41,23 +52,35 @@ export interface RateLimitClient {
   readonly identifier: string;
   /** An IPv4 or IPv6 address. IPv6 counts by its /64. */
   readonly ip: string;
+  /** The auth.device id of a valid device cookie for the identifier's account. */
+  readonly device?: string;
 }
 
-/** The counter's key: the identifier, and the address as a /32 or /64 network, where the scope has them. */
+/** The sign-in scopes a client counts against: its device's alone, if it has one. */
+export function signInScopes(client: RateLimitClient): readonly RateLimitScope[] {
+  return client.device === undefined ? SIGN_IN_SCOPES : DEVICE_SIGN_IN_SCOPES;
+}
+
+/**
+ * The counter's key: the identifier, the address as a /32 or /64 network,
+ * and the device, where the scope has them.
+ */
 function keyOf(scope: RateLimitScope, client: RateLimitClient) {
   const identifier = scope.includes('identifier') ? client.identifier : null;
-  if (!scope.endsWith('_ip')) return { identifier, network: sql<null>`NULL::cidr` };
+  const device = scope.endsWith('_device') ? client.device : null;
+  if (device === undefined) throw new Error('A device counter needs a device.');
+  if (!scope.endsWith('_ip')) return { identifier, network: sql<null>`NULL::cidr`, device };
   if (isIP(client.ip) === 0) throw new Error('The client address is not an IP address.');
   const address = sql`${client.ip}::inet`;
   const network = sql<string>`network(set_masklen(${address},
     CASE WHEN family(${address}) = 4 THEN 32 ELSE 64 END))::cidr`;
-  return { identifier, network };
+  return { identifier, network, device };
 }
 
 const matching = (scope: RateLimitScope, client: RateLimitClient) => {
-  const { identifier, network } = keyOf(scope, client);
+  const { identifier, network, device } = keyOf(scope, client);
   return sql`scope = ${scope} AND identifier IS NOT DISTINCT FROM ${identifier}
-    AND client_ip IS NOT DISTINCT FROM ${network}`;
+    AND client_ip IS NOT DISTINCT FROM ${network} AND device_id IS NOT DISTINCT FROM ${device}::uuid`;
 };
 
 /** What a charge sets on a stored counter `r`, and on a new one. */
@@ -101,13 +124,13 @@ export async function chargeRateLimits<DB>(
     const reached = await db.transaction().execute(async (trx) => {
       const found: RateLimitScope[] = [];
       for (const scope of scopes) {
-        const { identifier, network } = keyOf(scope, client);
+        const { identifier, network, device } = keyOf(scope, client);
         const set = charge(scope);
         const { rows } = await sql<{ blocked: boolean }>`
           INSERT INTO auth.rate_limit AS r
-            (scope, identifier, client_ip, count, window_started_at, blocked_until)
-          VALUES (${scope}, ${identifier}, ${network}, 1, now(), ${set.first})
-          ON CONFLICT (scope, identifier, client_ip) DO UPDATE
+            (scope, identifier, client_ip, device_id, count, window_started_at, blocked_until)
+          VALUES (${scope}, ${identifier}, ${network}, ${device}::uuid, 1, now(), ${set.first})
+          ON CONFLICT (scope, identifier, client_ip, device_id) DO UPDATE
             SET count = ${set.count}, window_started_at = ${set.start}, blocked_until = ${set.blocked}
             WHERE r.blocked_until IS NULL OR r.blocked_until <= now()
           RETURNING blocked_until IS NOT NULL AS blocked
@@ -137,15 +160,16 @@ export async function chargeRateLimits<DB>(
 /**
  * Give back a sign-in charge after a success, in `trx`: the identifier and
  * client counter starts afresh, and the others lose the attempt, and their
- * delay if that leaves them below their limit.
+ * delay if that leaves them below their limit. A client with a device was
+ * charged to its device counter alone.
  */
 export async function refundSignIn<DB>(
   trx: Transaction<DB>,
   client: RateLimitClient,
 ): Promise<void> {
-  await sql`DELETE FROM auth.rate_limit WHERE ${matching('sign_in_identifier_ip', client)}`.execute(
-    trx,
-  );
+  const fresh = client.device === undefined ? 'sign_in_identifier_ip' : 'sign_in_identifier_device';
+  await sql`DELETE FROM auth.rate_limit WHERE ${matching(fresh, client)}`.execute(trx);
+  if (client.device !== undefined) return;
   for (const scope of ['sign_in_identifier', 'sign_in_ip'] as const) {
     await sql`
       UPDATE auth.rate_limit SET count = count - 1, blocked_until =

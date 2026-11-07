@@ -30,6 +30,7 @@ export {
   EMAIL_SCOPES,
   refundSignIn,
   SIGN_IN_SCOPES,
+  signInScopes,
   type RateLimitCharge,
   type RateLimitClient,
   type RateLimitScope,
