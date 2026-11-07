@@ -51,10 +51,11 @@ describe('visibleItems for a tool', () => {
     expect(visibleItems({ permissions: [], modules: [] })).toEqual([]);
   });
 
-  it('keeps grants for a session that does not report modules yet, and hides it when it is not listed', () => {
+  it('hides grants when the session lists modules without it', () => {
     const permissions = ['grants.programmes.manage'];
-    expect(labels(visibleItems({ permissions }))).toEqual(['Programmes']);
+    expect(labels(visibleItems({ permissions, modules: ['grants'] }))).toEqual(['Programmes']);
     expect(visibleItems({ permissions, modules: ['crm'] })).toEqual([]);
+    expect(visibleItems({ permissions })).toEqual([]);
   });
 });
 
