@@ -1,6 +1,8 @@
 platform.tenant.created: Tenant created
 platform.tenant.updated: Tenant updated
 platform.theme.changed: Theme changed
+platform.embed_origin.added: Embed origin added
+platform.embed_origin.removed: Embed origin removed
 platform.module.switched_on: Module switched on
 platform.module.switched_off: Module switched off
 platform.invitation.sent: Invitation sent

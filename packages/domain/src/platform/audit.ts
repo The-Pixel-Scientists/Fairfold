@@ -60,6 +60,9 @@ export const platformAuditActions = defineAuditActions('platform', [
   'platform.tenant.created',
   'platform.tenant.updated',
   'platform.theme.changed',
+  // An origin allowed or no longer allowed to frame the tenant's embeds (ADR 0035).
+  'platform.embed_origin.added',
+  'platform.embed_origin.removed',
   'platform.module.switched_on',
   'platform.module.switched_off',
   'platform.invitation.sent',
