@@ -7,7 +7,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./classification": "./classification.ts"
+    "./classification": "./classification.ts",
+    "./generated/*": "./src/generated/*.ts"
   },
   "dependencies": {
     "@pixel-scientists/domain": "workspace:*",
