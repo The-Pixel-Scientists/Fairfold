@@ -49,11 +49,9 @@ export const switchableModuleIds = moduleIds.filter(
 /**
  * Whether a module is on for a tenant, given its stored switch
  * (`app.tenant_module.enabled`, undefined where the tenant has no row). The
- * platform and party are always on. No tool is on without a row (ADR 0024),
- * except grants, until S11-69 gives every existing tenant a grants row and
- * removes the exception.
+ * platform and party are always on. No tool is on without a row (ADR 0024).
  */
 export function moduleOn(module: ModuleId, stored: boolean | undefined): boolean {
   if (!modules[module].switchable) return true;
-  return stored ?? module === 'grants';
+  return stored === true;
 }

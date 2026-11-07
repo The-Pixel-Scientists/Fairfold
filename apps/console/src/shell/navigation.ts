@@ -58,8 +58,8 @@ export const navigationItems: readonly NavigationItem[] = [
 
 /**
  * The items this session may use: the tool is on for the funder (a session
- * that does not say counts as off, except for grants, as `moduleOn` has it)
- * and the member holds the permission. The server still checks every request.
+ * that does not say counts as off, as `moduleOn` has it) and the member
+ * holds the permission. The server still checks every request.
  */
 export function visibleItems(
   session: NavigationSession,
