@@ -89,7 +89,7 @@ describe('the counters in app.request_limit', { timeout: 30_000 }, () => {
     const expected = keyHash(KEY, 'probe', clientNetwork(remoteAddress));
     const { rows } = await withClient('app_api', (client) =>
       client.query<{ bucket: string; count: number; bytes: number; whole_window: boolean }>(
-        `SELECT bucket, count, octet_length(key_hash) AS bytes,
+        `SELECT bucket, count::int AS count, octet_length(key_hash) AS bytes,
                 extract(epoch FROM window_start)::bigint % 60 = 0 AS whole_window
            FROM app.request_limit WHERE key_hash = $1`,
         [expected],
