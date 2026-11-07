@@ -72,6 +72,9 @@ describe('grants audit actions', () => {
       'Monitoring withdrawn',
       'Monitoring disclosed',
       'Reminder setting updated',
+      'Application note added',
+      'Application message sent',
+      'Application messages viewed',
     ]);
   });
 });

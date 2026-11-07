@@ -47,6 +47,29 @@ describe('the grants audit actions', () => {
     }
   });
 
+  it('find a note or message event subject from the application its entity id names', async () => {
+    const lookups: unknown[] = [];
+    const query = {
+      select: () => query,
+      where: (column: string, _op: string, value: unknown) => (lookups.push(column, value), query),
+      executeTakeFirst: () => Promise.resolve({ applicant_person_id: ID }),
+    };
+    const tables = { selectFrom: (table: string) => (lookups.push(table), query) };
+    const tx = { $extendTables: () => tables } as unknown as Tx;
+    const entityId = crypto.randomUUID();
+    for (const action of [
+      'grants.application.note_added',
+      'grants.application.message_sent',
+      'grants.application.messages_viewed',
+    ] as const) {
+      lookups.length = 0;
+      const rule = grantsSubjectRules[action];
+      if ('none' in rule) throw new Error(`${action} has a subject.`);
+      expect(await rule.subject(tx, { entityId }), action).toBe(ID);
+      expect(lookups, action).toEqual(['grants.application', 'id', entityId]);
+    }
+  });
+
   it('read a deleted assignment application from its own changes, and only if that is an id', async () => {
     const rule = grantsSubjectRules['grants.assignment.removed'];
     if ('none' in rule) throw new Error('A removed assignment has a subject.');

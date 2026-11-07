@@ -71,6 +71,14 @@ export const grantsAuditActions = defineAuditActions('grants', [
   // A round's reminder setting (S11-54). Reminders sent are kept in their own
   // outbox, not the audit log.
   'grants.reminder_setting.updated',
+  // Notes and messages (S12-02). The entity is the application, so the
+  // subject is its applicant (ADR 0027); the note or message id, the side and
+  // counts go in the changes, never a body or a name. `messages_viewed` is
+  // each staff read of a thread, a sensitive read; the applicant's reads of
+  // their own are not.
+  'grants.application.note_added',
+  'grants.application.message_sent',
+  'grants.application.messages_viewed',
 ]);
 
 export type GrantsAuditAction = (typeof grantsAuditActions)[number];
