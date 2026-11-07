@@ -4,13 +4,14 @@
 // (ADR 0010). Enrol and confirm need a session waiting for enrolment, verify
 // one waiting for a code. Each attempt locks its user, then its session, so
 // attempts in one session take turns. Every attempt is charged to sign-in's limits
-// first (S02-08), and a delayed one is refused without checking the code or
+// first (S02-08), to the device if the browser has a valid device cookie for
+// the account, and a delayed one is refused without checking the code or
 // counting on the session. A right code completes the session as a new one,
-// with a new id and token, and gives back its own charge and the sign-in's,
-// each to the address it was charged to.
+// with a new id and token, gives back its own charge and the sign-in's, each
+// to the device or address it was charged to, and keeps the device.
 // A wrong one is counted on the session, which is discarded at the fifth.
 
-import { chargeRateLimits, refundSignIn, SIGN_IN_SCOPES } from '@pixel-scientists/db';
+import { chargeRateLimits, refundSignIn, signInScopes } from '@pixel-scientists/db';
 import { confirmTotp, enrolTotp, verifyTotp } from '@pixel-scientists/domain/auth';
 import { productName } from '@pixel-scientists/domain/platform';
 
@@ -20,6 +21,7 @@ import { route, type Route } from '../routes/register.ts';
 import { clearedCookie } from './cookies.ts';
 import { copyAuthEvent, recordAuthEvent, type AuthEvent } from './events.ts';
 import { plainAddress } from './limits.ts';
+import { countedClient, rememberDevice } from './limits/devices.ts';
 import { answerWithSession, sessionOf, type RouteDependencies } from './routes.ts';
 import { detailsOf, lockSession, rotateSession } from './sessions.ts';
 import { tooMany } from './sign-up.ts';
@@ -71,8 +73,10 @@ async function completeWithCode(
   const email = await session.email();
   const client = { identifier: deps.keepIdentifier(email), ip };
   const details = { requestId, userId, tenant, ...client };
+  // The pending session's browser holds the cookie its sign-in was counted by.
+  const counted = await countedClient(deps, requestId, session.app, email, client);
 
-  const charged = await chargeRateLimits(deps.auth, SIGN_IN_SCOPES, client);
+  const charged = await chargeRateLimits(deps.auth, signInScopes(counted), counted);
   if (charged.refused) throw tooMany(deps, requestId, charged.retryAfter);
 
   const outcome = await deps.auth.transaction().execute(async (trx) => {
@@ -83,9 +87,12 @@ async function completeWithCode(
     const db = trx.$extendTables<AuthTables>();
     if (await useCode(trx, key, userId, code, use)) {
       // Give back this attempt's charge, and the sign-in's, which waited for
-      // MFA, to the address that sign-in came from.
-      await refundSignIn(trx, client);
-      await refundSignIn(trx, { ...client, ip: plainAddress(current.ip_address) });
+      // MFA, to the device, or else the address that sign-in came from.
+      await refundSignIn(trx, counted);
+      if (counted.device === undefined) {
+        await refundSignIn(trx, { ...client, ip: plainAddress(current.ip_address) });
+      }
+      const device = await rememberDevice(trx, deps, requestId, session.app, userId);
       const events: AuthEvent[] = [];
       if (use === 'confirm') {
         await db
@@ -96,7 +103,7 @@ async function completeWithCode(
         events.push(await recordAuthEvent(trx, 'mfa_enrolled', details));
       }
       const token = await rotateSession(trx, current, { mfa: 'complete', ip, userAgent });
-      return { token, events };
+      return { token, events, device };
     }
     const failures = current.mfa_failures + 1;
     const discarded = failures >= MAX_FAILURES;
@@ -120,7 +127,9 @@ async function completeWithCode(
 
   if (outcome.token !== undefined) {
     if (use === 'confirm') sendNotice(deps, email, requestId);
-    return (await answerWithSession(deps, requestId, outcome.token, email)).body;
+    const { body } = await answerWithSession(deps, requestId, outcome.token, email);
+    if (outcome.device !== undefined) deps.setHeader(requestId, 'set-cookie', outcome.device);
+    return body;
   }
   if (outcome.discarded) {
     deps.setHeader(requestId, 'set-cookie', clearedCookie(session.app));

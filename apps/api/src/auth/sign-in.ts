@@ -1,19 +1,20 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
 // Password sign-in to a tenant's console or portal (ADR 0010). The attempt
-// is charged to its limits first, and a delayed attempt is refused without
+// is charged to its limits first, its device's alone if it has a valid
+// device cookie for the account, and a delayed attempt is refused without
 // checking the password. An unknown address costs a dummy hash, and every
 // failure gets the same problem. Success issues a session for the resolved
 // app with the slug's tenant active: a console session waits for MFA, which
-// gives the charge back when it completes, and a portal one needs none and
-// gives it back now. A portal sign-in with no membership in the tenant makes
-// the person an applicant there.
+// gives the charge back and keeps the device when it completes, and a portal
+// one needs none and does both now. A portal sign-in with no membership in
+// the tenant makes the person an applicant there.
 
 import {
   chargeRateLimits,
   refundSignIn,
   sessionContext,
-  SIGN_IN_SCOPES,
+  signInScopes,
   withTenant,
   type TenantId,
 } from '@pixel-scientists/db';
@@ -26,6 +27,7 @@ import { route, type Route } from '../routes/register.ts';
 import { hashToken, sessionCookie } from './cookies.ts';
 import { copyAuthEvent, recordAuthEvent } from './events.ts';
 import { plainAddress } from './limits.ts';
+import { countedClient, rememberDevice } from './limits/devices.ts';
 import { verifyNothing, verifyPassword } from './passwords.ts';
 import { sessionBody, type RouteDependencies } from './routes.ts';
 import { currentPassword, issueSession, lockUser } from './sessions.ts';
@@ -75,8 +77,9 @@ export function signInRoutes(deps: RouteDependencies): Route[] {
       const ip = plainAddress(address);
       const identifier = deps.keepIdentifier(email);
       const client = { identifier, ip };
+      const counted = await countedClient(deps, requestId, app, email, client);
 
-      const charged = await chargeRateLimits(deps.auth, SIGN_IN_SCOPES, client);
+      const charged = await chargeRateLimits(deps.auth, signInScopes(counted), counted);
       if (charged.refused) throw tooMany(deps, requestId, charged.retryAfter);
 
       const account = await users
@@ -130,9 +133,15 @@ export function signInRoutes(deps: RouteDependencies): Route[] {
         // replaced meanwhile does not sign in.
         if (!(await lockUser(trx, userId, 'share'))) return 'not_active';
         if ((await currentPassword(trx, userId)) !== verified) return 'bad_password';
-        // A console sign-in's charge is given back only once MFA completes.
-        if (mfa === 'not_required') await refundSignIn(trx, client);
+        // A console sign-in's charge is given back, and its device kept,
+        // only once MFA completes.
+        let device: string | undefined;
+        if (mfa === 'not_required') {
+          await refundSignIn(trx, counted);
+          device = await rememberDevice(trx, deps, requestId, app, userId);
+        }
         return {
+          device,
           token: await issueSession(trx, {
             userId,
             app,
@@ -151,7 +160,7 @@ export function signInRoutes(deps: RouteDependencies): Route[] {
         };
       });
       if (typeof issued === 'string') return refuse(issued);
-      const { token, event } = issued;
+      const { token, event, device } = issued;
 
       // The new session is the source of its tenant from here on.
       const tokenHash = hashToken(token);
@@ -160,6 +169,7 @@ export function signInRoutes(deps: RouteDependencies): Route[] {
       if (app === 'portal') await joinAsApplicant(deps, session.tenant, userId, requestId);
       await copyAuthEvent(deps, event, session.tenant);
       deps.setHeader(requestId, 'set-cookie', sessionCookie(app, token));
+      if (device !== undefined) deps.setHeader(requestId, 'set-cookie', device);
       return sessionBody(deps.api, {
         userId,
         email,

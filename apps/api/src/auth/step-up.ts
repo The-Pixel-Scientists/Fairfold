@@ -4,18 +4,20 @@
 // it is the user with their password and a code together, and is replaced
 // by a new session, with a new id and token, re-authenticated now, which the
 // policy accepts for 5 minutes (S02-05). The attempt is charged to sign-in's
-// limits first, and a delayed one is refused without checking either. The
+// limits first, the device's alone with a valid device cookie, and a delayed
+// one is refused without checking either. The
 // code is checked only after the password, so a wrong password never spends
 // one. The password is checked again, under the session's lock, against the
 // hash as it is then (sessions.ts).
 
-import { chargeRateLimits, refundSignIn, SIGN_IN_SCOPES } from '@pixel-scientists/db';
+import { chargeRateLimits, refundSignIn, signInScopes } from '@pixel-scientists/db';
 import { stepUp } from '@pixel-scientists/domain/auth';
 
 import { ApiError } from '../problems.ts';
 import { route, type Route } from '../routes/register.ts';
 import { copyAuthEvent, recordAuthEvent } from './events.ts';
 import { plainAddress } from './limits.ts';
+import { countedClient } from './limits/devices.ts';
 import { verifyNothing, verifyPassword } from './passwords.ts';
 import { answerWithSession, sessionOf, type RouteDependencies } from './routes.ts';
 import { currentPassword, detailsOf, lockSession, rotateSession } from './sessions.ts';
@@ -37,8 +39,9 @@ export function stepUpRoutes(deps: RouteDependencies, totpKey: () => Promise<Tot
       const email = await session.email();
       const { ip, userAgent } = deps.client(requestId);
       const client = { identifier: deps.keepIdentifier(email), ip: plainAddress(ip) };
+      const counted = await countedClient(deps, requestId, 'console', email, client);
 
-      const charged = await chargeRateLimits(deps.auth, SIGN_IN_SCOPES, client);
+      const charged = await chargeRateLimits(deps.auth, signInScopes(counted), counted);
       if (charged.refused) throw tooMany(deps, requestId, charged.retryAfter);
 
       const account = await users
@@ -60,7 +63,7 @@ export function stepUpRoutes(deps: RouteDependencies, totpKey: () => Promise<Tot
         // A password that a reset has replaced since it was checked does not count.
         const confirmed = matched && (await currentPassword(trx, userId)) === account?.password;
         if (confirmed && (await useCode(trx, key, userId, code, 'verify'))) {
-          await refundSignIn(trx, client);
+          await refundSignIn(trx, counted);
           const token = await rotateSession(trx, current, {
             reauthenticated: true,
             ip: client.ip,
