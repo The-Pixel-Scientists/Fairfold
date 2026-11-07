@@ -32,16 +32,20 @@ export interface AuthAuditCopyPending {
 }
 
 export interface AuthAuditEvent {
+  backup_notice_count: number | null;
   code: string;
   id: Generated<string>;
   identifier: string | null;
   ip_address: string | null;
+  key_version: number | null;
   occurred_at: Generated<Timestamp>;
   purged_count: number | null;
   reason: string | null;
   request_id: string;
   retain_until: Timestamp;
+  sso_count: number | null;
   tenant_id: string | null;
+  totp_count: number | null;
   user_id: string | null;
 }
 

@@ -174,6 +174,10 @@ export const auth: ClassificationRegistry = {
     identifier: auditPersonal,
     ip_address: auditPersonal,
     purged_count: audit,
+    key_version: audit,
+    totp_count: audit,
+    sso_count: audit,
+    backup_notice_count: audit,
   },
   'auth.audit_copy_pending': {
     auth_event_id: pending,

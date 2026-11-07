@@ -49,3 +49,4 @@ platform.auth.passkey_added: Passkey added
 platform.auth.passkey_removed: Passkey removed
 platform.auth.audit_purged: Audit purged
 platform.auth.password_check_setting_changed: Password check setting changed
+platform.auth.secrets_re_encrypted: Secrets re encrypted
