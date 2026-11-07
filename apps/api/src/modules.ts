@@ -44,6 +44,27 @@ import { ApiError } from './problems.ts';
 import { publicRoutes } from './public/index.ts';
 import type { PublicLog } from './public/tenants.ts';
 import { route, type Route } from './routes/register.ts';
+import type { ModuleJob } from './worker/registry.ts';
+
+/** What the platform reads from a module's server entry point besides its routes. */
+export interface ModuleServer {
+  readonly jobs?: readonly ModuleJob[];
+}
+
+/**
+ * The jobs of every registered module server, whether or not a tenant has the
+ * module on: each handler checks its module inside the tenant transaction. A
+ * queue two modules both define stops start-up.
+ */
+export function collectModuleJobs(servers: readonly ModuleServer[]): readonly ModuleJob[] {
+  const jobs = servers.flatMap((server) => server.jobs ?? []);
+  const names = new Set<string>();
+  for (const { queue } of jobs) {
+    if (names.has(queue.name)) throw new Error(`The queue ${queue.name} is defined twice.`);
+    names.add(queue.name);
+  }
+  return jobs;
+}
 
 export interface ComposedModules {
   readonly routes: readonly Route[];
