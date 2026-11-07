@@ -41,6 +41,28 @@ function change(client: pg.ClientBase, id: string, set: string, values: unknown[
   return outcome(client, `UPDATE app.file SET ${set} WHERE id = $1`, [id, ...values]);
 }
 
+/** Change file `id`, read `read` inside the same transaction, then undo the change. */
+async function readAfter<T>(
+  client: pg.ClientBase,
+  id: string,
+  set: string,
+  values: unknown[] = [],
+  read: (client: pg.ClientBase) => Promise<T> = (inside) => row(inside, id) as Promise<T>,
+): Promise<T> {
+  await client.query('SAVEPOINT read_after');
+  try {
+    await client.query(`UPDATE app.file SET ${set} WHERE id = $1`, [id, ...values]);
+    return await read(client);
+  } finally {
+    await client.query('ROLLBACK TO SAVEPOINT read_after');
+  }
+}
+
+/** Change file `id` and keep the change for what follows. */
+async function keep(client: pg.ClientBase, id: string, set: string, values: unknown[] = []) {
+  await client.query(`UPDATE app.file SET ${set} WHERE id = $1`, [id, ...values]);
+}
+
 const WITHHOLD = "scan_state = 'withheld', storage_key = $2, scan_version = 2";
 const RESTORE = "scan_state = 'clean', storage_key = $2, scan_version = 3";
 const DELETE_WITHHELD = "scan_state = 'infected', sha256 = NULL, storage_key = NULL";
@@ -71,7 +93,9 @@ describe('app.file after its verdict', { timeout: 30_000 }, () => {
     await asRoleIn('app_api', tenant.id, async (client) => {
       const id = await addFile(client, tenant, member);
       expect(await change(client, id, 'scan_version = 1, updated_by = $2', [member])).toBe('ok');
-      expect(await row(client, id)).toMatchObject({ scan_version: 1, scanned_now: true });
+      expect(
+        await readAfter(client, id, 'scan_version = 1, updated_by = $2', [member]),
+      ).toMatchObject({ scan_version: 1, scanned_now: true });
       expect(await change(client, id, WITHHOLD, [clean(id)])).toBe('23514');
       expect(
         await change(client, id, WITHHOLD.replace(', scan_version = 2', ', scan_version = NULL'), [
@@ -79,13 +103,19 @@ describe('app.file after its verdict', { timeout: 30_000 }, () => {
         ]),
       ).toBe('23514');
       expect(await change(client, id, WITHHOLD, [withheld(id)])).toBe('ok');
-      expect(await row(client, id)).toMatchObject({
+      expect(await readAfter(client, id, WITHHOLD, [withheld(id)])).toMatchObject({
         scan_state: 'withheld',
         storage_key: withheld(id),
         scan_version: 2,
       });
-      const { rows } = await client.query('SELECT updated_by FROM app.file WHERE id = $1', [id]);
-      expect(rows[0]).toEqual({ updated_by: member });
+      const updatedBy = await readAfter(client, id, 'scan_version = 1', [], async (inside) => {
+        const { rows } = await inside.query<{ updated_by: string }>(
+          'SELECT updated_by FROM app.file WHERE id = $1',
+          [id],
+        );
+        return rows[0];
+      });
+      expect(updatedBy).toEqual({ updated_by: member });
     });
   });
 
@@ -108,12 +138,13 @@ describe('app.file after its verdict', { timeout: 30_000 }, () => {
       expect(await change(client, held, "scan_state = 'infected'")).toBe('23514');
       expect(await change(client, held, RESTORE, [clean(held)])).toBe('55000');
       expect(await change(client, held, DELETE_WITHHELD)).toBe('ok');
-      expect(await row(client, held)).toMatchObject({
+      expect(await readAfter(client, held, DELETE_WITHHELD)).toMatchObject({
         scan_state: 'infected',
         sha256: null,
         storage_key: null,
         scanned_now: false,
       });
+      await keep(client, held, DELETE_WITHHELD);
       expect(await change(client, held, "scan_state = 'error'")).toBe('55000');
     });
   });
@@ -128,7 +159,7 @@ describe('app.file after its verdict', { timeout: 30_000 }, () => {
       );
       expect(await change(client, held, 'scan_version = 3')).toBe('ok');
       expect(await change(client, held, RESTORE, [clean(held)])).toBe('ok');
-      expect(await row(client, held)).toMatchObject({
+      expect(await readAfter(client, held, RESTORE, [clean(held)])).toMatchObject({
         scan_state: 'clean',
         storage_key: clean(held),
         scan_version: 3,
@@ -174,6 +205,7 @@ describe('app.file after its verdict', { timeout: 30_000 }, () => {
     await asRoleIn('migrator', tenant.id, async (client) => {
       expect(await change(client, held, 'erased_at = now(), scan_version = 9')).toBe('55000');
       expect(await change(client, held, 'erased_at = now()')).toBe('ok');
+      await keep(client, held, 'erased_at = now()');
       const { rows } = await client.query('SELECT name FROM app.file WHERE id = $1', [held]);
       expect(rows[0]).toEqual({ name: 'Erased file' });
       expect(await row(client, held)).toMatchObject({

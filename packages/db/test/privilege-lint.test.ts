@@ -59,7 +59,12 @@ describe('privilege lint', () => {
         GRANT INSERT ON app.audit_event TO app_api;
         GRANT UPDATE (action), INSERT (retain_until) ON app.audit_event TO app_operator;
         GRANT TRUNCATE ON app.tenant_module TO app_operator;
+      `);
+      // Only the function's owner may grant on it.
+      await client.query(`
+        SET LOCAL ROLE owner_app_tenant_ids;
         GRANT EXECUTE ON FUNCTION app.tenant_ids() TO app_operator;
+        RESET ROLE;
       `);
       return findPrivilegeProblems(client, [...EXCEPTED_SCHEMAS.keys()]);
     });

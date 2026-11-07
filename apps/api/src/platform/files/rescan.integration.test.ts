@@ -15,8 +15,10 @@ import {
   asMigratorIn,
   committedIn,
   createTestTenant,
+  insertRow,
   type TestTenant,
 } from '../../../../../packages/db/test/tenants.ts';
+import { addApplication } from '../../../../../packages/db/test/grants/application-fixtures.ts';
 import { trustedTenantId } from '../../../../../packages/db/src/tenant-context.ts';
 import { addMember, events, type Member } from '../../../test/settings-api.ts';
 import { recordAudit, recordRead } from '../../audit/writer.ts';
@@ -236,7 +238,8 @@ describe('the hash check', () => {
     await expect(sender(objects, 'clean')(adminA, id)).rejects.toMatchObject({ status: 404 });
     objects.delete(key);
     await expect(sender(objects, 'clean')(adminA, id)).rejects.toMatchObject({ status: 404 });
-    expect(await events(tenantA, 'platform.file.downloaded')).toHaveLength(1);
+    const downloads = await events(tenantA, 'platform.file.downloaded');
+    expect(downloads.filter((event) => event.entity_id === id)).toEqual([]);
   });
 });
 
@@ -532,8 +535,16 @@ describe('the tenant files job', { timeout: 60_000 }, () => {
   const releasedFile = async (member: Member, objects: Map<string, Buffer>) => {
     const id = await cleanFile(member, objects, 200);
     await asMigratorIn(member.tenant.id, async (client) => {
-      await client.query('UPDATE app.file SET linked_at = now() WHERE id = $1', [id]);
-      await client.query('UPDATE app.file SET released_at = now() WHERE id = $1', [id]);
+      // Only a link's triggers may set linked_at and released_at (0041).
+      const { id: application, parts } = await addApplication(client, member.tenant);
+      const link = await insertRow(client, 'grants.application_file', {
+        tenant_id: member.tenant.id,
+        application_id: application,
+        file_id: id,
+        field_id: 'f_accounts',
+        created_by: parts.member,
+      });
+      await client.query('DELETE FROM grants.application_file WHERE id = $1', [link]);
     });
     return id;
   };
@@ -622,9 +633,11 @@ describe('the tenant files job', { timeout: 60_000 }, () => {
     expect(steps).toEqual(['sweep', 'recheck']);
     expect(await row(tenantA, releasedA)).toBeUndefined();
 
-    const [sweep] = await events(tenantA, 'platform.file_sweep.completed');
+    // Other tests leave their own events; this job's are the last of each.
+    const sweep = (await events(tenantA, 'platform.file_sweep.completed')).at(-1);
+    const rechecks = await events(tenantA, 'platform.file_recheck.completed');
 
     expect(JSON.stringify(sweep?.changes)).toContain('"after":1');
-    expect(await events(tenantA, 'platform.file_recheck.completed')).toHaveLength(1);
+    expect(rechecks.length).toBeGreaterThan(0);
   });
 });

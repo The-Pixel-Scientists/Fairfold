@@ -164,7 +164,7 @@ describe('schema lint', () => {
       return findSchemaProblems(client, registry);
     });
 
-    const allRoles = 'app_api, app_auth, app_queue, app_worker';
+    const allRoles = 'app_api, app_auth, app_operator, app_queue, app_worker';
     expect(problems).toEqual(
       [
         'app.lint_bare does not enable row-level security.',
