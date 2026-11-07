@@ -7,7 +7,10 @@
 // them against a stand-in. It needs the stack (`pnpm stack`, then
 // `pnpm test:stack -- decisions`) and the seed's `applications` scenario, which
 // holds six submitted applications to the Autumn 2026 round, one of them
-// withdrawn, with Northfield's reviewers assigned to those in Review:
+// withdrawn, with Northfield's reviewers assigned to those in Review. The
+// manager has already recorded two of their decisions, released neither: an
+// award of £18,000 and a decline. The journey records the other three and
+// releases all five:
 //
 //   TPS_E2E_MANAGER_EMAIL     the programme manager's email address
 //   TPS_E2E_MANAGER_PASSWORD  the seed password
@@ -48,6 +51,21 @@ async function decisionEmails(): Promise<number> {
   const found = await fetch(`${MAILPIT}/api/v1/search?query=${query}`);
   const { messages_count: count } = (await found.json()) as { messages_count: number };
   return count;
+}
+
+/** Opens a submission with no decision yet, from the list of the round's decisions, and gives its name. */
+async function openFirstUndecided(page: Page): Promise<string> {
+  await openFirstSubmission(page);
+  await openDecisions(page);
+  const link = decisionRows(page)
+    .filter({ hasText: 'No decision yet' })
+    .first()
+    .getByRole('rowheader')
+    .getByRole('link');
+  const name = ((await link.textContent()) ?? '').trim();
+  await link.click();
+  await expect(h1(page, name)).toBeFocused();
+  return name;
 }
 
 /** Signs in as the programme manager, setting up the authenticator app on the first run and using its key after. Gives the last code used. */
@@ -98,12 +116,14 @@ test.describe('the decisions journey against the real API', () => {
     const before = await decisionEmails();
 
     // Step 12: one award from the submission's page, the rest in bulk. Nothing goes to applicants.
-    await openFirstSubmission(page);
+    await openFirstUndecided(page);
     await recordAwardFromTheDetail(page, '12,500');
     await openDecisions(page);
-    await expectBudgetWords(page, /^£12,500 of £[\d,]+, £[\d,]+ left$/);
-    await recordSeveral(page, 2, 'Waitlisted');
-    await recordSeveral(page, 2, 'Declined');
+    // With the seed's award of £18,000 to Friends of Elm Park.
+    await expectBudgetWords(page, '£30,500 of £150,000, £119,500 left');
+    await recordSeveral(page, 1, 'Waitlisted');
+    await recordSeveral(page, 1, 'Declined');
+    await expect(decisionRows(page).filter({ hasText: 'No decision yet' })).toHaveCount(0);
     await expect(decisionsTable(page).getByText('Released', { exact: true })).toHaveCount(0);
     expect(await decisionEmails()).toBe(before);
 
