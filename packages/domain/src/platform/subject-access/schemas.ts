@@ -56,6 +56,7 @@ export const subjectFieldIdSchema = z
 
 /** One value, with its field's sensitivity from the classification map or the pinned form version. */
 export const subjectDataCellSchema = z.strictObject({
+  // nosemgrep: tps-no-loose-api-schema -- the file a subject access job writes, never a request or response body: a cell holds whatever the subject's column or answer holds, as JSON (ADR 0027)
   value: z.json(),
   sensitivity: z.enum(classifications),
 });

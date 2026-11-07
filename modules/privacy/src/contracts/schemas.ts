@@ -41,6 +41,7 @@ export function choice<const T extends readonly [string, ...string[]]>(
   message: PrivacyMessage,
 ) {
   const allowed: readonly string[] = values;
+  // nosemgrep: tps-contracts-meta-claims-no-checks -- the enum lists exactly the values the z.enum(values) pipe below checks, for the OpenAPI document; refine() gives the catalogue message first (ADR 0004)
   return z
     .string()
     .refine((value) => allowed.includes(value), { ...says(message), abort: true })

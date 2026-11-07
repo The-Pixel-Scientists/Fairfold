@@ -41,6 +41,7 @@ export function choice<const T extends readonly [string, ...string[]]>(
   message: CrmMessage,
 ) {
   const allowed: readonly string[] = values;
+  // nosemgrep: tps-contracts-meta-claims-no-checks -- the enum lists exactly the values the z.enum(values) pipe below checks, for the OpenAPI document; refine() gives the catalogue message first (ADR 0004)
   return z
     .string()
     .refine((value) => allowed.includes(value), { ...says(message), abort: true })
@@ -62,6 +63,7 @@ export function unique<T>(key: (item: T) => string) {
  * `x-personal` in the OpenAPI document.
  */
 export function personal<S extends z.ZodType>(schema: S): S {
+  // nosemgrep: tps-contracts-meta-claims-no-checks -- a marker for projection and logging, not a check; marking a field personal only adds protection
   return schema.meta({ 'x-personal': true });
 }
 

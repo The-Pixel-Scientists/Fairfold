@@ -55,8 +55,12 @@ export const idempotencyKeySchema = z
   )
   .toLowerCase();
 
-/** An idempotent route's request headers, for its schema and the OpenAPI document: the key, required. */
-export const idempotencyHeadersSchema = z.looseObject({
+/**
+ * An idempotent route's request headers, for its schema and the OpenAPI
+ * document: the key, required. A request carries other headers too; parsing
+ * keeps only the key, the one header this schema declares.
+ */
+export const idempotencyHeadersSchema = z.object({
   [idempotencyKeyHeader.toLowerCase()]: idempotencyKeySchema,
 });
 
