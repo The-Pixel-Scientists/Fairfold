@@ -41,11 +41,24 @@ export interface AuthAuditEvent {
   user_id: string | null;
 }
 
+export interface AuthDevice {
+  created_at: Generated<Timestamp>;
+  device_hash: Buffer;
+  id: Generated<string>;
+  issued_at: Generated<Timestamp>;
+  key_version: number;
+  last_used_at: Generated<Timestamp>;
+  revoked_at: Timestamp | null;
+  updated_at: Generated<Timestamp>;
+  user_id: string;
+}
+
 export interface AuthRateLimit {
   blocked_until: Timestamp | null;
   client_ip: string | null;
   count: Generated<number>;
   created_at: Generated<Timestamp>;
+  device_id: string | null;
   id: Generated<string>;
   identifier: string | null;
   scope: string;
@@ -108,6 +121,7 @@ export interface DB {
   'auth.account': AuthAccount;
   'auth.audit_copy_pending': AuthAuditCopyPending;
   'auth.audit_event': AuthAuditEvent;
+  'auth.device': AuthDevice;
   'auth.rate_limit': AuthRateLimit;
   'auth.session': AuthSession;
   'auth.two_factor': AuthTwoFactor;
