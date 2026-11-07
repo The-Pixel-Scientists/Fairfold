@@ -8,7 +8,7 @@
 
 import { createHash } from 'node:crypto';
 
-import type { Generated } from '@pixel-scientists/db';
+import { setLocalLockTimeout, type Generated } from '@pixel-scientists/db';
 import { idempotencyProblems } from '@pixel-scientists/domain/api';
 import { messages } from '@pixel-scientists/domain/platform';
 
@@ -29,8 +29,7 @@ type KeyTables = {
   };
 };
 
-/** How long a request waits for another that holds the same key. */
-const LOCK_WAIT = '5s';
+/** SQLSTATE when a statement gives up waiting for a lock. */
 const LOCK_NOT_AVAILABLE = '55P03';
 
 const inProgress = (): ApiError =>
@@ -108,16 +107,10 @@ export async function withIdempotencyKey<T>(
   create: () => Promise<T>,
   replay: (createdId: string | null) => Promise<T>,
 ): Promise<T> {
-  const setLockWait = (wait: string) =>
-    tx
-      .selectNoFrom((eb) =>
-        eb.fn('set_config', [eb.val('lock_timeout'), eb.val(wait), eb.val(true)]).as('set'),
-      )
-      .execute();
   const db = tx.$extendTables<KeyTables>();
 
   // A second insert of the same key waits here for the first transaction to end.
-  await setLockWait(LOCK_WAIT);
+  await setLocalLockTimeout(tx, '5s');
   let reserved: { id: string } | undefined;
   try {
     reserved = await db
@@ -136,7 +129,7 @@ export async function withIdempotencyKey<T>(
     if ((error as { code?: unknown }).code === LOCK_NOT_AVAILABLE) throw inProgress();
     throw error;
   }
-  await setLockWait('0');
+  await setLocalLockTimeout(tx, 'default');
 
   if (reserved !== undefined) {
     const body = await create();

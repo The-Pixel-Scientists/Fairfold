@@ -25,6 +25,7 @@ export {
   type DatabaseSettings,
   type DatabaseTls,
 } from './database.ts';
+export { setLocalLockTimeout } from './lock-timeout.ts';
 export {
   chargeRateLimits,
   EMAIL_SCOPES,

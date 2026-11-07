@@ -335,11 +335,7 @@ describe('the audit-copy replay', { timeout: 60_000 }, () => {
     await recordEvent(member);
     expect(await replay()).toMatchObject({ copied: 1 });
     const setting = await api
-      .selectNoFrom((eb) =>
-        eb
-          .fn<string | null>('current_setting', [eb.val('app.tenant_id'), eb.val(true)])
-          .as('tenant'),
-      )
+      .selectNoFrom((eb) => eb.fn<string | null>('app.current_tenant_id', []).as('tenant'))
       .executeTakeFirstOrThrow();
     expect(setting.tenant ?? '').toBe('');
   });

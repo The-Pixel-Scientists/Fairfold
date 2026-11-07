@@ -305,9 +305,9 @@ describe('the request guard', () => {
 });
 
 describe('a raw upload', () => {
-  const upload = route(attachmentRoutes.uploadAttachment, () =>
-    Promise.reject(new Error('No upload reaches its handler without a session.')),
-  );
+  const refuse = () =>
+    Promise.reject(new Error('No upload reaches its handler without a session.'));
+  const upload = route(attachmentRoutes.uploadAttachment, refuse, { replay: refuse });
   const url =
     '/api/portal/applications/0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b/fields/f_accounts/files';
   const send = (headers: Record<string, string>, to = url) =>
