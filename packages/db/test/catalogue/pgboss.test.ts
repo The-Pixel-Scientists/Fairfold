@@ -32,7 +32,7 @@ describe('the pgboss catalogue', () => {
         const { schema, table } = JOB_RIGHTS[role];
         const expected = [
           ...schema,
-          ...jobTables.flatMap((name) => table.map((right) => right.replace('%', name))),
+          ...jobTables.flatMap((name) => table.map((right) => right.replaceAll('%', name))),
         ];
         const actual = held
           .filter((right) => right.role === role)
