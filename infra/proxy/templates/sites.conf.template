@@ -1,0 +1,63 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# The console and portal hosts. The image's entrypoint fills in the
+# TPS_PROXY_ variables at start-up; one left unset stays as an nginx
+# variable nginx does not know, so the proxy refuses to start.
+#
+#   TPS_PROXY_CONSOLE_HOST, TPS_PROXY_PORTAL_HOST   the host names served
+#   TPS_PROXY_CONSOLE_PORT, TPS_PROXY_PORTAL_PORT   the HTTPS port each is
+#                                                   reached on, for redirects
+#   TPS_PROXY_HSTS   the Strict-Transport-Security value, or empty for none:
+#                    max-age=63072000; includeSubDomains with a real
+#                    certificate (ADR 0030)
+
+upstream api {
+  server api:3000;
+}
+
+upstream console {
+  server console:8080;
+}
+
+upstream portal {
+  server portal:8080;
+}
+
+map "" $hsts {
+  default "${TPS_PROXY_HSTS}";
+}
+
+# Plain HTTP only redirects.
+server {
+  listen 8080;
+  server_name ${TPS_PROXY_CONSOLE_HOST};
+  return 308 https://${TPS_PROXY_CONSOLE_HOST}:${TPS_PROXY_CONSOLE_PORT}$request_uri;
+}
+
+server {
+  listen 8080;
+  server_name ${TPS_PROXY_PORTAL_HOST};
+  return 308 https://${TPS_PROXY_PORTAL_HOST}:${TPS_PROXY_PORTAL_PORT}$request_uri;
+}
+
+server {
+  listen 8443 ssl;
+  server_name ${TPS_PROXY_CONSOLE_HOST};
+  include /etc/nginx/proxy/app.conf;
+
+  location / {
+    include /etc/nginx/proxy/web.conf;
+    proxy_pass http://console;
+  }
+}
+
+server {
+  listen 8443 ssl;
+  server_name ${TPS_PROXY_PORTAL_HOST};
+  include /etc/nginx/proxy/app.conf;
+
+  location / {
+    include /etc/nginx/proxy/web.conf;
+    proxy_pass http://portal;
+  }
+}
