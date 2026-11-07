@@ -2,7 +2,7 @@
 //
 // An application as a task list, its eligibility questions, and its sections.
 
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
@@ -231,7 +231,10 @@ describe('a section', () => {
 
     const heading = await h1('Your project');
 
-    expect(document.activeElement).toBe(heading);
+    // The screen takes focus in an effect, which may run just after the heading shows.
+    await waitFor(() => {
+      expect(document.activeElement).toBe(heading);
+    });
   });
 
   it('opens at the question a link names', async () => {
@@ -239,7 +242,9 @@ describe('a section', () => {
 
     await h1('Your project');
 
-    expect(document.activeElement?.id).toBe('f_people');
+    await waitFor(() => {
+      expect(document.activeElement?.id).toBe('f_people');
+    });
   });
 
   it('shows a question only when an earlier answer asks for it', async () => {
