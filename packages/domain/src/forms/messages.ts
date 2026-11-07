@@ -136,5 +136,9 @@ export const formMessages = {
   totalType: 'Turn off the total. Only number and currency columns can have one.',
   fileTypesUnique: 'Choose each file type only once.',
   fileAudiences: 'Choose who sees the files: the applicant, and staff or reviewers or both.',
+  identityClassification: 'Classify a question that identifies the applicant as personal.',
+  fileClassification: 'Classify file questions as personal. A file can name a person.',
+  specialAudiences: 'Show answers to special category questions only in totals.',
+  aggregateClassification: 'Classify questions shown only in totals as special category.',
   tooManyFields: `Use no more than ${count(MAX_FIELDS)} questions in a form.`,
 } as const;

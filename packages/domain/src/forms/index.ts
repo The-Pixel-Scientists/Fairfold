@@ -14,8 +14,15 @@ export {
 } from './answers.ts';
 export { canSee, projectionAudiences, type ProjectionAudience } from './audience.ts';
 export {
+  answerClassifications,
+  answersUpTo,
+  classificationOf,
+  loweredClassifications,
+} from './classification.ts';
+export {
   audiencesSchema,
   CELL_MAX_CHARACTERS,
+  classifications,
   columnIdSchema,
   conditionSchema,
   fieldAudiences,
@@ -30,6 +37,7 @@ export {
   SHORT_TEXT_MAX_CHARACTERS,
   TABLE_MAX_ROWS,
   tableColumnSchema,
+  type Classification,
   type Condition,
   type FileField,
   type FormField,

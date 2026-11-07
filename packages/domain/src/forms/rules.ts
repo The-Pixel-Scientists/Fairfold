@@ -13,13 +13,17 @@
 //   - a table's column ids differ, only number and currency columns have a
 //     total, and a table controls no condition (it is no choice question);
 //   - a file question lists each type once, is never aggregate only, and
-//     controls no condition or eligibility rule.
+//     controls no condition or eligibility rule;
+//   - identity and file questions are personal or above, and a question is
+//     special category exactly when it is aggregate only (ADRs 0030, 0032).
 
 import type { z } from 'zod';
 
 import { catalogueParams } from '../platform/messages.ts';
 import { canSee, projectionAudiences } from './audience.ts';
+import { classificationOf } from './classification.ts';
 import {
+  classifications,
   definitionShapeSchema,
   fieldsOf,
   type Condition,
@@ -119,6 +123,18 @@ function fieldProblems(field: FormField, path: Path): Problem[] {
       add('allowedTypes', m.fileTypesUnique);
     }
     if (field.audiences === 'aggregate_only') add('audiences', m.fileAudiences);
+  }
+  if (field.type !== 'content') {
+    const level = classificationOf(field);
+    if (classifications.indexOf(level) < classifications.indexOf('personal')) {
+      if (field.type === 'file') add('classification', m.fileClassification);
+      else if (field.identity) add('classification', m.identityClassification);
+    }
+    const aggregateOnly = field.audiences === 'aggregate_only';
+    if (level === 'special_category' && !aggregateOnly) add('audiences', m.specialAudiences);
+    if (aggregateOnly && level !== 'special_category') {
+      add('classification', m.aggregateClassification);
+    }
   }
   return problems;
 }
