@@ -62,6 +62,8 @@ describe('the app schema', () => {
         'owner_app_public_tenant USAGE',
         'owner_app_public_tenant_logo USAGE',
         'owner_auth_session_memberships USAGE',
+        // app.tenant_ids(), migration 0024.
+        'owner_app_tenant_ids USAGE',
       ].sort(),
     });
   });
