@@ -129,9 +129,10 @@ export const app: ClassificationRegistry = {
     updated_by: internal,
   },
   // An uploaded file (ADR 0047). Its name often names a person. A linked
-  // file follows its record's retention rule, as grants.application's; a
-  // refused (infected or error) row, linked to nothing, follows the
-  // 12-month audit floor, for the retention sweep (S11-102).
+  // file follows its record's retention rule, as grants.application's, and
+  // the file sweep removes it once released; a refused (infected or error)
+  // row, linked to nothing, goes 12 months after its scan, the audit floor
+  // (ADR 0030). An erased row keeps no name, hash or key.
   'app.file': {
     tenant_id: internal,
     id: internal,
@@ -143,8 +144,14 @@ export const app: ClassificationRegistry = {
     storage_key: internal,
     scan_state: internal,
     scanned_at: internal,
+    scan_version: internal,
+    linked_at: internal,
+    released_at: internal,
+    erased_at: internal,
     created_by: internal,
     created_at: internal,
+    updated_by: internal,
+    updated_at: internal,
   },
   // An invitation to the team (ADR 0010). The address names a person who may
   // never join, so every row goes 90 days after it expires, whatever its

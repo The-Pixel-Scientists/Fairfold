@@ -59,14 +59,20 @@ export interface AppFile {
   content_type: string;
   created_at: Generated<Timestamp>;
   created_by: string;
+  erased_at: Timestamp | null;
   id: Generated<string>;
+  linked_at: Timestamp | null;
   name: string;
+  released_at: Timestamp | null;
   scan_state: Generated<string>;
+  scan_version: number | null;
   scanned_at: Timestamp | null;
   sha256: Buffer | null;
   size_bytes: Int8;
   storage_key: string | null;
   tenant_id: string;
+  updated_at: Generated<Timestamp>;
+  updated_by: string | null;
 }
 
 export interface AppIdempotencyKey {
@@ -137,7 +143,7 @@ export interface AppMembership {
 
 export interface AppRequestLimit {
   bucket: string;
-  count: number;
+  count: Int8;
   expires_at: Generated<Timestamp>;
   key_hash: Buffer;
   window_start: Timestamp;

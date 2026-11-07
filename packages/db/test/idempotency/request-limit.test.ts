@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// app.request_limit (migration 0017): a store of hashed client keys and
-// counters with no tenant, which app_api may upsert but not delete, which
-// app_worker sees only once expired, and whose expiry the database sets.
+// app.request_limit (migrations 0017 and 0041): a store of hashed client
+// keys and counters with no tenant, which app_api may upsert but not
+// delete, which app_worker sees only once expired, and whose expiry the
+// database sets. Upload byte counters need a bigint count (ADR 0030).
 
 import { randomBytes } from 'node:crypto';
 
@@ -67,18 +68,25 @@ describe('app.request_limit', { timeout: 30_000 }, () => {
            RETURNING count, expires_at - window_start = interval '24 hours' AS day`,
           [hash, start],
         );
-      expect((await upsert()).rows).toEqual([{ count: 1, day: true }]);
-      expect((await upsert()).rows).toEqual([{ count: 2, day: true }]);
+      expect((await upsert()).rows).toEqual([{ count: '1', day: true }]);
+      expect((await upsert()).rows).toEqual([{ count: '2', day: true }]);
     });
   });
 
-  it.each([
+  it.each<[string, Row, string]>([
     ['refuses a clear IPv4 address', { key_hash: Buffer.from([192, 0, 2, 1]) }, '23514'],
     ['refuses a clear identifier', { key_hash: Buffer.from('jo@example.test') }, '23514'],
     ['refuses a 16-byte hash', { key_hash: randomBytes(16) }, '23514'],
     ['refuses an unknown bucket', { bucket: 'sign_in' }, '23514'],
     ['refuses a negative count', { count: -1 }, '23514'],
     ['accepts a 32-byte hash in a known bucket', { bucket: 'probe' }, 'ok'],
+    ...[
+      'upload_files_membership',
+      'upload_bytes_membership',
+      'upload_files_address',
+      'upload_bytes_address',
+    ].map((bucket): [string, Row, string] => [`accepts the ${bucket} bucket`, { bucket }, 'ok']),
+    ['accepts a count of bytes past 2^31', { count: '4294967296' }, 'ok'],
   ])('%s', async (_, change: Row, expected) => {
     await rolledBack('app_api', async (client) => {
       const { text, values } = insertStatement(client, LIMITS, counter(change));

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// app.file (migration 0008): isolation, the columns app_api may write, the
-// one-way scan state, the storage key rule and the checks on each column.
+// app.file (migrations 0008 and 0041): isolation, the columns app_api may
+// write, the verdict on a pending file, the storage key rule and the checks
+// on each column. file-withheld.test.ts covers the changes after a verdict.
 
 import { createHash, randomUUID } from 'node:crypto';
 
@@ -132,7 +133,7 @@ describe('app.file', { timeout: 30_000 }, () => {
       });
 
       expect(await scan(client, id, 'error', null, null)).toBe('55000');
-      expect(await outcome(client, 'UPDATE app.file SET scan_state = scan_state')).toBe('55000');
+      expect(await scan(client, id, 'pending', null, null)).toBe('55000');
     });
   });
 
@@ -187,6 +188,8 @@ describe('app.file', { timeout: 30_000 }, () => {
         'created_by = created_by',
         'scanned_at = now()',
         'created_at = now()',
+        'erased_at = now()',
+        'updated_at = now()',
         'tenant_id = tenant_id',
         'id = id',
       ]) {
@@ -220,7 +223,8 @@ describe('app.file', { timeout: 30_000 }, () => {
         [id],
       );
       expect((await stored(client, id))?.scanned_now).toBe(true);
-      expect(await outcome(client, "UPDATE app.file SET name = 'Renamed.pdf'")).toBe('55000');
+      expect(await outcome(client, "UPDATE app.file SET name = 'Renamed.pdf'")).toBe('23514');
+      expect(await scan(client, id, 'clean', HASH, keyOf(tenant.id, id))).toBe('55000');
     });
   });
 
