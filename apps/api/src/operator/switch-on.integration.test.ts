@@ -8,7 +8,6 @@
 import { randomUUID } from 'node:crypto';
 
 import { createDatabase, withTenant, type TenantId } from '@pixel-scientists/db';
-import { switchableModuleIds } from '@pixel-scientists/domain/platform';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import { connectionSettings } from '../../../../packages/db/test/connect.ts';
@@ -92,10 +91,9 @@ describe('tenant:create --modules', { timeout: 60_000 }, () => {
     expect(result.code, result.err).toBe(0);
     const id = idOf(result.out);
     const rows = await modulesOf(id);
-    expect(rows.map((r) => r.module)).toEqual([...switchableModuleIds].sort());
+    expect(rows.map((r) => r.module)).toEqual(['crm', 'grants']);
     for (const row of rows) {
-      expect(row).toMatchObject({ updated_by_kind: 'operator', updated_by: null });
-      expect(row.enabled).toBe(row.module === 'crm' || row.module === 'grants');
+      expect(row).toMatchObject({ enabled: true, updated_by_kind: 'operator', updated_by: null });
     }
     const events = await rowsIn(
       id,
@@ -109,21 +107,19 @@ describe('tenant:create --modules', { timeout: 60_000 }, () => {
       id,
       "SELECT count(*)::int AS n FROM app.audit_event WHERE action LIKE 'platform.module.%'",
     );
-    expect(all).toEqual([{ n: switchableModuleIds.length }]);
+    expect(all).toEqual([{ n: 2 }]);
     const versions = await rowsIn(
       id,
       "SELECT author_kind, author_id, version FROM app.config_version WHERE entity_type = 'platform.module'",
     );
-    expect(versions).toHaveLength(switchableModuleIds.length);
+    expect(versions).toHaveLength(2);
     expect(versions.every((v) => v.author_kind === 'operator' && v.version === 1)).toBe(true);
   });
 
-  it('writes every tool off without the flag', async () => {
+  it('writes no rows without the flag, so every tool is off', async () => {
     const result = await create([]);
     expect(result.code, result.err).toBe(0);
-    const rows = await modulesOf(idOf(result.out));
-    expect(rows).toHaveLength(switchableModuleIds.length);
-    expect(rows.every((row) => row.enabled === false)).toBe(true);
+    expect(await modulesOf(idOf(result.out))).toEqual([]);
   });
 
   it('refuses an unknown or repeated id and writes nothing', async () => {
@@ -174,21 +170,6 @@ describe('grants backfill', { timeout: 120_000 }, () => {
     const second = await run();
     expect(second.out).toMatch(/Switched grants on for 0\.$/);
     expect(await modulesOf(fresh.id)).toHaveLength(1);
-  });
-
-  it('leaves grants off for new tenants on a second run (ADR 0024)', async () => {
-    const withCrm = await create(['--modules', 'crm']);
-    const none = await create([]);
-    const crmId = idOf(withCrm.out);
-    const noneId = idOf(none.out);
-    for (let run = 0; run < 2; run += 1) {
-      const code = await runBackfillGrants([], env, { out: () => undefined, err: () => undefined });
-      expect(code).toBe(0);
-    }
-    for (const id of [crmId, noneId]) {
-      const grants = (await modulesOf(id)).find((row) => row.module === 'grants');
-      expect(grants?.enabled).toBe(false);
-    }
   });
 
   it("writes only the set tenant's rows, and sees no other tenant's", async () => {

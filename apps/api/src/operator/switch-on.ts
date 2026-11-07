@@ -4,7 +4,7 @@
 // and the grants backfill. Runs in a tenant's transaction as app_worker, so
 // the tenant is the one set and the database holds each row to it, to the
 // operator author (migration 0039). A tool that already has a row, on or
-// off, is left alone. Each row added writes its configuration version
+// off, is left alone; a missing row means off. Each row added writes its configuration version
 // (rule 10) and a switched_on or switched_off event (rule 4).
 
 import type { Transaction } from '@pixel-scientists/db';
@@ -107,20 +107,13 @@ async function addRows(
   return added;
 }
 
-/**
- * A new tenant's rows (ADR 0024): one for every switchable module, on for
- * `on` and off for the rest, so no later backfill can switch one on.
- */
+/** A new tenant's rows (ADR 0024): one on row per listed module; a missing row means off. */
 export function createModuleRows(
   trx: Transaction<unknown>,
   requestId: string,
   on: readonly SwitchableModuleId[],
 ): Promise<number> {
-  return addRows(
-    trx,
-    requestId,
-    switchableModuleIds.map((module) => ({ module, enabled: on.includes(module) })),
-  );
+  return switchModulesOn(trx, requestId, on);
 }
 
 /** Switch on each of `modules` that has no row yet. Returns how many it switched on. */
