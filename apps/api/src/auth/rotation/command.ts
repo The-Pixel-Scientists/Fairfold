@@ -2,15 +2,16 @@
 //
 // The secret re-encryption command (ADR 0010, "Secrets at rest"), run once
 // before an old auth key version is removed. It reads the auth settings as
-// the API does, refuses to start unless they pass the API's checks and name
-// more than one key version, and connects only as app_auth. It prints counts
+// the API does, including every TPS_AUTH_SECRET_<n> version and
+// TPS_AUTH_SECRET_CURRENT, refuses to start unless they pass the API's checks
+// and name more than one key version, and connects only as app_auth. It prints counts
 // and codes, never a secret, an id or an address.
 
 import { randomUUID } from 'node:crypto';
 
 import { createDatabase, type Env } from '@pixel-scientists/db';
 
-import { ConfigError, loadConfig, type Secret } from '../../config.ts';
+import { ConfigError, loadConfig } from '../../config.ts';
 import { createSender, type Sender } from '../../email/sender.ts';
 import { createSmtpTransport } from '../../email/transport.ts';
 import { createLogger } from '../../logger.ts';
@@ -31,8 +32,6 @@ const UNUSED = {
 } as const;
 
 export interface Options {
-  /** The auth secret by key version; the settings' one secret is version 1. */
-  readonly secrets?: ReadonlyMap<number, Secret>;
   /** Replaces the configured mail server. */
   readonly sender?: Sender;
 }
@@ -53,13 +52,12 @@ export async function runSecretReencryption(
     for (const problem of error.problems) output.err(problem);
     return 2;
   }
-  const secrets = options.secrets ?? new Map([[1, settings.secret]]);
-  if (secrets.size < 2) {
+  if (settings.secrets.versions.size < 2) {
     output.err('Only one auth key version is configured, so there is nothing to re-encrypt.');
     return 2;
   }
 
-  const keys = rotationKeys(secrets);
+  const keys = rotationKeys(settings.secrets);
   const log = createLogger({ level: 'warn' });
   const { database, smtp } = config;
   const auth = createDatabase<unknown>({
