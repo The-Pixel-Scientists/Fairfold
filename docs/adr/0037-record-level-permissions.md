@@ -610,19 +610,36 @@ only like this:
   reviewer read of an application is audited.
 - Reads during a grant are audited the same way, and the review screen ties
   them to the grant by member and time.
-- **Audit events about a restricted record.** An event whose entity is a
-  restricted record, one of its children or access rows, a grant on it or
-  one of its held-back subject access items carries the record's type and
-  id in two new columns of `app.audit_event`, `reach_record_type` and
-  `reach_record_id`, set by the writer from the record it loaded (rule 6).
-  The audit log route lists such an event only to a reader who reaches
-  that record now without break-glass, through the shared filter, and
-  never resolves its label otherwise. The break-glass review screen shows
+- **Audit events about a restrictable record.** Every event whose entity is
+  a record of a restrictable type, one of its children or access rows, a
+  grant on it or one of its held-back subject access items carries the
+  record's type and id in two new columns of `app.audit_event`,
+  `reach_record_type` and `reach_record_id`, set by the writer from the
+  record it loaded (rule 6), whether or not the record is restricted when
+  the event is written. So the events from creating, naming and editing a
+  record before it is restricted are tagged like the ones after. The audit
+  action catalogue marks each action on a restrictable type, and the
+  writer refuses such an action without both columns.
+- The filter reads the record's state at read time, never at write time.
+  The audit log route lists a tagged event only to a reader who reaches
+  that record now without break-glass, through the shared filter: anyone
+  with the permission while it is unrestricted, only those with an access
+  row while it is restricted. A tagged event whose record no longer exists
+  is treated as restricted with no access rows. The route never resolves a
+  label it would not list. Subject access applies the same current-state
+  filter to the requester (below). The break-glass review screen shows
   a reviewer the grant under review and the read events during it, by id,
   never the record's subject. This filter is in the API only: the audit
   table keeps its tenant policy, since the subject access job and the
   review screen read it, and its rows hold ids and codes, never content.
   Reading the audit log is still not itself audited.
+- Tests S12-79 must name: a record created and named while unrestricted,
+  then restricted, has its creation and naming events hidden from a reader
+  who does not reach it, in the audit log and in that reader's subject
+  access output, and shown again once the restriction is lifted; a record
+  restricted from creation in one transaction shows none of its events to
+  such a reader; and an event about a restrictable record written without
+  the reach columns is refused by the writer.
 
 ### Subject access and erasure
 
