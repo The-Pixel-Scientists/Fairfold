@@ -6,15 +6,25 @@
 // prints which, to standard error, and exits with status 1 before it opens a
 // port or a database connection.
 
+// Installs the outbound rules (ADR 0010). Keep it first: it must run before any
+// other module loads and can make a request.
+import './outbound/install.ts';
+
 import { buildApp } from './app.ts';
 import { loadAuthSettings, createAuth, type AuthSettings } from './auth/index.ts';
 import { ConfigError, loadConfig, type Config } from './config.ts';
 import { openDatabase } from './database.ts';
-import { createFileService, loadFileSettings, type FileSettings } from './platform/files/index.ts';
+import {
+  createFileService,
+  createStorage,
+  loadFileSettings,
+  type FileSettings,
+} from './platform/files/index.ts';
 import { createSender } from './email/sender.ts';
 import { createSmtpTransport } from './email/transport.ts';
 import { createLogger } from './logger.ts';
 import { composeModules } from './modules.ts';
+import { pinnedFetch } from './outbound/pinned.ts';
 import {
   loadTelemetrySettings,
   startTelemetry,
@@ -95,7 +105,11 @@ async function main(): Promise<void> {
       logger,
       checkDatabase: () => database.check(),
       inTenant: database.inTenant,
-      files: createFileService(fileSettings),
+      // The object store is a fixed destination: its own pinned client, not the global one.
+      files: createFileService(
+        fileSettings,
+        createStorage(fileSettings.storage, pinnedFetch(fileSettings.storage.endpoint)),
+      ),
       auth,
       ...composeModules({
         publicTenants: database.publicTenants,

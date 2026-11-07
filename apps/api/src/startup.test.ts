@@ -88,14 +88,25 @@ describe('starting the API', () => {
     expect(result.stderr).not.toContain('leak-7q');
   });
 
-  it.each(['HTTP_PROXY', 'https_proxy', 'NODE_USE_ENV_PROXY'])(
-    'refuses to start with %s set, before it opens a port',
-    (name) => {
-      const result = start({ [name]: 'http://proxy.example.org:3128' });
+  it.each(
+    ['HTTP_PROXY', 'HTTPS_PROXY', 'NODE_USE_ENV_PROXY'].flatMap((name) => [
+      name,
+      name.toLowerCase(),
+    ]),
+  )('refuses to start with %s set, before it reads any setting or opens a port', (name) => {
+    const result = start({ [name]: 'http://user:proxy-secret-7q@proxy.example.org:3128' });
 
-      expect(result.status).toBe(1);
-      expect(result.stdout).toBe('');
-      expect(result.stderr).toContain(`${name} is set. The API does not use a proxy`);
-    },
-  );
+    expect(result.status).toBe(1);
+    expect(result.stdout).toBe('');
+    expect(result.stderr).toContain(`${name} is set. The API does not use a proxy`);
+    expect(result.stderr).not.toContain('proxy-secret-7q');
+    expect(result.stderr).not.toContain('TPS_API_HOST');
+  });
+
+  it('refuses a proxy variable set to an empty string', () => {
+    const result = start({ HTTPS_PROXY: '' });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('HTTPS_PROXY is set.');
+  });
 });

@@ -12,6 +12,7 @@ import { createStorage, type Storage } from './storage.ts';
 import type { FileService } from './types.ts';
 
 export { loadFileSettings, type FileSettings } from './settings.ts';
+export { createStorage } from './storage.ts';
 export type {
   FileReply,
   FileRequest,
