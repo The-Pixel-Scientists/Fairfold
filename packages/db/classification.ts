@@ -3,14 +3,15 @@
 // The field classification map (architecture rule 5). Every column of every
 // table in an application schema is registered here with a sensitivity level
 // and a retention rule. Export, subject access requests, erasure and the
-// warehouse feed read it. The schema-lint test (packages/db/test) fails if a
-// column is missing from the map, or the map names a column that does not
-// exist.
+// warehouse feed read it. Beside the columns, each table records the path
+// from its rows to the party they are about (ADR 0027). The schema-lint test
+// (packages/db/test) fails if a column is missing from the map, the map
+// names a column that does not exist, or a path is missing or broken.
 
-import { app } from './classification/app.ts';
-import { auth } from './classification/auth.ts';
-import { grants } from './classification/grants.ts';
-import { party } from './classification/party.ts';
+import { app, appSubjects } from './classification/app.ts';
+import { auth, authSubjects } from './classification/auth.ts';
+import { grants, grantsSubjects } from './classification/grants.ts';
+import { party, partySubjects } from './classification/party.ts';
 
 /** How sensitive a field's values are, from least to most. */
 export const SENSITIVITIES = ['public', 'internal', 'personal', 'special_category'] as const;
@@ -57,16 +58,50 @@ export type ClassificationRegistry = Readonly<
 >;
 
 /**
- * Every schema's map, from its own file in classification/ (ADR 0016). A
- * file may name only its own schema's tables, so no table is in two maps.
+ * The path from a table's row to the party it is about (ADR 0027, "Subject
+ * paths"). Subject access, erasure and export follow it. The column may be
+ * null on a row with no known subject.
+ * - `party`: the column holds a party id: it is a party key itself, or
+ *   references `party.party`, `party.person` or `party.organisation`.
+ * - `join`: the column is a foreign key to `table`, whose path continues.
+ * - `account`: the column holds an `auth.user` id, which reaches a person in
+ *   a tenant through `party.person.user_id`.
+ * - `unlinked`: the personal values belong to no known subject, for `reason`.
+ *   Every column is kept for a fixed 12 months or less.
  */
-export const classification: ClassificationRegistry = Object.fromEntries(
-  Object.entries({ app, auth, party, grants }).flatMap(([schema, tables]) =>
-    Object.entries(tables).map(([table, fields]) => {
-      if (!table.startsWith(`${schema}.`)) {
-        throw new Error(`classification/${schema}.ts names ${table}, outside its schema.`);
-      }
-      return [table, fields] as const;
-    }),
-  ),
-);
+export type SubjectPath =
+  | { readonly kind: 'party' | 'account'; readonly column: string }
+  | { readonly kind: 'join'; readonly column: string; readonly table: string }
+  | { readonly kind: 'unlinked'; readonly reason: string };
+
+/** Each table's subject path: `{ 'schema.table': path }`. */
+export type SubjectPathRegistry = Readonly<Record<string, SubjectPath>>;
+
+/**
+ * Merge one map per schema, each from its own file in classification/ (ADR
+ * 0016). A file may name only its own schema's tables, so no table is in two
+ * maps.
+ */
+export function mergeSchemaMaps<T>(
+  maps: Readonly<Record<string, Readonly<Record<string, T>>>>,
+): Record<string, T> {
+  return Object.fromEntries(
+    Object.entries(maps).flatMap(([schema, tables]) =>
+      Object.entries(tables).map(([table, entry]) => {
+        if (!table.startsWith(`${schema}.`)) {
+          throw new Error(`classification/${schema}.ts names ${table}, outside its schema.`);
+        }
+        return [table, entry] as const;
+      }),
+    ),
+  );
+}
+
+export const classification: ClassificationRegistry = mergeSchemaMaps({ app, auth, party, grants });
+
+export const subjectPaths: SubjectPathRegistry = mergeSchemaMaps({
+  app: appSubjects,
+  auth: authSubjects,
+  party: partySubjects,
+  grants: grantsSubjects,
+});

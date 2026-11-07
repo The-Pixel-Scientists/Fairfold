@@ -19,7 +19,11 @@
 // told what and when (ADR 0020), and erasure anonymises a person in place
 // (ADR 0017).
 
-import type { ClassificationRegistry, FieldClassification } from '../classification.ts';
+import type {
+  ClassificationRegistry,
+  FieldClassification,
+  SubjectPathRegistry,
+} from '../classification.ts';
 
 const internal: FieldClassification = {
   sensitivity: 'internal',
@@ -203,4 +207,26 @@ export const grants: ClassificationRegistry = {
     funder_name: shown,
     identifier_prefix: shown,
   },
+};
+
+const throughApplication = {
+  kind: 'join',
+  column: 'application_id',
+  table: 'grants.application',
+} as const;
+
+/**
+ * Each table's path to the party its rows are about (ADR 0027): an
+ * application's applicant, reached from the records about the application,
+ * and a decision email's recipient.
+ */
+export const grantsSubjects: SubjectPathRegistry = {
+  'grants.application': { kind: 'party', column: 'applicant_person_id' },
+  'grants.eligibility_result': throughApplication,
+  'grants.stage_transition': throughApplication,
+  'grants.application_file': throughApplication,
+  'grants.assignment': throughApplication,
+  'grants.score': { kind: 'join', column: 'assignment_id', table: 'grants.assignment' },
+  'grants.decision': throughApplication,
+  'grants.decision_email': { kind: 'party', column: 'recipient_person_id' },
 };

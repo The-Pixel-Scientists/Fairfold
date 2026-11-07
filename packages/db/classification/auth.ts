@@ -12,6 +12,7 @@ import type {
   ClassificationRegistry,
   FieldClassification,
   Sensitivity,
+  SubjectPathRegistry,
 } from '../classification.ts';
 
 const account = (sensitivity: Sensitivity): FieldClassification => ({
@@ -120,4 +121,25 @@ export const auth: ClassificationRegistry = {
     auth_event_id: pending,
     created_at: pending,
   },
+};
+
+/**
+ * Each table's path to the person its rows are about (ADR 0027): the account,
+ * which reaches a person in a tenant through party.person.user_id. An auth
+ * event for an unknown identifier has none.
+ */
+export const authSubjects: SubjectPathRegistry = {
+  'auth.user': { kind: 'account', column: 'id' },
+  'auth.session': { kind: 'account', column: 'user_id' },
+  'auth.account': { kind: 'account', column: 'user_id' },
+  'auth.verification': {
+    kind: 'unlinked',
+    reason: 'An emailed link comes before any account is known, and goes a day after it expires.',
+  },
+  'auth.two_factor': { kind: 'account', column: 'user_id' },
+  'auth.rate_limit': {
+    kind: 'unlinked',
+    reason: 'Sign-in limits count typed identifiers and addresses, not accounts.',
+  },
+  'auth.audit_event': { kind: 'account', column: 'user_id' },
 };

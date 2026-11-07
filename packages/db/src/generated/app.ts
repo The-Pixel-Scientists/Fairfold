@@ -37,6 +37,7 @@ export interface AppAuditEvent {
   occurred_at: Generated<Timestamp>;
   request_id: string;
   retain_until: Timestamp;
+  subject_party_id: string | null;
   tenant_id: string;
 }
 
