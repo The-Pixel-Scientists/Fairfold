@@ -79,6 +79,23 @@ export const grantsAuditActions = defineAuditActions('grants', [
   'grants.application.note_added',
   'grants.application.message_sent',
   'grants.application.messages_viewed',
+  // Triage, saved views, exports and test sends (S12-07). A bulk change
+  // records one event per application. Changes hold ids, codes and counts
+  // only: never a label's or view's name, a filter value, an address or a
+  // file's contents.
+  'grants.application.owner_changed',
+  'grants.application.labels_changed',
+  'grants.label.created',
+  'grants.label.updated',
+  'grants.label.archived',
+  'grants.saved_view.created',
+  'grants.saved_view.updated',
+  'grants.saved_view.deleted',
+  'grants.export.requested',
+  'grants.board_pack.requested',
+  'grants.email_template.test_sent',
+  'grants.programme_config.exported',
+  'grants.programme_config.imported',
 ]);
 
 export type GrantsAuditAction = (typeof grantsAuditActions)[number];

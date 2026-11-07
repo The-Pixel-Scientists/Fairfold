@@ -26,6 +26,11 @@ describe('grants audit actions', () => {
         'grants.adjustment',
         'grants.monitoring',
         'grants.reminder_setting',
+        'grants.label',
+        'grants.saved_view',
+        'grants.board_pack',
+        'grants.email_template',
+        'grants.programme_config',
       ]),
     );
   });
@@ -75,6 +80,19 @@ describe('grants audit actions', () => {
       'Application note added',
       'Application message sent',
       'Application messages viewed',
+      'Application owner changed',
+      'Application labels changed',
+      'Label created',
+      'Label updated',
+      'Label archived',
+      'Saved view created',
+      'Saved view updated',
+      'Saved view deleted',
+      'Export requested',
+      'Board pack requested',
+      'Email template test sent',
+      'Programme config exported',
+      'Programme config imported',
     ]);
   });
 });

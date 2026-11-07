@@ -93,6 +93,8 @@ const adjustment: SubjectRule = {
 const configuration: SubjectRule = { none: 'Programme, round or form configuration.' };
 const reviewerPool: SubjectRule = { none: 'A reviewer is the actor, found through actor_id.' };
 const aggregate: SubjectRule = { none: 'Covers a whole round or the funder, not one person.' };
+const ownView: SubjectRule = { none: "A member's own saved view, not about an applicant." };
+const testSend: SubjectRule = { none: 'A template test sent to the member who asked for it.' };
 
 export const grantsSubjectRules: Readonly<Record<GrantsAuditAction, SubjectRule>> = {
   'grants.programme.created': configuration,
@@ -140,4 +142,17 @@ export const grantsSubjectRules: Readonly<Record<GrantsAuditAction, SubjectRule>
   'grants.monitoring.withdrawn': application,
   'grants.monitoring.disclosed': application,
   'grants.reminder_setting.updated': configuration,
+  'grants.application.owner_changed': application,
+  'grants.application.labels_changed': application,
+  'grants.label.created': configuration,
+  'grants.label.updated': configuration,
+  'grants.label.archived': configuration,
+  'grants.saved_view.created': ownView,
+  'grants.saved_view.updated': ownView,
+  'grants.saved_view.deleted': ownView,
+  'grants.export.requested': aggregate,
+  'grants.board_pack.requested': aggregate,
+  'grants.email_template.test_sent': testSend,
+  'grants.programme_config.exported': configuration,
+  'grants.programme_config.imported': configuration,
 };
