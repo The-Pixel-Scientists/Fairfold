@@ -57,24 +57,32 @@ export interface ApiDatabase {
 }
 
 export function openDatabase(settings: Config['database'], log: FastifyBaseLogger): ApiDatabase {
-  const connection = {
+  const password = settings.password.reveal();
+  // Problems that no request is waiting for, such as an idle connection that fails.
+  const logProblem = (message: string, error: Error) => {
+    log.error({ err: error }, message);
+  };
+  const db = createDatabase<unknown>({
     host: settings.host,
     port: settings.port,
     database: settings.database,
     role: 'app_api',
-    password: settings.password.reveal(),
+    password,
     tls: settings.tls,
-    // Problems that no request is waiting for, such as an idle connection that fails.
-    log: (message: string, error: Error) => {
-      log.error({ err: error }, message);
-    },
-  } as const;
-  const db = createDatabase<unknown>({ ...connection, applicationName: 'tps-api' });
+    log: logProblem,
+    applicationName: 'tps-api',
+  });
   // The limits' counters get a small pool of their own, which gives up quickly, so
   // that a flood of requests being counted can never take the connections that tenant
   // transactions need (S11-36).
   const counters = createDatabase<unknown>({
-    ...connection,
+    host: settings.host,
+    port: settings.port,
+    database: settings.database,
+    role: 'app_api',
+    password,
+    tls: settings.tls,
+    log: logProblem,
     applicationName: 'tps-api-limits',
     maxConnections: 4,
     connectionTimeoutMillis: 500,

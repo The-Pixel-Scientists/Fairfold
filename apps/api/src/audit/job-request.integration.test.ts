@@ -10,7 +10,7 @@ import { createDatabase, withTenant, type Kysely } from '@pixel-scientists/db';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { trustedTenantId } from '../../../../packages/db/src/tenant-context.ts';
-import { databaseSettings } from '../../../../packages/db/test/connect.ts';
+import { connectionSettings } from '../../../../packages/db/test/connect.ts';
 import {
   addMember,
   asMigratorIn,
@@ -27,7 +27,16 @@ beforeAll(async () => {
   tenant = await createTestTenant();
   const member = await asMigratorIn(tenant.id, (client) => addMember(client, tenant));
   actor = { kind: 'user', membershipId: member, requestId: randomUUID() };
-  api = createDatabase<unknown>(databaseSettings('app_api', 2));
+  const settings = connectionSettings('app_api');
+  api = createDatabase<unknown>({
+    host: settings.host,
+    port: settings.port,
+    database: settings.database,
+    role: 'app_api',
+    password: settings.password,
+    maxConnections: 2,
+    applicationName: 'tps-db-tests',
+  });
 }, 30_000);
 afterAll(() => api.destroy());
 
