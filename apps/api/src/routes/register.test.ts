@@ -651,8 +651,8 @@ describe('the policy before the transaction', () => {
     const sessions = {
       none: undefined,
       waiting: staff({ mfa: 'enrol' }),
-      staff: staff(),
-      applicant: applicant(),
+      staff: staff({ recentAuthAt: new Date() }),
+      applicant: applicant({ recentAuthAt: new Date() }),
     } as const;
     const allowed = {
       none: { none: true, waiting: true, staff: true, applicant: true },
@@ -666,6 +666,44 @@ describe('the policy before the transaction', () => {
         const expected = allowed[contract.session][name as keyof typeof sessions];
         expect(passed(await status(contract, read)), `${contract.path} with ${name}`).toBe(
           expected,
+        );
+      }
+    }
+  });
+
+  it('lets an auth route with step-up through only within 5 minutes of re-authentication', async () => {
+    const stepUp = Object.entries(authRoutes).filter(([, c]) => 'stepUp' in c && c.stepUp);
+    expect(stepUp.map(([name]) => name)).toEqual([
+      'generateBackupCodes',
+      'startTotpChange',
+      'confirmTotpChange',
+      'removeTotp',
+      'requestEmailChange',
+      'changePassword',
+      'passkeyRegistrationOptions',
+      'addPasskey',
+      'removePasskey',
+    ]);
+    const ago = (minutes: number) => new Date(Date.now() - minutes * 60_000);
+    for (const [, contract] of stepUp) {
+      for (const as of [staff, applicant]) {
+        for (const recentAuthAt of [null, ago(5.5), ago(60), new Date(Date.now() + 60_000)]) {
+          expect(await status(contract, as({ recentAuthAt })), contract.path).toBe(403);
+        }
+        for (const recentAuthAt of [ago(0), ago(4.5)]) {
+          expect(passed(await status(contract, as({ recentAuthAt }))), contract.path).toBe(true);
+        }
+      }
+    }
+  });
+
+  it('lets an auth route without step-up through whatever the last authentication', async () => {
+    const plain = authContracts.filter((c) => c.session === 'complete' && !('stepUp' in c));
+    expect(plain.length).toBeGreaterThan(0);
+    for (const contract of plain) {
+      for (const as of [staff, applicant]) {
+        expect(passed(await status(contract, as({ recentAuthAt: null }))), contract.path).toBe(
+          true,
         );
       }
     }

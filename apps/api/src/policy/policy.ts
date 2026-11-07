@@ -69,6 +69,14 @@ function mfaWaiting(session: RequestSession): boolean {
   return session.mfa === 'enrol' || session.mfa === 'verify';
 }
 
+/** Throws unless the session re-authenticated within the window; a future time never counts. */
+function checkStepUp(session: RequestSession, now: number): void {
+  const at = session.recentAuthAt?.getTime();
+  if (at === undefined || now - at > STEP_UP_WINDOW_MS || at > now) {
+    throw refuse(403, 'step_up', 'Confirm it is you again, then try again.');
+  }
+}
+
 /** Throws unless the session is what the route needs. Reads nothing but the context. */
 export function checkSession(
   route: RouteContract,
@@ -86,6 +94,7 @@ export function checkSession(
       throw refuse(403, 'wrong_session');
     }
     if (route.session === 'complete' && !mfaSettled(session)) throw refuse(401, 'mfa_pending');
+    if (route.stepUp === true) checkStepUp(session, now);
     return;
   }
 
@@ -94,12 +103,7 @@ export function checkSession(
   if (context.app !== route.audience || session.app !== route.audience) {
     throw refuse(403, 'wrong_session');
   }
-  if (route.stepUp === true) {
-    const at = session.recentAuthAt?.getTime();
-    if (at === undefined || now - at > STEP_UP_WINDOW_MS || at > now) {
-      throw refuse(403, 'step_up', 'Confirm it is you again, then try again.');
-    }
-  }
+  if (route.stepUp === true) checkStepUp(session, now);
 }
 
 const auditOf = (tx: TenantTransaction, actor: AuditActor): RequestAudit =>
