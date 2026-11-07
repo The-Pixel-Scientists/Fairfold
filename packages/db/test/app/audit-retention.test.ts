@@ -70,11 +70,11 @@ describe('app.retention_policy', { timeout: 30_000 }, () => {
     });
   });
 
-  it('lets app_api read the settings, but never add, change or remove one', async () => {
+  it('lets app_api read, add and change the settings (0032), but never remove one', async () => {
     await asRoleIn('app_api', tenant.id, async (client) => {
       const { text, values } = insertStatement(client, 'app.retention_policy', policy());
-      expect(await outcome(client, text, values)).toBe('42501');
-      expect(await outcome(client, 'UPDATE app.retention_policy SET days = 400')).toBe('42501');
+      expect(await outcome(client, text, values)).toBe('ok');
+      expect(await outcome(client, 'UPDATE app.retention_policy SET days = 500')).toBe('ok');
       expect(await outcome(client, 'DELETE FROM app.retention_policy')).toBe('42501');
       expect(await outcome(client, 'SELECT days FROM app.retention_policy')).toBe('ok');
     });

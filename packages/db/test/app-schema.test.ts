@@ -64,6 +64,9 @@ describe('the app schema', () => {
         'owner_auth_session_memberships USAGE',
         // app.tenant_ids(), migration 0024.
         'owner_app_tenant_ids USAGE',
+        // The retention functions, migrations 0031 and 0032.
+        'owner_app_purge_expired_audit USAGE',
+        'owner_app_apply_retention USAGE',
       ].sort(),
     });
   });
@@ -82,13 +85,21 @@ describe('app.current_tenant_id()', () => {
     ]);
   });
 
-  it('can be executed by the app roles and migrator only', async () => {
+  it('can be executed by the app roles, migrator and the retention function owners only', async () => {
     const acl = await withClient('app_api', (client) =>
       ownerAndGrants(client, FUNCTION_ACL, ['app.current_tenant_id()']),
     );
     expect(acl).toEqual({
       owner: 'migrator',
-      grants: [...APP_ROLES, 'migrator'].map((role) => `${role} EXECUTE`).sort(),
+      grants: [
+        ...APP_ROLES,
+        'migrator',
+        // The retention functions' owners, migrations 0031 and 0032.
+        'owner_app_purge_expired_audit',
+        'owner_app_apply_retention',
+      ]
+        .map((role) => `${role} EXECUTE`)
+        .sort(),
     });
   });
 

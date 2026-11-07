@@ -32,6 +32,8 @@ export const app: SchemaCatalogue = {
     ['app.tenant_ids()', ['app_worker']],
     // The audit retention purge (ADR 0003), per tenant and once with none set.
     ['app.purge_expired_audit()', ['app_worker']],
+    // Every other retention policy, per tenant (ADR 0003).
+    ['app.apply_retention(text)', ['app_worker']],
   ],
   definerFunctions: [
     [
@@ -129,6 +131,16 @@ export const app: SchemaCatalogue = {
             (command) => `${table} policy purge_expired_audit_${command}`,
           ),
         ),
+      },
+    ],
+    [
+      'app.apply_retention(text)',
+      {
+        owner: 'owner_app_apply_retention',
+        // No column outside the audit tables has a tenant_policy rule yet,
+        // so it has no targets, and no rights on any table.
+        rights: ['USAGE on schema app', 'EXECUTE on function app.current_tenant_id()'],
+        policies: [],
       },
     ],
   ],
