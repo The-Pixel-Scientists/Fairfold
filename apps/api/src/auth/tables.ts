@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
 // The columns the auth module reads and writes (migrations 0002 to 0004,
-// 0015 and 0025). The auth tables are reached as app_auth; the app tables as
-// app_api, inside withTenant().
+// 0015, 0025 and 0030). The auth tables are reached as app_auth; the app
+// tables as app_api, inside withTenant().
 
 import type { Generated } from '@pixel-scientists/db';
 import type { AuthEventCode } from '@pixel-scientists/domain/auth';
@@ -51,6 +51,13 @@ export type AuthTables = {
     tenant_id: string | null;
     identifier: string | null;
     ip_address: string | null;
+  };
+  'auth.passkey': {
+    id: Generated<string>;
+    user_id: string;
+    name: string;
+    created_at: Generated<Date>;
+    last_used_at: Date | null;
   };
   'auth.audit_copy_pending': { auth_event_id: string };
   'auth.rate_limit': { scope: string; identifier: string | null };
