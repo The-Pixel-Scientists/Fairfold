@@ -40,19 +40,3 @@ platform.auth.password_reset_requested: Password reset requested
 platform.auth.password_reset_completed: Password reset completed
 platform.auth.sessions_revoked: Sessions revoked
 platform.auth.invitation_accepted: Invitation accepted
-platform.auth.password_changed: Password changed
-platform.auth.email_changed: Email changed
-platform.auth.mfa_removed: MFA removed
-platform.auth.backup_code_used: Backup code used
-platform.auth.backup_codes_regenerated: Backup codes regenerated
-platform.auth.passkey_added: Passkey added
-platform.auth.passkey_removed: Passkey removed
-platform.auth.sso_session_created: SSO session created
-platform.auth.sso_response_rejected: SSO response rejected
-platform.auth.sso_provider_changed: SSO provider changed
-platform.auth.sso_domain_changed: SSO domain changed
-platform.auth.sso_domain_conflict: SSO domain conflict
-platform.auth.account_deactivated: Account deactivated
-platform.auth.secrets_reencrypted: Secrets re-encrypted
-platform.auth.audit_copy_replayed: Audit copy replayed
-platform.auth.audit_purged: Audit purged
