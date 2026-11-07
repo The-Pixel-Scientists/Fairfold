@@ -12,6 +12,7 @@ import './outbound/install.ts';
 
 import { buildApp } from './app.ts';
 import { loadAuthSettings, createAuth, type AuthSettings } from './auth/index.ts';
+import { recordBreachSetting } from './breach-setting.ts';
 import { ConfigError, loadConfig, type Config } from './config.ts';
 import { openDatabase } from './database.ts';
 import {
@@ -103,6 +104,11 @@ async function main(): Promise<void> {
     await auth.close();
     await database.close();
   };
+  if (!(await recordBreachSetting(auth, logger))) {
+    await closeAll();
+    process.exitCode = 1;
+    return;
+  }
   let app;
   try {
     app = await buildApp({
