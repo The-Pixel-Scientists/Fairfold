@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import { fileRefusalMessages, fileRefusals } from './messages.ts';
 import { fileTypeExtensions, fileTypeLabels, fileTypes, MAX_FILE_BYTES } from './types.ts';
-import { fileViewSchema, isDownloadable, scanStates } from './view.ts';
+import { fileViewSchema, isDownloadable, scanStateLabels, scanStates } from './view.ts';
 
 const view = {
   id: '0b7c4a1e-5d2f-4c8e-9a3b-6f1d2e4c8a90',
@@ -63,6 +63,12 @@ describe('fileViewSchema', () => {
 describe('scan states', () => {
   it('let only a clean file be downloaded', () => {
     expect(scanStates.filter(isDownloadable)).toEqual(['clean']);
+  });
+
+  it('each have a label in sentence case', () => {
+    expect(Object.keys(scanStateLabels)).toEqual([...scanStates]);
+    expect(scanStateLabels.withheld).toBe('Held back');
+    for (const label of Object.values(scanStateLabels)) expect(label).toMatch(/^[A-Z][a-z ]+$/);
   });
 });
 

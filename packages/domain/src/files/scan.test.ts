@@ -37,13 +37,22 @@ describe('scan state changes', () => {
     const allowed = scanStates.flatMap((from) =>
       scanStates.filter((to) => canChangeScanState(from, to)).map((to) => `${from}>${to}`),
     );
-    expect(allowed.sort()).toEqual(['pending>clean', 'pending>infected', 'pending>error'].sort());
+    expect(allowed.sort()).toEqual(
+      [
+        'pending>clean',
+        'pending>infected',
+        'pending>error',
+        'clean>withheld',
+        'withheld>clean',
+        'withheld>infected',
+      ].sort(),
+    );
   });
 
-  it('never return a file to pending, nor change a final one', () => {
+  it('never return a file to pending, withhold it at upload, nor change a final one', () => {
     for (const from of scanStates) expect(canChangeScanState(from, 'pending')).toBe(false);
+    expect(canChangeScanState('pending', 'withheld')).toBe(false);
     for (const to of scanStates) {
-      expect(canChangeScanState('clean', to)).toBe(false);
       expect(canChangeScanState('infected', to)).toBe(false);
       expect(canChangeScanState('error', to)).toBe(false);
     }

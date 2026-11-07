@@ -23,10 +23,23 @@ export const fileViewSchema = z.strictObject({
 
 export type FileView = z.infer<typeof fileViewSchema>;
 
-/** A file is `pending` only while its upload request runs, then one final state. */
-export const scanStates = ['pending', 'clean', 'infected', 'error'] as const;
+/**
+ * A file is `pending` only while its upload request runs, then gets one
+ * verdict. A clean file a later scan flags is `withheld` until a scan
+ * passes it again or a person deletes it (ADR 0030).
+ */
+export const scanStates = ['pending', 'clean', 'withheld', 'infected', 'error'] as const;
 
 export type ScanState = (typeof scanStates)[number];
+
+/** Each state in words, for staff screens and reports. */
+export const scanStateLabels: Readonly<Record<ScanState, string>> = {
+  pending: 'Being checked',
+  clean: 'Checked',
+  withheld: 'Held back',
+  infected: 'Virus found',
+  error: 'Could not be checked',
+};
 
 /** Only a clean file is ever sent to anyone. */
 export function isDownloadable(state: ScanState): boolean {

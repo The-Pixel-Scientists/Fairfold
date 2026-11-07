@@ -47,6 +47,7 @@ export {
 export {
   fileViewSchema,
   isDownloadable,
+  scanStateLabels,
   scanStates,
   type FileView,
   type ScanState,

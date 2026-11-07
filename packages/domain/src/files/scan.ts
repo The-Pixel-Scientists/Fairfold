@@ -27,14 +27,17 @@ export function needsRescan(lastVersion: number | null, currentVersion: number):
 }
 
 /**
- * The only changes of state, as `app.file`'s trigger allows them: a pending
- * file gets its one verdict, and a final file never changes. ADR 0030's
- * `withheld` state and its changes join this list and `scanStates` with the
- * migration that lets the database store them, never before.
+ * The only changes of state, as `app.file`'s trigger (migration 0041)
+ * allows them: a pending file gets its one verdict; a rescan that flags a
+ * clean file withholds it; a withheld file returns to clean when a rescan
+ * passes it, or becomes infected when a person deletes it or it is erased.
+ * A rescan that keeps a clean or withheld file's state is not a change.
+ * Infected and error are final.
  */
 export const scanStateChanges: Readonly<Record<ScanState, readonly ScanState[]>> = {
   pending: ['clean', 'infected', 'error'],
-  clean: [],
+  clean: ['withheld'],
+  withheld: ['clean', 'infected'],
   infected: [],
   error: [],
 };
