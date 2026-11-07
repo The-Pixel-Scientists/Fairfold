@@ -50,6 +50,53 @@ The October milestone does not meet two items in the definition of done below. B
 
 Until then, the October build is a demonstration on synthetic data. It is not ready for a real applicant.
 
+#### What remains open on 2 November 2026
+
+The October build meets the scope table above, with the gaps listed in [what the first release leaves out](demo/mvp1-known-gaps.md). These are plans, not results: each line says what it closes with, and nothing is marked closed before the 18 December check (S12-91) against merged code.
+
+- **Acceptance criteria pass in staging: still unmet.** Staging is built in November (S11-35, S11-65). The item closes when signed images first reach staging and the demonstration round's end-to-end test passes there (S11-71, planned 19 November). That comes after the rate limits (S11-36), the outbound request guard (S11-32) and both fixes from the second security review have merged.
+- **Reviewed and approved by at least one other engineer: still unmet.** It waits for the reviewers: the second security pass over authentication and row-level security (S11-05, S11-09, S11-17, S11-20, with fixes in S11-24, S11-30 and S11-69), the external review of the deferred sign-in features (findings fixed in S12-38), and a contract reviewer for module server code from 30 November. No date is promised.
+
+Password reset and invitations were built in October, so they are not listed. The October build is still a demonstration on synthetic data and is not ready for a real applicant. Live applicant data still waits for Gate 1.
+
+| Epic | Item that waits | Planned to close with |
+| --- | --- | --- |
+| E1 Platform | Staging on Google Cloud | S11-35, S11-65, S11-71 |
+| E1 Platform | Helm chart | S12-11 |
+| E2 Identity | Single sign-on (OpenID Connect, SAML) | S11-60, S11-62, S11-90, S11-99 |
+| E2 Identity | Passkeys; authenticator app for applicants | S11-83, S11-100 |
+| E2 Identity | Backup codes; remembered devices | S11-49; S11-46 |
+| E2 Identity | Changing email; breached-password check | S11-73; S11-77 |
+| E2 Identity | Account security screens | S11-94 |
+| E3 Governance | Retention deletion | S11-97, S11-102, S11-107 |
+| E3 Governance | Subject access requests | S11-85 |
+| E3 Governance | Erasure | S11-106, S11-109, S11-110 |
+| E3 Governance | Screens for retention, access and erasure | S12-05 |
+| E3 Governance | Classification of each answer | S11-78 |
+| E3 Governance | Audit search and export | S12-49, S12-57 |
+| E4 Set-up | Export and import of configuration | S12-39, S12-56 |
+| E5 Forms | File upload | S11-61, S11-74, S11-81, S11-87 |
+| E6 Portal | Browsing before sign-in | S12-55, S12-64 |
+| E6 Portal | Messaging | S12-32, S12-41 |
+| E6 Portal | Manual accessibility audit | January 2027, prepared by S11-07 and S11-16 |
+| E7 Triage | Saved views, owners, labels | S12-39, S12-56 |
+| E7 Triage | Notes and messages | S12-32, S12-40 |
+| E9 Decisions | Test send | S12-39, S12-56 |
+| E9 Decisions | Reminders | S12-50 |
+| E10 Data out | CSV of saved views | S12-49, S12-88 |
+| E10 Data out | Board packs | S12-78, S12-88 |
+| E10 Data out | 360Giving publishes verified identifiers only | S12-30 |
+| E10 Data out | Scheduled and incremental feeds, BigQuery | Later, with the insight tool's next version |
+| E11 Design | External accessibility audit | January 2027, at Gate 1 |
+| E12 Operability | Off-site backups; timed restore rehearsal | S11-88; S12-01 |
+| E12 Operability | Runbooks | S11-111, S11-112 |
+| E12 Operability | Dashboards | S11-15, S11-72 |
+| Suite | The CRM tool's first version | S12-25, S12-33, S12-42, S12-51, S12-58 |
+| Suite | Release emails move to the background worker | S11-92 |
+| Suite | Direct charitable activities, finance | Later waves; no finance code is built this year |
+
+The penetration test also runs in January 2027, as part of Gate 1. Three Gate 1 engineering items stay open too: organisation details as submitted (S11-66, S11-93), the person each audit event is about (S11-55) and idempotent create requests (S11-80).
+
 ## Scope and success
 
 V1 lets a design-partner funder run one real funding round end to end, from opening a programme to releasing decisions, on a secure, compliant core. It is delivered in 12 two-week sprints (about 24 weeks) and ends at Gate 1, before any live applicant data is accepted.
@@ -303,6 +350,8 @@ Contingency: sprints 11 and 12 absorb slippage. If M3 slips by more than one spr
 ## Definition of done
 
 A story is done only when all of the following are true. No exceptions for deadline pressure; unmet items become explicit, logged debt approved by the tech lead.
+
+The October 2026 milestone leaves two items open; see [Known debt](#known-debt).
 
 - [ ] Acceptance criteria pass in staging.
 - [ ] Unit and integration tests cover the new logic; end-to-end test added for any user journey change.
