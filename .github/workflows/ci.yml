@@ -270,6 +270,7 @@ jobs:
           }
           pnpm stack seed "$SCENARIO"
           TPS_SEED_PASSWORD_FILE="$HOME/.tps/stack/$project/TPS_STACK_SEED_PASSWORD" \
+            TPS_STACK_CERTIFICATE_FILE="$HOME/.tps/stack/$project/TPS_STACK_PROXY_CERTIFICATE" \
             node packages/db/seed/manager.ts "$port" "$RUNNER_TEMP/e2e-manager"
           if [ -n "$SHARD" ]; then
             all="$MANAGER_JOURNEYS $REVIEW_JOURNEYS $PROGRAMME_JOURNEY"

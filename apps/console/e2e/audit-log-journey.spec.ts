@@ -32,7 +32,7 @@ const day = (daysAgo: number): string =>
 /** Signs in as the administrator, setting up the authenticator app on the first run and using its key after. */
 async function signInAsAdministrator(page: Page): Promise<void> {
   await page.goto('/northfield/sign-in');
-  await page.getByRole('textbox', { name: 'Email address' }).fill(EMAIL ?? '');
+  await page.getByRole('textbox', { name: 'Email address', exact: true }).fill(EMAIL ?? '');
   await page.getByLabel('Password', { exact: true }).fill(PASSWORD ?? '');
   await page.getByRole('button', { name: 'Sign in' }).click();
 

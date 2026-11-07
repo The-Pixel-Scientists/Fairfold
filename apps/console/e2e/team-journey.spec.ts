@@ -36,7 +36,7 @@ const NEW_PASSWORD = 'a first long passphrase';
 
 async function signIn(page: Page, address: string, password: string): Promise<void> {
   await page.goto('/northfield/sign-in');
-  await page.getByRole('textbox', { name: 'Email address' }).fill(address);
+  await page.getByRole('textbox', { name: 'Email address', exact: true }).fill(address);
   await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Sign in' }).click();
 }
@@ -113,7 +113,7 @@ test.describe('the team journey against the real API', () => {
     await expect(person).toHaveURL(/\/northfield\/invitation$/);
 
     await person.getByRole('link', { name: 'Create an account' }).click();
-    await person.getByRole('textbox', { name: 'Email address' }).fill(address);
+    await person.getByRole('textbox', { name: 'Email address', exact: true }).fill(address);
     await person.getByRole('button', { name: 'Email me a link' }).click();
     await openEmailedLink(person, address, '/sign-up/complete');
     await person.getByLabel('Password', { exact: true }).fill(NEW_PASSWORD);
