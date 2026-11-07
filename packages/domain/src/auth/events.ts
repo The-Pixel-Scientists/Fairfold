@@ -7,7 +7,8 @@
 // changing the email address; then passkeys; then the audit retention
 // purge's count of what it deleted; then the operator's breached-password
 // check setting, recorded at start-up when it changes; then the secret
-// re-encryption command's run. The others in ADR 0010's list join with
+// re-encryption command's run; then each copy the audit-copy replay command
+// writes to a tenant's audit log. The others in ADR 0010's list join with
 // the feature that first writes them, whose migration widens the table's
 // check in the same change: the list and the check stay equal.
 
@@ -36,6 +37,7 @@ export const authEventCodes = [
   'audit_purged',
   'password_check_setting_changed',
   'secrets_re_encrypted',
+  'audit_copy_replayed',
 ] as const;
 
 export type AuthEventCode = (typeof authEventCodes)[number];

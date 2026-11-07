@@ -41,6 +41,7 @@ export interface AuthAuditEvent {
   occurred_at: Generated<Timestamp>;
   purged_count: number | null;
   reason: string | null;
+  replayed_event_id: string | null;
   request_id: string;
   retain_until: Timestamp;
   sso_count: number | null;

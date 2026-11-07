@@ -178,6 +178,7 @@ export const auth: ClassificationRegistry = {
     totp_count: audit,
     sso_count: audit,
     backup_notice_count: audit,
+    replayed_event_id: audit,
   },
   'auth.audit_copy_pending': {
     auth_event_id: pending,
