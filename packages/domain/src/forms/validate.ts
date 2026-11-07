@@ -24,6 +24,7 @@ import { idSchema } from '../id.ts';
 import { messages, type FieldProblem } from '../platform/messages.ts';
 import { moneySchema } from '../platform/money.ts';
 import { ukAddressSchema } from './answers.ts';
+import { isBlankCell, isBlankText, isNoAnswer } from './clean.ts';
 import {
   fieldIdSchema,
   LONG_TEXT_MAX_CHARACTERS,
@@ -61,31 +62,6 @@ const questionWords: AnswerWords = {
   amountAtLeast: m.amountAtLeast,
   chooseOption: m.chooseOption,
 };
-
-const STRING_ANSWERS = new Set<Question['type']>([
-  'short_text',
-  'long_text',
-  'date',
-  'email',
-  'phone',
-  'url',
-  'single_choice',
-  'dropdown',
-]);
-
-function isNoAnswer(field: Question, value: unknown): boolean {
-  if (value === undefined || value === null) return true;
-  if (typeof value === 'string') return STRING_ANSWERS.has(field.type) && value.trim() === '';
-  const list = field.type === 'multiple_choice' || field.type === 'table' || field.type === 'file';
-  return list && Array.isArray(value) && value.length === 0;
-}
-
-/** A blank cell, by the same rule: text and dropdown cells hold strings. */
-function isBlankCell(column: TableColumn, value: unknown): boolean {
-  if (value === undefined || value === null) return true;
-  const text = column.type === 'short_text' || column.type === 'dropdown';
-  return text && typeof value === 'string' && value.trim() === '';
-}
 
 function isRealDate(value: unknown): boolean {
   const match = typeof value === 'string' ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(value) : null;
@@ -182,8 +158,8 @@ function addressProblems(field: Question, value: unknown): FieldProblem[] {
   if (!parsed.success) return [{ field: field.id, message: m.address }];
   const { line1, town, postcode } = parsed.data;
   const problems: FieldProblem[] = [];
-  if (line1.trim() === '') problems.push({ field: `${field.id}.line1`, message: m.addressLine1 });
-  if (town.trim() === '') problems.push({ field: `${field.id}.town`, message: m.addressTown });
+  if (isBlankText(line1)) problems.push({ field: `${field.id}.line1`, message: m.addressLine1 });
+  if (isBlankText(town)) problems.push({ field: `${field.id}.town`, message: m.addressTown });
   if (!UK_POSTCODE.test(postcode))
     problems.push({ field: `${field.id}.postcode`, message: m.postcode });
   return problems;
