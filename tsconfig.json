@@ -24,6 +24,21 @@
       "path": "modules/grants"
     },
     {
+      "path": "modules/crm"
+    },
+    {
+      "path": "modules/assure"
+    },
+    {
+      "path": "modules/forms"
+    },
+    {
+      "path": "modules/privacy"
+    },
+    {
+      "path": "modules/insight"
+    },
+    {
       "path": "apps/api"
     },
     {

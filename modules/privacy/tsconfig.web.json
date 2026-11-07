@@ -1,0 +1,25 @@
+// Contracts and screens, bundled by Vite in the console and portal. Contracts are checked
+// here without Node.js types, so they stay safe for the browser.
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "node_modules/.cache/tsc/web",
+    "tsBuildInfoFile": "node_modules/.cache/tsc/web/tsconfig.tsbuildinfo",
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "lib": ["es2024", "dom", "dom.iterable"],
+    "jsx": "react-jsx"
+  },
+  "include": ["src/contracts", "src/console", "src/portal"],
+  "references": [
+    {
+      "path": "../../packages/domain"
+    },
+    {
+      "path": "../../packages/ui"
+    },
+    {
+      "path": "../party/tsconfig.web.json"
+    }
+  ]
+}

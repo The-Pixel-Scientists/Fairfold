@@ -1,0 +1,20 @@
+{
+  "name": "@pixel-scientists/crm",
+  "version": "0.0.0",
+  "private": true,
+  "description": "CRM: relationships, interactions, lists, segments, import and merge for organisations and people",
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "exports": {
+    "./contracts": "./src/contracts/index.ts",
+    "./server": "./src/server/index.ts",
+    "./console": "./src/console/index.ts",
+    "./portal": "./src/portal/index.ts"
+  },
+  "dependencies": {
+    "@pixel-scientists/domain": "workspace:*",
+    "@pixel-scientists/grants": "workspace:*",
+    "@pixel-scientists/party": "workspace:*",
+    "zod": "4.6.5"
+  }
+}
