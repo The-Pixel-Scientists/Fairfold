@@ -24,6 +24,7 @@ import { symmetricDecrypt } from 'better-auth/crypto';
 import type { RequestContext } from '../../context.ts';
 import { ApiError } from '../../problems.ts';
 import { route, type Route } from '../../routes/register.ts';
+import { clearCodes } from '../backup-codes/store.ts';
 import { clearedCookie } from '../cookies.ts';
 import { copyAuthEvent, recordAuthEvent, type AuthEvent } from '../events.ts';
 import { plainAddress } from '../limits.ts';
@@ -201,6 +202,8 @@ export function authenticatorRoutes(
           });
         }
         await assertMayRemoveFactor(trx, deps.api, session, 'totp');
+        // The last factor goes, so the backup codes go with it.
+        await clearCodes(trx, userId);
         const db = trx.$extendTables<AuthTables>();
         await db
           .updateTable('auth.two_factor')

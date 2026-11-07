@@ -409,11 +409,13 @@ describe('Better Auth', () => {
     const { app } = await start();
     const ours = new Set(Object.values(authRoutes).map((r) => `${r.method} /api${r.path}`));
     const answered: string[] = [];
+    const walked: string[] = [];
     for (const endpoint of Object.values(betterAuth().api) as {
       path?: string;
       options?: { method?: string | string[] };
     }[]) {
       if (endpoint.path === undefined) continue;
+      walked.push(endpoint.path);
       const path = endpoint.path.replaceAll(/:[a-z]+/gi, 'x');
       for (const method of [endpoint.options?.method ?? 'GET'].flat()) {
         if (ours.has(`${method} /api/auth${path}`)) continue;
@@ -435,6 +437,15 @@ describe('Better Auth', () => {
       }
     }
     expect(answered).toEqual([]);
+    // Our own routes handle backup codes (ADR 0010): Better Auth's two answer
+    // nothing, and its view-backup-codes is server-only, with no path at all.
+    expect(walked).toEqual(
+      expect.arrayContaining([
+        '/two-factor/verify-backup-code',
+        '/two-factor/generate-backup-codes',
+      ]),
+    );
+    expect((betterAuth().api.viewBackupCodes as { path?: string }).path).toBeUndefined();
   });
 
   it('is configured to ADR 0010', () => {

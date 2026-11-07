@@ -432,6 +432,7 @@ describe('every route', { timeout: 120_000 }, () => {
     '/auth/totp/enrol',
     '/auth/totp/confirm',
     '/auth/totp/verify',
+    '/auth/backup-codes/verify',
     '/auth/session',
     '/auth/sign-out',
   ]);

@@ -35,6 +35,7 @@ import type { Sender } from '../email/sender.ts';
 import { ApiError } from '../problems.ts';
 import { isRegisteredFromContract, registerRoutes } from '../routes/register.ts';
 import { authenticatorRoutes } from './authenticators/routes.ts';
+import { backupCodeRoutes } from './backup-codes/routes.ts';
 import { createBetterAuth } from './better-auth.ts';
 import { clientTracker } from './clients.ts';
 import { copyAuthEvent, recordAuthEvent } from './events.ts';
@@ -208,6 +209,7 @@ export function createAuth(settings: AuthSettings, deps: AuthDependencies): Auth
   const routes = [
     ...authRoutes(routeDeps),
     ...mfaRoutes(routeDeps, totpKey),
+    ...backupCodeRoutes(routeDeps),
     ...stepUpRoutes(routeDeps, totpKey),
     ...switchTenantRoutes(routeDeps),
     ...invitationRoutes(routeDeps),
