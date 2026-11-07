@@ -23,6 +23,9 @@ describe('grants audit actions', () => {
         'grants.decision_email',
         'grants.export',
         'grants.publisher_setting',
+        'grants.adjustment',
+        'grants.monitoring',
+        'grants.reminder_setting',
       ]),
     );
   });
@@ -43,6 +46,8 @@ describe('grants audit actions', () => {
       'Application created',
       'Application eligibility checked',
       'Application submitted',
+      'Application submitted on behalf',
+      'Application answers saved on behalf',
       'Application withdrawn',
       'Application stage changed',
       'Application viewed',
@@ -60,6 +65,13 @@ describe('grants audit actions', () => {
       'Decision email resent',
       'Export downloaded',
       'Publisher setting changed',
+      'Adjustment granted',
+      'Adjustment revoked',
+      'Monitoring saved',
+      'Monitoring read',
+      'Monitoring withdrawn',
+      'Monitoring disclosed',
+      'Reminder setting updated',
     ]);
   });
 });
