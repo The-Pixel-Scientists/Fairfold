@@ -27,7 +27,7 @@ test.describe('step 2: the administrator signs in with a code from their app', (
     const { email } = person('admin');
     const visitor = await pages.visitor('console');
     await visitor.goto('/northfield/forgot-password');
-    await visitor.getByRole('textbox', { name: 'Email address' }).fill(email);
+    await visitor.getByRole('textbox', { name: 'Email address', exact: true }).fill(email);
     await visitor.getByRole('button', { name: 'Email me a reset link' }).click();
     await expect(h1(visitor, 'Check your email')).toBeVisible();
 

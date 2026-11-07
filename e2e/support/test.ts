@@ -41,7 +41,7 @@ export const h1 = (page: Page, name: string | RegExp) =>
 async function signInStaffPage(page: Page, slug: Slug, name: string): Promise<void> {
   const { email, password } = person(name);
   await page.goto(`/${slug}/sign-in`);
-  await page.getByRole('textbox', { name: 'Email address' }).fill(email);
+  await page.getByRole('textbox', { name: 'Email address', exact: true }).fill(email);
   await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Sign in' }).click();
 
@@ -63,7 +63,7 @@ async function signInStaffPage(page: Page, slug: Slug, name: string): Promise<vo
 async function signInApplicantPage(page: Page, slug: Slug, name: string): Promise<void> {
   const { email, password } = person(name);
   await page.goto(`/${slug}/sign-in`);
-  await page.getByRole('textbox', { name: 'Email address' }).fill(email);
+  await page.getByRole('textbox', { name: 'Email address', exact: true }).fill(email);
   await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(h1(page, 'Apply for a grant')).toBeVisible();

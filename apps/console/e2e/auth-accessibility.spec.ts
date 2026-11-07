@@ -100,7 +100,9 @@ const screens: Screen[] = [
     open: async (page) => {
       await visitor(page);
       await page.goto('/northfield/sign-in');
-      await page.getByRole('textbox', { name: 'Email address' }).fill('ada@example.org');
+      await page
+        .getByRole('textbox', { name: 'Email address', exact: true })
+        .fill('ada@example.org');
       await page.getByLabel('Password', { exact: true }).fill('wrong password here');
       await page.getByRole('button', { name: 'Sign in' }).click();
       await expect(summary(page)).toContainText('The email address or password is not right.');

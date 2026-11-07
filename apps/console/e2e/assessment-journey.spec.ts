@@ -56,7 +56,7 @@ interface Person {
 /** Signs in, setting up the authenticator app on the first run and using its key after. */
 async function signIn(page: Page, who: Person, name: string): Promise<void> {
   await page.goto('/northfield/sign-in');
-  await page.getByRole('textbox', { name: 'Email address' }).fill(who.email ?? '');
+  await page.getByRole('textbox', { name: 'Email address', exact: true }).fill(who.email ?? '');
   await page.getByLabel('Password', { exact: true }).fill(who.password ?? '');
   await page.getByRole('button', { name: 'Sign in' }).click();
 

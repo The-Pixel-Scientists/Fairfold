@@ -48,7 +48,7 @@ test.describe('sign in', () => {
     await expect(page).toHaveTitle(`Sign in ${SUFFIX}`);
     await expect(page).toHaveURL(/\/northfield\/sign-in$/);
 
-    await page.getByRole('textbox', { name: 'Email address' }).fill('Ada@Example.org');
+    await page.getByRole('textbox', { name: 'Email address', exact: true }).fill('Ada@Example.org');
     await page.getByLabel('Password', { exact: true }).fill('correct horse battery');
     await page.getByRole('button', { name: 'Sign in' }).click();
 
@@ -81,7 +81,7 @@ test.describe('sign in', () => {
     await page.keyboard.press('Tab');
     await expect(page.getByRole('link', { name: 'Skip to main content' })).toBeFocused();
     await page.keyboard.press('Tab');
-    await expect(page.getByRole('textbox', { name: 'Email address' })).toBeFocused();
+    await expect(page.getByRole('textbox', { name: 'Email address', exact: true })).toBeFocused();
     await page.keyboard.type('ada@example.org');
     await page.keyboard.press('Tab');
     await expect(page.getByLabel('Password', { exact: true })).toBeFocused();
@@ -105,7 +105,7 @@ test.describe('sign in', () => {
     await page.goto('/northfield/somewhere/else');
     await expect(h1(page, 'Sign in')).toBeVisible();
     await expect(page).toHaveURL(/\/northfield\/sign-in\?next=%2Fsomewhere%2Felse$/);
-    await page.getByRole('textbox', { name: 'Email address' }).fill('ada@example.org');
+    await page.getByRole('textbox', { name: 'Email address', exact: true }).fill('ada@example.org');
     await page.getByLabel('Password', { exact: true }).fill('correct horse battery');
     await page.getByRole('button', { name: 'Sign in' }).click();
 
@@ -120,7 +120,7 @@ test.describe('sign in', () => {
     });
 
     await page.goto('/northfield/sign-in?next=//evil.example/path');
-    await page.getByRole('textbox', { name: 'Email address' }).fill('ada@example.org');
+    await page.getByRole('textbox', { name: 'Email address', exact: true }).fill('ada@example.org');
     await page.getByLabel('Password', { exact: true }).fill('correct horse battery');
     await page.getByRole('button', { name: 'Sign in' }).click();
 
@@ -136,7 +136,9 @@ test.describe('sign in', () => {
       'POST /auth/tenants/northfield/sign-in': problem(401, 'No account with that address.'),
     });
     await page.goto('/northfield/sign-in');
-    await page.getByRole('textbox', { name: 'Email address' }).fill('nobody@example.org');
+    await page
+      .getByRole('textbox', { name: 'Email address', exact: true })
+      .fill('nobody@example.org');
     await page.getByLabel('Password', { exact: true }).fill('wrong password here');
 
     await page.getByRole('button', { name: 'Sign in' }).click();
@@ -158,7 +160,7 @@ test.describe('sign in', () => {
       },
     });
     await page.goto('/northfield/sign-in');
-    await page.getByRole('textbox', { name: 'Email address' }).fill('ada@example.org');
+    await page.getByRole('textbox', { name: 'Email address', exact: true }).fill('ada@example.org');
     await page.getByLabel('Password', { exact: true }).fill('correct horse battery');
 
     await page.getByRole('button', { name: 'Sign in' }).click();
@@ -176,7 +178,7 @@ test.describe('sign in', () => {
 
     const summary = page.getByRole('alert', { name: 'There is a problem' });
     await expect(summary.getByRole('link')).toHaveCount(2);
-    await expect(page.getByRole('textbox', { name: 'Email address' })).toHaveAttribute(
+    await expect(page.getByRole('textbox', { name: 'Email address', exact: true })).toHaveAttribute(
       'aria-invalid',
       'true',
     );
@@ -203,7 +205,7 @@ test.describe('create an account', () => {
     });
 
     await page.goto('/northfield/sign-up');
-    await page.getByRole('textbox', { name: 'Email address' }).fill('new@example.org');
+    await page.getByRole('textbox', { name: 'Email address', exact: true }).fill('new@example.org');
     await page.getByRole('button', { name: 'Email me a link' }).click();
     await expect(h1(page, 'Check your email')).toBeFocused();
     await expect(page.getByText('The link works once, for 24 hours.')).toBeVisible();
@@ -263,7 +265,9 @@ test.describe('reset a forgotten password', () => {
     await page.goto('/northfield/sign-in');
     await page.getByRole('link', { name: 'Forgot your password?' }).click();
     await expect(h1(page, 'Reset your password')).toBeFocused();
-    await page.getByRole('textbox', { name: 'Email address' }).fill('anyone@example.org');
+    await page
+      .getByRole('textbox', { name: 'Email address', exact: true })
+      .fill('anyone@example.org');
     await page.getByRole('button', { name: 'Email me a reset link' }).click();
 
     await expect(h1(page, 'Check your email')).toBeFocused();
