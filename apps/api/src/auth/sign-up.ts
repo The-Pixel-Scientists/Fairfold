@@ -36,7 +36,8 @@ import type { AuthTables } from './tables.ts';
 
 /** A sign-up link's verification value is this prefix and the address. */
 const SIGN_UP = 'sign_up:';
-const LINK_MS = 24 * 3600_000;
+/** How long a link lasts, as an interval on the database's clock, which every check of it reads. */
+const LINK = '24 hours';
 
 /** Refuse a new password on the common-password list. */
 export function refuseCommonPassword(list: ReadonlySet<string>, password: string): void {
@@ -120,7 +121,11 @@ async function newLink(deps: RouteDependencies, { app, slug, email }: SignUpEmai
     await db.deleteFrom('auth.verification').where('value', '=', value).execute();
     await db
       .insertInto('auth.verification')
-      .values({ identifier: tokenId(token), value, expires_at: new Date(Date.now() + LINK_MS) })
+      .values((eb) => ({
+        identifier: tokenId(token),
+        value,
+        expires_at: eb.fn<Date>('date_add', [eb.fn('now'), eb.val(LINK)]),
+      }))
       .execute();
   });
   return `${tenantBase(deps, app, slug)}/sign-up/complete#token=${token}`;

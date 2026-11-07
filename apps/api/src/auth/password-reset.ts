@@ -30,7 +30,8 @@ import type { AuthTables } from './tables.ts';
 /** A reset link's verification value is this prefix, the user's id and the tenant's id. */
 export const RESET = 'password_reset:';
 export const VALUE = /^password_reset:([0-9a-f-]{36}):([0-9a-f-]{36})$/;
-const LINK_MS = 30 * 60_000;
+/** How long a link lasts, as an interval on the database's clock, which every check of it reads. */
+const LINK = '30 minutes';
 
 interface ResetRequest {
   readonly app: App;
@@ -85,11 +86,11 @@ async function sendResetLink(deps: RouteDependencies, job: ResetRequest): Promis
     await trx
       .$extendTables<AuthTables>()
       .insertInto('auth.verification')
-      .values({
+      .values((eb) => ({
         identifier: tokenId(token),
         value: `${RESET}${account.id}:${job.tenant.id}`,
-        expires_at: new Date(Date.now() + LINK_MS),
-      })
+        expires_at: eb.fn<Date>('date_add', [eb.fn('now'), eb.val(LINK)]),
+      }))
       .execute();
     await recordAuthEvent(trx, 'password_reset_requested', { ...details, userId: account.id });
   });
