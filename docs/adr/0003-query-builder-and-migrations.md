@@ -72,11 +72,17 @@ write.
 | `app_api`, `app_worker` | API, and job handlers in the worker | Explicit grants only |
 | `app_queue` | pg-boss's own connection in the worker ([ADR 0009](0009-background-jobs.md)) | Grants in schema `pgboss`; outside it, only `USAGE` on schema `app`, `SELECT` on `app.job_queue` and `EXECUTE` on `app.current_tenant_id()`, which the job trigger uses |
 | `app_auth` | `apps/api/src/auth` only | Grants in schema `auth`; outside it, only `USAGE` on schema `app` and `EXECUTE` on `app.current_tenant_id()`, which its policies call |
+| `app_operator` | Operator commands in `apps/api/src/operator/` only, through `SET LOCAL ROLE` from `app_worker` ([ADR 0024](0024-no-tool-on-by-default.md); Aaron, 29 October 2026) | `NOLOGIN`. Explicit grants only: the module switch, configuration version and audit event inserts ADR 0024 lists, each held by restrictive policies to the tenant set, the operator as author and no membership; no `UPDATE` or `DELETE` |
 | One owner per approved definer function | That function | `NOLOGIN`; owns only its function; exactly the grants listed below |
 
 - Every role above is `NOSUPERUSER`, `NOBYPASSRLS`, `NOCREATEROLE`,
   `NOCREATEDB` and `NOREPLICATION`, and belongs to no other role. The app
   roles own nothing.
+- One membership is allowed besides those of [ADR 0023](0023-function-owner-memberships.md):
+  `app_worker` in `app_operator`, `WITH ADMIN FALSE, INHERIT FALSE, SET
+  TRUE`. A worker connection holds none of `app_operator`'s grants until it
+  runs `SET LOCAL ROLE app_operator`, which ends with the transaction. No
+  other role is a member of `app_operator`, and it is a member of none.
 - A roles script in `packages/db/scripts/` creates the roles and resets their
   attributes. It is idempotent and versioned, and the install and upgrade
   procedures run it as superuser before migrating. It also revokes from
@@ -102,7 +108,8 @@ write.
    `WITH CHECK` explicitly.
 4. A command that no app role may run on a table has no grant and a
    restrictive policy: `AS RESTRICTIVE FOR <command> TO app_api, app_worker,
-   app_queue, app_auth USING (false)`, or `WITH CHECK (false)` for `INSERT`.
+   app_queue, app_auth, app_operator USING (false)`, or `WITH CHECK (false)`
+   for `INSERT`.
 5. `app.current_tenant_id()` is `STABLE` and returns
    `NULLIF(current_setting('app.tenant_id', true), '')::uuid`. With no tenant
    set, every policy matches nothing; a test proves it for every tenant table.
