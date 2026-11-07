@@ -10,6 +10,9 @@
 
 import {
   checkRoute,
+  idempotencyHeadersSchema,
+  idempotencyKeyHeader,
+  idempotencyKeySchema,
   isRawBody,
   problemSchema,
   rawUploadContentType,
@@ -19,7 +22,7 @@ import {
   type RouteContract,
 } from '@pixel-scientists/domain/api';
 import { decodeFileNameHeader, fileNameHeader } from '@pixel-scientists/domain/files';
-import { modules } from '@pixel-scientists/domain/platform';
+import { messages, modules } from '@pixel-scientists/domain/platform';
 import type {
   FastifyInstance,
   FastifyReply,
@@ -35,6 +38,7 @@ import type { InTenant, TenantTransaction } from '../database.ts';
 import type { FileService } from '../platform/files/index.ts';
 import { ApiError, handleError, handleNotFound, PROBLEM_CONTENT_TYPE } from '../problems.ts';
 import { asMember, checkSession, type ScopeInput, type ScopeResolvers } from '../policy/index.ts';
+import { requestHash, withIdempotencyKey } from './idempotency.ts';
 
 type MemberAudience = 'console' | 'portal';
 
@@ -87,20 +91,42 @@ interface HandlerArgs {
   input: ScopeInput;
 }
 
+/**
+ * Answers a replay of an idempotent route: the created resource as it reads
+ * now, through the audience projection the route's read uses. `id` is the
+ * `id` of the first response, or null where that had none.
+ */
+export type Replay<C extends RouteContract> = C extends { readonly audience: MemberAudience }
+  ? (args: {
+      tx: TenantTransaction;
+      context: MemberContext;
+      input: Input<C>;
+      id: string | null;
+    }) => Promise<Output<C>>
+  : never;
+
 /** A contract and its handler. Make one with route(), which checks the two fit. */
 export interface Route {
   readonly contract: RouteContract;
   readonly handler: (args: HandlerArgs) => Promise<unknown>;
   /** The largest request body in bytes, where the server's default is too small. */
   readonly bodyLimit?: number;
+  /** Required for an idempotent route, refused on any other (ADR 0028). */
+  readonly replay?: (
+    args: HandlerArgs & { tx: TenantTransaction; id: string | null },
+  ) => Promise<unknown>;
 }
 
 export function route<const C extends RouteContract>(
   contract: C,
   handler: Handler<C>,
-  options: { bodyLimit?: number } = {},
+  options: { bodyLimit?: number; replay?: Replay<C> } = {},
 ): Route {
-  return { contract, handler: handler as unknown as Route['handler'], ...options };
+  return {
+    contract,
+    handler: handler as unknown as Route['handler'],
+    ...options,
+  } as Route;
 }
 
 export interface RouteDependencies {
@@ -171,6 +197,9 @@ export function documentRawUploads(document: object): object {
   return openapi;
 }
 
+const idempotent = (contract: RouteContract): boolean =>
+  (contract as { idempotent?: true }).idempotent === true;
+
 function schemaFor(contract: RouteContract, status: number): FastifySchema {
   const raw = contract.responses[status];
   const success = isRawBody(raw)
@@ -186,12 +215,17 @@ function schemaFor(contract: RouteContract, status: number): FastifySchema {
     ...(contract.params === undefined ? {} : { params: contract.params }),
     // A part the contract does not declare takes nothing: an unknown query key is refused.
     querystring: contract.query ?? z.strictObject({}),
+    ...(idempotent(contract) ? { headers: idempotencyHeadersSchema } : {}),
     ...(contract.body === undefined || isRawBody(contract.body) ? {} : { body: contract.body }),
     // The OpenAPI document shows a raw upload (see documentRawUploads); the handler checks its bytes.
     ...(isRawBody(contract.body) ? { [RAW_UPLOAD]: contract.body } : {}),
     response: {
       [status]: success ?? { description: 'No content.', content: {} },
-      ...Object.fromEntries(PROBLEM_STATUSES[contract.audience].map((s) => [s, problemResponse])),
+      ...Object.fromEntries(
+        [...PROBLEM_STATUSES[contract.audience], ...(idempotent(contract) ? [409] : [])].map(
+          (s) => [s, problemResponse],
+        ),
+      ),
     },
   };
 }
@@ -216,8 +250,17 @@ function missingForBadParams(error: unknown, request: FastifyRequest, reply: Fas
  * defineRoute() is caught), has more than one success response, or has a
  * scope rule nobody resolves.
  */
-function checkRegistration(contract: RouteContract, deps: RouteDependencies): void {
+function checkRegistration(
+  contract: RouteContract,
+  deps: RouteDependencies,
+  replay: Route['replay'],
+): void {
   const problems = checkRoute(contract);
+  if (idempotent(contract) && contract.audience !== 'console' && contract.audience !== 'portal') {
+    problems.push('Only a console or portal route can be idempotent until ADR 0036 is accepted.');
+  } else if (idempotent(contract) !== (replay !== undefined)) {
+    problems.push('An idempotent route has a replay reader, and any other route has none.');
+  }
   if (Object.keys(contract.responses).length !== 1) {
     problems.push('The API registers routes with exactly one success response.');
   }
@@ -242,6 +285,8 @@ export function registerRoutes(
   const contexts = new WeakMap<FastifyRequest, RequestContext>();
   // The `File-Name` header of each raw upload, decoded before its body is read.
   const fileNames = new WeakMap<FastifyRequest, string>();
+  // The valid `Idempotency-Key` of each request to an idempotent route.
+  const keys = new WeakMap<FastifyRequest, string>();
 
   // A raw upload's bytes, as a buffer: its route's limit is the body limit.
   if (routes.some((r) => isRawBody(r.contract.body))) {
@@ -279,8 +324,8 @@ export function registerRoutes(
     fileNames.set(request, name);
   };
 
-  for (const { contract, handler, bodyLimit } of routes) {
-    checkRegistration(contract, deps);
+  for (const { contract, handler, bodyLimit, replay } of routes) {
+    checkRegistration(contract, deps, replay);
     const rawUpload = isRawBody(contract.body) ? contract.body : undefined;
     const status = Number(Object.keys(contract.responses)[0]);
     const hasBody = contract.responses[status] !== null;
@@ -318,6 +363,21 @@ export function registerRoutes(
         }
       },
       preValidation: (request, _reply, done) => {
+        if (idempotent(contract)) {
+          const key = idempotencyKeySchema.safeParse(
+            request.headers[idempotencyKeyHeader.toLowerCase()],
+          );
+          if (!key.success) {
+            done(
+              new ApiError(400, messages.fixFields, {
+                reason: 'bad_idempotency_key',
+                errors: [{ field: 'header.idempotency-key', message: messages.notValid }],
+              }),
+            );
+            return;
+          }
+          keys.set(request, key.data);
+        }
         if (rawUpload !== undefined) {
           const name = fileNames.get(request);
           if (name === undefined || !Buffer.isBuffer(request.body)) {
@@ -357,7 +417,23 @@ export function registerRoutes(
                 audit: caller.audit,
               });
               const member = { ...caller, files };
-              return handler({ tx, context: member, input });
+              const key = keys.get(request);
+              if (key === undefined || replay === undefined) {
+                return handler({ tx, context: member, input });
+              }
+              const routeId = `${contract.method} ${contract.path}`;
+              return withIdempotencyKey(
+                tx,
+                {
+                  membershipId: caller.membership.id,
+                  routeId,
+                  key,
+                  hash: requestHash(routeId, input),
+                  status,
+                },
+                () => handler({ tx, context: member, input }),
+                (id) => replay({ tx, context: member, input, id }),
+              );
             },
           );
         } else {
