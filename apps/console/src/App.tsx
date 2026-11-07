@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import { emailChangeLinkPath } from '@pixel-scientists/domain/auth';
 import { grantsRoutes } from '@pixel-scientists/grants/console';
 import { AppShell, NotFoundPage, Router, SessionProvider } from '@pixel-scientists/ui';
 import type { PageDefinition, RouteDefinition } from '@pixel-scientists/ui';
@@ -7,6 +8,7 @@ import { Suspense, lazy } from 'react';
 import type { ReactNode } from 'react';
 
 import { endSession, loadSession } from './api.ts';
+import { ACCOUNT_SECURITY_PATH } from './account/security/paths.ts';
 import CheckEmailPage from './auth/CheckEmailPage.tsx';
 import CompleteSignUpPage from './auth/CompleteSignUpPage.tsx';
 import EnterCodePage from './auth/EnterCodePage.tsx';
@@ -50,6 +52,11 @@ export const tenantRoutes: readonly RouteDefinition[] = [
   ...memberRoutes([
     ...grantsRoutes,
     {
+      path: ACCOUNT_SECURITY_PATH,
+      title: 'Account security',
+      load: () => import('./account/security/SecurityPage.tsx'),
+    },
+    {
       path: AUDIT_LOG_PATH,
       title: 'Audit log',
       load: () => import('./platform/audit-log/AuditLogPage.tsx'),
@@ -63,6 +70,11 @@ export const tenantRoutes: readonly RouteDefinition[] = [
     path: INVITATION_PATH,
     title: 'Accept your invitation',
     load: () => import('./platform/team/InvitationPage.tsx'),
+  },
+  {
+    path: emailChangeLinkPath,
+    title: 'Confirm your new email address',
+    load: () => import('./account/security/EmailChangePage.tsx'),
   },
   {
     path: '/settings',

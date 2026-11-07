@@ -1,9 +1,17 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { Button, Dialog, TenantLogo, useSession } from '@pixel-scientists/ui';
+import {
+  Button,
+  Dialog,
+  Link,
+  TenantLogo,
+  buttonClassName,
+  useSession,
+} from '@pixel-scientists/ui';
 import type { SessionData } from '@pixel-scientists/ui';
 import { useState } from 'react';
 
+import { ACCOUNT_SECURITY_PATH } from '../account/security/paths.ts';
 import { useTenantLook } from '../platform/settings/look.tsx';
 import { useTenantSlug } from '../tenant.ts';
 import { FunderList } from './FunderList.tsx';
@@ -42,6 +50,9 @@ export function AccountControls({ session }: { session: SessionData }) {
           Switch funder
         </Button>
       )}
+      <Link to={ACCOUNT_SECURITY_PATH} className={buttonClassName('quiet')}>
+        Account security
+      </Link>
       <Button
         variant="quiet"
         onClick={() => {
