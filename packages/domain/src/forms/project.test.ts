@@ -12,7 +12,7 @@ import { visibleFields } from './visibility.ts';
 /** Written from the rules, not from canSee(), so the two are checked against each other. */
 function mayView(field: FormField, audience: ProjectionAudience): boolean {
   if (field.type === 'content') return false;
-  if (audience === 'applicant') return true;
+  if (audience === 'applicant' || audience === 'respondent') return true;
   if (field.audiences === 'aggregate_only') return false;
   if (audience === 'staff') return field.audiences.includes('staff');
   const reviewer = field.audiences.includes('reviewer');
@@ -173,7 +173,9 @@ describe('projectAnswers, on 500 random forms', { timeout: 30_000 }, () => {
         expect(projected, `seed ${seed}, ${audience}`).toEqual(expected);
         for (const field of form.sections.flatMap((section) => section.fields)) {
           if (!(field.id in projected) || field.type === 'content') continue;
-          if (audience !== 'applicant') expect(field.audiences).not.toBe('aggregate_only');
+          if (audience !== 'applicant' && audience !== 'respondent') {
+            expect(field.audiences).not.toBe('aggregate_only');
+          }
           if (audience === 'blind_reviewer') {
             expect(field.identity).toBe(false);
             expect(field.type).not.toBe('file');

@@ -24,6 +24,7 @@ const readers: Record<ProjectionAudience, string> = {
   staff: 'staff',
   reviewer: 'reviewers',
   blind_reviewer: 'blind reviewers',
+  respondent: 'the respondent',
 };
 
 function schemaFor<const A extends ProjectionAudience>(audience: A) {
@@ -40,6 +41,7 @@ export const projectedAnswersSchemas = {
   staff: schemaFor('staff'),
   reviewer: schemaFor('reviewer'),
   blind_reviewer: schemaFor('blind_reviewer'),
+  respondent: schemaFor('respondent'),
 } as const satisfies Record<ProjectionAudience, z.ZodType>;
 
 export type ProjectedAnswers<A extends ProjectionAudience> = z.output<
