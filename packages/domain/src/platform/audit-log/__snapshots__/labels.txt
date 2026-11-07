@@ -42,3 +42,5 @@ platform.auth.sessions_revoked: Sessions revoked
 platform.auth.invitation_accepted: Invitation accepted
 platform.auth.mfa_removed: MFA removed
 platform.auth.password_changed: Password changed
+platform.auth.backup_code_used: Backup code used
+platform.auth.backup_codes_regenerated: Backup codes regenerated

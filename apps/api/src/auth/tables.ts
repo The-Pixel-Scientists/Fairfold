@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
 // The columns the auth module reads and writes (migrations 0002 to 0004,
-// and 0015). The auth tables are reached as app_auth; the app tables as
+// 0015 and 0025). The auth tables are reached as app_auth; the app tables as
 // app_api, inside withTenant().
 
 import type { Generated } from '@pixel-scientists/db';
@@ -26,6 +26,8 @@ export type AuthTables = {
     verified: boolean;
     /** A bigint: written as a number, read as text. */
     last_used_step: string | number | null;
+    /** The backup code set as HMACs (backup-codes/codes.ts, migration 0025). */
+    backup_codes: string | null;
   };
   'auth.session': {
     user_id: string;
