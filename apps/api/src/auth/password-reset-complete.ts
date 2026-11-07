@@ -5,8 +5,8 @@
 // usable. Then, in one transaction, with completions for the account taking
 // turns: the token and every other reset link of the account are spent, the
 // user is locked against sessions being issued, the new password is set,
-// every session is revoked, the address's sign-in counters and delays are
-// cleared, and the events are recorded. It never signs in and never touches
+// every session and device cookie is revoked, the address's sign-in
+// counters and delays are cleared, and the events are recorded. It never signs in and never touches
 // MFA, and the user is emailed a notice.
 
 import { completePasswordReset } from '@pixel-scientists/domain/auth';
@@ -16,6 +16,7 @@ import { ApiError } from '../problems.ts';
 import { route, type Route } from '../routes/register.ts';
 import { recordAuthEvent } from './events.ts';
 import { plainAddress } from './limits.ts';
+import { revokeDevices } from './limits/devices.ts';
 import { hashPassword } from './passwords.ts';
 import { RESET, sendResetEmail, VALUE } from './password-reset.ts';
 import type { RouteDependencies } from './routes.ts';
@@ -87,9 +88,14 @@ export function completeResetRoute(deps: RouteDependencies): Route {
         .executeTakeFirst();
       if (changed.numUpdatedRows === 0n) throw linkNotValid;
       await revokeAll(trx, { userId });
+      await revokeDevices(trx, userId);
       await db
         .deleteFrom('auth.rate_limit')
-        .where('scope', 'in', ['sign_in_identifier_ip', 'sign_in_identifier'])
+        .where('scope', 'in', [
+          'sign_in_identifier_ip',
+          'sign_in_identifier',
+          'sign_in_identifier_device',
+        ])
         .where('identifier', '=', user.email)
         .execute();
       const details = { requestId, userId, tenant: tenantId, ip };

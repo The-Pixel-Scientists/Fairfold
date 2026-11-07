@@ -29,6 +29,7 @@ import { ApiError } from '../problems.ts';
 import { route, type Route } from '../routes/register.ts';
 import { clearedCookie, hashToken, sessionCookie } from './cookies.ts';
 import { copyAuthEvent, recordAuthEvent, type CopyDependencies } from './events.ts';
+import type { DeviceKeys } from './limits/device-cookie.ts';
 import { requestResetRoute } from './password-reset.ts';
 import { completeResetRoute } from './password-reset-complete.ts';
 import { detailsOf, revoke } from './sessions.ts';
@@ -45,8 +46,14 @@ export interface RouteDependencies extends CopyDependencies {
   readonly commonPasswords: ReadonlySet<string> | undefined;
   /** A typed identifier as counters and events keep it (limits.ts). */
   readonly keepIdentifier: (typed: string) => string;
+  /** The keys that sign and check device cookies (limits/device-cookie.ts). */
+  readonly devices: DeviceKeys;
   /** The client of the request with this id, as Fastify derived it through the trusted proxies. */
-  readonly client: (requestId: string) => { readonly ip: string; readonly userAgent?: string };
+  readonly client: (requestId: string) => {
+    readonly ip: string;
+    readonly userAgent?: string;
+    readonly cookie?: string;
+  };
   /** Adds a header to the response to the request with this id. */
   readonly setHeader: (requestId: string, name: string, value: string) => void;
   /** Runs work after the response is sent, logging any failure. */

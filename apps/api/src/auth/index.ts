@@ -41,6 +41,8 @@ import { appResolver } from './hosts.ts';
 import { invitationRoutes } from './invitation-accept.ts';
 import { createInvitation, type Inviter } from './invitations.ts';
 import { identifierKeeper } from './limits.ts';
+import { deviceKeys } from './limits/device-cookie.ts';
+import { revokeDevices } from './limits/devices.ts';
 import { revokeSessionsForMembership, type MembershipChange } from './memberships.ts';
 import { loadCommonPasswords } from './passwords.ts';
 import { mfaRoutes } from './mfa.ts';
@@ -62,7 +64,11 @@ export {
 export type { MembershipChange } from './memberships.ts';
 
 export interface Auth extends AuthModule {
-  /** Revoke a user's live sessions, or those active in one tenant, and record it. Returns how many. */
+  /**
+   * Revoke a user's live sessions, or those active in one tenant, and record
+   * it. Revoking them all ("sign out everywhere") revokes the account's
+   * device cookies too. Returns how many sessions.
+   */
   revokeSessions(target: {
     readonly userId: string;
     readonly tenant?: TenantId;
@@ -167,6 +173,7 @@ export function createAuth(settings: AuthSettings, deps: AuthDependencies): Auth
     sender: deps.sender,
     commonPasswords,
     keepIdentifier: identifierKeeper(settings.secret),
+    devices: deviceKeys(settings.secret),
     client: (requestId) => {
       const client = clients.get(requestId);
       if (client === undefined) {
@@ -276,6 +283,8 @@ export function createAuth(settings: AuthSettings, deps: AuthDependencies): Auth
           userId,
           ...(tenant === undefined ? {} : { tenantId: tenant }),
         }),
+        // Signing out everywhere also ends the account's device cookies.
+        devices: tenant === undefined ? await revokeDevices(trx, userId) : 0,
         event: await recordAuthEvent(trx, 'sessions_revoked', {
           requestId,
           userId,
