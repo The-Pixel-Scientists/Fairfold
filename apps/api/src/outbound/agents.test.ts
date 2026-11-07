@@ -142,8 +142,9 @@ describe('node:https through the outbound agent', () => {
     const agent = agentFor(() => stub.port);
 
     await new Promise<void>((resolve, reject) => {
-      // A request that tries to turn certificate checking off; the agent must override it.
+      // Deliberate: a request that turns certificate checking off, to prove the agent overrides it.
       const checkingOff = false;
+      // nosemgrep: bypass-tls-verification
       httpsGet('https://stub.test/', { agent, rejectUnauthorized: checkingOff }, (response) => {
         response.resume();
         resolve();
