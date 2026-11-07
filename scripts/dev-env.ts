@@ -31,12 +31,14 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { isIPv4 } from 'node:net';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { parseEnv } from 'node:util';
 
+import { isLoopbackHost } from '../packages/db/src/settings.ts';
 import { currentDevNames, repositoryRoot } from './dev-names.ts';
+
+export { isLoopbackHost };
 
 const COMPOSE_FILE = join(repositoryRoot, 'infra', 'compose', 'compose.dev.yaml');
 const ENV_FILE = join(repositoryRoot, '.env');
@@ -272,12 +274,6 @@ export function developmentValues(
     values[key] = environmentValue(postgres, 'postgres', key);
   }
   return values;
-}
-
-/** The same rule as isLoopbackHost in packages/db/scripts/settings.ts. */
-export function isLoopbackHost(host: string): boolean {
-  if (host === 'localhost' || host === '::1' || host === '[::1]') return true;
-  return isIPv4(host) && host.startsWith('127.');
 }
 
 /** The inherited environment without any TPS_ variable, in any letter case. */
