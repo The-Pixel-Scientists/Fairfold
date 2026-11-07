@@ -36,6 +36,38 @@ describe('role map', () => {
     const granted = new Set(roleIds.flatMap((id) => roles[id].permissions));
     expect(permissionIds.filter((p) => !granted.has(p))).toEqual([]);
   });
+
+  it('give equality monitoring answers only to the data protection lead, who holds nothing else (ADR 0032)', () => {
+    const holders = roleIds.filter((id) =>
+      (roles[id].permissions as readonly Permission[]).includes('grants.monitoring.disclose'),
+    );
+    expect(holders).toEqual(['data_protection_lead']);
+    expect(roles.data_protection_lead.permissions).toEqual(['grants.monitoring.disclose']);
+  });
+
+  it('keep due diligence and monitoring totals away from reviewers and programme managers (ADRs 0031, 0032)', () => {
+    expect(roles.reviewer.permissions.filter((p) => !p.startsWith('platform.'))).toEqual([
+      'grants.reviews.score',
+    ]);
+    expect(roles.programme_manager.permissions).not.toContain('insight.monitoring.report');
+  });
+
+  it('leave shortening how long data is kept to administrators', () => {
+    for (const permission of ['platform.retention.manage', 'forms.retention.manage'] as const) {
+      const holders = roleIds.filter((id) =>
+        (roles[id].permissions as readonly Permission[]).includes(permission),
+      );
+      expect(holders, permission).toEqual(['tenant_admin']);
+    }
+  });
+
+  it('let every console role search, except the data protection lead', () => {
+    for (const id of roleIds) {
+      const role = roles[id];
+      const searches = (role.permissions as readonly Permission[]).includes('platform.search.use');
+      expect(searches, id).toBe(role.app === 'console' && id !== 'data_protection_lead');
+    }
+  });
 });
 
 describe('permissionsFor', () => {
@@ -49,6 +81,7 @@ describe('permissionsFor', () => {
     expect(permissionsFor(['tenant_admin', 'applicant'], 'portal')).toEqual([
       'party.profile.manage',
       'grants.applications.apply',
+      'forms.responses.submit',
     ]);
     expect(permissionsFor(['applicant'], 'console')).toEqual([]);
   });
