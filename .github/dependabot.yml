@@ -7,7 +7,7 @@
 # Major versions are left out of the batches and upgraded by hand, after
 # reading the release notes and updating any ADR they touch. For example,
 # TypeScript 7 waits until typescript-eslint supports it, @types/node follows
-# the Node.js 24 LTS line, and PostgreSQL stays on 16.
+# the Node.js 26 LTS line, and PostgreSQL stays on 16.
 
 version: 2
 
