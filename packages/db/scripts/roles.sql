@@ -1,6 +1,6 @@
 -- SPDX-License-Identifier: AGPL-3.0-or-later
 --
--- Fairfold Grants database roles, version 4 (ADR 0003), part 1 of 2: the roles.
+-- Fairfold Grants database roles, version 5 (ADR 0003), part 1 of 2: the roles.
 --
 -- Creates the login roles and the function-owner roles, and resets their
 -- attributes, memberships, settings and passwords. Roles belong to the
@@ -41,10 +41,16 @@
 -- that function and nothing else. Owners of functions that later tasks add
 -- are created ahead, so that no migration waits on a new version of this
 -- script; each owns nothing until its migration hands it its function. A
--- new owner role comes with a new version number. The one membership any
--- role holds is migrator's in each owner, with SET but not INHERIT:
+-- new owner role comes with a new version number. Besides app_worker's in
+-- app_operator, below, the one membership any role holds is migrator's in
+-- each owner, with SET but not INHERIT:
 -- migrator can hand a function to its owner, or replace it as that owner,
 -- but never holds the owner's rights (ADR 0023).
+--
+-- app_operator is the NOLOGIN role operator commands run as (ADR 0024).
+-- app_worker is its one member, with SET but not INHERIT, so a worker
+-- connection holds its rights only after SET LOCAL ROLE app_operator, and
+-- it belongs to no role.
 
 BEGIN;
 
@@ -58,10 +64,11 @@ SET LOCAL lock_timeout = '30s';
 
 DO $roles$
 DECLARE
-  roles_version CONSTANT text := '4';
+  roles_version CONSTANT text := '5';
   managed CONSTANT boolean := current_setting('tps.admin_mode', true) = 'managed';
   backup_role CONSTANT text := 'backup_reader';
   login_roles CONSTANT text[] := ARRAY['migrator', 'app_api', 'app_worker', 'app_auth', 'app_queue', backup_role];
+  operator_role CONSTANT text := 'app_operator';
   owner_roles CONSTANT text[] := ARRAY[
     'owner_auth_session_context',              -- auth.session_context()
     'owner_auth_session_memberships',          -- auth.session_memberships()
@@ -88,8 +95,11 @@ DECLARE
     'owner_app_embed_origins',                 -- S12-48
     'owner_party_record_unsubscribe',          -- S12-53
     'owner_app_resolve_signature_callback',    -- S12-62
-    'owner_app_erase_documents'                -- S12-62
+    'owner_app_erase_documents',               -- S12-62
+    'owner_app_delete_swept_file',             -- S11-74, app.delete_swept_file()
+    'owner_app_erase_file'                     -- S11-74, app.erase_file()
   ];
+  all_roles CONSTANT text[] := login_roles || operator_role || owner_roles;
   admin record;
   refused text;
   is_login boolean;
@@ -122,7 +132,7 @@ BEGIN
     -- OPTION on a role, as its creator does, can change it at all.
     SELECT string_agg(r.rolname, ', ' ORDER BY r.rolname) INTO refused
     FROM pg_catalog.pg_roles r
-    WHERE r.rolname = ANY (login_roles || owner_roles)
+    WHERE r.rolname = ANY (all_roles)
       AND (r.rolsuper OR NOT EXISTS (
         SELECT FROM pg_catalog.pg_auth_members m
         WHERE m.roleid = r.oid AND m.member = admin.oid AND m.admin_option));
@@ -135,7 +145,7 @@ BEGIN
     PERFORM pg_catalog.pg_advisory_xact_lock(4917734305101002001);
   END IF;
 
-  FOREACH role_name IN ARRAY login_roles || owner_roles
+  FOREACH role_name IN ARRAY all_roles
   LOOP
     is_login := role_name = ANY (login_roles);
 
@@ -209,7 +219,7 @@ BEGIN
     -- roles from another version of this script.
     EXECUTE format('COMMENT ON ROLE %I IS %L', role_name, 'tps-roles-version=' || roles_version);
 
-    -- A function owner never logs in, so it has no password at all.
+    -- A function owner or app_operator never logs in, so it has no password at all.
     IF NOT is_login THEN
       EXECUTE format('ALTER ROLE %I PASSWORD NULL', role_name);
       CONTINUE;
@@ -247,6 +257,8 @@ BEGIN
   LOOP
     EXECUTE format('GRANT %I TO migrator WITH ADMIN FALSE, INHERIT FALSE, SET TRUE', role_name);
   END LOOP;
+
+  EXECUTE format('GRANT %I TO app_worker WITH ADMIN FALSE, INHERIT FALSE, SET TRUE', operator_role);
 END
 $roles$;
 
