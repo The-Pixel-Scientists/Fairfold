@@ -23,8 +23,18 @@ export async function loadVersions(roundId: string) {
   return { ...context, versions };
 }
 
-/** One form version with its round and programme. */
+/** One form version with its round and programme, and the definitions of the round's published versions. */
 export async function loadVersion(formVersionId: string) {
   const version = await call(getFormVersion, { params: { formVersionId } });
-  return { version, ...(await loadRoundAndProgramme(version.roundId)) };
+  const [context, { versions }] = await Promise.all([
+    loadRoundAndProgramme(version.roundId),
+    call(listFormVersions, { params: { roundId: version.roundId } }),
+  ]);
+  const published = await Promise.all(
+    versions
+      .filter((item) => item.status === 'published')
+      .map((item) => call(getFormVersion, { params: { formVersionId: item.id } })),
+  );
+  const earlier = published.flatMap((item) => (item.definition === null ? [] : [item.definition]));
+  return { version, earlier, ...context };
 }
