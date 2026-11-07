@@ -26,6 +26,7 @@ vi.mock('../telemetry/index.ts', async (importOriginal) => ({
 
 const KEY = new Secret('a-key-of-at-least-thirty-two-bytes!');
 const RETRY_AFTER = 17;
+const CALLS_PER_GROUP = 2;
 
 /** Counts in memory. Every counter starts at `start`, to reach a limit without sending all of it. */
 function fakeStore(start = 0) {
@@ -331,6 +332,134 @@ describe('one client flooding the counters', () => {
     await Promise.all(Array.from({ length: 20 }, () => server.inject({ url: '/openapi.json' })));
 
     expect(most).toBe(2);
+  });
+
+  it('never has more than four store calls in progress across many keys', async () => {
+    let active = 0;
+    let most = 0;
+    const store: CounterStore = {
+      async count() {
+        most = Math.max(most, ++active);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        active--;
+        return { count: 1, retryAfter: RETRY_AFTER };
+      },
+    };
+    const { server } = await start({ store });
+
+    const responses = await Promise.all(
+      Array.from({ length: 40 }, (_, i) =>
+        server.inject({ url: '/openapi.json', remoteAddress: `203.0.113.${String(i + 1)}` }),
+      ),
+    );
+
+    expect(most).toBe(4);
+    expect(responses.map((response) => response.statusCode)).toEqual(Array<number>(40).fill(200));
+  });
+
+  it(
+    'keeps a full key map from leaving a key untracked: a flood from one address stays bounded',
+    { timeout: 30_000 },
+    async () => {
+      let calls = 0;
+      let active = 0;
+      let most = 0;
+      const store: CounterStore = {
+        async count() {
+          calls++;
+          most = Math.max(most, ++active);
+          await new Promise((resolve) => setTimeout(resolve, 1));
+          active--;
+          return { count: 1, retryAfter: RETRY_AFTER };
+        },
+      };
+      const { server } = await start({ store });
+      // Many /64s from many /48s, so the key map fills to its limit.
+      for (let batch = 0; batch < 20; batch++) {
+        await Promise.all(
+          Array.from({ length: 500 }, (_, i) =>
+            server.inject({
+              url: '/openapi.json',
+              remoteAddress: `2001:db8:${(batch * 500 + i + 1).toString(16)}::1`,
+            }),
+          ),
+        );
+      }
+      calls = 0;
+      most = 0;
+
+      const codes = (
+        await Promise.all(
+          Array.from({ length: 500 }, () =>
+            server.inject({ url: '/openapi.json', remoteAddress: '203.0.113.9' }),
+          ),
+        )
+      ).map((response) => response.statusCode);
+
+      expect(calls).toBeLessThanOrEqual(LIMITS.openapi.max + 1);
+      expect(most).toBeLessThanOrEqual(2);
+      expect(codes.filter((code) => code === 429)).toHaveLength(500 - LIMITS.openapi.max);
+    },
+  );
+
+  it('gives all the /64s of one IPv6 /48 two store calls in progress, and serves another network promptly', async () => {
+    let active = 0;
+    let most = 0;
+    const store: CounterStore = {
+      async count() {
+        most = Math.max(most, ++active);
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        active--;
+        return { count: 1, retryAfter: RETRY_AFTER };
+      },
+    };
+    const { server } = await start({ store });
+    const from48 = (n: number) =>
+      Array.from({ length: n }, (_, i) =>
+        server.inject({
+          url: '/openapi.json',
+          remoteAddress: `2001:db8:1:${(i + 1).toString(16)}::1`,
+        }),
+      );
+
+    await Promise.all(from48(60));
+    expect(most).toBe(CALLS_PER_GROUP);
+
+    const flood = from48(60);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    const began = Date.now();
+    const other = await server.inject({ url: '/openapi.json', remoteAddress: '203.0.113.10' });
+    const waited = Date.now() - began;
+    await Promise.all(flood);
+
+    expect(other.statusCode).toBe(200);
+    expect(waited).toBeLessThan(500);
+  });
+
+  it('frees its turn when a store call fails, so later keys are still served', async () => {
+    let calls = 0;
+    const store: CounterStore = {
+      count() {
+        return ++calls <= 8
+          ? Promise.reject(new Error('connection refused'))
+          : Promise.resolve({ count: 1, retryAfter: RETRY_AFTER });
+      },
+    };
+    const { server } = await start({ store });
+
+    const codes = [];
+    for (let i = 0; i < 10; i++) {
+      codes.push(
+        (
+          await server.inject({
+            url: '/openapi.json',
+            remoteAddress: `198.51.100.${String(i + 1)}`,
+          })
+        ).statusCode,
+      );
+    }
+
+    expect(codes).toEqual([...Array<number>(8).fill(503), 200, 200]);
   });
 });
 

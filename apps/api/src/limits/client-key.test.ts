@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { Secret } from '../config.ts';
-import { clientNetwork, keyHash } from './client-key.ts';
+import { clientGroup, clientNetwork, keyHash } from './client-key.ts';
 
 describe('clientNetwork', () => {
   it.each([
@@ -24,6 +24,15 @@ describe('clientNetwork', () => {
   it('gives two addresses in one IPv6 /64 the same network, and another /64 a different one', () => {
     expect(clientNetwork('2001:db8:1:2::1')).toBe(clientNetwork('2001:db8:1:2:ffff::9'));
     expect(clientNetwork('2001:db8:1:2::1')).not.toBe(clientNetwork('2001:db8:1:3::1'));
+  });
+});
+
+describe('clientGroup', () => {
+  it('groups every /64 of one IPv6 /48, keeps IPv4 as it is, and separates other /48s', () => {
+    expect(clientGroup('2001:db8:1:2::1')).toBe('2001:db8:1::/48');
+    expect(clientGroup('2001:db8:1:ffff::9')).toBe('2001:db8:1::/48');
+    expect(clientGroup('2001:db8:2:2::1')).not.toBe(clientGroup('2001:db8:1:2::1'));
+    expect(clientGroup('::ffff:192.0.2.7')).toBe('192.0.2.7');
   });
 });
 

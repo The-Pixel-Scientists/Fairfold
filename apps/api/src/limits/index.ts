@@ -14,8 +14,11 @@
 // is remembered in memory until its window ends, so a client that keeps
 // sending costs no further counter call. Each key is also counted in memory,
 // requests whose counter call failed included, and at most two counter calls
-// per key run at once, so one client cannot fill the connection pool and turn
-// everyone else away. If the counters cannot be reached the request gets a
+// per group (an IPv4 address, an IPv6 /48, a user) and four in all run at
+// once, the rest waiting in memory, so many keys together cannot fill the
+// connection pool and turn everyone away. Memory is bounded: a full map drops
+// its least recently used idle entry, and with none idle the request gets a
+// 503. If the counters cannot be reached the request gets a
 // 503, never a free pass, except /health, which never depends on the database:
 // it waits for the counters only a moment.
 
@@ -25,7 +28,7 @@ import type { Secret } from '../config.ts';
 import type { SessionRead } from '../context.ts';
 import { ApiError } from '../problems.ts';
 import { recordRateLimitHit } from '../telemetry/index.ts';
-import { clientNetwork, keyHash } from './client-key.ts';
+import { clientGroup, clientNetwork, keyHash } from './client-key.ts';
 import { LIMITS, type LimitName } from './definitions.ts';
 import { securityEventLogger, type SecurityEventDetails } from './security-events.ts';
 import type { CounterStore } from './store.ts';
@@ -43,10 +46,12 @@ export interface LimitOptions {
 
 /** How long /health waits for the counters before it answers without them. */
 const HEALTH_WAIT_MS = 200;
-/** Most keys counted in memory at once; past it a request is counted by the store alone. */
+/** Most keys, and most groups, held in memory at once; past it the least recently used idle one makes room. */
 const MAX_KEYS = 10_000;
-/** Store calls in progress at once for one key, so one client cannot fill the connection pool. */
+/** Store calls in progress at once for one group (an IPv4 address, an IPv6 /48, a user), so one client cannot fill the connection pool. */
 const CALLS_PER_KEY = 2;
+/** Store calls in progress at once in all, under the counter pool's four connections. */
+const CALLS_IN_ALL = 4;
 
 /** What this instance knows of one key in its current window. */
 interface Local {
@@ -56,7 +61,10 @@ interface Local {
   count: number;
   /** Which window this is, so a late answer from an earlier one is not applied. */
   window: number;
-  /** Store calls in progress, and the requests waiting for a turn. */
+}
+
+/** The store calls in progress for one group, and the requests waiting for a turn. */
+interface Group {
   active: number;
   readonly waiting: Array<() => void>;
 }
@@ -83,27 +91,48 @@ export function registerLimits(server: FastifyInstance, options: LimitOptions) {
   const report = securityEventLogger();
   const now = options.now ?? Date.now;
   const keys = new Map<string, Local>();
-  let sweepAt = 0;
+  const groups = new Map<string, Group>();
+  let inFlight = 0;
+  const queued: Array<() => void> = [];
+
+  /**
+   * The map's entry for `id`, made the most recently used. A full map gives up
+   * its least recently used idle entry; with none idle there is no entry, and
+   * the caller refuses: a key is never left untracked.
+   */
+  function track<T>(map: Map<string, T>, id: string, make: () => T, idle: (found: T) => boolean) {
+    let entry = map.get(id);
+    if (entry !== undefined) map.delete(id);
+    else {
+      if (map.size >= MAX_KEYS) {
+        for (const [other, found] of map) {
+          if (idle(found)) {
+            map.delete(other);
+            break;
+          }
+        }
+        if (map.size >= MAX_KEYS) return undefined;
+      }
+      entry = make();
+    }
+    map.set(id, entry);
+    return entry;
+  }
 
   /**
    * This instance's count of a key in the current window. The shared count can
    * never be lower than the one instance's own, so past `max` it refuses from
    * memory, whether or not the store ever answered.
    */
-  function local(id: string, windowMs: number): Local {
+  function local(id: string, windowMs: number): Local | undefined {
     const time = now();
-    let entry = keys.get(id);
-    if (entry === undefined) {
-      if (keys.size >= MAX_KEYS && time >= sweepAt) {
-        for (const [other, found] of keys) {
-          if (found.end <= time && found.active === 0) keys.delete(other);
-        }
-        sweepAt = time + 1000;
-      }
-      entry = { end: 0, count: 0, window: 0, active: 0, waiting: [] };
-      if (keys.size < MAX_KEYS) keys.set(id, entry);
-    }
-    if (entry.end <= time) {
+    const entry = track(
+      keys,
+      id,
+      () => ({ end: 0, count: 0, window: 0 }),
+      () => true,
+    );
+    if (entry !== undefined && entry.end <= time) {
       entry.end = (Math.floor(time / windowMs) + 1) * windowMs;
       entry.count = 0;
       entry.window++;
@@ -112,12 +141,20 @@ export function registerLimits(server: FastifyInstance, options: LimitOptions) {
   }
 
   /** One store call, after waiting for one of the key's turns. */
-  async function call(entry: Local, limit: LimitName, key: Buffer) {
+  async function call(entry: Group, limit: LimitName, key: Buffer) {
     const { bucket, windowSeconds } = LIMITS[limit];
     if (entry.active < CALLS_PER_KEY) entry.active++;
     else await new Promise<void>((resolve) => entry.waiting.push(resolve));
     try {
-      return await options.store.count(bucket, key, windowSeconds);
+      if (inFlight < CALLS_IN_ALL) inFlight++;
+      else await new Promise<void>((resolve) => queued.push(resolve));
+      try {
+        return await options.store.count(bucket, key, windowSeconds);
+      } finally {
+        const turn = queued.shift();
+        if (turn) turn();
+        else inFlight--;
+      }
     } finally {
       const next = entry.waiting.shift();
       if (next) next();
@@ -126,7 +163,7 @@ export function registerLimits(server: FastifyInstance, options: LimitOptions) {
   }
 
   /** The counters' answer; /health gives up on them after HEALTH_WAIT_MS. */
-  async function counted(request: FastifyRequest, entry: Local, limit: LimitName, key: Buffer) {
+  async function counted(request: FastifyRequest, entry: Group, limit: LimitName, key: Buffer) {
     const pending = call(entry, limit, key);
     if (request.routeOptions.url !== '/health') return pending;
     let timer: NodeJS.Timeout | undefined;
@@ -142,7 +179,7 @@ export function registerLimits(server: FastifyInstance, options: LimitOptions) {
     }
   }
 
-  async function charge(request: FastifyRequest, limit: LimitName, subject: string) {
+  async function charge(request: FastifyRequest, limit: LimitName, subject: string, group: string) {
     const { max, metric } = LIMITS[limit];
     const key = keyHash(options.key, limit, subject);
     const audience = audienceOf(request);
@@ -161,12 +198,23 @@ export function registerLimits(server: FastifyInstance, options: LimitOptions) {
     }
 
     const entry = local(id, LIMITS[limit].windowSeconds * 1000);
+    const turns = track(
+      groups,
+      keyHash(options.key, limit, group).toString('hex'),
+      () => ({ active: 0, waiting: [] }),
+      (found) => found.active === 0,
+    );
+    if (entry === undefined || turns === undefined) {
+      report(request, { ...event, code: 'counter_store_unavailable' });
+      if (request.routeOptions.url === '/health') return;
+      throw new ApiError(503, undefined, { reason: 'limit_store_unavailable' });
+    }
     entry.count++;
     const window = entry.window;
     if (entry.count > max) refuse(Math.max(1, Math.ceil((entry.end - now()) / 1000)));
     let result;
     try {
-      result = await counted(request, entry, limit, key);
+      result = await counted(request, turns, limit, key);
     } catch {
       report(request, { ...event, code: 'counter_store_unavailable' });
       if (request.routeOptions.url === '/health') return;
@@ -181,14 +229,20 @@ export function registerLimits(server: FastifyInstance, options: LimitOptions) {
   }
 
   server.addHook('onRequest', async (request) => {
-    await charge(request, addressLimit(request), clientNetwork(request.ip));
+    await charge(
+      request,
+      addressLimit(request),
+      clientNetwork(request.ip),
+      clientGroup(request.ip),
+    );
   });
 
   return (read: ReadSession): ReadSession =>
     async (request) => {
       const found = await read(request);
       if (found.session !== null) {
-        await charge(request, 'general_session', `${found.session.app}:${found.session.userId}`);
+        const user = `${found.session.app}:${found.session.userId}`;
+        await charge(request, 'general_session', user, user);
       }
       return found;
     };

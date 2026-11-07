@@ -30,19 +30,32 @@ function groupsOf(address: string): number[] {
   return [...first, ...gap, ...last].map((group) => parseInt(group, 16));
 }
 
-/** The IPv4 address, or the IPv6 /64 network, that an address counts as. */
-export function clientNetwork(ip: string): string {
+/** The IPv4 address, or the first `groups` 16-bit groups of the IPv6 address, that an address counts as. */
+function networkOf(ip: string, groups: 4 | 3): string {
   if (isIPv4(ip)) return ip;
   if (!isIPv6(ip)) return 'invalid';
-  const groups = groupsOf(ip);
-  const [g0, g1, g2, g3, g4, g5, g6 = 0, g7 = 0] = groups;
+  const all = groupsOf(ip);
+  const [g0, g1, g2, g3, g4, g5, g6 = 0, g7 = 0] = all;
   if (g0 === 0 && g1 === 0 && g2 === 0 && g3 === 0 && g4 === 0 && g5 === 0xffff) {
     return `${String(g6 >> 8)}.${String(g6 & 255)}.${String(g7 >> 8)}.${String(g7 & 255)}`;
   }
-  return `${groups
-    .slice(0, 4)
+  return `${all
+    .slice(0, groups)
     .map((group) => group.toString(16))
-    .join(':')}::/64`;
+    .join(':')}::/${String(groups * 16)}`;
+}
+
+/** The IPv4 address, or the IPv6 /64 network, that an address counts as. */
+export function clientNetwork(ip: string): string {
+  return networkOf(ip, 4);
+}
+
+/**
+ * The IPv4 address, or the IPv6 /48 network, that shares one budget of store
+ * calls in progress, so rotating through the /64s of one allocation gains nothing.
+ */
+export function clientGroup(ip: string): string {
+  return networkOf(ip, 3);
 }
 
 /** The 32-byte key of one limit's counter for one subject, such as a network or a user. */
