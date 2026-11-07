@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// The checks on the auth tables (migration 0004), and what app_auth may
+// The checks on the auth tables (migrations 0004 and 0025), and what app_auth may
 // change. Each statement runs as app_auth with a new account's id as $1, and
 // is rolled back.
 
@@ -12,6 +12,8 @@ import { addUser, asRoleRolledBack, tokenHash } from './fixtures.ts';
 const ARGON2ID = `$argon2id$v=19$m=19456,t=2,p=1$c2FsdHNhbHRzYWx0c2FsdA$${'h'.repeat(43)}`;
 const SCRYPT = `$scrypt$ln=14,r=16,p=1$${'a'.repeat(22)}$${'b'.repeat(43)}`;
 const ENCRYPTED = 'a1'.repeat(60);
+/** An HMAC-SHA-256 in hex, as a backup code is kept (migration 0025). */
+const HMAC = 'c3'.repeat(32);
 
 /** The SQLSTATE of `statement`, or ok, run as app_auth with a new account's id as $1. */
 function asAuth(statement: string, values: unknown[] = []): Promise<string> {
@@ -154,13 +156,48 @@ describe('auth.two_factor', { timeout: 30_000 }, () => {
     expect(await asAuth(insert, [secret])).toBe(expected);
   });
 
-  it('refuses backup codes from app_auth', async () => {
+  it('lets app_auth insert no backup codes', async () => {
     expect(
       await asAuth(
         'INSERT INTO auth.two_factor (user_id, secret, backup_codes) VALUES ($1, $2, $3)',
-        [ENCRYPTED, 'codes'],
+        [ENCRYPTED, `1:${HMAC}`],
       ),
     ).toBe('42501');
+  });
+
+  /** The SQLSTATE of setting `columns`, as app_auth, on a new account's confirmed authenticator. */
+  const onConfirmed = (columns: string, values: unknown[] = []) =>
+    asRoleRolledBack('app_auth', async (client) => {
+      const userId = await addUser(client);
+      await client.query(
+        'INSERT INTO auth.two_factor (user_id, secret, verified) VALUES ($1, $2, true)',
+        [userId, ENCRYPTED],
+      );
+      return outcome(client, `UPDATE auth.two_factor SET ${columns} WHERE user_id = $1`, [
+        userId,
+        ...values,
+      ]);
+    });
+
+  it.each([
+    ['one HMAC', 'ok', `1:${HMAC}`],
+    ['ten HMACs under key version 12', 'ok', `12:${Array(10).fill(HMAC).join(',')}`],
+    ['no codes left', 'ok', null],
+    ['eleven HMACs', '23514', `1:${Array(11).fill(HMAC).join(',')}`],
+    ['no key version', '23514', HMAC],
+    ['key version 0', '23514', `0:${HMAC}`],
+    ['an empty set', '23514', '1:'],
+    ['codes in clear', '23514', '1:abcde-12345,fghjk-67890'],
+    ['an HMAC in upper case', '23514', `1:${HMAC.toUpperCase()}`],
+    ['codes as Better Auth encrypts them', '23514', ENCRYPTED],
+  ])('lets app_auth set backup codes to %s: %s', async (_, expected, codes) => {
+    expect(await onConfirmed('backup_codes = $2', [codes])).toBe(expected);
+  });
+
+  it('keeps backup codes only beside a confirmed authenticator', async () => {
+    const codes = [`1:${HMAC}`];
+    expect(await onConfirmed('backup_codes = $2, verified = false', codes)).toBe('23514');
+    expect(await onConfirmed('backup_codes = $2', codes)).toBe('ok');
   });
 
   it('starts unverified, and lets app_auth confirm it and record a step, but not lock it', async () => {

@@ -2,8 +2,9 @@
 //
 // Who may reach the auth schema (migration 0004, ADR 0003, ADR 0010): only
 // app_auth holds rights on its tables, never on the columns the database
-// sets; nothing may write backup codes; each membership belongs to an
-// account; and the checks copy the domain package's lists.
+// sets; only app_auth may update backup codes, which are kept as HMACs
+// (migration 0025); each membership belongs to an account; and the checks
+// copy the domain package's lists.
 
 import { authEventCodes, mfaStates } from '@pixel-scientists/domain/auth';
 import { apps } from '@pixel-scientists/domain/platform';
@@ -57,18 +58,19 @@ describe('the auth schema', { timeout: 30_000 }, () => {
     expect(deleters.rows).toEqual([]);
   });
 
-  it('lets no role write backup codes or a lockout, and keeps those columns empty', async () => {
+  it('lets app_auth alone update backup codes, no role insert them, and none write a lockout', async () => {
     const { rows } = await withClient('app_auth', (client) =>
       client.query<{ right: string }>(
-        `SELECT r.name || ' ' || c.name AS right
+        `SELECT r.name || ' ' || p.privilege || ' ' || c.name AS right
            FROM pg_catalog.unnest($1::text[]) AS r(name)
           CROSS JOIN pg_catalog.unnest($2::text[]) AS c(name)
-          WHERE pg_catalog.has_column_privilege(r.name, 'auth.two_factor', c.name,
-                                                'INSERT, UPDATE')`,
+          CROSS JOIN (VALUES ('INSERT'), ('UPDATE')) AS p(privilege)
+          WHERE pg_catalog.has_column_privilege(r.name, 'auth.two_factor', c.name, p.privilege)
+          ORDER BY 1`,
         [APP_ROLES, ['backup_codes', 'failed_verification_count', 'locked_until']],
       ),
     );
-    expect(rows).toEqual([]);
+    expect(rows).toEqual([{ right: 'app_auth UPDATE backup_codes' }]);
     expect(
       await Promise.all(
         [
@@ -78,7 +80,7 @@ describe('the auth schema', { timeout: 30_000 }, () => {
         ].map(checkDefinition),
       ),
     ).toEqual([
-      'CHECK ((backup_codes IS NULL))',
+      "CHECK (((backup_codes IS NULL) OR (verified AND (backup_codes ~ '^[1-9][0-9]{0,8}:[0-9a-f]{64}(,[0-9a-f]{64}){0,9}$'::text))))",
       'CHECK ((failed_verification_count = 0))',
       'CHECK ((locked_until IS NULL))',
     ]);
