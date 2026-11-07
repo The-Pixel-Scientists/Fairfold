@@ -33,6 +33,11 @@ const reactFiles = [
 export const MODULES = new Map([
   ['party', ['party']],
   ['grants', ['grants']],
+  ['crm', ['crm']],
+  ['assure', ['assure']],
+  ['forms', ['forms']],
+  ['privacy', ['privacy']],
+  ['insight', ['insight']],
 ]);
 const ENTRY_POINTS = ['contracts', 'server', 'console', 'portal'];
 

@@ -41,6 +41,7 @@ export {
 } from './messages.ts';
 export {
   moduleIds,
+  moduleOn,
   moduleSchema,
   modules,
   switchableModuleIds,
