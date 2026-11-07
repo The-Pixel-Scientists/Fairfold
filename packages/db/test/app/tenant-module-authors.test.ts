@@ -3,8 +3,9 @@
 // The operator author on app.tenant_module and app.config_version (migration
 // 0026, ADR 0024): a row names a membership exactly when its author is a
 // user, app_api writes only user rows, an update by app_api makes an
-// operator's switch a member's, app_worker writes neither table, and a wave 1
-// switch is kept from every other tenant.
+// operator's switch a member's, and a wave 1 switch is kept from every other
+// tenant. Since 0039 app_worker, as the operator, adds only operator rows
+// that switch a module on, in the tenant set, and never changes a row.
 
 import { randomUUID } from 'node:crypto';
 
@@ -16,6 +17,7 @@ import {
   asMigratorIn,
   asRoleIn,
   createTestTenant,
+  insertRow,
   insertStatement,
   outcome,
   type Row,
@@ -167,18 +169,132 @@ describe('app.config_version authors', { timeout: 30_000 }, () => {
   });
 });
 
-describe('app_worker', { timeout: 30_000 }, () => {
-  it('cannot add a switch or a configuration version, even with a tenant set', async () => {
+describe('app_worker as the operator', { timeout: 30_000 }, () => {
+  // Only the columns app_worker may write: no membership.
+  const workerSwitch = (owner: string, change: Row = {}): Row => ({
+    tenant_id: owner,
+    module: 'grants',
+    enabled: true,
+    updated_by_kind: 'operator',
+    ...change,
+  });
+  const workerVersion = (owner: string, change: Row = {}): Row => ({
+    tenant_id: owner,
+    entity_type: 'platform.module',
+    entity_id: randomUUID(),
+    version: 1,
+    author_kind: 'operator',
+    diff: {},
+    ...change,
+  });
+
+  it('adds an operator switch that turns a module on, and its version', async () => {
     await asRoleIn('app_worker', tenant.id, async (client) => {
       for (const [table, row] of [
-        ['app.tenant_module', switchRow(operatorSwitch)],
-        ['app.tenant_module', switchRow()],
-        ['app.config_version', versionRow(operatorVersion)],
-        ['app.config_version', versionRow()],
+        ['app.tenant_module', workerSwitch(tenant.id)],
+        ['app.config_version', workerVersion(tenant.id)],
       ] as const) {
         const { text, values } = insertStatement(client, table, row);
-        expect(await outcome(client, text, values), table).toBe('42501');
+        expect((await client.query(text, values)).rowCount, table).toBe(1);
+      }
+      const { rows } = await client.query(
+        'SELECT module, enabled, updated_by, updated_by_kind FROM app.tenant_module',
+      );
+      expect(rows).toEqual([
+        { module: 'grants', enabled: true, updated_by: null, updated_by_kind: 'operator' },
+      ]);
+    });
+  });
+
+  it.each([
+    ['a user switch', 'app.tenant_module', () => switchRow()],
+    [
+      'a switch that turns a module off',
+      'app.tenant_module',
+      () => workerSwitch(tenant.id, { enabled: false }),
+    ],
+    [
+      'a user switch without a member',
+      'app.tenant_module',
+      () => workerSwitch(tenant.id, { updated_by_kind: 'user' }),
+    ],
+    ['a user version', 'app.config_version', () => versionRow()],
+    [
+      'a version of another entity',
+      'app.config_version',
+      () => workerVersion(tenant.id, { entity_type: 'platform.theme' }),
+    ],
+    [
+      'a user version without a member',
+      'app.config_version',
+      () => workerVersion(tenant.id, { author_kind: 'user' }),
+    ],
+  ])('refuses %s', async (_, table, row: () => Row) => {
+    await asRoleIn('app_worker', tenant.id, async (client) => {
+      const { text, values } = insertStatement(client, table, row());
+      expect(await outcome(client, text, values)).toBe('42501');
+    });
+  });
+
+  it('never changes or removes a switch or a version', async () => {
+    await asRoleIn('app_worker', tenant.id, async (client) => {
+      for (const statement of [
+        'UPDATE app.tenant_module SET enabled = true',
+        'DELETE FROM app.tenant_module',
+        'UPDATE app.config_version SET diff = diff',
+        'DELETE FROM app.config_version',
+      ]) {
+        expect(await outcome(client, statement), statement).toBe('42501');
       }
     });
+  });
+
+  it('keeps an explicit off when it switches on only where no row exists', async () => {
+    const owner = await createTestTenant();
+    await asMigratorIn(owner.id, async (client) =>
+      insertRow(client, 'app.tenant_module', {
+        tenant_id: owner.id,
+        module: 'grants',
+        enabled: false,
+        updated_by: await addMember(client, owner),
+      }),
+    );
+    await asRoleIn('app_worker', owner.id, async (client) => {
+      const { rowCount } = await client.query(
+        `INSERT INTO app.tenant_module (tenant_id, module, enabled, updated_by_kind)
+         VALUES ($1, 'grants', true, 'operator') ON CONFLICT (tenant_id, module) DO NOTHING`,
+        [owner.id],
+      );
+      expect(rowCount).toBe(0);
+      const { rows } = await client.query('SELECT enabled, updated_by_kind FROM app.tenant_module');
+      expect(rows).toEqual([{ enabled: false, updated_by_kind: 'user' }]);
+    });
+  });
+
+  it("cannot read or add another tenant's switches and versions", async () => {
+    const [a, b] = [await createTestTenant(), await createTestTenant()];
+    await asMigratorIn(a.id, async (client) => {
+      await insertRow(client, 'app.tenant_module', workerSwitch(a.id));
+      await insertRow(client, 'app.config_version', workerVersion(a.id));
+    });
+    for (const set of [b.id, '']) {
+      await asRoleIn('app_worker', set, async (client) => {
+        for (const table of ['app.tenant_module', 'app.config_version']) {
+          const { rowCount } = await client.query(`SELECT 1 FROM ${table} WHERE tenant_id = $1`, [
+            a.id,
+          ]);
+          expect(rowCount, `${table} as ${set || 'no tenant'}`).toBe(0);
+        }
+        for (const [table, row] of [
+          ['app.tenant_module', workerSwitch(a.id, { module: 'crm' })],
+          ['app.config_version', workerVersion(a.id)],
+        ] as const) {
+          const { text, values } = insertStatement(client, table, row);
+          expect(await outcome(client, text, values), `${table} as ${set || 'no tenant'}`).toBe(
+            '42501',
+          );
+        }
+      });
+    }
   });
 });
