@@ -3,8 +3,8 @@
 // Who may reach the auth schema (migration 0004, ADR 0003, ADR 0010): only
 // app_auth holds rights on its tables, never on the columns the database
 // sets; only app_auth may update backup codes, which are kept as HMACs
-// (migration 0025); each membership belongs to an account; and the checks
-// copy the domain package's lists.
+// (migration 0025), or an account's email (migration 0028); each membership
+// belongs to an account; and the checks copy the domain package's lists.
 
 import { authEventCodes, mfaStates } from '@pixel-scientists/domain/auth';
 import { apps } from '@pixel-scientists/domain/platform';
@@ -83,6 +83,25 @@ describe('the auth schema', { timeout: 30_000 }, () => {
       "CHECK (((backup_codes IS NULL) OR (verified AND (backup_codes ~ '^[1-9][0-9]{0,8}:[0-9a-f]{64}(,[0-9a-f]{64}){0,9}$'::text))))",
       'CHECK ((failed_verification_count = 0))',
       'CHECK ((locked_until IS NULL))',
+    ]);
+  });
+
+  it('lets app_auth alone update an account name, email and MFA flag, and nothing else of it', async () => {
+    const { rows } = await withClient('app_auth', (client) =>
+      client.query<{ right: string }>(
+        `SELECT r.name || ' ' || a.attname AS right
+           FROM pg_catalog.pg_attribute a
+          CROSS JOIN pg_catalog.unnest($1::text[]) AS r(name)
+          WHERE a.attrelid = 'auth."user"'::regclass AND a.attnum > 0 AND NOT a.attisdropped
+            AND pg_catalog.has_column_privilege(r.name, a.attrelid, a.attnum, 'UPDATE')
+          ORDER BY 1`,
+        [APP_ROLES],
+      ),
+    );
+    expect(rows.map(({ right }) => right)).toEqual([
+      'app_auth email',
+      'app_auth name',
+      'app_auth two_factor_enabled',
     ]);
   });
 

@@ -3,9 +3,10 @@
 // The codes `auth.audit_event` accepts (ADR 0010), for the first release's
 // auth: email-first sign-up, password sign-in and reset, TOTP for staff,
 // step-up, switching tenant and invitations; then changing or removing an
-// authenticator and the password when signed in; then backup codes. The
-// others in ADR 0010's list join with the feature that first writes them, whose migration widens the
-// table's check in the same change: the list and the check stay equal.
+// authenticator and the password when signed in; then backup codes; then
+// changing the email address. The others in ADR 0010's list join with the
+// feature that first writes them, whose migration widens the table's check
+// in the same change: the list and the check stay equal.
 
 export const authEventCodes = [
   'account_created',
@@ -26,6 +27,7 @@ export const authEventCodes = [
   'password_changed',
   'backup_code_used',
   'backup_codes_regenerated',
+  'email_changed',
 ] as const;
 
 export type AuthEventCode = (typeof authEventCodes)[number];

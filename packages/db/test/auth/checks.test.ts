@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// The checks on the auth tables (migrations 0004 and 0025), and what app_auth may
-// change. Each statement runs as app_auth with a new account's id as $1, and
+// The checks on the auth tables (migrations 0004, 0025 and 0028), and what
+// app_auth may change. Each statement runs as app_auth with a new account's id as $1, and
 // is rolled back.
 
 import { describe, expect, it } from 'vitest';
@@ -41,8 +41,24 @@ describe('auth.user', { timeout: 30_000 }, () => {
       '42501',
     ],
     [
-      'app_auth changing an address',
-      `UPDATE auth."user" SET email = 'x@example.test' WHERE id = $1`,
+      'app_auth changing an address (migration 0028)',
+      `UPDATE auth."user" SET email = 'changed-' || $1 || '@example.test' WHERE id = $1`,
+      'ok',
+    ],
+    [
+      'app_auth changing an address to one not in lower case',
+      `UPDATE auth."user" SET email = 'Changed-' || $1 || '@example.test' WHERE id = $1`,
+      '23514',
+    ],
+    [
+      'app_auth changing an address to one an account has',
+      `UPDATE auth."user" SET email = (SELECT email FROM auth."user" WHERE id <> $1 LIMIT 1)
+        WHERE id = $1`,
+      '23505',
+    ],
+    [
+      'app_auth marking an address verified',
+      `UPDATE auth."user" SET email_verified = true WHERE id = $1`,
       '42501',
     ],
     ['app_auth deleting an account', `DELETE FROM auth."user" WHERE id = $1`, '42501'],
