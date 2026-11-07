@@ -1,9 +1,68 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import { checkOwnDatabase } from './db.ts';
-import { passwordVariable, readRolePassword } from './roles.ts';
+import {
+  BACKUP_ROLE,
+  passwordVariable,
+  readAdminMode,
+  readAdminRole,
+  readRolePassword,
+} from './roles.ts';
+
+const ROOT = join(import.meta.dirname, '..', '..', '..');
+
+/** Every file under `folder`, as a path from the repository root, leaving out dependencies and builds. */
+function sourceFiles(folder: string): string[] {
+  return readdirSync(join(ROOT, folder), { withFileTypes: true }).flatMap((entry) => {
+    const path = `${folder}/${entry.name}`;
+    if (!entry.isDirectory()) return [path];
+    return ['node_modules', 'dist', 'generated'].includes(entry.name) ? [] : sourceFiles(path);
+  });
+}
+
+describe('readAdminMode', () => {
+  it('is superuser unless TPS_DB_ADMIN_MODE says managed', () => {
+    expect(readAdminMode({})).toBe('superuser');
+    expect(readAdminMode({ TPS_DB_ADMIN_MODE: '' })).toBe('superuser');
+    expect(readAdminMode({ TPS_DB_ADMIN_MODE: 'superuser' })).toBe('superuser');
+    expect(readAdminMode({ TPS_DB_ADMIN_MODE: 'managed' })).toBe('managed');
+    expect(() => readAdminMode({ TPS_DB_ADMIN_MODE: 'Managed' })).toThrow(
+      'TPS_DB_ADMIN_MODE must be superuser or managed.',
+    );
+  });
+});
+
+describe('readAdminRole', () => {
+  it('names TPS_DB_SUPERUSER in managed mode, and no role in superuser mode', () => {
+    expect(readAdminRole({ TPS_DB_SUPERUSER: 'postgres' })).toBeUndefined();
+    expect(readAdminRole({ TPS_DB_ADMIN_MODE: 'managed', TPS_DB_SUPERUSER: 'admin' })).toBe(
+      'admin',
+    );
+    expect(() => readAdminRole({ TPS_DB_ADMIN_MODE: 'managed' })).toThrow('Set TPS_DB_SUPERUSER.');
+  });
+});
+
+describe('the backup role', () => {
+  it('is named by no app, module or package outside the roles script', () => {
+    const allowed = new Set([
+      'packages/db/scripts/roles.sql',
+      'packages/db/scripts/database-privileges.sql',
+      'packages/db/scripts/roles.ts',
+      'packages/db/scripts/roles.test.ts',
+      'packages/db/scripts/roles.db.test.ts',
+    ]);
+    const names = new RegExp(`${BACKUP_ROLE}|${passwordVariable(BACKUP_ROLE)}`, 'i');
+    const naming = ['apps', 'modules', 'packages']
+      .flatMap(sourceFiles)
+      .filter((path) => !allowed.has(path) && names.test(readFileSync(join(ROOT, path), 'utf8')));
+    expect(naming).toEqual([]);
+  });
+});
 
 describe('readRolePassword', () => {
   it('reads the role password from its variable', () => {
