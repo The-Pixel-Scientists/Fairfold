@@ -3,7 +3,8 @@
 // The platform's queues (migration 0029): each is registered with its kind
 // and a dead-letter queue <queue>.dead of the same kind, each can be
 // defined in code under its registered name, and no other queue is
-// registered but the job tests' own.
+// registered but pg-boss's cron queue (migration 0036) and the job tests'
+// own.
 
 import { describe, expect, it } from 'vitest';
 
@@ -30,14 +31,17 @@ const EVENTS = ['crm', 'assure'] as const;
 
 /** Each source queue's name, kind and dead-letter queue. */
 const EXPECTED = [
-  ...PLATFORM.map((name) => [name, 'platform'] as const),
-  ...[...TENANT, ...EVENTS.map((module) => `events.${module}`)].map(
-    (name) => [name, 'tenant'] as const,
-  ),
-].flatMap(([name, kind]) => [
-  { name, kind, dead_letter: `${name}.dead` },
-  { name: `${name}.dead`, kind, dead_letter: null },
-]);
+  { name: '__pgboss__send-it', kind: 'platform', dead_letter: null },
+  ...[
+    ...PLATFORM.map((name) => [name, 'platform'] as const),
+    ...[...TENANT, ...EVENTS.map((module) => `events.${module}`)].map(
+      (name) => [name, 'tenant'] as const,
+    ),
+  ].flatMap(([name, kind]) => [
+    { name, kind, dead_letter: `${name}.dead` },
+    { name: `${name}.dead`, kind, dead_letter: null },
+  ]),
+];
 
 /**
  * Queues the job tests register while they run: S11-48's test queues, and
