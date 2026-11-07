@@ -45,3 +45,5 @@ platform.auth.password_changed: Password changed
 platform.auth.backup_code_used: Backup code used
 platform.auth.backup_codes_regenerated: Backup codes regenerated
 platform.auth.email_changed: Email changed
+platform.auth.passkey_added: Passkey added
+platform.auth.passkey_removed: Passkey removed

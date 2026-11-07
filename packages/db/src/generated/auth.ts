@@ -56,6 +56,22 @@ export interface AuthDevice {
   user_id: string;
 }
 
+export interface AuthPasskey {
+  aaguid: string | null;
+  backed_up: boolean;
+  counter: Int8;
+  created_at: Generated<Timestamp>;
+  credential_id: string;
+  device_type: string;
+  id: Generated<string>;
+  last_used_at: Timestamp | null;
+  name: string;
+  public_key: string;
+  transports: string | null;
+  updated_at: Generated<Timestamp>;
+  user_id: string;
+}
+
 export interface AuthRateLimit {
   blocked_until: Timestamp | null;
   client_ip: string | null;
@@ -176,6 +192,7 @@ export interface DB {
   'auth.audit_copy_pending': AuthAuditCopyPending;
   'auth.audit_event': AuthAuditEvent;
   'auth.device': AuthDevice;
+  'auth.passkey': AuthPasskey;
   'auth.rate_limit': AuthRateLimit;
   'auth.saml_replay': AuthSamlReplay;
   'auth.session': AuthSession;

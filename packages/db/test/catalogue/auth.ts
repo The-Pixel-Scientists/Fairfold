@@ -105,6 +105,10 @@ export const auth: SchemaCatalogue = {
         'auth.device',
         'A device cookie belongs to an account, whatever the tenant, and grants no tenant.',
       ],
+      [
+        'auth.passkey',
+        'A passkey belongs to an account, whatever the tenant, and grants no tenant.',
+      ],
       ['auth.audit_event', 'Some auth events have no tenant, such as a failed sign-in.'],
       ['auth.audit_copy_pending', 'It holds only an auth event id and a time.'],
     ] as const

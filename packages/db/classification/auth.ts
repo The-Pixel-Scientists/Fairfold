@@ -18,6 +18,10 @@
 // internal. An SSO identity's subject is its account_id, personal like a
 // credential account's; its tenant, provider and issuer are internal. A
 // used assertion id goes a day after it expires.
+//
+// A passkey is kept with its account until the user removes it or the
+// account goes. Its credential id, public key and AAGUID are personal
+// account security data, and so is its name, which the user types.
 
 import type {
   ClassificationRegistry,
@@ -138,6 +142,21 @@ export const auth: ClassificationRegistry = {
     created_at: device,
     updated_at: device,
   },
+  'auth.passkey': {
+    id: accountInternal,
+    user_id: accountPersonal,
+    credential_id: accountPersonal,
+    public_key: accountPersonal,
+    counter: accountInternal,
+    name: accountPersonal,
+    device_type: accountInternal,
+    backed_up: accountInternal,
+    transports: accountInternal,
+    aaguid: accountPersonal,
+    last_used_at: accountInternal,
+    created_at: accountInternal,
+    updated_at: accountInternal,
+  },
   'auth.audit_event': {
     id: audit,
     occurred_at: audit,
@@ -227,5 +246,6 @@ export const authSubjects: SubjectPathRegistry = {
     reason: 'Sign-in limits count typed identifiers and addresses, not accounts.',
   },
   'auth.device': { kind: 'account', column: 'user_id' },
+  'auth.passkey': { kind: 'account', column: 'user_id' },
   'auth.audit_event': { kind: 'account', column: 'user_id' },
 };
