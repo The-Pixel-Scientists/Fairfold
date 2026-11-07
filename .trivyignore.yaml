@@ -7,14 +7,15 @@ vulnerabilities:
   - id: CVE-2026-93687
     paths:
       - pnpm-lock.yaml
-    expired_at: 2026-11-03
+    expired_at: 2027-02-03
     statement: &braces >-
       braces (GHSA-vfj7-8cjw-p6xm), high, no fixed release. Development only,
       through kysely-codegen and micromatch, which parse this repository's own
       glob patterns, never untrusted input. Approved by Aaron Gardner on
-      4 October 2026.
+      4 October 2026, and extended to 3 February 2027 on 7 November 2026,
+      with no fixed release yet.
   - id: GHSA-vfj7-8cjw-p6xm
     paths:
       - pnpm-lock.yaml
-    expired_at: 2026-11-03
+    expired_at: 2027-02-03
     statement: *braces
