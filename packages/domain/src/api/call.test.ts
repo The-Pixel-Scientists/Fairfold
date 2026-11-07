@@ -15,7 +15,7 @@ import {
   type UploadOptions,
   type UploadRequest,
 } from './call.ts';
-import { ProblemError } from './problem.ts';
+import { idempotencyProblems, ProblemError } from './problem.ts';
 import { defineRoute, type JsonRouteContract, type UploadRouteContract } from './route.ts';
 
 const ID = '0b7c4a1e-5d2f-4c8e-9a3b-6f1d2e4c8a90';
@@ -219,6 +219,181 @@ describe('call', () => {
   });
 });
 
+const createProgramme = defineRoute({
+  method: 'POST',
+  idempotent: true,
+  path: '/console/programmes',
+  audience: 'console',
+  module: 'grants',
+  summary: 'Create a programme',
+  permission: 'grants.programmes.manage',
+  scope: 'tenant',
+  body: z.strictObject({ title: z.string().min(1) }),
+  responses: { 201: z.object({ id: idSchema, title: z.string() }) },
+});
+
+const created = { id: ID, title: 'Community Spaces Fund' };
+const KEY = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const GIVEN = '5e1f0c2a-7b3d-4a9e-8c6f-1d2b3a4c5e6f';
+
+/** Answers each request with the next of `answers`: a status and body, or a failure to connect. */
+function answeringInTurn(...answers: ([number, unknown?] | 'offline')[]) {
+  let next = 0;
+  return vi.fn<Fetch>(() => {
+    const answer = answers[Math.min(next++, answers.length - 1)];
+    if (answer === undefined || answer === 'offline') {
+      return Promise.reject(new TypeError('Failed to fetch'));
+    }
+    const [status, body] = answer;
+    return Promise.resolve({ status, json: () => Promise.resolve(body) });
+  });
+}
+
+function keysSent(fetch: ReturnType<typeof answeringInTurn>): (string | undefined)[] {
+  return fetch.mock.calls.map(([, init]) => init.headers['Idempotency-Key']);
+}
+
+const reused = {
+  type: idempotencyProblems.reused.type,
+  title: idempotencyProblems.reused.title,
+  status: 409,
+  detail: idempotencyProblems.reused.detail,
+  requestId: 'req-3',
+};
+
+describe('call on an idempotent route (ADR 0028)', () => {
+  const body = { body: { title: 'Community Spaces Fund' } };
+
+  it('sends one new key per call, and nothing else changes', async () => {
+    const fetch = answeringInTurn([201, created]);
+    await expect(call(createProgramme, body, { fetch })).resolves.toEqual(created);
+    await call(createProgramme, body, { fetch });
+    const [first, second] = keysSent(fetch);
+    expect(first).toMatch(KEY);
+    expect(second).toMatch(KEY);
+    expect(second).not.toBe(first);
+    expect(fetch.mock.calls[0]?.[1]).toEqual({
+      method: 'POST',
+      headers: {
+        accept: 'application/json',
+        'content-type': 'application/json',
+        'Idempotency-Key': first,
+      },
+      body: '{"title":"Community Spaces Fund"}',
+      credentials: 'same-origin',
+      redirect: 'error',
+    });
+  });
+
+  it("sends the caller's key as given, in lower case", async () => {
+    const fetch = answeringInTurn([201, created]);
+    await call(createProgramme, body, { fetch, idempotencyKey: GIVEN });
+    await call(createProgramme, body, { fetch, idempotencyKey: GIVEN.toUpperCase() });
+    expect(keysSent(fetch)).toEqual([GIVEN, GIVEN]);
+  });
+
+  it('refuses a key that is not a version 4 or 7 uuid, without sending or repeating it', async () => {
+    const fetch = answeringInTurn([201, created]);
+    for (const idempotencyKey of ['', 'my-key-123', '00000000-0000-0000-0000-000000000000']) {
+      const error = await call(createProgramme, body, { fetch, idempotencyKey }).catch(
+        (thrown: unknown) => thrown,
+      );
+      expect(error).toBeInstanceOf(TypeError);
+      if (idempotencyKey !== '') expect((error as Error).message).not.toContain(idempotencyKey);
+    }
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('retries a failure to connect or a gateway answer twice, with the same key and body', async () => {
+    const fetch = answeringInTurn('offline', [503], [201, created]);
+    await expect(call(createProgramme, body, { fetch })).resolves.toEqual(created);
+    expect(fetch).toHaveBeenCalledTimes(3);
+    const [first] = fetch.mock.calls;
+    for (const [url, init] of fetch.mock.calls) {
+      expect(url).toBe(first?.[0]);
+      expect(init).toEqual(first?.[1]);
+    }
+  });
+
+  it('gives up after two retries, with the key on the error to try again', async () => {
+    for (const status of [502, 503, 504]) {
+      const fetch = answeringInTurn([status]);
+      const error = await failure(call(createProgramme, body, { fetch, idempotencyKey: GIVEN }));
+      expect(fetch).toHaveBeenCalledTimes(3);
+      expect(error).toMatchObject({
+        status,
+        detail: messages.serviceFailed,
+        idempotencyKey: GIVEN,
+      });
+    }
+    const offline = answeringInTurn('offline');
+    const error = await failure(call(createProgramme, body, { fetch: offline }));
+    expect(offline).toHaveBeenCalledTimes(3);
+    expect(error).toMatchObject({ status: 0, detail: messages.noConnection });
+    expect(error.idempotencyKey).toBe(keysSent(offline)[0]);
+  });
+
+  it('never retries any other answer', async () => {
+    for (const status of [400, 404, 409, 422, 429, 500]) {
+      const fetch = answeringInTurn([status]);
+      const error = await failure(call(createProgramme, body, { fetch }));
+      expect(fetch, String(status)).toHaveBeenCalledTimes(1);
+      expect(error.idempotencyKey).toBe(keysSent(fetch)[0]);
+    }
+  });
+
+  it('turns each idempotency problem into its type, status and catalogue words', async () => {
+    const inProgress = { ...reused, type: idempotencyProblems.inProgress.type, detail: 'Wait.' };
+    const cases = [
+      [reused, messages.keyReused],
+      [inProgress, messages.keyInProgress],
+    ] as const;
+    for (const [problem, detail] of cases) {
+      const error = await failure(
+        call(createProgramme, body, { fetch: answeringInTurn([409, problem]) }),
+      );
+      expect(error).toMatchObject({ status: 409, type: problem.type, detail, requestId: 'req-3' });
+    }
+    const unknown = { ...reused, type: '/problems/something-else', detail: 'Unknown.' };
+    const error = await failure(
+      call(createProgramme, body, { fetch: answeringInTurn([409, unknown]) }),
+    );
+    expect(error).toMatchObject({ type: 'about:blank', detail: messages.requestFailed });
+  });
+
+  it('never shows the key or a sent value in the words of a problem', async () => {
+    const title = 'Hartley Lane Allotment Society 7731';
+    const echo = `${GIVEN} ${title}`;
+    const problem = {
+      ...reused,
+      title: echo,
+      detail: echo,
+      errors: [{ field: 'x', message: echo }],
+    };
+    const fetch = answeringInTurn([409, problem]);
+    const error = await failure(
+      call(createProgramme, { body: { title } }, { fetch, idempotencyKey: GIVEN }),
+    );
+    const words = JSON.stringify([error.message, error.detail, error.errors]);
+    expect(words).not.toContain(GIVEN);
+    expect(words).not.toContain(title);
+    expect(error.idempotencyKey).toBe(GIVEN);
+  });
+});
+
+describe('call on a route that is not idempotent', () => {
+  it('sends no key and never retries, even when given one', async () => {
+    const fetch = answeringInTurn([503], [200, created]);
+    const error = await failure(call(updateProgramme, input, { fetch, idempotencyKey: GIVEN }));
+    expect(error).toMatchObject({ status: 503, idempotencyKey: null });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(keysSent(fetch)).toEqual([undefined]);
+    const offline = answeringInTurn('offline');
+    await failure(call(signOut, {}, { fetch: offline }));
+    expect(offline).toHaveBeenCalledTimes(1);
+  });
+});
+
 const attach = defineRoute({
   method: 'POST',
   idempotent: true,
@@ -334,6 +509,7 @@ describe('upload', () => {
       accept: 'application/json',
       'content-type': 'application/octet-stream',
       'File-Name': 'Accounts%202025.pdf',
+      'Idempotency-Key': expect.stringMatching(KEY) as string,
     });
     expect(sent.sent).toBe(file);
     sent.upload.onprogress?.({ loaded: 400 });
@@ -453,6 +629,23 @@ describe('upload', () => {
       TypeError,
     );
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("sends a new key each time, or the caller's, and puts it on the error", async () => {
+    const first = start();
+    const second = start({ idempotencyKey: GIVEN });
+    const key = first.request().headers['Idempotency-Key'];
+    expect(key).toMatch(KEY);
+    expect(second.request().headers['Idempotency-Key']).toBe(GIVEN);
+    first.request().onerror?.();
+    expect(await failure(first.promise)).toMatchObject({ status: 0, idempotencyKey: key });
+    second.request().answer(409, reused);
+    expect(await failure(second.promise)).toMatchObject({
+      type: idempotencyProblems.reused.type,
+      detail: messages.keyReused,
+      idempotencyKey: GIVEN,
+    });
+    await expect(start({ idempotencyKey: 'x' }).promise).rejects.toThrow(TypeError);
   });
 
   it('takes a base path, as call() does', async () => {

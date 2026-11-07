@@ -7,6 +7,11 @@
 // redirect is a failure too: the API never sends one. Routes that answer a
 // raw body, such as a stylesheet, are loaded by URL instead, and routes that
 // take a file's bytes are sent with upload().
+//
+// An idempotent route gets an `Idempotency-Key` (ADR 0028): one per call,
+// unless the caller passes the key of the submission it is trying again.
+// Only then is it safe to send a POST twice, so only then does call() retry,
+// with the same key and body.
 
 import type { z } from 'zod';
 
@@ -18,8 +23,14 @@ import {
   messages,
   type FieldProblem,
 } from '../platform/messages.ts';
-import { ProblemError, problemSchema } from './problem.ts';
-import type { JsonRouteContract, RouteContract, UploadRouteContract } from './route.ts';
+import { idempotencyProblems, ProblemError, problemSchema } from './problem.ts';
+import {
+  idempotencyKeyHeader,
+  idempotencyKeySchema,
+  type JsonRouteContract,
+  type RouteContract,
+  type UploadRouteContract,
+} from './route.ts';
 import { isRawBody, rawUploadContentType, rawUploadProblems } from './schema-rules.ts';
 
 /** Each app's origin forwards this path to the API. */
@@ -27,6 +38,16 @@ export const apiBasePath = '/api';
 
 const BASE_PATH = /^(?:\/[A-Za-z0-9_-]+)*$/;
 const ROUTE_PATH = /^\/(?:console|portal|public|auth)\//;
+
+/** How long to wait before each retry of an idempotent route. */
+const RETRY_DELAYS_MS = [100, 300];
+/** Gateway answers that mean the request may not have arrived. */
+const RETRY_STATUSES = new Set([502, 503, 504]);
+
+/** The catalogue's words for each typed problem, whatever the API's text says. */
+const TYPED_PROBLEMS = new Map<string, string>(
+  Object.values(idempotencyProblems).map(({ type, detail }) => [type, detail]),
+);
 
 /** The part of `fetch` this file uses, so the package needs no DOM or Node.js types. */
 interface FetchInit {
@@ -49,6 +70,8 @@ export interface CallOptions {
   fetch?: Fetch;
   /** Where the API is on this origin, such as `/api`; an empty string for the root. */
   basePath?: string;
+  /** To try a submission again: the `idempotencyKey` of its ProblemError. Otherwise each call makes its own. */
+  idempotencyKey?: string;
 }
 
 type Part<K extends 'params' | 'query' | 'body', C> = C extends {
@@ -69,6 +92,40 @@ export type CallResult<C extends RouteContract> = {
 
 function globalFetch(url: string, init: FetchInit): Promise<FetchResponse> {
   return (globalThis as unknown as { fetch: Fetch }).fetch(url, init);
+}
+
+/** Reached through globalThis, as fetch is, so the package needs no DOM or Node.js types. */
+function randomUUID(): string {
+  return (globalThis as unknown as { crypto: { randomUUID(): string } }).crypto.randomUUID();
+}
+
+function wait(ms: number): Promise<void> {
+  const timers = globalThis as unknown as { setTimeout(callback: () => void, ms: number): unknown };
+  return new Promise((resolve) => {
+    timers.setTimeout(resolve, ms);
+  });
+}
+
+/** The key for an idempotent route, or null: the caller's, checked, or a new one. */
+function keyFor(route: RouteContract, given: string | undefined): string | null {
+  if (route.idempotent !== true) return null;
+  if (given === undefined) return randomUUID();
+  const parsed = idempotencyKeySchema.safeParse(given);
+  if (!parsed.success) throw new TypeError('idempotencyKey must be a version 4 or 7 uuid.');
+  return parsed.data;
+}
+
+/** A response, or undefined when the API could not be reached. */
+async function attempt(
+  send: Fetch,
+  url: string,
+  init: FetchInit,
+): Promise<FetchResponse | undefined> {
+  try {
+    return await send(url, init);
+  } catch {
+    return undefined;
+  }
 }
 
 function parsePart(
@@ -133,26 +190,36 @@ function checkTarget(route: RouteContract, basePath: string): void {
   }
 }
 
-/** A success parsed with the route's schema, or a problem as one ProblemError. */
-function settle<C extends RouteContract>(route: C, status: number, json: unknown): CallResult<C> {
+/** A success parsed with the route's schema, or a problem as one ProblemError carrying the key sent. */
+function settle<C extends RouteContract>(
+  route: C,
+  status: number,
+  json: unknown,
+  idempotencyKey: string | null,
+): CallResult<C> {
   if (status >= 200 && status < 300) {
     const schema = route.responses[status];
     if (schema === undefined || isRawBody(schema)) {
-      throw new ProblemError(status, messages.serviceFailed);
+      throw new ProblemError(status, messages.serviceFailed, { idempotencyKey });
     }
     if (schema === null) return undefined as CallResult<C>;
     const parsed = schema.safeParse(json);
-    if (!parsed.success) throw new ProblemError(status, messages.serviceFailed);
+    if (!parsed.success) throw new ProblemError(status, messages.serviceFailed, { idempotencyKey });
     return parsed.data as CallResult<C>;
   }
   const problem = problemSchema.safeParse(json);
   if (problem.success) {
-    throw new ProblemError(status, problem.data.detail, {
-      requestId: problem.data.requestId,
-      errors: problem.data.errors ?? [],
+    const { type, detail, requestId, errors } = problem.data;
+    const typed = TYPED_PROBLEMS.get(type);
+    throw new ProblemError(status, typed ?? detail, {
+      type,
+      requestId,
+      errors: typed === undefined ? (errors ?? []) : [],
+      idempotencyKey,
     });
   }
-  throw new ProblemError(status, status >= 500 ? messages.serviceFailed : messages.requestFailed);
+  const detail = status >= 500 ? messages.serviceFailed : messages.requestFailed;
+  throw new ProblemError(status, detail, { idempotencyKey });
 }
 
 export async function call<const C extends JsonRouteContract>(
@@ -165,6 +232,7 @@ export async function call<const C extends JsonRouteContract>(
   if (isRawBody(route.body)) {
     throw new TypeError('call() sends JSON; send a file to a route that takes one with upload().');
   }
+  const key = keyFor(route, options.idempotencyKey);
   const parts = input as { params?: unknown; query?: unknown; body?: unknown };
   const errors: FieldProblem[] = [];
   const params = parsePart('params', route.params, parts.params, errors);
@@ -182,19 +250,25 @@ export async function call<const C extends JsonRouteContract>(
     init.headers['content-type'] = 'application/json';
     init.body = JSON.stringify(body);
   }
+  if (key !== null) init.headers[idempotencyKeyHeader] = key;
   const url = `${basePath}${fillPath(route.path, params)}${queryString(query)}`;
 
-  let response: FetchResponse;
-  try {
-    response = await (options.fetch ?? globalFetch)(url, init);
-  } catch {
-    throw new ProblemError(0, messages.noConnection);
+  const send = options.fetch ?? globalFetch;
+  let response = await attempt(send, url, init);
+  // Only with a key, and with the same init each time: the same key and the same body.
+  for (const delay of key === null ? [] : RETRY_DELAYS_MS) {
+    if (response !== undefined && !RETRY_STATUSES.has(response.status)) break;
+    await wait(delay);
+    response = await attempt(send, url, init);
+  }
+  if (response === undefined) {
+    throw new ProblemError(0, messages.noConnection, { idempotencyKey: key });
   }
 
   const { status } = response;
   const schema = route.responses[status];
   // No body to read for a declared empty success.
-  return settle(route, status, schema === null ? undefined : await readJson(response));
+  return settle(route, status, schema === null ? undefined : await readJson(response), key);
 }
 
 /** A file to send. A browser `File` is one. */
@@ -233,6 +307,8 @@ export interface UploadOptions {
   signal?: UploadSignal;
   /** Bytes sent so far, of the file's size. */
   onProgress?: (sent: number, total: number) => void;
+  /** As for call(); upload() never retries. */
+  idempotencyKey?: string;
   /** Tests pass their own. */
   request?: () => UploadRequest;
 }
@@ -286,6 +362,7 @@ export async function upload<const C extends UploadRouteContract>(
   ) {
     throw new TypeError('upload() sends a file to a route with a raw upload body and no query.');
   }
+  const key = keyFor(route, options.idempotencyKey);
   const errors: FieldProblem[] = [];
   const params = parsePart('params', route.params, (input as { params?: unknown }).params, errors);
   if (errors.length > 0) throw new ProblemError(400, messages.fixFields, { errors });
@@ -314,11 +391,11 @@ export async function upload<const C extends UploadRouteContract>(
     request.onload = () => {
       // XMLHttpRequest follows redirects, and the API never sends one.
       if (request.responseURL !== `${pageOrigin()}${url}`) {
-        fail(new ProblemError(0, messages.noConnection));
+        fail(new ProblemError(0, messages.noConnection, { idempotencyKey: key }));
         return;
       }
       try {
-        const result = settle(route, request.status, parseJson(request.responseText));
+        const result = settle(route, request.status, parseJson(request.responseText), key);
         signal?.removeEventListener('abort', abort);
         resolve(result);
       } catch (error) {
@@ -326,7 +403,7 @@ export async function upload<const C extends UploadRouteContract>(
       }
     };
     request.onerror = () => {
-      fail(new ProblemError(0, messages.noConnection));
+      fail(new ProblemError(0, messages.noConnection, { idempotencyKey: key }));
     };
     request.onabort = () => {
       fail(abortReason(signal));
@@ -336,6 +413,7 @@ export async function upload<const C extends UploadRouteContract>(
     request.setRequestHeader('accept', 'application/json');
     request.setRequestHeader('content-type', rawUploadContentType);
     request.setRequestHeader(fileNameHeader, encodeFileNameHeader(name.data));
+    if (key !== null) request.setRequestHeader(idempotencyKeyHeader, key);
     request.send(file);
   });
 }
