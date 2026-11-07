@@ -13,7 +13,9 @@ import { startJobSender, startWorker, stopJobSender, stopWorker } from '@pixel-s
 
 import { ConfigError } from './config.ts';
 import { createLogger } from './logger.ts';
+import { pinnedFetch } from './outbound/pinned.ts';
 import { proxyProblems } from './outbound/proxy.ts';
+import { createFilesJob } from './platform/files/index.ts';
 import { startTelemetry } from './telemetry/index.ts';
 import { jobLogger } from './worker/job-logger.ts';
 import { handlerRegistry, type ModuleJob } from './worker/registry.ts';
@@ -78,7 +80,11 @@ async function main(): Promise<void> {
         maxConnections: 4,
       },
       setup: { db, sender, logger: jobLogger(logger) },
-      handlers: handlerRegistry(jobLogger(logger), moduleJobs),
+      handlers: handlerRegistry(
+        jobLogger(logger),
+        moduleJobs,
+        createFilesJob(settings.files, pinnedFetch(settings.files.storage.endpoint)),
+      ),
       schedules,
       onError,
     });

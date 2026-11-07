@@ -7,6 +7,7 @@
 
 import { isLoopbackHost, readSecret, type Env } from '@pixel-scientists/db';
 
+import { loadFileSettings, type FileSettings } from '../platform/files/index.ts';
 import { ConfigError, loadConfig, Secret, type Config, type LogLevel } from '../config.ts';
 import { loadTelemetrySettings, type TelemetrySettings } from '../telemetry/index.ts';
 
@@ -19,6 +20,8 @@ export interface WorkerSettings {
   /** pg-boss's own role. */
   readonly queuePassword: Secret;
   readonly telemetry: TelemetrySettings;
+  /** The object store, with the removal key, and clamd, for the files job. */
+  readonly files: FileSettings;
 }
 
 const MINIMUM_PASSWORD_LENGTH = 16;
@@ -76,15 +79,17 @@ export function loadWorkerSettings(env: Env): WorkerSettings {
   const workerPassword = attempt(() => password(env, 'TPS_DB_APP_WORKER_PASSWORD'));
   const queuePassword = attempt(() => password(env, 'TPS_DB_APP_QUEUE_PASSWORD'));
   const telemetry = attempt(() => loadTelemetrySettings(env));
+  const files = attempt(() => loadFileSettings(env, undefined, { removal: true }));
   if (
     config === undefined ||
     workerPassword === undefined ||
     queuePassword === undefined ||
-    telemetry === undefined
+    telemetry === undefined ||
+    files === undefined
   ) {
     throw new ConfigError(problems);
   }
   const { host, port, database: name, tls } = config.database;
   const database = { host, port, database: name, tls };
-  return { logLevel: config.logLevel, database, workerPassword, queuePassword, telemetry };
+  return { logLevel: config.logLevel, database, workerPassword, queuePassword, telemetry, files };
 }
