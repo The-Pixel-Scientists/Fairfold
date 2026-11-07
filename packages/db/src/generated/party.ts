@@ -9,6 +9,18 @@ export type Generated<T> =
     ? ColumnType<S, I | undefined, U>
     : ColumnType<T, T | undefined, T>;
 
+export type Json = JsonValue;
+
+export type JsonArray = JsonValue[];
+
+export type JsonObject = {
+  [x: string]: JsonValue | undefined;
+};
+
+export type JsonPrimitive = boolean | number | string | null;
+
+export type JsonValue = JsonArray | JsonObject | JsonPrimitive;
+
 export type Timestamp = ColumnType<Date, Date | string, Date | string>;
 
 export interface PartyConsent {
@@ -54,6 +66,23 @@ export interface PartyOrganisationIdentifier {
   updated_by: string | null;
   verified_at: Timestamp | null;
   verified_by: string | null;
+}
+
+export interface PartyOrganisationSnapshot {
+  address_country_code: string;
+  address_line1: string;
+  address_line2: string | null;
+  address_postcode: string;
+  address_town: string;
+  id: Generated<string>;
+  identifiers: Json;
+  legal_form: string;
+  name: string;
+  organisation_id: string;
+  taken_at: Timestamp;
+  taken_by: string;
+  tenant_id: string;
+  website: string | null;
 }
 
 export interface PartyParty {
@@ -102,6 +131,7 @@ export interface DB {
   'party.consent': PartyConsent;
   'party.organisation': PartyOrganisation;
   'party.organisation_identifier': PartyOrganisationIdentifier;
+  'party.organisation_snapshot': PartyOrganisationSnapshot;
   'party.party': PartyParty;
   'party.person': PartyPerson;
   'party.relationship': PartyRelationship;

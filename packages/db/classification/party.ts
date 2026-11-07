@@ -91,6 +91,27 @@ export const party: ClassificationRegistry = {
     recorded_at: personal,
     recorded_by: personal,
   },
+  // An organisation as submitted (ADR 0017), classified like the columns it
+  // copies. It is kept with the application that references it: today that
+  // is the tenant's lifetime, as for grants.application, until retention
+  // rules arrive (S11-102). Erasure clears its address as the
+  // organisation's (ADR 0027).
+  'party.organisation_snapshot': {
+    tenant_id: internal,
+    id: internal,
+    organisation_id: internal,
+    name: internal,
+    legal_form: internal,
+    address_line1: personal,
+    address_line2: personal,
+    address_town: personal,
+    address_postcode: personal,
+    address_country_code: personal,
+    website: internal,
+    identifiers: internal,
+    taken_by: internal,
+    taken_at: internal,
+  },
 };
 
 /**
@@ -101,6 +122,7 @@ export const partySubjects: SubjectPathRegistry = {
   'party.party': { kind: 'party', column: 'id' },
   'party.organisation': { kind: 'party', column: 'id' },
   'party.organisation_identifier': { kind: 'party', column: 'organisation_id' },
+  'party.organisation_snapshot': { kind: 'party', column: 'organisation_id' },
   'party.person': { kind: 'party', column: 'id' },
   'party.consent': { kind: 'party', column: 'person_id' },
 };

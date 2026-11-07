@@ -34,6 +34,7 @@ export interface GrantsApplication {
   form_version_id: string;
   id: Generated<string>;
   organisation_id: string;
+  organisation_snapshot_id: string | null;
   round_id: string;
   stage_id: string | null;
   status: Generated<string>;

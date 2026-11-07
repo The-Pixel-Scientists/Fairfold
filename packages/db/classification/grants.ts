@@ -117,6 +117,7 @@ export const grants: ClassificationRegistry = {
     submitted_at: internal,
     submitted_late: internal,
     withdrawn_at: internal,
+    organisation_snapshot_id: internal,
   },
   'grants.eligibility_result': {
     tenant_id: internal,
