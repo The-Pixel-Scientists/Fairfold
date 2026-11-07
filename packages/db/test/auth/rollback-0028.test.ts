@@ -20,14 +20,15 @@ const read = (file: string) =>
   readFile(join(MIGRATIONS_FOLDER, '0028_auth_email_change', file), 'utf8');
 const down = () => read('down.sql');
 
-/** The grants on auth.user's columns and the event check, as the catalogue prints them. */
+/**
+ * The grants on auth.user's columns, as the catalogue prints them. Not the
+ * event check, which later migrations widen; migrations.test.ts checks it
+ * round trip by round trip.
+ */
 async function state(client: pg.Client): Promise<unknown[]> {
   const { rows } = await client.query<{ name: string; value: string | null }>(
     `SELECT a.attname AS name, a.attacl::text AS value FROM pg_catalog.pg_attribute a
       WHERE a.attrelid = 'auth."user"'::regclass AND a.attnum > 0
-     UNION ALL
-     SELECT conname, pg_catalog.pg_get_constraintdef(oid) FROM pg_catalog.pg_constraint
-      WHERE conrelid = 'auth.audit_event'::regclass AND conname = 'audit_event_code_check'
      ORDER BY 1`,
   );
   return rows;
