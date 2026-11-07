@@ -7,7 +7,7 @@ import { ESLint } from 'eslint';
 import tseslint from 'typescript-eslint';
 import { describe, expect, it } from 'vitest';
 
-import { moduleBoundaries } from './eslint.config.js';
+import { MODULES, moduleBoundaries } from './eslint.config.js';
 
 const eslint = new ESLint({
   cwd: import.meta.dirname,
@@ -31,6 +31,25 @@ const server = 'modules/grants/src/server/decisions.ts';
 const consoleScreen = 'modules/party/src/console/People.tsx';
 const portalScreen = 'modules/grants/src/portal/Apply.tsx';
 
+/** The suite's modules as the domain package lists them (ADR 0016). */
+interface ModuleList {
+  moduleIds: readonly string[];
+  modules: Record<string, { schemas: readonly string[] }>;
+}
+
+describe('MODULES', () => {
+  it("matches the domain's modules and their schemas, less the platform", async () => {
+    // Loaded by a computed path: the type check of the root files does not
+    // reach the domain package.
+    const path = './packages/domain/src/platform/modules.ts';
+    const { moduleIds, modules } = (await import(path)) as ModuleList;
+    const expected = moduleIds
+      .filter((id) => id !== 'platform')
+      .map((id) => [id, modules[id]?.schemas]);
+    expect([...MODULES]).toEqual(expected);
+  });
+});
+
 describe('module boundaries', () => {
   it.each([
     [contracts, 'zod'],
@@ -42,6 +61,7 @@ describe('module boundaries', () => {
     [server, './release.ts'],
     [server, '@pixel-scientists/db'],
     [server, '@pixel-scientists/db/generated/grants'],
+    ['modules/party/src/server/people.ts', '@pixel-scientists/db/generated/party'],
     [server, '@pixel-scientists/domain'],
     [server, '@pixel-scientists/party/contracts'],
     [server, '@pixel-scientists/party/server'],
@@ -68,6 +88,10 @@ describe('module boundaries', () => {
     [contracts, '../server/people.ts'],
     [contracts, '../console/index.ts'],
     [server, '@pixel-scientists/db/generated/party'],
+    [server, '@pixel-scientists/db/generated/app'],
+    [server, '@pixel-scientists/db/generated/auth'],
+    [server, '@pixel-scientists/db/generated'],
+    [contracts, '@pixel-scientists/db/generated/party'],
     [server, '@pixel-scientists/party/server/people.ts'],
     [server, '@pixel-scientists/party/console'],
     [server, '@pixel-scientists/ui'],

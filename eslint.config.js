@@ -21,11 +21,25 @@ const reactFiles = [
   'modules/*/src/portal/**/*.{ts,tsx}',
 ];
 
-const MODULES = ['party', 'grants'];
+/**
+ * Each module under modules/, with the schemas whose generated types its
+ * server may import: `moduleIds` and each module's `schemas` in
+ * packages/domain/src/platform/modules.ts, less the platform. Written out
+ * because the type check of this file does not reach that package;
+ * eslint.config.test.ts fails when the two disagree.
+ *
+ * @type {ReadonlyMap<string, readonly string[]>}
+ */
+export const MODULES = new Map([
+  ['party', ['party']],
+  ['grants', ['grants']],
+]);
 const ENTRY_POINTS = ['contracts', 'server', 'console', 'portal'];
 
-const moduleContracts = MODULES.map((module) => `@pixel-scientists/${module}/contracts`);
-const moduleServers = MODULES.map((module) => `@pixel-scientists/${module}/server`);
+const moduleContracts = [...MODULES.keys()].map(
+  (module) => `@pixel-scientists/${module}/contracts`,
+);
+const moduleServers = [...MODULES.keys()].map((module) => `@pixel-scientists/${module}/server`);
 
 /** Every entry point may import @pixel-scientists/domain and its subpaths. */
 const DOMAIN = /^@pixel-scientists\/domain(?:\/[a-z0-9-]+)?$/;
@@ -36,9 +50,10 @@ const DOMAIN = /^@pixel-scientists\/domain(?:\/[a-z0-9-]+)?$/;
  * `reachable` entry points of the same module.
  *
  * @param {string} module
+ * @param {readonly string[]} schemas the module's own schemas
  * @returns {Record<string, { reachable: string[], allowed: string[], message: string }>}
  */
-function entryPoints(module) {
+function entryPoints(module, schemas) {
   const screens = {
     allowed: ['react', '@pixel-scientists/ui', ...moduleContracts],
     message:
@@ -55,11 +70,11 @@ function entryPoints(module) {
       reachable: ['server', 'contracts'],
       allowed: [
         '@pixel-scientists/db',
-        `@pixel-scientists/db/generated/${module}`,
+        ...schemas.map((schema) => `@pixel-scientists/db/generated/${schema}`),
         ...moduleContracts,
         ...moduleServers,
       ],
-      message: `Module server code may import only its own contracts, @pixel-scientists/domain, @pixel-scientists/db with the ${module} schema's generated types, and modules' contracts and server`,
+      message: `Module server code may import only its own contracts, @pixel-scientists/domain, @pixel-scientists/db with the generated types of its own schema (${schemas.join(', ')}), and modules' contracts and server`,
     },
     console: { reachable: ['console', 'contracts'], ...screens },
     portal: { reachable: ['portal', 'contracts'], ...screens },
@@ -121,9 +136,10 @@ const moduleImports = {
       .split(sep)
       .join('/');
     const [, module = '', entry = ''] = MODULE_FILE.exec(file) ?? [];
+    const schemas = MODULES.get(module);
     const boundary =
-      MODULES.includes(module) && ENTRY_POINTS.includes(entry)
-        ? entryPoints(module)[entry]
+      schemas !== undefined && ENTRY_POINTS.includes(entry)
+        ? entryPoints(module, schemas)[entry]
         : undefined;
     if (boundary === undefined) {
       return {
