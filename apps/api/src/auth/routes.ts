@@ -17,9 +17,11 @@ import {
   moduleSchema,
   permissionsFor,
   roles,
+  switchableModuleIds,
   type App,
   type Permission,
   type Role,
+  type SwitchableModuleId,
 } from '@pixel-scientists/domain/platform';
 
 import type { MfaState, RequestContext, RequestSession } from '../context.ts';
@@ -68,6 +70,7 @@ interface Active {
     Extract<Session, { app: 'console'; mfa: 'complete' }>['activeMembership']
   >;
   readonly permissions: Permission[];
+  readonly modules: SwitchableModuleId[];
 }
 
 /** The roles in `names` that belong to `app`. */
@@ -93,9 +96,17 @@ export function onModulePermissions(
 }
 
 /**
+ * The switchable modules on by moduleOn(), given the tenant's stored switches
+ * by module: a module without a row is off (ADR 0024).
+ */
+export function onModules(stored: ReadonlyMap<string, boolean>): SwitchableModuleId[] {
+  return switchableModuleIds.filter((module) => moduleOn(module, stored.get(module)));
+}
+
+/**
  * The session's active membership in its app, with its roles for that app,
- * and the permissions they give in the modules on for the tenant by
- * moduleOn(). None if it has no role in this app.
+ * the permissions they give in the modules on for the tenant by moduleOn(),
+ * and those modules. None if it has no role in this app.
  */
 async function activeMembership(
   api: Kysely<unknown>,
@@ -124,6 +135,7 @@ async function activeMembership(
     return {
       membership: { id: row.id, tenant: { slug: row.slug, name: row.name }, roles: held },
       permissions: onModulePermissions(permissionsFor(held, app), stored),
+      modules: onModules(stored),
     };
   });
 }
@@ -169,6 +181,7 @@ export async function sessionBody(api: Kysely<unknown>, view: SessionView): Prom
       activeMembership: null,
       memberships: [],
       permissions: [],
+      modules: [],
     } as Session;
   }
   const [active, all] = await Promise.all([
@@ -188,6 +201,7 @@ export async function sessionBody(api: Kysely<unknown>, view: SessionView): Prom
     activeMembership: active?.membership ?? null,
     memberships,
     permissions: active?.permissions ?? [],
+    modules: active?.modules ?? [],
   } as Session;
 }
 

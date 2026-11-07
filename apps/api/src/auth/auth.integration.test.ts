@@ -9,7 +9,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { createDatabase, type Kysely, type TenantId } from '@pixel-scientists/db';
-import { moduleOn, permissionsFor, type Permission } from '@pixel-scientists/domain/platform';
+import { permissionsFor, type Permission } from '@pixel-scientists/domain/platform';
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -30,7 +30,7 @@ import { createBetterAuth, type BetterAuth } from './better-auth.ts';
 import { hashToken, newToken, TIMEOUTS } from './cookies.ts';
 import { copyAuthEvent, recordAuthEvent } from './events.ts';
 import { createAuth, loadAuthSettings, type Auth } from './index.ts';
-import { onModulePermissions } from './routes.ts';
+import { onModulePermissions, onModules } from './routes.ts';
 import { issueSession } from './sessions.ts';
 
 /** The wave 1 tools, off for a tenant without their row (ADR 0024). */
@@ -176,6 +176,7 @@ describe('reading a session', { timeout: 30_000 }, () => {
         roles: ['tenant_admin'],
       },
       memberships: [{ id: member.membershipId }],
+      modules: ['grants'],
     });
     expect(body['permissions']).toEqual(
       permissionsFor(['tenant_admin'], 'console').filter((permission) => !WAVE_1.test(permission)),
@@ -187,13 +188,13 @@ describe('reading a session', { timeout: 30_000 }, () => {
     const all = permissionsFor(['tenant_admin'], 'console');
     expect(all.filter((permission) => WAVE_1.test(permission))).not.toEqual([]);
     const bare = await addMember(await createTestTenant());
-    const permissions = (await readSession(await addSession(bare))).json<{
+    const { permissions, modules } = (await readSession(await addSession(bare))).json<{
       permissions: string[];
-    }>().permissions;
-    // ADR 0024: no row means off, so grants too once moduleOn() drops its exception.
-    expect(permissions.some((permission) => permission.startsWith('grants.'))).toBe(
-      moduleOn('grants', undefined),
-    );
+      modules: string[];
+    }>();
+    // ADR 0024: a module without a row is off, so no tool is listed or permitted.
+    expect(modules).toEqual([]);
+    expect(permissions.some((permission) => permission.startsWith('grants.'))).toBe(false);
     expect(permissions.some((permission) => permission.startsWith('platform.'))).toBe(true);
     expect(permissions.filter((permission) => WAVE_1.test(permission))).toEqual([]);
   });
@@ -217,6 +218,7 @@ describe('reading a session', { timeout: 30_000 }, () => {
       app: 'portal',
       activeMembership: null,
       permissions: [],
+      modules: [],
     });
   });
 
@@ -275,9 +277,11 @@ describe('reading a session', { timeout: 30_000 }, () => {
         updated_by: other.membershipId,
       }),
     );
-    const permissions = (await readSession(await addSession(other))).json<{
+    const { permissions, modules } = (await readSession(await addSession(other))).json<{
       permissions: string[];
-    }>().permissions;
+      modules: string[];
+    }>();
+    expect(modules).toEqual([]);
     expect(permissions).toEqual(
       all.filter((permission) => !permission.startsWith('grants.') && !WAVE_1.test(permission)),
     );
@@ -296,6 +300,17 @@ describe('keeping the permissions of modules that are on', () => {
     expect(onModulePermissions(all, new Map([['forms', false]]))).not.toEqual(
       expect.arrayContaining(of('forms')),
     );
+  });
+
+  it('lists only the switchable modules whose row switches them on', () => {
+    const stored = new Map([
+      ['crm', true],
+      ['grants', true],
+      ['forms', false],
+      ['platform', true],
+    ]);
+    expect(onModules(stored)).toEqual(['grants', 'crm']);
+    expect(onModules(new Map())).toEqual([]);
   });
 
   it('drops a permission whose prefix is not a module', () => {
