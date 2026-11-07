@@ -52,6 +52,12 @@ export const messages = {
   serviceFailed: 'Something went wrong on our side. Try again in a few minutes.',
   noConnection: 'We could not reach the service. Check your connection and try again.',
 
+  // Repeated requests (ADR 0028).
+  keyReusedTitle: 'Already sent with different details',
+  keyReused: 'This was already sent with different details. Start again to send it.',
+  keyInProgressTitle: 'Still being saved',
+  keyInProgress: 'This is still being saved. Wait a moment, then check whether it was saved.',
+
   // Accounts and sign-in.
   email: 'Enter an email address in the correct format, like name@example.com.',
   emailTooLong: 'Enter an email address of 254 characters or fewer.',
