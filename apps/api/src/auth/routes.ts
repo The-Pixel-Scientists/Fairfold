@@ -30,6 +30,7 @@ import { route, type Route } from '../routes/register.ts';
 import { clearedCookie, hashToken, sessionCookie } from './cookies.ts';
 import { copyAuthEvent, recordAuthEvent, type CopyDependencies } from './events.ts';
 import type { DeviceKeys } from './limits/device-cookie.ts';
+import type { BreachAnswer } from './password/range.ts';
 import { requestResetRoute } from './password-reset.ts';
 import { completeResetRoute } from './password-reset-complete.ts';
 import { detailsOf, revoke } from './sessions.ts';
@@ -44,6 +45,8 @@ export interface RouteDependencies extends CopyDependencies {
   readonly sender: Sender | undefined;
   /** The bundled common-password list, or undefined if it did not load: then no password can be set. */
   readonly commonPasswords: ReadonlySet<string> | undefined;
+  /** The breached-password lookup (password/range.ts), unless settings.breachCheck is off. */
+  readonly lookUpPassword: (password: string) => Promise<BreachAnswer>;
   /** A typed identifier as counters and events keep it (limits.ts). */
   readonly keepIdentifier: (typed: string) => string;
   /** The keys that sign and check device cookies (limits/device-cookie.ts). */
@@ -125,6 +128,19 @@ async function activeMembership(
   });
 }
 
+/**
+ * The answer for a session whose password was found in a data breach
+ * (ADR 0010): it reaches only the password change and sign-out, so the
+ * apps are told to change the password rather than given the session.
+ */
+export function passwordChangeRequired(): ApiError {
+  return new ApiError(
+    403,
+    'This password has appeared in a data breach, so change it before you continue.',
+    { reason: 'password_change_required' },
+  );
+}
+
 /** What the apps see of a session. */
 export interface SessionView {
   readonly userId: string;
@@ -190,6 +206,7 @@ export async function answerWithSession(
   const session = await sessionContext(deps.api, tokenHash);
   if (session === undefined) throw new Error('The new session could not be read.');
   deps.setHeader(requestId, 'set-cookie', sessionCookie(session.app, token));
+  if (session.mfaState === 'password_change_required') throw passwordChangeRequired();
   const body = await sessionBody(deps.api, {
     userId: session.userId,
     email,
@@ -218,7 +235,9 @@ export function authRoutes(deps: RouteDependencies): Route[] {
 
     route(getSession, async ({ context }) => {
       const session = sessionOf(context);
-      const { expiresAt, reauthenticatedAt, tokenHash } = detailsOf(session);
+      const details = detailsOf(session);
+      if (details.passwordChangeRequired) throw passwordChangeRequired();
+      const { expiresAt, reauthenticatedAt, tokenHash } = details;
       return sessionBody(deps.api, {
         ...session,
         email: await session.email(),

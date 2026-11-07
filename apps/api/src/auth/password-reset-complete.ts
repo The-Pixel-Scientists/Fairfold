@@ -6,7 +6,8 @@
 // turns: the token and every other reset link of the account are spent, the
 // user is locked against sessions being issued, the new password is set,
 // every session and device cookie is revoked, the address's sign-in
-// counters and delays are cleared, and the events are recorded. It never signs in and never touches
+// counters and delays are cleared, the breach state is set for the new
+// password, and the events are recorded. It never signs in and never touches
 // MFA, and the user is emailed a notice.
 
 import { completePasswordReset } from '@pixel-scientists/domain/auth';
@@ -21,7 +22,8 @@ import { hashPassword } from './passwords.ts';
 import { RESET, sendResetEmail, VALUE } from './password-reset.ts';
 import type { RouteDependencies } from './routes.ts';
 import { revokeAll } from './sessions.ts';
-import { refuseCommonPassword, tokenId } from './sign-up.ts';
+import { checkNewPassword, newPasswordState, refuseBreachedAgain } from './password/policy.ts';
+import { tokenId } from './sign-up.ts';
 import type { AuthTables } from './tables.ts';
 
 export function completeResetRoute(deps: RouteDependencies): Route {
@@ -45,7 +47,7 @@ export function completeResetRoute(deps: RouteDependencies): Route {
     if (value === undefined || userId === undefined || tenantId === undefined) {
       throw linkNotValid;
     }
-    refuseCommonPassword(deps.commonPasswords, password);
+    const pending = await checkNewPassword(deps, requestId, deps.commonPasswords, password);
     const hash = await hashPassword(password);
     const ip = plainAddress(deps.client(requestId).ip);
 
@@ -80,9 +82,10 @@ export function completeResetRoute(deps: RouteDependencies): Route {
         .forUpdate()
         .executeTakeFirst();
       if (user === undefined) throw linkNotValid;
+      await refuseBreachedAgain(trx, userId, password);
       const changed = await db
         .updateTable('auth.account')
-        .set({ password: hash })
+        .set({ password: hash, ...newPasswordState(pending) })
         .where('user_id', '=', userId)
         .where('provider_id', '=', 'credential')
         .executeTakeFirst();

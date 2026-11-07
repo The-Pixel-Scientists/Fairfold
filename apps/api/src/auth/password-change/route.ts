@@ -5,8 +5,10 @@
 // the new password (ADR 0010; S11-23's contract). If the account holds a
 // factor, the session must have proven it too (lockForChange()). The
 // password passes the rules every new password does before anything is
-// written. Then, in one transaction, under an exclusive lock on the user:
-// the new hash is set, every other session and every device cookie is
+// written. A session whose password was found breached reaches this route
+// alone (sessions.ts), and the change clears that state. Then, in one
+// transaction, under an exclusive lock on the user: the new hash is set
+// with its breach state, every other session and every device cookie is
 // revoked, this browser gets a new session id and a fresh device cookie,
 // and the events are recorded. The user is emailed once it commits.
 
@@ -20,9 +22,9 @@ import { sessionCookie } from '../cookies.ts';
 import { copyAuthEvent, recordAuthEvent } from '../events.ts';
 import { plainAddress } from '../limits.ts';
 import { rememberDevice } from '../limits/devices.ts';
+import { checkNewPassword, newPasswordState, refuseBreachedAgain } from '../password/policy.ts';
 import { hashPassword } from '../passwords.ts';
 import { sessionOf, type RouteDependencies } from '../routes.ts';
-import { refuseCommonPassword } from '../sign-up.ts';
 import type { AuthTables } from '../tables.ts';
 
 export function passwordChangeRoute(deps: RouteDependencies): Route {
@@ -33,17 +35,23 @@ export function passwordChangeRoute(deps: RouteDependencies): Route {
     if (deps.commonPasswords === undefined) {
       throw new ApiError(503, undefined, { reason: 'no_common_password_list' });
     }
-    refuseCommonPassword(deps.commonPasswords, input.body.password);
+    const pending = await checkNewPassword(
+      deps,
+      requestId,
+      deps.commonPasswords,
+      input.body.password,
+    );
     const hash = await hashPassword(input.body.password);
     const client = deps.client(requestId);
     const at = { requestId, userId, tenant, ip: plainAddress(client.ip) };
 
     const outcome = await deps.auth.transaction().execute(async (trx) => {
       const current = await lockForChange(trx, session);
+      await refuseBreachedAgain(trx, userId, input.body.password);
       const changed = await trx
         .$extendTables<AuthTables>()
         .updateTable('auth.account')
-        .set({ password: hash })
+        .set({ password: hash, ...newPasswordState(pending) })
         .where('user_id', '=', userId)
         .where('provider_id', '=', 'credential')
         .executeTakeFirst();
