@@ -17,8 +17,10 @@ import { ConfigError, loadConfig, type Config } from './config.ts';
 import { openDatabase } from './database.ts';
 import {
   createFileService,
+  createScannerStorage,
   createStorage,
   loadFileSettings,
+  uploadGate,
   type FileSettings,
 } from './platform/files/index.ts';
 import { createSender } from './email/sender.ts';
@@ -119,6 +121,7 @@ async function main(): Promise<void> {
       files: createFileService(
         fileSettings,
         createStorage(fileSettings.storage, pinnedFetch(fileSettings.storage.endpoint)),
+        createScannerStorage(fileSettings.storage, pinnedFetch(fileSettings.storage.endpoint)),
       ),
       auth,
       ...composeModules({
@@ -129,6 +132,7 @@ async function main(): Promise<void> {
       }),
       trustProxy: config.trustProxy,
       limits: { store: database.requestLimits, key: limitSettings.key },
+      uploads: uploadGate({ store: database.requestLimits, key: limitSettings.key }),
       telemetry,
     });
   } catch (error) {

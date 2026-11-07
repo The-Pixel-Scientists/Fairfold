@@ -16,7 +16,7 @@ import { suiteName } from '@pixel-scientists/domain/platform';
 import manifest from '../package.json' with { type: 'json' };
 import type { AuthModule } from './context.ts';
 import type { InTenant } from './database.ts';
-import type { FileService } from './platform/files/index.ts';
+import type { FileService, UploadGate } from './platform/files/index.ts';
 import { withTenantScope, type ScopeResolvers } from './policy/index.ts';
 import { registerLimits, type LimitOptions } from './limits/index.ts';
 import { createReadinessCheck, healthRoutes } from './routes/health.ts';
@@ -50,6 +50,8 @@ export interface AppOptions {
   trustProxy?: readonly string[];
   /** The counters and key behind the request limits (S11-36). Without them, nothing is limited. */
   limits?: LimitOptions;
+  /** Counts and limits raw uploads before their bodies are read (ADR 0030). Without it, none is limited. */
+  uploads?: UploadGate;
   /** Traces and request metrics. Without it, or while it is off, nothing is recorded. */
   telemetry?: Telemetry;
 }
@@ -115,6 +117,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     readSession: limitSessions(options.auth?.readSession.bind(options.auth) ?? signedOut),
     inTenant: options.inTenant ?? noDatabase,
     files: options.files,
+    uploads: options.uploads,
     resolvers: withTenantScope(options.resolvers ?? {}),
   };
   // Registering inside a plugin applies the prefix.
