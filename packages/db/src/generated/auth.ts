@@ -17,8 +17,11 @@ export interface AuthAccount {
   account_id: string;
   created_at: Generated<Timestamp>;
   id: Generated<string>;
-  password: string;
+  password: string | null;
   provider_id: string;
+  sso_issuer: string | null;
+  sso_provider_id: string | null;
+  tenant_id: string | null;
   updated_at: Generated<Timestamp>;
   user_id: string;
 }
@@ -66,6 +69,16 @@ export interface AuthRateLimit {
   window_started_at: Generated<Timestamp>;
 }
 
+export interface AuthSamlReplay {
+  assertion_id: string;
+  created_at: Generated<Timestamp>;
+  expires_at: Timestamp;
+  id: Generated<string>;
+  provider_id: string;
+  tenant_id: string;
+  updated_at: Generated<Timestamp>;
+}
+
 export interface AuthSession {
   active_tenant_id: string | null;
   app: string;
@@ -82,6 +95,47 @@ export interface AuthSession {
   updated_at: Generated<Timestamp>;
   user_agent: string | null;
   user_id: string;
+}
+
+export interface AuthSsoDomain {
+  created_at: Generated<Timestamp>;
+  created_by: string;
+  dns_token: string;
+  domain: string;
+  id: Generated<string>;
+  provider_id: string;
+  state: Generated<string>;
+  tenant_id: string;
+  updated_at: Generated<Timestamp>;
+  updated_by: string;
+  verified_at: Timestamp | null;
+}
+
+export interface AuthSsoProvider {
+  authorization_endpoint: string | null;
+  certificates: string[] | null;
+  client_id: string | null;
+  client_secret: Buffer | null;
+  created_at: Generated<Timestamp>;
+  created_by: string;
+  entity_id: string | null;
+  id: Generated<string>;
+  issuer: string | null;
+  jwks_uri: string | null;
+  key_version: number | null;
+  kind: string;
+  mfa_acr: string[] | null;
+  mfa_amr: string[] | null;
+  mfa_contexts: string[] | null;
+  name: string;
+  sp_certificate: string | null;
+  sp_private_key: Buffer | null;
+  sso_url: string | null;
+  tenant_id: string;
+  token_endpoint: string | null;
+  updated_at: Generated<Timestamp>;
+  updated_by: string;
+  userinfo_endpoint: string | null;
 }
 
 export interface AuthTwoFactor {
@@ -123,7 +177,10 @@ export interface DB {
   'auth.audit_event': AuthAuditEvent;
   'auth.device': AuthDevice;
   'auth.rate_limit': AuthRateLimit;
+  'auth.saml_replay': AuthSamlReplay;
   'auth.session': AuthSession;
+  'auth.sso_domain': AuthSsoDomain;
+  'auth.sso_provider': AuthSsoProvider;
   'auth.two_factor': AuthTwoFactor;
   'auth.user': AuthUser;
   'auth.verification': AuthVerification;
