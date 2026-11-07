@@ -34,23 +34,26 @@ export function hashToken(token: string): Buffer {
   return createHash('sha256').update(token, 'utf8').digest();
 }
 
+/** The value of the cookie `name`, or undefined if the header has none or more than one. */
+export function readCookie(cookieHeader: string | undefined, name: string): string | undefined {
+  const values = (cookieHeader ?? '')
+    .split(';')
+    .map((pair) => pair.trim())
+    .filter((pair) => pair.startsWith(`${name}=`))
+    .map((pair) => pair.slice(name.length + 1));
+  return values.length === 1 ? values[0] : undefined;
+}
+
 /**
  * The token in the app's session cookie, or undefined if the request has
  * none, more than one, or one that is not a token.
  */
 export function readToken(cookieHeader: string | undefined, app: App): string | undefined {
-  if (cookieHeader === undefined) return undefined;
-  const name = SESSION_COOKIES[app];
-  const values = cookieHeader
-    .split(';')
-    .map((pair) => pair.trim())
-    .filter((pair) => pair.startsWith(`${name}=`))
-    .map((pair) => pair.slice(name.length + 1));
-  const [value] = values;
-  return values.length === 1 && value !== undefined && TOKEN.test(value) ? value : undefined;
+  const value = readCookie(cookieHeader, SESSION_COOKIES[app]);
+  return value !== undefined && TOKEN.test(value) ? value : undefined;
 }
 
-const ATTRIBUTES = 'Path=/; Secure; HttpOnly; SameSite=Lax';
+export const ATTRIBUTES = 'Path=/; Secure; HttpOnly; SameSite=Lax';
 
 export function sessionCookie(app: App, token: string): string {
   return `${SESSION_COOKIES[app]}=${token}; ${ATTRIBUTES}; Max-Age=${String(TIMEOUTS[app].absolute)}`;
