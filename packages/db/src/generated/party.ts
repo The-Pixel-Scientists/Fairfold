@@ -90,6 +90,7 @@ export interface PartyParty {
   created_by: string | null;
   id: Generated<string>;
   kind: string;
+  merged_into: string | null;
   status: Generated<string>;
   tenant_id: string;
   updated_at: Generated<Timestamp>;
@@ -127,6 +128,18 @@ export interface PartyRelationship {
   updated_by: string | null;
 }
 
+export interface PartyValueHistory {
+  changed_at: Generated<Timestamp>;
+  changed_by: string | null;
+  field_id: string;
+  id: Generated<string>;
+  new_value: string | null;
+  old_value: string | null;
+  party_id: string;
+  party_kind: string;
+  tenant_id: string;
+}
+
 export interface DB {
   'party.consent': PartyConsent;
   'party.organisation': PartyOrganisation;
@@ -135,4 +148,5 @@ export interface DB {
   'party.party': PartyParty;
   'party.person': PartyPerson;
   'party.relationship': PartyRelationship;
+  'party.value_history': PartyValueHistory;
 }

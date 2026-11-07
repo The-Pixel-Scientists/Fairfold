@@ -39,6 +39,7 @@ export const party: ClassificationRegistry = {
     ...keyAndActors,
     kind: internal,
     status: internal,
+    merged_into: internal,
   },
   'party.organisation': {
     ...keyAndActors,
@@ -112,6 +113,20 @@ export const party: ClassificationRegistry = {
     taken_by: internal,
     taken_at: internal,
   },
+  // One change to a party field (ADR 0025). The values are personal
+  // whatever the field (ADR 0025, rule 5), and are kept as long as their
+  // party; erasure clears them with their source column (ADR 0027).
+  'party.value_history': {
+    tenant_id: internal,
+    id: internal,
+    party_id: internal,
+    party_kind: internal,
+    field_id: internal,
+    old_value: personal,
+    new_value: personal,
+    changed_by: internal,
+    changed_at: internal,
+  },
 };
 
 /**
@@ -125,4 +140,5 @@ export const partySubjects: SubjectPathRegistry = {
   'party.organisation_snapshot': { kind: 'party', column: 'organisation_id' },
   'party.person': { kind: 'party', column: 'id' },
   'party.consent': { kind: 'party', column: 'person_id' },
+  'party.value_history': { kind: 'party', column: 'party_id' },
 };
