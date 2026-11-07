@@ -10,7 +10,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { createDatabase, withTenant, type Kysely } from '@pixel-scientists/db';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { databaseSettings, withClient } from '../../../../../packages/db/test/connect.ts';
+import { connectionSettings, withClient } from '../../../../../packages/db/test/connect.ts';
 import {
   asMigratorIn,
   committedIn,
@@ -28,7 +28,7 @@ import { filesHandler } from '../../worker/jobs/files.ts';
 import type { Verdict } from './clamd.ts';
 import { recheckTenant, type RecheckDependencies } from './recheck.ts';
 import { sweepTenant, type SweepStorage } from './sweep.ts';
-import { sendFile, type SendDependencies } from './send.ts';
+import { sendStoredFile, type SendDependencies } from './send.ts';
 import { createSlots } from './slots.ts';
 import type { Storage } from './storage.ts';
 import type { FileRequest } from './types.ts';
@@ -51,7 +51,16 @@ beforeAll(async () => {
     TPS_API_PORT: '41003',
     TPS_DB_NAME: process.env['TPS_TEST_DB_NAME'],
   });
-  worker = createDatabase<unknown>(databaseSettings('app_worker', 8));
+  const creds = connectionSettings('app_worker');
+  worker = createDatabase<unknown>({
+    host: creds.host,
+    port: creds.port,
+    database: creds.database,
+    role: 'app_worker',
+    password: creds.password,
+    maxConnections: 8,
+    applicationName: 'tps-db-tests',
+  });
   database = openDatabase(settings, createLogger({ level: 'silent' }));
   [tenantA, tenantB] = await Promise.all([createTestTenant(), createTestTenant()]);
   adminA = await addMember(tenantA, 'console', 'tenant_admin');
@@ -153,7 +162,7 @@ function sender(objects: Map<string, Buffer>, verdict: Verdict, version: number 
   };
   return (member: Member, id: string, pause?: () => Promise<void>) =>
     request(member, async (req) => {
-      const reply = await sendFile(deps, req, id, { audit: true });
+      const reply = await sendStoredFile(deps, req, id, { audit: true });
       await pause?.();
       return reply;
     });

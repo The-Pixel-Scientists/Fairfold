@@ -56,7 +56,7 @@ const sameHash = (bytes: Uint8Array, hash: Buffer): boolean =>
 const unavailable = (reason: string): ApiError =>
   new ApiError(503, undefined, { reason, headers: { 'retry-after': '5' } });
 
-export async function sendFile(
+export async function sendStoredFile(
   deps: SendDependencies,
   request: FileRequest,
   fileId: string,

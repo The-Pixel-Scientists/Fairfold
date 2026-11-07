@@ -6,7 +6,7 @@
 
 import { cachedVersion, scan, signatureVersion } from './clamd.ts';
 import type { FileSettings } from './settings.ts';
-import { sendFile } from './send.ts';
+import { sendStoredFile } from './send.ts';
 import { createSlots } from './slots.ts';
 import { createStore } from './store.ts';
 import {
@@ -44,7 +44,7 @@ export function createFileService(
   const sending = { storage, scanner, scan: scanBytes, version, slots };
   return (request) => ({
     store: (input) => store(request, input),
-    send: (fileId, options) => sendFile(sending, request, fileId, options),
+    send: (fileId, options) => sendStoredFile(sending, request, fileId, options),
     deleteWithheld: (fileId) => deleteWithheld(request, fileId),
   });
 }
