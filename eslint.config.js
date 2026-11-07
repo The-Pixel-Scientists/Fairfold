@@ -46,8 +46,11 @@ const moduleContracts = [...MODULES.keys()].map(
 );
 const moduleServers = [...MODULES.keys()].map((module) => `@pixel-scientists/${module}/server`);
 
-/** Every entry point may import @pixel-scientists/domain and its subpaths. */
-const DOMAIN = /^@pixel-scientists\/domain(?:\/[a-z0-9-]+)?$/;
+/**
+ * Every entry point may import @pixel-scientists/domain and its subpaths, at
+ * any depth its `./*` export resolves (such as `platform/subject-access`).
+ */
+const DOMAIN = /^@pixel-scientists\/domain(?:\/[a-z0-9-]+)*$/;
 
 /**
  * What each entry point may import (ADR 0016) besides @pixel-scientists/domain:
@@ -60,9 +63,14 @@ const DOMAIN = /^@pixel-scientists\/domain(?:\/[a-z0-9-]+)?$/;
  */
 function entryPoints(module, schemas) {
   const screens = {
-    allowed: ['react', '@pixel-scientists/ui', ...moduleContracts],
+    allowed: [
+      'react',
+      '@pixel-scientists/ui',
+      '@pixel-scientists/ui/form-builder',
+      ...moduleContracts,
+    ],
     message:
-      "Module screens may import only their own contracts, modules' contracts, @pixel-scientists/ui, @pixel-scientists/domain and React",
+      "Module screens may import only their own contracts, modules' contracts, @pixel-scientists/ui (and its form-builder entry), @pixel-scientists/domain and React",
   };
   return {
     contracts: {
