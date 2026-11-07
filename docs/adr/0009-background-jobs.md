@@ -88,6 +88,12 @@ If a guard is removed, the exception lapses until a new ADR replaces it.
     completes, fails and retries jobs, runs maintenance and inserts scheduled
     jobs, with the rights that needs and none on tenant tables. Handlers never
     use it.
+  - `app_operator` (Aaron, 29 October 2026; [ADR 0024](0024-no-tool-on-by-default.md))
+    is a `NOLOGIN` role that operator commands in the worker switch to with
+    `SET LOCAL ROLE`, inside a tenant's transaction. `app_worker` is its one
+    member, `WITH ADMIN FALSE, INHERIT FALSE, SET TRUE`, so a worker
+    connection holds none of its rights until then. It holds no right on any
+    job table, and only the inserts ADR 0003 lists for it.
   - No app role may execute `create_queue`, `delete_queue` or the
     `job_table_*` functions; `job_now()` is granted by name. All three can
     read `app.job_queue`.
