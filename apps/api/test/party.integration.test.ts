@@ -108,7 +108,12 @@ const send = (
   url: string,
   payload?: unknown,
 ) =>
-  api.inject({ method, url: `/api${url}`, headers: as(member), ...(payload ? { payload } : {}) });
+  api.inject({
+    method,
+    url: `/api${url}`,
+    headers: { ...as(member), 'idempotency-key': randomUUID() },
+    ...(payload ? { payload } : {}),
+  });
 
 const organisationBody = (change: Record<string, unknown> = {}) => ({
   name: 'Northfield Allotment Society',
