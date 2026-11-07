@@ -10,6 +10,8 @@ export const auth: SchemaCatalogue = {
     ['auth.session_context(bytea)', ['app_api']],
     // A session's memberships, for switching tenant (ADR 0019).
     ['auth.session_memberships(bytea)', ['app_api']],
+    // Finds the SSO secrets a key version sealed, for re-encryption (ADR 0010).
+    ['auth.sso_providers_by_key_version(integer)', ['app_auth']],
   ],
   definerFunctions: [
     [
@@ -71,6 +73,19 @@ export const auth: SchemaCatalogue = {
         ],
       },
     ],
+    [
+      'auth.sso_providers_by_key_version(integer)',
+      {
+        owner: 'owner_auth_sso_providers_by_key_version',
+        rights: [
+          'USAGE on schema auth',
+          ...['id', 'tenant_id', 'key_version'].map(
+            (column) => `SELECT on column auth.sso_provider.${column}`,
+          ),
+        ],
+        policies: ['auth.sso_provider policy sso_providers_by_key_version_select'],
+      },
+    ],
   ],
   nonTenantTables: (
     [
@@ -79,7 +94,10 @@ export const auth: SchemaCatalogue = {
         'An account belongs to one person and may hold memberships in several tenants.',
       ],
       ['auth.session', 'A session belongs to an account; its active tenant grants nothing alone.'],
-      ['auth.account', 'Credential accounts have no tenant; SSO identities add one later.'],
+      [
+        'auth.account',
+        "Credential accounts have no tenant, while SSO identities do; its policies are ADR 0003's named exception.",
+      ],
       ['auth.verification', 'Emailed links come before any tenant is known.'],
       ['auth.two_factor', 'MFA belongs to the account, whatever the tenant.'],
       ['auth.rate_limit', 'Sign-in limits count identifiers and addresses, not tenants.'],

@@ -10,6 +10,14 @@
 // device's hash and the counter keyed by it, which are online identifiers. A
 // device goes 12 months after issue, or 30 days after revocation if that is
 // sooner (limits/devices.ts in apps/api/src/auth deletes it).
+//
+// A tenant's SSO set-up is kept while the tenant is a customer, and each
+// row goes when its provider is removed: a domain and a used assertion id
+// with their provider, and an SSO identity with its provider or account.
+// The sealed client secret and signing key, and the DNS token, are
+// internal. An SSO identity's subject is its account_id, personal like a
+// credential account's; its tenant, provider and issuer are internal. A
+// used assertion id goes a day after it expires.
 
 import type {
   ClassificationRegistry,
@@ -39,6 +47,11 @@ const audit = fixed('internal', 366, 'occurred_at');
 const auditPersonal = fixed('personal', 366, 'occurred_at');
 const pending = fixed('internal', 366, 'created_at');
 const device = fixed('internal', 366, 'issued_at');
+const sso: FieldClassification = {
+  sensitivity: 'internal',
+  retention: { kind: 'tenant_lifetime' },
+};
+const replay = fixed('internal', 1, 'expires_at');
 const devicePersonal = fixed('personal', 366, 'issued_at');
 
 export const auth: ClassificationRegistry = {
@@ -77,6 +90,9 @@ export const auth: ClassificationRegistry = {
     password: accountInternal,
     created_at: accountInternal,
     updated_at: accountInternal,
+    tenant_id: accountInternal,
+    sso_provider_id: accountInternal,
+    sso_issuer: accountInternal,
   },
   'auth.verification': {
     id: verification,
@@ -137,6 +153,58 @@ export const auth: ClassificationRegistry = {
   'auth.audit_copy_pending': {
     auth_event_id: pending,
     created_at: pending,
+  },
+  'auth.sso_provider': Object.fromEntries(
+    [
+      'tenant_id',
+      'id',
+      'kind',
+      'name',
+      'issuer',
+      'client_id',
+      'client_secret',
+      'authorization_endpoint',
+      'token_endpoint',
+      'jwks_uri',
+      'userinfo_endpoint',
+      'mfa_amr',
+      'mfa_acr',
+      'entity_id',
+      'sso_url',
+      'certificates',
+      'sp_certificate',
+      'sp_private_key',
+      'mfa_contexts',
+      'key_version',
+      'created_at',
+      'created_by',
+      'updated_at',
+      'updated_by',
+    ].map((column) => [column, sso]),
+  ),
+  'auth.sso_domain': Object.fromEntries(
+    [
+      'tenant_id',
+      'id',
+      'provider_id',
+      'domain',
+      'dns_token',
+      'state',
+      'verified_at',
+      'created_at',
+      'created_by',
+      'updated_at',
+      'updated_by',
+    ].map((column) => [column, sso]),
+  ),
+  'auth.saml_replay': {
+    tenant_id: replay,
+    id: replay,
+    provider_id: replay,
+    assertion_id: replay,
+    expires_at: replay,
+    created_at: replay,
+    updated_at: replay,
   },
 };
 
