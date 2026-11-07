@@ -4,7 +4,8 @@
 // and so addresses, that no earlier run has used, and committed. Each row
 // sits in its own tenant, out of sight of the other's app roles; each member
 // has a verified account with an Argon2id password and no authenticator, a
-// membership and a person; and Northfield's round is set up as configured,
+// membership and a person; each tenant has grants on and the wave 1 tools
+// off; and Northfield's round is set up as configured,
 // with its published form. `applications` adds applicants, their
 // organisations and their applications, with each application's
 // eligibility check and stage history, the round's reviewer pool with its
@@ -33,6 +34,7 @@ const PASSWORD = 'a long synthetic passphrase';
 const TENANT_TABLES = [
   'app.tenant',
   'app.membership',
+  'app.tenant_module',
   'app.tenant_theme',
   'party.party',
   'party.person',
@@ -100,7 +102,12 @@ beforeAll(async () => {
 
 describe('the configured scenario', { timeout: 60_000 }, () => {
   it('writes the rows each tenant needs', () => {
-    const people = { 'auth.user': 4, 'auth.account': 4, 'app.membership': 4 };
+    const people = {
+      'auth.user': 4,
+      'auth.account': 4,
+      'app.membership': 4,
+      'app.tenant_module': 6,
+    };
     const persons = { 'party.party': 4, 'party.person': 4 };
     expect(counts(northfield)).toEqual({
       'app.tenant': 1,
@@ -170,6 +177,28 @@ describe('the configured scenario', { timeout: 60_000 }, () => {
         })),
       );
       expect(new Set(accounts.map(({ password }) => password)).size).toBe(accounts.length);
+    }
+  });
+
+  it('switches grants on and every wave 1 tool off, as each tenant administrator', async () => {
+    for (const [index, tenant] of scenario.entries()) {
+      const id = [northfield, eastmoor][index]?.id ?? '';
+      const switches = await asRoleIn('app_api', id, async (client) => {
+        const { rows } = await client.query<Record<string, unknown>>(
+          `SELECT s.module, s.enabled, s.updated_by_kind, m.roles
+             FROM app.tenant_module s JOIN app.membership m ON m.id = s.updated_by
+            ORDER BY s.module`,
+        );
+        return rows;
+      });
+      expect(switches, tenant.slug).toEqual(
+        ['assure', 'crm', 'forms', 'grants', 'insight', 'privacy'].map((module) => ({
+          module,
+          enabled: module === 'grants',
+          updated_by_kind: 'user',
+          roles: ['tenant_admin'],
+        })),
+      );
     }
   });
 

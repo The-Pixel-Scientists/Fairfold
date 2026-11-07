@@ -5,14 +5,20 @@
 // forced row-level security binds like any app role (ADR 0003), so it sets
 // each tenant in turn and writes that tenant's rows, all in one transaction.
 // Actor columns stay null, as for anything the system does, except where the
-// schema needs a member: the programme manager publishes forms, moves
-// applications on, fills reviewer pools and records decisions, and
-// applicants start, check and submit their own.
+// schema needs a member: the administrator switches the tenant's tools, the
+// programme manager publishes forms, moves applications on, fills reviewer
+// pools and records decisions, and applicants start, check and submit their
+// own.
 
 import { argon2Sync, randomBytes, randomUUID } from 'node:crypto';
 
 import { checkEligibility, parseDefinition } from '@pixel-scientists/domain/forms';
-import { permissionsFor, type Preset, type Role } from '@pixel-scientists/domain/platform';
+import {
+  permissionsFor,
+  switchableModuleIds,
+  type Preset,
+  type Role,
+} from '@pixel-scientists/domain/platform';
 import type pg from 'pg';
 
 /** Given name, family name and role. The address is given.family@<slug>.example. */
@@ -273,6 +279,18 @@ async function writeTenant(
     const granted = permissionsFor([role], 'console');
     if (granted.includes('platform.settings.manage')) settingsManager ??= membership;
     if (MANAGER.every((permission) => granted.includes(permission))) manager ??= membership;
+  }
+  // No tool is on without its row (ADR 0024): grants on, every wave 1 tool off.
+  if (settingsManager === undefined) {
+    throw new Error(`${tenant.slug} needs a member who manages settings to switch its tools.`);
+  }
+  for (const module of switchableModuleIds) {
+    await insert('app.tenant_module', {
+      tenant_id: tenantId,
+      module,
+      enabled: module === 'grants',
+      updated_by: settingsManager,
+    });
   }
   if (tenant.theme) {
     await insert('app.tenant_theme', {
