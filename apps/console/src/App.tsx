@@ -19,9 +19,12 @@ import { Screen } from './auth/Screen.tsx';
 import SetUpAuthenticatorPage from './auth/SetUpAuthenticatorPage.tsx';
 import SignedOutPage from './auth/SignedOutPage.tsx';
 import SignInPage from './auth/SignInPage.tsx';
+import { SSO_FAILED_PATH, SSO_SIGNING_IN_PATH } from './auth/sign-in/paths.ts';
+import { SsoFailedPage, SsoSigningInPage } from './auth/sign-in/SsoLandingPages.tsx';
 import SignUpPage from './auth/SignUpPage.tsx';
 import { AUDIT_LOG_PATH } from './platform/audit-log/paths.ts';
 import { DATA_PATH } from './platform/data/paths.ts';
+import { SSO_PATH } from './platform/sso/paths.ts';
 import { TenantLook } from './platform/settings/look.tsx';
 import { INVITATION_PATH, TEAM_PATH } from './platform/team/paths.ts';
 import { productName, titleSuffix } from './product.ts';
@@ -62,6 +65,11 @@ export const tenantRoutes: readonly RouteDefinition[] = [
       load: () => import('./platform/audit-log/AuditLogPage.tsx'),
     },
     ...moduleRoutes,
+    {
+      path: SSO_PATH,
+      title: 'Single sign-on',
+      load: () => import('./platform/sso/SsoPage.tsx'),
+    },
     { path: DATA_PATH, title: 'Data', load: () => import('./platform/data/DataPage.tsx') },
     { path: TEAM_PATH, title: 'Team', load: () => import('./platform/team/TeamPage.tsx') },
   ]),
@@ -92,6 +100,8 @@ export const tenantRoutes: readonly RouteDefinition[] = [
     load: () => import('./platform/settings/ModulesPage.tsx'),
   },
   { path: '/sign-in', title: 'Sign in', component: SignInPage },
+  { path: SSO_SIGNING_IN_PATH, title: 'Signing you in', component: SsoSigningInPage },
+  { path: SSO_FAILED_PATH, title: 'Single sign-on did not work', component: SsoFailedPage },
   { path: '/sign-up', title: 'Create your account', component: SignUpPage },
   { path: '/sign-up/check-email', title: 'Check your email', component: CheckEmailPage },
   { path: '/sign-up/complete', title: 'Set your password', component: CompleteSignUpPage },
