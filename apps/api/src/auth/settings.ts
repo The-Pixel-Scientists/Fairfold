@@ -38,8 +38,11 @@ export interface AuthSettings {
 const MINIMUM_SECRET_BYTES = 32;
 const MINIMUM_PASSWORD_LENGTH = 16;
 
-/** Better Auth's built-in default secret. */
-const KNOWN_DEFAULTS = new Set(['better-auth-secret-12345678901234567890']);
+/** Better Auth's built-in default secret, and the one its published test helpers use. */
+const KNOWN_DEFAULTS = new Set([
+  'better-auth-secret-12345678901234567890',
+  'better-auth-secret-that-is-long-enough-for-validation-test',
+]);
 
 /** The fixed development values in infra/compose/compose.dev.yaml all end like this. */
 const DEVELOPMENT_VALUE = /not-a-secret$/;

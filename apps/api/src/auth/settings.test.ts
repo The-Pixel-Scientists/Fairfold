@@ -61,8 +61,10 @@ describe('loadAuthSettings', () => {
     ]);
   });
 
-  it("refuses Better Auth's default secret, even in development", () => {
-    const secret = 'better-auth-secret-12345678901234567890';
+  it.each([
+    'better-auth-secret-12345678901234567890',
+    'better-auth-secret-that-is-long-enough-for-validation-test',
+  ])("refuses Better Auth's published secret %s, even in development", (secret) => {
     for (const env of [valid, { ...valid, TPS_DEV: '1' }]) {
       expect(problems({ ...env, TPS_AUTH_SECRET: secret })).toEqual([
         'TPS_AUTH_SECRET is a published value. Set a random one of at least 32 bytes.',

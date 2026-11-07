@@ -34,7 +34,7 @@ import type { AuthModule } from '../context.ts';
 import type { Sender } from '../email/sender.ts';
 import { ApiError } from '../problems.ts';
 import { isRegisteredFromContract, registerRoutes } from '../routes/register.ts';
-import { createBetterAuth, type BetterAuth } from './better-auth.ts';
+import { createBetterAuth } from './better-auth.ts';
 import { clientTracker } from './clients.ts';
 import { copyAuthEvent, recordAuthEvent } from './events.ts';
 import { appResolver } from './hosts.ts';
@@ -76,8 +76,6 @@ export interface Auth extends AuthModule {
   ): Promise<Invitation>;
   /** Revoke a member's sessions active in their tenant, in the change's transaction (memberships.ts). */
   revokeSessionsForMembership(trx: Transaction<unknown>, change: MembershipChange): Promise<number>;
-  /** Better Auth's server API and context. */
-  readonly betterAuth: BetterAuth;
   /** Waits for work after responses, such as sign-up emails, then closes the module's database pools. */
   close(): Promise<void>;
 }
@@ -269,7 +267,6 @@ export function createAuth(settings: AuthSettings, deps: AuthDependencies): Auth
   return {
     plugin,
     readSession,
-    betterAuth,
     createInvitation: (trx, actor, input) => createInvitation(invitations, trx, actor, input),
     revokeSessionsForMembership: (trx, change) =>
       revokeSessionsForMembership({ api, auth, log: deps.log }, trx, change),
