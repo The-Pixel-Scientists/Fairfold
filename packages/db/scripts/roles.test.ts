@@ -55,6 +55,9 @@ describe('the backup role', () => {
       'packages/db/scripts/roles.ts',
       'packages/db/scripts/roles.test.ts',
       'packages/db/scripts/roles.db.test.ts',
+      // Database tests that check the role's grants on purpose.
+      'packages/db/test/app-schema.test.ts',
+      'packages/db/test/privilege-lint.test.ts',
     ]);
     const names = new RegExp(`${BACKUP_ROLE}|${passwordVariable(BACKUP_ROLE)}`, 'i');
     const naming = ['apps', 'modules', 'packages']
