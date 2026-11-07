@@ -7,8 +7,9 @@
 // plain message and nothing written. It prints the tenant's id and slug and
 // never a token or a link.
 //
-// The tenant is made, then its event is recorded, then the invitation is
-// sent, each in its own transaction as app_worker. If the email cannot be
+// The tenant is made, then its event and tool switches are recorded as
+// app_operator, then the invitation is sent as app_worker, each in its own
+// transaction. If the email cannot be
 // sent, the tenant and its event stay, and the command says that the first
 // administrator has not been invited.
 
@@ -140,7 +141,7 @@ export async function runCreateTenant(
     }
     output.out(`Created tenant ${slug} (${tenant.id}).`);
     try {
-      await tenant.inTenant(async (trx) => {
+      await tenant.asOperator(async (trx) => {
         await recordAudit(
           trx,
           { kind: 'operator', requestId },

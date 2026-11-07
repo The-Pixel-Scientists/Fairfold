@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
 // The operator switches tools on (ADR 0024), for `--modules` on tenant:create
-// and the grants backfill. Runs in a tenant's transaction as app_worker, so
-// the tenant is the one set and the database holds each row to it, to the
-// operator author (migration 0039). A tool that already has a row, on or
+// and the grants backfill. Runs in a tenant's transaction as app_operator,
+// so the tenant is the one set and the database holds each row to it, to the
+// operator author (migrations 0039 and 0040). A tool that already has a row, on or
 // off, is left alone; a missing row means off. Each row added writes its configuration version
 // (rule 10) and a switched_on or switched_off event (rule 4).
 

@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
 // `--modules` and the grants backfill against the test database, as
-// app_worker: rows, configuration versions and events written together, an
+// app_worker set to app_operator: rows, configuration versions and events written together, an
 // explicit off left alone, a second run writing nothing, and one tenant's
 // transaction unable to touch another's.
 
 import { randomUUID } from 'node:crypto';
 
-import { createDatabase, withTenant, type TenantId } from '@pixel-scientists/db';
+import { createDatabase, withOperator, type TenantId } from '@pixel-scientists/db';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import { connectionSettings } from '../../../../packages/db/test/connect.ts';
@@ -175,12 +175,12 @@ describe('grants backfill', { timeout: 120_000 }, () => {
   it("writes only the set tenant's rows, and sees no other tenant's", async () => {
     const a = await createTestTenant();
     const b = await createTestTenant();
-    await withTenant(worker, a.id as TenantId, (trx) =>
+    await withOperator(worker, a.id as TenantId, (trx) =>
       switchModulesOn(trx, randomUUID(), ['grants']),
     );
     expect(await modulesOf(b.id)).toEqual([]);
 
-    const seen = await withTenant(worker, b.id as TenantId, async (trx) => {
+    const seen = await withOperator(worker, b.id as TenantId, async (trx) => {
       const { rows } = await trx
         .$extendTables<{ 'app.tenant_module': { module: string } }>()
         .selectFrom('app.tenant_module')

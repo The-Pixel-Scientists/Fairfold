@@ -3,8 +3,8 @@
 // The one-off grants backfill (ADR 0024). No tool is on without a row, so
 // every tenant that exists before the policy changes needs a grants row.
 // This adds an enabled one where a tenant has none; an explicit off stays
-// off. Each tenant is set in turn as app_worker, so a run writes only
-// through the tenant the helper sets. A second run writes nothing. It
+// off. Each tenant is set in turn and the rows are added as app_operator,
+// so a run writes only through the tenant the helper sets. A second run writes nothing. It
 // prints counts only, never a tenant's name or slug.
 //
 // Deploy order: migrate, run this backfill, then roll out the API with the
@@ -12,7 +12,7 @@
 
 import { randomUUID } from 'node:crypto';
 
-import { createDatabase } from '@pixel-scientists/db';
+import { asOperator, createDatabase } from '@pixel-scientists/db';
 import { forEachTenant } from '@pixel-scientists/db/jobs';
 
 import { ConfigError } from '../config.ts';
@@ -56,10 +56,13 @@ export async function runBackfillGrants(
   let tenants = 0;
   let switched = 0;
   try {
-    await forEachTenant(worker, async (trx) => {
-      tenants += 1;
-      switched += await switchModulesOn(trx, requestId, ['grants']);
-    });
+    await forEachTenant(
+      worker,
+      asOperator(async (trx) => {
+        tenants += 1;
+        switched += await switchModulesOn(trx, requestId, ['grants']);
+      }),
+    );
   } catch {
     output.err(
       `The backfill stopped after ${tenants} tenants and ${switched} grants rows. ` +
