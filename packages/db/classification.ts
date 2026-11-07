@@ -9,10 +9,15 @@
 // names a column that does not exist, or a path is missing or broken.
 
 import { app, appSubjects } from './classification/app.ts';
+import { assure } from './classification/assure.ts';
 import { auth, authSubjects } from './classification/auth.ts';
+import { crm } from './classification/crm.ts';
+import { forms } from './classification/forms.ts';
 import { grants, grantsSubjects } from './classification/grants.ts';
+import { insight } from './classification/insight.ts';
 import { party, partySubjects } from './classification/party.ts';
 import { pgboss } from './classification/pgboss.ts';
+import { privacy } from './classification/privacy.ts';
 
 /** How sensitive a field's values are, from least to most. */
 export const SENSITIVITIES = ['public', 'internal', 'personal', 'special_category'] as const;
@@ -121,6 +126,11 @@ export const classification: ClassificationRegistry = mergeSchemaMaps({
   party,
   grants,
   pgboss,
+  crm,
+  assure,
+  forms,
+  privacy,
+  insight,
 });
 
 export const subjectPaths: SubjectPathRegistry = mergeSchemaMaps({

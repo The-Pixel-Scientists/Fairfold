@@ -274,6 +274,13 @@ describe('subject paths (ADR 0027)', () => {
     );
   });
 
+  it("refuses a column map for a table outside its file's schema", () => {
+    const field = { sensitivity: 'internal', retention: { kind: 'tenant_lifetime' } } as const;
+    expect(() => mergeSchemaMaps({ crm: {}, assure: { 'crm.contact': { id: field } } })).toThrow(
+      /^classification\/assure\.ts names crm\.contact, outside its schema\.$/,
+    );
+  });
+
   it("refuses a path for a table outside its file's schema", () => {
     expect(() =>
       mergeSchemaMaps({ app: { 'grants.application': { kind: 'party', column: 'id' } } }),
