@@ -17,6 +17,11 @@ interface ModuleState {
 
 const about: Record<SwitchableModuleId, string> = {
   grants: 'Programmes, forms, applications, reviews and decisions.',
+  crm: 'Contacts, organisations, relationships and consent.',
+  assure: 'Checks on organisations before you award a grant.',
+  forms: 'Forms you build once and use across your tools.',
+  privacy: 'Requests for personal data, erasure and retention.',
+  insight: 'Reports on your programmes and what they achieve.',
 };
 
 function ModuleList({ initial }: { initial: readonly ModuleState[] }) {

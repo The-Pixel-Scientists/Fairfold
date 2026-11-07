@@ -24,6 +24,7 @@ import { TenantLook } from './platform/settings/look.tsx';
 import { INVITATION_PATH, TEAM_PATH } from './platform/team/paths.ts';
 import { productName, titleSuffix } from './product.ts';
 import { memberRoutes } from './shell/memberRoutes.tsx';
+import { moduleRoutes } from './shell/moduleRoutes.tsx';
 import { TenantProvider, tenantSlugOf } from './tenant.ts';
 
 /**
@@ -53,6 +54,7 @@ export const tenantRoutes: readonly RouteDefinition[] = [
       title: 'Audit log',
       load: () => import('./platform/audit-log/AuditLogPage.tsx'),
     },
+    ...moduleRoutes,
     { path: DATA_PATH, title: 'Data', load: () => import('./platform/data/DataPage.tsx') },
     { path: TEAM_PATH, title: 'Team', load: () => import('./platform/team/TeamPage.tsx') },
   ]),
