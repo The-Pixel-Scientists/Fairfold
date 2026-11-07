@@ -23,12 +23,13 @@ import {
 } from '@pixel-scientists/domain/platform';
 
 import { recordAudit, recordRead, type AuditActor } from '../audit/writer.ts';
-import type {
-  PolicyContext,
-  OwnTransaction,
-  RequestAudit,
-  RequestContext,
-  RequestSession,
+import {
+  withSubjects,
+  type OwnTransaction,
+  type PolicyContext,
+  type RequestAudit,
+  type RequestContext,
+  type RequestSession,
 } from '../context.ts';
 import type { InTenant, TenantTransaction } from '../database.ts';
 import { recordConfigVersion } from '../platform/config-versions.ts';
@@ -100,10 +101,11 @@ export function checkSession(
   }
 }
 
-const auditOf = (tx: TenantTransaction, actor: AuditActor): RequestAudit => ({
-  record: (event) => recordAudit(tx, actor, event),
-  read: (entity) => recordRead(tx, actor, entity),
-});
+const auditOf = (tx: TenantTransaction, actor: AuditActor): RequestAudit =>
+  withSubjects(tx, {
+    record: (event) => recordAudit(tx, actor, event),
+    read: (entity) => recordRead(tx, actor, entity),
+  });
 
 export interface MemberRequest {
   readonly route: Extract<RouteContract, { audience: 'console' | 'portal' }>;
