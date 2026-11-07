@@ -28,9 +28,12 @@ import { createSender, type Sender } from '../email/sender.ts';
 import { createSmtpTransport } from '../email/transport.ts';
 import { createLogger } from '../logger.ts';
 import { loadOperatorSettings } from './settings.ts';
+import { createModuleRows, parseModules } from './switch-on.ts';
 import { makeTenant } from './tenant.ts';
 
-const USAGE = 'Usage: pnpm tenant:create --slug <slug> --name <name> --admin-email <address>';
+const USAGE =
+  'Usage: pnpm tenant:create --slug <slug> --name <name> --admin-email <address> [--modules <id,id>]\n' +
+  'No --modules means every tool is off, with a row saying so (ADR 0024).';
 
 export interface Output {
   out(text: string): void;
@@ -58,7 +61,7 @@ export async function runCreateTenant(
   output: Output,
   sender?: Sender,
 ): Promise<number> {
-  let values: { slug?: string; name?: string; 'admin-email'?: string };
+  let values: { slug?: string; name?: string; 'admin-email'?: string; modules?: string };
   try {
     ({ values } = parseArgs({
       args: [...argv],
@@ -66,6 +69,7 @@ export async function runCreateTenant(
         slug: { type: 'string' },
         name: { type: 'string' },
         'admin-email': { type: 'string' },
+        modules: { type: 'string' },
       },
       strict: true,
     }));
@@ -85,11 +89,18 @@ export async function runCreateTenant(
   const slug = check(slugSchema, values.slug, 'Slug');
   const name = check(tenantNameSchema, values.name, 'Name');
   const email = check(inviteSchema.shape.email, values['admin-email'], 'Admin email');
-  if (typeof slug !== 'string' || typeof name !== 'string' || typeof email !== 'string') {
+  const modules = parseModules(values.modules);
+  if (
+    typeof slug !== 'string' ||
+    typeof name !== 'string' ||
+    typeof email !== 'string' ||
+    typeof modules === 'string'
+  ) {
     for (const problems of [slug, name, email]) {
       if (typeof problems === 'string') continue;
       for (const problem of problems) output.err(problem);
     }
+    if (typeof modules === 'string') output.err(modules);
     return 2;
   }
 
@@ -129,8 +140,8 @@ export async function runCreateTenant(
     }
     output.out(`Created tenant ${slug} (${tenant.id}).`);
     try {
-      await tenant.inTenant((trx) =>
-        recordAudit(
+      await tenant.inTenant(async (trx) => {
+        await recordAudit(
           trx,
           { kind: 'operator', requestId },
           {
@@ -138,8 +149,9 @@ export async function runCreateTenant(
             entityId: tenant.id,
             changes: { 'app.tenant.slug': { after: slug }, 'app.tenant.name': { after: name } },
           },
-        ),
-      );
+        );
+        await createModuleRows(trx, requestId, modules);
+      });
       await tenant.inTenant((trx) =>
         createOperatorInvitation(
           { consoleBase, sender: mail },
