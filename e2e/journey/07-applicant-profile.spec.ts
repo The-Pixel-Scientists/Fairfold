@@ -25,7 +25,7 @@ test.describe('step 7: an applicant signs up and gets ready to apply', () => {
     const visitor = await pages.visitor();
     await visitor.goto('/northfield/');
     await visitor.getByRole('link', { name: 'Create an account' }).click();
-    await visitor.getByRole('textbox', { name: 'Email address' }).fill(email);
+    await visitor.getByRole('textbox', { name: 'Email address', exact: true }).fill(email);
     await visitor.getByRole('button', { name: 'Email me a link' }).click();
     await expect(h1(visitor, 'Check your email')).toBeVisible();
     await openEmailedLink(visitor, email, '/sign-up/complete');

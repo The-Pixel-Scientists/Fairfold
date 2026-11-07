@@ -82,7 +82,7 @@ async function applyWithFile(browser: Browser): Promise<string> {
 /** Signs in as the programme manager with the authenticator app's key, which the first run of another journey sets up. */
 async function signInAsManager(page: Page): Promise<void> {
   await page.goto('/northfield/sign-in');
-  await page.getByRole('textbox', { name: 'Email address' }).fill(EMAIL ?? '');
+  await page.getByRole('textbox', { name: 'Email address', exact: true }).fill(EMAIL ?? '');
   await page.getByLabel('Password', { exact: true }).fill(PASSWORD ?? '');
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(h1(page, 'Enter your code')).toBeVisible();

@@ -53,7 +53,7 @@ async function decisionEmails(): Promise<number> {
 /** Signs in as the programme manager, setting up the authenticator app on the first run and using its key after. Gives the last code used. */
 async function signInAsManager(page: Page): Promise<string> {
   await page.goto('/northfield/sign-in');
-  await page.getByRole('textbox', { name: 'Email address' }).fill(EMAIL ?? '');
+  await page.getByRole('textbox', { name: 'Email address', exact: true }).fill(EMAIL ?? '');
   await page.getByLabel('Password', { exact: true }).fill(PASSWORD ?? '');
   await page.getByRole('button', { name: 'Sign in' }).click();
 

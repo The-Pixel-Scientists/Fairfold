@@ -266,7 +266,7 @@ test.describe('the journey against the real API', () => {
 
   test('@api refuses a provider URL pointing at a private address', async ({ page }) => {
     await page.goto('/northfield/sign-in');
-    await page.getByRole('textbox', { name: 'Email address' }).fill(email ?? '');
+    await page.getByRole('textbox', { name: 'Email address', exact: true }).fill(email ?? '');
     await page.getByLabel('Password', { exact: true }).fill(password ?? '');
     await page.getByRole('button', { name: 'Sign in' }).click();
     await page.getByLabel('Code from your app').fill(await nextCode(key ?? '', null));

@@ -165,7 +165,9 @@ test.describe('the account security page', () => {
     await confirmItsYou(page, 'correct horse battery', '123456');
 
     await expect(section(page, 'Email address')).toContainText('Check your email.');
-    await expect(page.getByRole('heading', { level: 2, name: 'Email address' })).toBeFocused();
+    await expect(
+      page.getByRole('heading', { level: 2, name: 'Email address', exact: true }),
+    ).toBeFocused();
   });
 
   test('changes the password and clears the field', async ({ page }) => {
@@ -276,7 +278,7 @@ test.describe('@api the journey on the stack', () => {
       },
     });
     await page.goto('/northfield/sign-in');
-    await page.getByRole('textbox', { name: 'Email address' }).fill(EMAIL ?? '');
+    await page.getByRole('textbox', { name: 'Email address', exact: true }).fill(EMAIL ?? '');
     await page.getByRole('textbox', { name: 'Password', exact: true }).fill(PASSWORD ?? '');
     await page.getByRole('button', { name: 'Sign in' }).click();
     await page.getByLabel('Code from your app').fill(await nextCode(TOTP_KEY ?? '', null));

@@ -5,7 +5,8 @@
 //
 //   node packages/db/seed/manager.ts <stack console port> <env file>
 //
-// It signs in as the manager through the stack's console on 127.0.0.1, sets
+// It signs in as the manager through the stack's console on 127.0.0.1, over
+// HTTPS checked against the stack's own certificate (TPS_STACK_CERTIFICATE_FILE), sets
 // up the app, and writes TPS_E2E_MANAGER_EMAIL, TPS_E2E_MANAGER_PASSWORD and
 // TPS_E2E_MANAGER_TOTP_KEY to <env file>, readable by this user only, for
 // `docker run --env-file`. Every value is synthetic and none is kept in the
@@ -14,8 +15,8 @@
 // is the one the stack makes now. None of them is printed.
 
 import { createHmac } from 'node:crypto';
-import { writeFileSync } from 'node:fs';
-import { request } from 'node:http';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { request } from 'node:https';
 
 import { permissionsFor } from '@pixel-scientists/domain/platform';
 
@@ -77,6 +78,8 @@ interface Answer {
 /** A POST to the stack's API through its console, with the console's own Host and Origin. */
 function post(port: number, path: string, body?: object, token?: string): Promise<Answer> {
   const host = `console.localhost:${String(port)}`;
+  const file = process.env.TPS_STACK_CERTIFICATE_FILE;
+  if (file === undefined || file === '') throw new Error('Set TPS_STACK_CERTIFICATE_FILE.');
   const payload = body === undefined ? undefined : JSON.stringify(body);
   return new Promise((resolve, reject) => {
     const sent = request(
@@ -85,9 +88,11 @@ function post(port: number, path: string, body?: object, token?: string): Promis
         port,
         method: 'POST',
         path: `/api${path}`,
+        servername: 'console.localhost',
+        ca: readFileSync(file),
         headers: {
           host,
-          origin: `http://${host}`,
+          origin: `https://${host}`,
           ...(payload === undefined ? {} : { 'content-type': 'application/json' }),
           ...(token === undefined ? {} : { cookie: `${SESSION_COOKIE}=${token}` }),
         },

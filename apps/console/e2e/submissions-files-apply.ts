@@ -59,7 +59,7 @@ async function openEmailedLink(page: Page, address: string, part: string): Promi
 async function createAccount(page: Page, address: string, password: string): Promise<void> {
   await page.goto('/northfield/');
   await page.getByRole('link', { name: 'Create an account' }).click();
-  await page.getByRole('textbox', { name: 'Email address' }).fill(address);
+  await page.getByRole('textbox', { name: 'Email address', exact: true }).fill(address);
   await page.getByRole('button', { name: 'Email me a link' }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'Check your email' })).toBeVisible();
   await openEmailedLink(page, address, '/sign-up/complete');
@@ -71,7 +71,7 @@ async function createAccount(page: Page, address: string, password: string): Pro
 
 async function signIn(page: Page, address: string, password: string): Promise<void> {
   await page.goto('/northfield/sign-in');
-  await page.getByRole('textbox', { name: 'Email address' }).fill(address);
+  await page.getByRole('textbox', { name: 'Email address', exact: true }).fill(address);
   await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Sign in' }).click();
 }
