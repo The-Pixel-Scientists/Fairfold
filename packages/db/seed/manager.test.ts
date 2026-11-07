@@ -51,13 +51,12 @@ describe('envFile', () => {
 describe("the CI stack job's patterns for the manager's journeys", () => {
   const root = join(import.meta.dirname, '..', '..', '..');
   const read = (path: string): string => readFileSync(join(root, path), 'utf8');
-  const ci = read('.github/workflows/ci.yml');
+  const lines = read('.github/workflows/ci.yml')
+    .split('\n')
+    .map((text) => text.trim());
   const setting = (name: string): string => {
     const prefix = `${name}: `;
-    const line = ci
-      .split('\n')
-      .map((text) => text.trim())
-      .find((text) => text.startsWith(prefix));
+    const line = lines.find((text) => text.startsWith(prefix));
     if (line === undefined) throw new Error(`ci.yml sets no ${name}.`);
     return line.slice(prefix.length);
   };
@@ -78,13 +77,22 @@ describe("the CI stack job's patterns for the manager's journeys", () => {
     return specs.filter((spec) => spec.includes(name));
   };
 
+  // The parts of the stack job's matrix. Each runs on a stack of its own,
+  // filled with one scenario, and runs either a shard of the specs or one
+  // list of journeys.
+  const parts = lines
+    .map((text) =>
+      /^- \{ part: '([^']+)', scenario: ([a-z]+), (shard|journeys): (\S+) \}$/.exec(text),
+    )
+    .filter((found) => found !== null)
+    .map(([, part, scenario, kind, value]) => ({ part, scenario, kind, value }));
+  /** Whether ci.yml has these lines one after another, indents aside. */
+  const runsInTurn = (...expected: string[]): boolean =>
+    lines.some((_, start) => expected.every((text, index) => lines[start + index] === text));
+  const lists = ['MANAGER_JOURNEYS', 'REVIEW_JOURNEYS', 'PROGRAMME_JOURNEY'];
+
   it('pick out each spec that signs in as the manager, once, the outcome journey first', () => {
-    const runs = [
-      ...setting('MANAGER_JOURNEYS').split(' '),
-      setting('SUBMISSIONS_JOURNEY'),
-      ...setting('APPLICATIONS_JOURNEYS').split(' '),
-      setting('PROGRAMME_JOURNEY'),
-    ];
+    const runs = lists.flatMap((name) => setting(name).split(' '));
     expect(runs.map(matches)).toEqual([
       ['apps/portal/e2e/outcome-journey.spec.ts'],
       ['apps/console/e2e/form-builder-journey.spec.ts'],
@@ -98,9 +106,37 @@ describe("the CI stack job's patterns for the manager's journeys", () => {
     expect(runs.flatMap(matches).sort()).toEqual(specs.filter(signsIn).sort());
   });
 
-  it('keep every one of them out of the run of the other specs', () => {
-    expect(ci).toContain(
-      'specs --grep-invert "$SUBMISSIONS_JOURNEY|$PROGRAMME_JOURNEY|${MANAGER_JOURNEYS// /|}|${APPLICATIONS_JOURNEYS// /|}"',
+  it('run each list in one part of its own, on the scenario it needs, a file at a time', () => {
+    expect(parts.filter(({ kind }) => kind === 'journeys')).toEqual([
+      { part: 'manager journeys', scenario: 'configured', kind: 'journeys', value: lists[0] },
+      { part: 'review journeys', scenario: 'applications', kind: 'journeys', value: lists[1] },
+      { part: 'programme journey', scenario: 'base', kind: 'journeys', value: lists[2] },
+    ]);
+    expect(lines).toContain('pnpm stack seed "$SCENARIO"');
+    expect(
+      runsInTurn(
+        'for journey in ${!JOURNEYS}; do',
+        'sleep $((31 - $(date +%s) % 30))',
+        'specs --grep "$journey" --workers 1',
+        'done',
+      ),
+    ).toBe(true);
+  });
+
+  it('keep every one of them out of the shards that run the other specs', () => {
+    expect(parts.filter(({ kind }) => kind === 'shard')).toEqual(
+      ['1/3', '2/3', '3/3'].map((value, index) => ({
+        part: `specs, ${String(index + 1)} of 3`,
+        scenario: 'configured',
+        kind: 'shard',
+        value,
+      })),
     );
+    expect(
+      runsInTurn(
+        `all="${lists.map((name) => `$${name}`).join(' ')}"`,
+        'specs --shard "$SHARD" --grep-invert "${all// /|}"',
+      ),
+    ).toBe(true);
   });
 });
