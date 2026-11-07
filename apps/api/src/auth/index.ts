@@ -34,6 +34,8 @@ import type { AuthModule } from '../context.ts';
 import type { Sender } from '../email/sender.ts';
 import { ApiError } from '../problems.ts';
 import { isRegisteredFromContract, registerRoutes } from '../routes/register.ts';
+import { setOldestAuditCopyProvider } from '../telemetry/index.ts';
+import { oldestPendingCopy } from './audit-copy/oldest.ts';
 import { authenticatorRoutes } from './authenticators/routes.ts';
 import { backupCodeRoutes } from './backup-codes/routes.ts';
 import { createBetterAuth } from './better-auth.ts';
@@ -168,6 +170,7 @@ export function createAuth(settings: AuthSettings, deps: AuthDependencies): Auth
     password: settings.databasePassword.reveal(),
   });
   const betterAuth = createBetterAuth(settings, auth);
+  setOldestAuditCopyProvider(oldestPendingCopy(auth, deps.log));
 
   const resolve = appResolver(settings);
   const resolveApp = (request: FastifyRequest): App | null =>
@@ -322,6 +325,7 @@ export function createAuth(settings: AuthSettings, deps: AuthDependencies): Auth
     },
     recordBreachCheckSetting: () => recordBreachCheckSetting(auth, settings.breachCheck),
     async close() {
+      setOldestAuditCopyProvider(undefined);
       await Promise.all(running);
       await Promise.all([api.destroy(), auth.destroy()]);
     },
