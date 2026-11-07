@@ -102,6 +102,25 @@ export interface AppJobQueue {
   name: string;
 }
 
+export interface AppJobRequest {
+  completed_at: Timestamp | null;
+  expires_at: Timestamp | null;
+  failure_code: string | null;
+  field_ids: string[];
+  filters: Json;
+  id: Generated<string>;
+  kind: string;
+  output_file_id: string | null;
+  output_sensitivity: string;
+  permission: string;
+  request_id: string;
+  requested_at: Generated<Timestamp>;
+  requested_by: string;
+  status: Generated<string>;
+  tenant_id: string;
+  updated_at: Generated<Timestamp>;
+}
+
 export interface AppMembership {
   created_at: Generated<Timestamp>;
   created_by: string | null;
@@ -173,6 +192,7 @@ export interface DB {
   'app.idempotency_key': AppIdempotencyKey;
   'app.invitation': AppInvitation;
   'app.job_queue': AppJobQueue;
+  'app.job_request': AppJobRequest;
   'app.membership': AppMembership;
   'app.request_limit': AppRequestLimit;
   'app.retention_policy': AppRetentionPolicy;

@@ -49,7 +49,7 @@ beforeAll(async () => {
 }, 30_000);
 
 describe('the party schema', { timeout: 30_000 }, () => {
-  it('is owned by migrator, and only app_api may use it', async () => {
+  it('is owned by migrator, and only app_api and app_worker may use it', async () => {
     const { rows } = await withClient('app_api', (client) =>
       client.query<{ owner: string; users: string[] }>(
         `SELECT n.nspowner::regrole::text AS owner,
@@ -60,7 +60,7 @@ describe('the party schema', { timeout: 30_000 }, () => {
         [APP_ROLES],
       ),
     );
-    expect(rows).toEqual([{ owner: 'migrator', users: ['app_api'] }]);
+    expect(rows).toEqual([{ owner: 'migrator', users: ['app_api', 'app_worker'] }]);
   });
 
   it('lets no app role delete a row from any party table', async () => {

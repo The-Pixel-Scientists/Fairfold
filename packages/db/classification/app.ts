@@ -38,6 +38,10 @@ const requestLimit: FieldClassification = {
   sensitivity: 'internal',
   retention: { kind: 'fixed', days: 1, from: 'window_start' },
 };
+const jobRequest: FieldClassification = {
+  sensitivity: 'internal',
+  retention: { kind: 'fixed', days: 7, from: 'completed_at' },
+};
 const audit: FieldClassification = {
   sensitivity: 'internal',
   retention: { kind: 'tenant_policy', policy: 'audit', minimumDays: 365 },
@@ -57,6 +61,7 @@ export const notKept: ReadonlySet<string> = new Set([
   'app.idempotency_key.request_hash',
   'app.request_limit.key_hash',
   'app.audit_event.changes',
+  'app.job_request.filters',
 ]);
 
 export const app: ClassificationRegistry = {
@@ -203,12 +208,33 @@ export const app: ClassificationRegistry = {
     kind: internal,
     created_at: internal,
   },
+  // A job acting for a member (ADR 0009): kept 7 days from completion, as
+  // its output is. Its filters may name the party a subject access request
+  // is about. Its audit event keeps the id, requester and permission.
+  'app.job_request': {
+    tenant_id: jobRequest,
+    id: jobRequest,
+    kind: jobRequest,
+    requested_by: jobRequest,
+    permission: jobRequest,
+    filters: { ...jobRequest, sensitivity: 'personal' },
+    field_ids: jobRequest,
+    output_sensitivity: jobRequest,
+    request_id: jobRequest,
+    status: jobRequest,
+    failure_code: jobRequest,
+    output_file_id: jobRequest,
+    requested_at: jobRequest,
+    updated_at: jobRequest,
+    completed_at: jobRequest,
+    expires_at: jobRequest,
+  },
 };
 
 /**
  * Each table's path to the party its rows are about (ADR 0027). A file is
- * about the member who uploaded it, and an invitation about the member it
- * made, if any.
+ * about the member who uploaded it, an invitation about the member it made,
+ * if any, and a job request about the member who asked.
  */
 export const appSubjects: SubjectPathRegistry = {
   'app.membership': { kind: 'account', column: 'user_id' },
@@ -223,4 +249,5 @@ export const appSubjects: SubjectPathRegistry = {
     reason: 'A hashed client key for rate limits, with no account or tenant.',
   },
   'app.audit_event': { kind: 'party', column: 'subject_party_id' },
+  'app.job_request': { kind: 'join', column: 'requested_by', table: 'app.membership' },
 };

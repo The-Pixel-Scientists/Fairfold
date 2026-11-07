@@ -56,7 +56,7 @@ function resolved(change: Row): Row {
 }
 
 describe('the grants schema', { timeout: 30_000 }, () => {
-  it('is owned by migrator, and only app_api may use it', async () => {
+  it('is owned by migrator, and only app_api and app_worker may use it', async () => {
     const { rows } = await withClient('app_api', (client) =>
       client.query<{ owner: string; users: string[] }>(
         `SELECT n.nspowner::regrole::text AS owner,
@@ -67,7 +67,7 @@ describe('the grants schema', { timeout: 30_000 }, () => {
         [APP_ROLES],
       ),
     );
-    expect(rows).toEqual([{ owner: 'migrator', users: ['app_api'] }]);
+    expect(rows).toEqual([{ owner: 'migrator', users: ['app_api', 'app_worker'] }]);
   });
 
   it('lets app_api alone delete, and only stages and criteria; the rest have a restrictive false policy', async () => {
