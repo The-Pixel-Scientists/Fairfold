@@ -2,13 +2,15 @@
 //
 // Auth events (ADR 0010, "Audit"). recordAuthEvent() writes the event to
 // auth.audit_event, as app_auth, in the transaction of the change it
-// records, with a pending-copy row when the event has a user and a tenant.
+// records, with a pending-copy row when a copy is due (copyIsDue()).
 // After that transaction commits, copyAuthEvent() copies it to the tenant's
 // own audit log as `platform.auth.<code>`, as app_api with the tenant of the
 // acting or new session, if the user holds a membership there. The copy is
 // keyed by the auth event's id, so a retry cannot duplicate it. A copy that
 // fails, or an event with no session to take the tenant from (a failed
-// sign-in), leaves its pending row for the replay command (deferred, D2).
+// sign-in), leaves its pending row for the replay command (audit-copy/),
+// which writes the copy through the same writeAuthCopy(). The replay's own
+// audit_copy_replayed event has no user: its copy names the operator.
 //
 // No password, token, code or cookie is ever a detail of an event.
 
@@ -30,11 +32,22 @@ export interface AuthEventDetails {
   readonly ip?: string;
   /** Why, as a code such as `bad_password`. */
   readonly reason?: string;
+  /** For `audit_copy_replayed`, the auth event whose copy was written. */
+  readonly replayedEventId?: string;
 }
 
 export interface AuthEvent extends AuthEventDetails {
   readonly id: string;
   readonly code: AuthEventCode;
+}
+
+/**
+ * Whether an event is copied to its tenant's audit log: one with a tenant
+ * and a user, or the replay's own event, which names the operator.
+ */
+export function copyIsDue(event: Pick<AuthEvent, 'code' | 'tenant' | 'userId'>): boolean {
+  if (event.tenant === undefined) return false;
+  return event.userId !== undefined || event.code === 'audit_copy_replayed';
 }
 
 /** Write an event in the change's transaction, which must be as app_auth. */
@@ -54,10 +67,11 @@ export async function recordAuthEvent(
       tenant_id: details.tenant ?? null,
       identifier: details.identifier ?? null,
       ip_address: details.ip ?? null,
+      replayed_event_id: details.replayedEventId ?? null,
     })
     .returning('id')
     .executeTakeFirstOrThrow();
-  if (details.userId !== undefined && details.tenant !== undefined) {
+  if (copyIsDue({ code, ...details })) {
     await db.insertInto('auth.audit_copy_pending').values({ auth_event_id: id }).execute();
   }
   return { ...details, id, code };
@@ -77,6 +91,70 @@ function isDuplicateCopy(error: unknown): boolean {
   return code === '23505' && constraint === 'audit_event_auth_copy_once';
 }
 
+/** What writeAuthCopy() found: a copy written, one already there, or none due. */
+export type CopyOutcome = 'copied' | 'exists' | 'none';
+
+/**
+ * Write a committed event's copy in `tenant`, as app_api, if `tenant` is the
+ * event's and its user holds a membership there. The one copy function, for
+ * the live path and the replay. Throws on any error but the duplicate.
+ */
+export async function writeAuthCopy(
+  api: Kysely<unknown>,
+  event: AuthEvent,
+  tenant: TenantId,
+): Promise<CopyOutcome> {
+  const { userId } = event;
+  if (event.tenant !== tenant) return 'none';
+  try {
+    if (event.code === 'audit_copy_replayed') return await writeReplayCopy(api, event, tenant);
+    if (userId === undefined) return 'none';
+    return await withTenant(api, tenant, async (tx) => {
+      const member = await tx
+        .$extendTables<TenantTables>()
+        .selectFrom('app.membership')
+        .select('id')
+        .where('user_id', '=', userId)
+        .executeTakeFirst();
+      if (member === undefined) return 'none';
+      await recordAudit(
+        tx,
+        { kind: 'user', membershipId: member.id, requestId: event.requestId },
+        { action: `platform.auth.${event.code}`, entityId: event.id },
+      );
+      return 'copied';
+    });
+  } catch (error) {
+    if (isDuplicateCopy(error)) return 'exists';
+    throw error;
+  }
+}
+
+/**
+ * The copy of an audit_copy_replayed event: by the operator, keyed by its
+ * own id as every copy is, with the replayed event's id as its change.
+ */
+async function writeReplayCopy(
+  api: Kysely<unknown>,
+  event: AuthEvent,
+  tenant: TenantId,
+): Promise<CopyOutcome> {
+  const { replayedEventId } = event;
+  if (replayedEventId === undefined) return 'none';
+  await withTenant(api, tenant, (tx) =>
+    recordAudit(
+      tx,
+      { kind: 'operator', requestId: event.requestId },
+      {
+        action: 'platform.auth.audit_copy_replayed',
+        entityId: event.id,
+        changes: { 'auth.audit_event.replayed_event_id': { after: replayedEventId } },
+      },
+    ),
+  );
+  return 'copied';
+}
+
 /**
  * Copy a committed event to its tenant's audit log, given the tenant of the
  * acting or new session, which must be the event's. Never throws.
@@ -86,27 +164,9 @@ export async function copyAuthEvent(
   event: AuthEvent,
   tenant: TenantId | undefined,
 ): Promise<void> {
-  const { userId } = event;
-  if (tenant === undefined || userId === undefined || event.tenant !== tenant) return;
+  if (tenant === undefined || event.userId === undefined || event.tenant !== tenant) return;
   try {
-    try {
-      await withTenant(deps.api, tenant, async (tx) => {
-        const member = await tx
-          .$extendTables<TenantTables>()
-          .selectFrom('app.membership')
-          .select('id')
-          .where('user_id', '=', userId)
-          .executeTakeFirst();
-        if (member === undefined) return;
-        await recordAudit(
-          tx,
-          { kind: 'user', membershipId: member.id, requestId: event.requestId },
-          { action: `platform.auth.${event.code}`, entityId: event.id },
-        );
-      });
-    } catch (error) {
-      if (!isDuplicateCopy(error)) throw error;
-    }
+    await writeAuthCopy(deps.api, event, tenant);
     await deps.auth
       .$extendTables<AuthTables>()
       .deleteFrom('auth.audit_copy_pending')
