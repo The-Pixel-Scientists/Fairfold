@@ -1,25 +1,50 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
 # `pnpm stack` (ADR 0005): PostgreSQL, a one-off migrate job, and the release
-# images of the API, console and portal, run as a self-hosted install runs
-# them, with Mailpit to catch the email. Start it with `pnpm stack`, which
-# sets the project name, the ports, the secrets and the web network for this
-# worktree (scripts/stack.ts).
+# images of the API, console and portal behind the reverse proxy (ADR 0030),
+# run as a self-hosted install runs them, with Mailpit to catch the email.
+# Start it with `pnpm stack`, which sets the project name, the ports, the
+# secrets, the proxy's certificate and the web network for this worktree
+# (scripts/stack.ts).
 #
 # Every secret is random, and Compose copies each one only into the
 # containers that use it, as a file under /run/secrets. The migrator and
-# superuser passwords reach the migrate job alone, and the storage admin key
-# the bucket job alone. Nothing here sets TPS_DEV, so the API refuses
-# development values.
+# superuser passwords reach the migrate job alone, the storage admin key the
+# bucket job alone, and the certificate and its key the proxy alone. Nothing
+# here sets TPS_DEV, so the API refuses development values.
 #
-# Networks: PostgreSQL and the migrate job sit on `database`, which has no
-# way out. The console and portal forward /api/ to the API over `web`, which
-# has no way out either and holds only those three, so the API trusts the
-# forwarding headers of `web`'s addresses alone. stack.ts makes `web` before
-# Compose starts, to learn its addresses. SeaweedFS, the bucket job and the
-# API share `files`, and ClamAV and the API share `scan`. Neither has a way
-# out, and ClamAV, which parses hostile files, cannot reach SeaweedFS. Only
-# the API, console and portal publish ports, on 127.0.0.1.
+# Networks:
+# - `apps`: the proxy alone. It is the only service that publishes ports
+#   for the apps, on 127.0.0.1: HTTPS for each app and plain HTTP, which
+#   only redirects.
+# - `sites`: the proxy, console and portal, with no way out. The proxy sends
+#   everything but /api/ to the app's web server; the web servers cannot
+#   reach the API, so their own /api/ forwarding (ADR 0022) is off.
+# - `web`: the proxy and the API, with no way out. /api/ goes straight to
+#   the API, which trusts the forwarding headers of `web`'s addresses alone.
+#   stack.ts makes `web` before Compose starts, to learn its addresses.
+#   /health, /health/ready and /openapi.json never pass the proxy; health
+#   checks call them inside the API's container.
+# - `database`: PostgreSQL, the migrate job, the API and the worker, with no
+#   way out. `files`: SeaweedFS, the bucket job, the API and the worker.
+#   `scan`: ClamAV, the API and the worker. Neither has a way out, and
+#   ClamAV, which parses hostile files, cannot reach SeaweedFS.
+# - `api`: the API alone, with a way out, for the breached-password check
+#   and Mailpit's inbox port (Mailpit shares the API's network namespace).
+#
+# Outbound requests (ADR 0010): the worker has no way out at all. The API's
+# way out is not yet limited to public addresses on 443: that needs a guard
+# container holding NET_ADMIN that installs nftables rules, an image this
+# stack does not have yet. Until it does, metadata addresses and private
+# ranges beyond the named networks are refused only by the API's pinned
+# outbound client, which checks every address it connects to.
+#
+# Self-hosted installs (decided, for S12-37 and S12-83 to build on): this
+# file stays the development stack, with Mailpit, the seed tunnel and fixed
+# localhost names. Self-hosters get a separate Compose file, made in a
+# follow-up, with no development services or defaults: every setting is
+# required with ${VAR:?}, every secret comes from a file the cli generates,
+# and the proxy's certificate is the operator's, with HSTS on.
 
 # No container can gain privileges. Those without secrets also run
 # read-only: Compose cannot copy a secret into a read-only container.
@@ -66,8 +91,9 @@ x-web-healthcheck: &web-healthcheck
 
 x-web: &web
   <<: [*hardening, *read-only]
-  # The image forwards /api/ to http://api:3000, which `web` resolves.
-  networks: [apps, web]
+  # The image forwards /api/ to http://api:3000, which `sites` does not
+  # resolve: behind the proxy, /api/ never reaches the web servers.
+  networks: [sites]
   healthcheck: *web-healthcheck
 
 services:
@@ -130,16 +156,21 @@ services:
       <<: [*database, *storage]
       TPS_API_HOST: 0.0.0.0
       TPS_API_PORT: '3000'
-      # The console and portal containers, and nothing else (see Networks).
-      # Empty, which the API refuses, unless stack.ts found `web`.
+      # The proxy, the only other container on `web` (see Networks). Empty,
+      # which the API refuses, unless stack.ts found `web`.
       TPS_API_TRUST_PROXY: ${TPS_STACK_WEB_SUBNETS:-}
-      TPS_CONSOLE_ORIGIN: http://console.localhost:${TPS_STACK_CONSOLE_PORT:?Run pnpm stack}
-      TPS_PORTAL_ORIGIN: http://portal.localhost:${TPS_STACK_PORTAL_PORT:?Run pnpm stack}
+      TPS_CONSOLE_ORIGIN: https://console.localhost:${TPS_STACK_CONSOLE_PORT:?Run pnpm stack}
+      TPS_PORTAL_ORIGIN: https://portal.localhost:${TPS_STACK_PORTAL_PORT:?Run pnpm stack}
       # Compose's internal network, which no other machine can reach.
       TPS_DB_TLS: disable
       TPS_DB_APP_API_PASSWORD_FILE: /run/secrets/app_api_password
       TPS_DB_APP_AUTH_PASSWORD_FILE: /run/secrets/app_auth_password
       TPS_AUTH_SECRET_FILE: /run/secrets/auth_secret
+      # Hashes the request limits' counter keys (ADR 0028).
+      TPS_REQUEST_LIMIT_KEY_FILE: /run/secrets/request_limit_key
+      # Wraps each subject's data key (ADR 0027), for the erasure work.
+      TPS_SUBJECT_KEK_FILE: /run/secrets/subject_kek
+      TPS_SUBJECT_KEK_VERSION: '1'
       # Mailpit shares this container's network, so mail never leaves it.
       TPS_SMTP_HOST: 127.0.0.1
       TPS_SMTP_PORT: '1025'
@@ -159,11 +190,12 @@ services:
       - { source: app_api_password, <<: *node-secret }
       - { source: app_auth_password, <<: *node-secret }
       - { source: auth_secret, <<: *node-secret }
+      - { source: request_limit_key, <<: *node-secret }
+      - { source: subject_kek, <<: *node-secret }
       - { source: storage_write_secret_key, <<: *node-secret }
       - { source: storage_read_secret_key, <<: *node-secret }
     networks: [database, web, api, files, scan]
     ports:
-      - 127.0.0.1:${TPS_STACK_API_PORT:?Run pnpm stack}:3000
       # Mailpit's inbox, published here because Mailpit uses this network.
       - 127.0.0.1:${TPS_STACK_MAIL_PORT:?Run pnpm stack}:8025
     healthcheck:
@@ -276,8 +308,6 @@ services:
       context: ../..
       dockerfile: infra/docker/web.Dockerfile
       args: { APP: console }
-    ports:
-      - 127.0.0.1:${TPS_STACK_CONSOLE_PORT:?Run pnpm stack}:8080
 
   portal:
     <<: *web
@@ -285,8 +315,82 @@ services:
       context: ../..
       dockerfile: infra/docker/web.Dockerfile
       args: { APP: portal }
+
+  # The reverse proxy (ADR 0030; infra/proxy/). It runs as the image's nginx
+  # user on ports above 1024, writing only to its tmpfs. It holds the
+  # certificate, so it is not read-only (see x-read-only). Both apps' HTTPS
+  # ports reach its one TLS listener, which tells them apart by host name.
+  # The stack's certificate is its own, so it sends no HSTS: a browser never
+  # pins a .localhost host.
+  proxy:
+    build:
+      context: ../proxy
+    <<: *hardening
+    tmpfs:
+      - /tmp:size=16m,uid=101,gid=101,mode=0700
+      - /etc/nginx/conf.d:size=1m,uid=101,gid=101,mode=0700
+    environment:
+      NGINX_ENVSUBST_TEMPLATE_DIR: /etc/nginx/proxy/templates
+      NGINX_ENVSUBST_FILTER: ^TPS_PROXY_
+      TPS_PROXY_CONSOLE_HOST: console.localhost
+      TPS_PROXY_PORTAL_HOST: portal.localhost
+      TPS_PROXY_CONSOLE_PORT: ${TPS_STACK_CONSOLE_PORT:?Run pnpm stack}
+      TPS_PROXY_PORTAL_PORT: ${TPS_STACK_PORTAL_PORT:?Run pnpm stack}
+      TPS_PROXY_HSTS: ''
+    secrets:
+      - { source: proxy_certificate, uid: '101', gid: '101', mode: 0400 }
+      - { source: proxy_key, uid: '101', gid: '101', mode: 0400 }
+    networks: [apps, sites, web]
     ports:
-      - 127.0.0.1:${TPS_STACK_PORTAL_PORT:?Run pnpm stack}:8080
+      - 127.0.0.1:${TPS_STACK_HTTP_PORT:?Run pnpm stack}:8080
+      - 127.0.0.1:${TPS_STACK_CONSOLE_PORT:?Run pnpm stack}:8443
+      - 127.0.0.1:${TPS_STACK_PORTAL_PORT:?Run pnpm stack}:8443
+    healthcheck:
+      test: [CMD, curl, --silent, --fail, --output, /dev/null, http://127.0.0.1:8081/]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+    depends_on:
+      api:
+        condition: service_healthy
+      console:
+        condition: service_healthy
+      portal:
+        condition: service_healthy
+
+  # Background jobs (ADR 0009), from the API's image as app_worker, with
+  # pg-boss's own role. No published port, no route to `web`, and no way
+  # out. It sits behind the `worker` profile until the worker entry point
+  # lands, so `pnpm stack` does not start it. Its storage keys come with the
+  # jobs that use them (ADR 0030: the scanner and removal keys).
+  worker:
+    build: *api-build
+    <<: *hardening
+    profiles: [worker]
+    command: [node, apps/api/src/worker.ts]
+    environment:
+      <<: [*database, *storage]
+      # Compose's internal network, which no other machine can reach.
+      TPS_DB_TLS: disable
+      TPS_DB_APP_WORKER_PASSWORD_FILE: /run/secrets/app_worker_password
+      TPS_DB_APP_QUEUE_PASSWORD_FILE: /run/secrets/app_queue_password
+      TPS_SUBJECT_KEK_FILE: /run/secrets/subject_kek
+      TPS_SUBJECT_KEK_VERSION: '1'
+      TPS_CLAMD_HOST: clamav
+      TPS_CLAMD_PORT: '3310'
+      TPS_CLAMD_TIMEOUT_MS: '25000'
+    secrets:
+      - { source: app_worker_password, <<: *node-secret }
+      - { source: app_queue_password, <<: *node-secret }
+      - { source: subject_kek, <<: *node-secret }
+    networks: [database, files, scan]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      storage-bucket:
+        condition: service_completed_successfully
+      clamav:
+        condition: service_healthy
 
   # `pnpm stack seed` only: forwards a port on 127.0.0.1, which Docker
   # picks, to PostgreSQL while the seed runs on this machine, then stops.
@@ -329,6 +433,15 @@ secrets:
     environment: TPS_STACK_BACKUP_READER_PASSWORD
   auth_secret:
     environment: TPS_STACK_AUTH_SECRET
+  request_limit_key:
+    environment: TPS_STACK_REQUEST_LIMIT_KEY
+  subject_kek:
+    environment: TPS_STACK_SUBJECT_KEK
+  # Made by stack.ts for console.localhost and portal.localhost.
+  proxy_certificate:
+    environment: TPS_STACK_PROXY_CERTIFICATE
+  proxy_key:
+    environment: TPS_STACK_PROXY_KEY
   # Built by stack.ts from the generated keys.
   storage_identities:
     environment: TPS_STACK_STORAGE_IDENTITIES
@@ -352,10 +465,12 @@ networks:
     internal: true
   scan:
     internal: true
+  sites:
+    internal: true
   web:
     external: true
     name: ${TPS_STACK_WEB_NETWORK:?Run pnpm stack}
-  # Published ports: the console's and portal's, the API's, and the tunnel's.
+  # Published ports: the proxy's, Mailpit's inbox on the API's, and the tunnel's.
   apps:
   api:
   tunnel:

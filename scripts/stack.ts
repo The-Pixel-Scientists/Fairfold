@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
 // `pnpm stack` (ADR 0005): build the release images, then run PostgreSQL,
-// the migrations, the API, the console, the portal and Mailpit in
-// containers, as a self-hosted install runs them
+// the migrations, the API, the console, the portal, the reverse proxy and
+// Mailpit in containers, as a self-hosted install runs them
 // (infra/compose/compose.stack.yaml).
 //
 //   node scripts/stack.ts                    build, start and wait until ready
@@ -24,12 +24,25 @@
 // builds its identities and security files from them, and Compose gives the
 // API the write and read keys only, and the bucket job the admin key.
 //
-// The console and portal reach the API over a network of their own, `web`,
+// The reverse proxy (ADR 0030) is the only way in. It serves the console at
+// https://console.localhost and the portal at https://portal.localhost, each
+// on its own port, with a certificate this script makes for those two hosts
+// and keeps with the other secrets; plain HTTP on a third port only
+// redirects. The proxy reaches the API over a network of their own, `web`,
 // which this script makes before Compose starts so that it can tell the API
 // to trust the forwarding headers of that network's addresses only.
 
 import { spawnSync, type SpawnSyncReturns } from 'node:child_process';
-import { existsSync, readFileSync, rmSync } from 'node:fs';
+import {
+  createHash,
+  generateKeyPairSync,
+  randomBytes,
+  sign,
+  X509Certificate,
+  type KeyObject,
+} from 'node:crypto';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { request } from 'node:https';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
@@ -46,6 +59,8 @@ const SECRETS = [
   'TPS_STACK_APP_QUEUE_PASSWORD',
   'TPS_STACK_BACKUP_READER_PASSWORD',
   'TPS_STACK_AUTH_SECRET',
+  'TPS_STACK_REQUEST_LIMIT_KEY',
+  'TPS_STACK_SUBJECT_KEK',
   'TPS_STACK_STORAGE_ADMIN_SECRET_KEY',
   'TPS_STACK_STORAGE_WRITE_SECRET_KEY',
   'TPS_STACK_STORAGE_READ_SECRET_KEY',
@@ -138,16 +153,110 @@ export function publishedPort(output: string): string {
   return port;
 }
 
+/** The host names the proxy serves, as compose.stack.yaml names them. */
+export const STACK_HOSTS = ['console.localhost', 'portal.localhost'] as const;
+
+/** Days a stack certificate is valid for; one with less than a week left is made again. */
+const CERTIFICATE_DAYS = 365;
+const RENEW_BEFORE_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** A DER element: tag, definite length, contents. */
+function der(tag: number, ...contents: Buffer[]): Buffer {
+  const body = Buffer.concat(contents);
+  const length: number[] = [];
+  for (let rest = body.length; rest > 0; rest >>= 8) length.unshift(rest & 0xff);
+  const header = body.length < 0x80 ? [body.length] : [0x80 | length.length, ...length];
+  return Buffer.concat([Buffer.from([tag, ...header]), body]);
+}
+
+const sequence = (...contents: Buffer[]) => der(0x30, ...contents);
+const ECDSA_WITH_SHA256 = sequence(Buffer.from('06082a8648ce3d040302', 'hex'));
+
+/** UTCTime, which X.509 uses for dates before 2050. */
+function utcTime(date: Date): Buffer {
+  return der(0x17, Buffer.from(`${date.toISOString().slice(2, 19).replace(/[-:T]/g, '')}Z`));
+}
+
+/**
+ * A self-signed P-256 certificate for `hosts`, for the stack's proxy only,
+ * with the hosts as its subject alternative names and server authentication
+ * as its one use. Returns the certificate and its private key in PEM.
+ */
+export function selfSignedCertificate(
+  hosts: readonly string[],
+  now = new Date(),
+): { certificate: string; key: string } {
+  const { publicKey, privateKey } = generateKeyPairSync('ec', { namedCurve: 'P-256' });
+  const serial = randomBytes(16);
+  serial[0] = ((serial[0] ?? 0) & 0x7f) | 0x40;
+  const name = sequence(
+    der(0x31, sequence(Buffer.from('0603550403', 'hex'), der(0x0c, Buffer.from('Local stack')))),
+  );
+  const extension = (oid: string, value: Buffer) =>
+    sequence(Buffer.from(oid, 'hex'), der(0x04, value));
+  const tbs = sequence(
+    der(0xa0, der(0x02, Buffer.from([2]))),
+    der(0x02, serial),
+    ECDSA_WITH_SHA256,
+    name,
+    sequence(
+      utcTime(new Date(now.getTime() - 60 * 60 * 1000)),
+      utcTime(new Date(now.getTime() + CERTIFICATE_DAYS * 24 * 60 * 60 * 1000)),
+    ),
+    name,
+    publicKey.export({ type: 'spki', format: 'der' }),
+    der(
+      0xa3,
+      sequence(
+        extension('0603551d11', sequence(...hosts.map((host) => der(0x82, Buffer.from(host))))),
+        extension('0603551d25', sequence(Buffer.from('06082b06010505070301', 'hex'))),
+      ),
+    ),
+  );
+  const signature = sign('sha256', tbs, privateKey);
+  const certificate = sequence(tbs, ECDSA_WITH_SHA256, der(0x03, Buffer.from([0]), signature));
+  const lines = certificate.toString('base64').match(/.{1,64}/g) ?? [];
+  return {
+    certificate: `-----BEGIN CERTIFICATE-----\n${lines.join('\n')}\n-----END CERTIFICATE-----\n`,
+    key: privateKey.export({ type: 'pkcs8', format: 'pem' }),
+  };
+}
+
+/** The base64 SHA-256 of a certificate's public key, as Chromium's SPKI allowlist takes it. */
+export function publicKeyHash(certificate: string): string {
+  const key: KeyObject = new X509Certificate(certificate).publicKey;
+  return createHash('sha256')
+    .update(key.export({ type: 'spki', format: 'der' }))
+    .digest('base64');
+}
+
 const names = currentDevNames();
 const project = names.stackProject;
 const secretsFolder = join(homedir(), '.tps', 'stack', project);
 const webNetwork = `${project}_web`;
 const ports = {
-  TPS_STACK_API_PORT: String(names.ports.stackApi),
+  // The proxy's plain HTTP port, which only redirects. The API publishes no
+  // port of its own, so the stack uses that one's number.
+  TPS_STACK_HTTP_PORT: String(names.ports.stackApi),
   TPS_STACK_CONSOLE_PORT: String(names.ports.stackConsole),
   TPS_STACK_PORTAL_PORT: String(names.ports.stackPortal),
   TPS_STACK_MAIL_PORT: String(names.ports.stackMail),
 };
+
+/** Where this worktree's stack keeps the proxy's certificate. */
+export const STACK_CERTIFICATE = join(secretsFolder, 'TPS_STACK_PROXY_CERTIFICATE');
+const STACK_CERTIFICATE_KEY = join(secretsFolder, 'TPS_STACK_PROXY_KEY');
+
+/** Make the proxy's certificate and key unless a current pair is there. */
+function ensureCertificate(): void {
+  if (existsSync(STACK_CERTIFICATE) && existsSync(STACK_CERTIFICATE_KEY)) {
+    const validTo = Date.parse(new X509Certificate(readFileSync(STACK_CERTIFICATE)).validTo);
+    if (validTo - Date.now() > RENEW_BEFORE_MS) return;
+  }
+  const { certificate, key } = selfSignedCertificate(STACK_HOSTS);
+  writeFileSync(STACK_CERTIFICATE_KEY, key, { mode: 0o600 });
+  writeFileSync(STACK_CERTIFICATE, certificate, { mode: 0o600 });
+}
 
 /**
  * Read the secrets, making any that are missing. A new superuser password
@@ -168,6 +277,9 @@ function loadSecrets(): Record<string, string> {
   }
   values['TPS_STACK_STORAGE_IDENTITIES'] = storageIdentities(values);
   values['TPS_STACK_STORAGE_SECURITY'] = storageSecurity(values);
+  ensureCertificate();
+  values['TPS_STACK_PROXY_CERTIFICATE'] = readFileSync(STACK_CERTIFICATE, 'utf8');
+  values['TPS_STACK_PROXY_KEY'] = readFileSync(STACK_CERTIFICATE_KEY, 'utf8');
   return values;
 }
 
@@ -225,37 +337,57 @@ function compose(
   );
 }
 
-/** Whether `/api/` on an app's port reaches the API, which names every answer. */
-async function forwardsToApi(port: string): Promise<boolean> {
-  try {
-    const response = await fetch(`http://127.0.0.1:${port}/api/`);
-    return response.headers.has('x-request-id');
-  } catch {
-    return false;
-  }
+/**
+ * Whether `/api/` on an app's host reaches the API through the proxy, over
+ * TLS checked against the stack's own certificate. The API names every answer.
+ */
+function reachesApi(host: string, port: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const call = request(
+      {
+        host: '127.0.0.1',
+        port,
+        servername: host,
+        path: '/api/',
+        headers: { host: `${host}:${port}` },
+        ca: readFileSync(STACK_CERTIFICATE),
+        timeout: 5_000,
+      },
+      (response) => {
+        response.resume();
+        resolve(response.headers['x-request-id'] !== undefined);
+      },
+    );
+    call.on('error', () => {
+      resolve(false);
+    });
+    call.on('timeout', () => {
+      call.destroy();
+    });
+    call.end();
+  });
 }
 
 async function up(): Promise<number> {
   createWebNetwork();
-  const { status } = compose(
-    ['up', '--build', '--detach', '--wait', 'api', 'mailpit', 'console', 'portal'],
-    { secrets: loadSecrets() },
-  );
+  const { status } = compose(['up', '--build', '--detach', '--wait', 'proxy', 'mailpit'], {
+    secrets: loadSecrets(),
+  });
   if (status !== 0) return status ?? 1;
 
-  const ready = `http://127.0.0.1:${ports.TPS_STACK_API_PORT}/health/ready`;
-  const response = await fetch(ready);
-  console.log(`${ready} answered ${String(response.status)}: ${await response.text()}`);
-  const forwarding = await Promise.all(
-    [ports.TPS_STACK_CONSOLE_PORT, ports.TPS_STACK_PORTAL_PORT].map(forwardsToApi),
-  );
-  if (forwarding.includes(false)) console.error('The console or portal does not reach the API.');
-  console.log(`Console: http://console.localhost:${ports.TPS_STACK_CONSOLE_PORT}`);
-  console.log(`Portal:  http://portal.localhost:${ports.TPS_STACK_PORTAL_PORT}`);
+  const [consoleHost, portalHost] = STACK_HOSTS;
+  const reached = await Promise.all([
+    reachesApi(consoleHost, ports.TPS_STACK_CONSOLE_PORT),
+    reachesApi(portalHost, ports.TPS_STACK_PORTAL_PORT),
+  ]);
+  if (reached.includes(false)) console.error('The proxy does not reach the API.');
+  console.log(`Console: https://${consoleHost}:${ports.TPS_STACK_CONSOLE_PORT}`);
+  console.log(`Portal:  https://${portalHost}:${ports.TPS_STACK_PORTAL_PORT}`);
   console.log(`Mailpit: http://127.0.0.1:${ports.TPS_STACK_MAIL_PORT}`);
+  console.log(`The certificate for both, made for this stack: ${STACK_CERTIFICATE}`);
   console.log('Fill it with synthetic data with: pnpm stack seed');
   console.log('Stop it with: pnpm stack down');
-  return response.ok && !forwarding.includes(false) ? 0 : 1;
+  return reached.includes(false) ? 1 : 0;
 }
 
 /** Run the seed on this machine, through a tunnel to the stack's database. */

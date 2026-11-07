@@ -27,18 +27,23 @@
 // journey project runs the specs in the root e2e/ folder, which work through
 // both apps; they read the portal's address, Mailpit's and the seed password
 // file from TPS_E2E_PORTAL_URL, TPS_MAILPIT_URL and
-// TPS_SEED_PASSWORD_FILE.
+// TPS_SEED_PASSWORD_FILE. The proxy project checks the reverse proxy's
+// controls with raw requests (infra/proxy).
 //
 // Every server uses this worktree's ports (scripts/dev-names.ts), and apps
 // are opened as console.localhost and portal.localhost (ADR 0005). Their
-// /api/ goes to this worktree's `pnpm dev` API, if it is running.
+// /api/ goes to this worktree's `pnpm dev` API, if it is running. The stack
+// serves both over HTTPS through its proxy, with a certificate of its own:
+// Chromium trusts that certificate's key alone, and no other check is off.
 
+import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 import { defineConfig, devices, type Project } from '@playwright/test';
 
 import { currentDevNames } from './scripts/dev-names.ts';
+import { publicKeyHash, STACK_CERTIFICATE } from './scripts/stack.ts';
 
 const { ports, stackProject } = currentDevNames();
 const ci = Boolean(process.env['CI']);
@@ -76,13 +81,25 @@ function buildServer(app: App, port: number, outDir: string, nodeEnv: string) {
   };
 }
 
-const appURL = (app: App, port: number): string => `http://${app}.localhost:${String(port)}`;
+const scheme = stack ? 'https' : 'http';
+const appURL = (app: App, port: number): string => `${scheme}://${app}.localhost:${String(port)}`;
+
+/** Chromium's flag that trusts the stack's certificate, by its key, and nothing else. */
+const trustStack = stack
+  ? {
+      launchOptions: {
+        args: [
+          `--ignore-certificate-errors-spki-list=${publicKeyHash(readFileSync(STACK_CERTIFICATE, 'utf8'))}`,
+        ],
+      },
+    }
+  : {};
 
 function project(name: string, app: App, port: number, options: Project = {}): Project {
   return {
     name,
     testDir: `apps/${app}/e2e`,
-    use: { ...devices['Desktop Chrome'], baseURL: appURL(app, port) },
+    use: { ...devices['Desktop Chrome'], baseURL: appURL(app, port), ...trustStack },
     ...options,
   };
 }
@@ -121,6 +138,7 @@ const projects = stack
       project('csp-console', 'console', ports.stackConsole, policyChecks),
       project('csp-portal', 'portal', ports.stackPortal, policyChecks),
       project('journey', 'console', ports.stackConsole, { testDir: 'e2e' }),
+      project('proxy', 'console', ports.stackConsole, { testDir: 'infra/proxy' }),
     ]
   : [
       project('console', 'console', ports.console, { grepInvert: /@api/ }),
