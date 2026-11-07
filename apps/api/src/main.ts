@@ -15,10 +15,21 @@ import { createSender } from './email/sender.ts';
 import { createSmtpTransport } from './email/transport.ts';
 import { createLogger } from './logger.ts';
 import { composeModules } from './modules.ts';
+import {
+  loadTelemetrySettings,
+  startTelemetry,
+  type TelemetrySettings,
+} from './telemetry/index.ts';
 
 /** Both groups of settings, with every problem in either reported together. */
 function readSettings():
-  { config: Config; authSettings: AuthSettings; fileSettings: FileSettings } | undefined {
+  | {
+      config: Config;
+      authSettings: AuthSettings;
+      fileSettings: FileSettings;
+      telemetrySettings: TelemetrySettings;
+    }
+  | undefined {
   const problems: string[] = [];
   const read = <T>(load: () => T): T | undefined => {
     try {
@@ -34,11 +45,17 @@ function readSettings():
   const config = read(() => loadConfig(process.env));
   const authSettings = read(() => loadAuthSettings(process.env));
   const fileSettings = read(() => loadFileSettings(process.env));
-  if (config === undefined || authSettings === undefined || fileSettings === undefined) {
+  const telemetrySettings = read(() => loadTelemetrySettings(process.env));
+  if (
+    config === undefined ||
+    authSettings === undefined ||
+    fileSettings === undefined ||
+    telemetrySettings === undefined
+  ) {
     process.stderr.write(`${new ConfigError(problems).message}\n`);
     return undefined;
   }
-  return { config, authSettings, fileSettings };
+  return { config, authSettings, fileSettings, telemetrySettings };
 }
 
 async function main(): Promise<void> {
@@ -47,7 +64,8 @@ async function main(): Promise<void> {
     process.exitCode = 1;
     return;
   }
-  const { config, authSettings, fileSettings } = settings;
+  const { config, authSettings, fileSettings, telemetrySettings } = settings;
+  const telemetry = startTelemetry({ service: 'api', settings: telemetrySettings });
 
   const logger = createLogger({ level: config.logLevel });
   const database = openDatabase(config.database, logger);
@@ -60,12 +78,14 @@ async function main(): Promise<void> {
   } catch (error) {
     if (error instanceof ConfigError) process.stderr.write(`${error.message}\n`);
     else logger.fatal({ err: error }, 'The auth module could not be created');
+    await telemetry.shutdown();
     await database.close();
     process.exitCode = 1;
     return;
   }
-  // Closed in order: the pools of the auth module, then the API's.
+  // Closed in order: telemetry, the pools of the auth module, then the API's.
   const closeAll = async (): Promise<void> => {
+    await telemetry.shutdown();
     await auth.close();
     await database.close();
   };
@@ -84,6 +104,7 @@ async function main(): Promise<void> {
         mail: { sender, portalOrigin: authSettings.origins.portal },
       }),
       trustProxy: config.trustProxy,
+      telemetry,
     });
   } catch (error) {
     // A route that cannot be served safely stops the API here, naming the route.

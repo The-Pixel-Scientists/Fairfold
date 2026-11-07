@@ -27,6 +27,7 @@ import {
   type Route,
 } from './routes/register.ts';
 import { createServer } from './server.ts';
+import { registerTelemetry, type Telemetry } from './telemetry/index.ts';
 
 export interface AppOptions {
   logger: FastifyBaseLogger;
@@ -46,6 +47,8 @@ export interface AppOptions {
   resolvers?: ScopeResolvers;
   /** Addresses or ranges of the reverse proxies to trust. None by default. */
   trustProxy?: readonly string[];
+  /** Traces and request metrics. Without it, or while it is off, nothing is recorded. */
+  telemetry?: Telemetry;
 }
 
 const noDatabase: InTenant = () =>
@@ -73,6 +76,8 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
       throw new Error(`${methods.join(', ')} ${route.url} has no route contract.`);
     }
   });
+
+  if (options.telemetry !== undefined) registerTelemetry(app, options.telemetry);
 
   await app.register(swagger, {
     openapi: {
