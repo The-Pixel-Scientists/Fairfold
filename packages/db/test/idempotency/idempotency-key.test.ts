@@ -64,8 +64,8 @@ describe('app.idempotency_key', { timeout: 30_000 }, () => {
     ['refuses a route in capitals', { route_id: 'POST /console/Programmes' }, '23514'],
     ['refuses a trailing slash', { route_id: 'POST /console/programmes/' }, '23514'],
     ['refuses a long route', { route_id: `POST /console/${'a'.repeat(200)}` }, '23514'],
-    ['accepts a version 7 key', { key: '01890a5d-ac96-774b-bcce-b302099a8057' }, 'ok'],
-    ['refuses a version 1 key', { key: '6ba7b810-9dad-11d1-80b4-00c04fd430c8' }, '23514'],
+    ['accepts a version 7 key', { key: '01890a5d-ac96-774b-bcce-b302099a8057' }, 'ok'], // gitleaks:allow
+    ['refuses a version 1 key', { key: '6ba7b810-9dad-11d1-80b4-00c04fd430c8' }, '23514'], // gitleaks:allow
     ['refuses the nil key', { key: '00000000-0000-0000-0000-000000000000' }, '23514'],
     ['refuses a short hash', { request_hash: randomBytes(31) }, '23514'],
     ['refuses an unknown state', { state: 'failed' }, '23514'],
