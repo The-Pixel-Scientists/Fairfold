@@ -370,6 +370,33 @@ describe('switching tenant', { timeout: 120_000 }, () => {
     }
   });
 
+  it('gives 404 for a membership suspended while the switch waits for the session', async () => {
+    const target = await createTestTenant();
+    const membershipId = await addMembership(target, user.userId, ['tenant_admin']);
+    await withClient('migrator', async (client) => {
+      await client.query('BEGIN');
+      await client.query('SELECT 1 FROM auth."user" WHERE id = $1 FOR UPDATE', [user.userId]);
+      const { rows } = await client.query<{ pid: number }>('SELECT pg_backend_pid() AS pid');
+      const switching = post('/auth/switch-tenant', token, { membershipId });
+      await vi.waitFor(
+        async () => {
+          const blocked = await migrator(
+            'SELECT 1 FROM pg_stat_activity WHERE $1::int = ANY(pg_blocking_pids(pid))',
+            [rows[0]?.pid],
+          );
+          expect(blocked).not.toEqual([]);
+        },
+        { timeout: 10_000 },
+      );
+      await asMigratorIn(target.id, (other) =>
+        other.query(`UPDATE app.membership SET status = 'suspended' WHERE id = $1`, [membershipId]),
+      );
+      await client.query('COMMIT');
+      expect((await switching).statusCode).toBe(404);
+    });
+    expect((await getSession(token)).statusCode).toBe(200);
+  });
+
   it('switches to another membership as a new session, still complete, and records it there', async () => {
     const response = await post('/auth/switch-tenant', token, { membershipId: ids['other'] });
     expect(response.statusCode).toBe(200);

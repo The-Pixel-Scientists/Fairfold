@@ -2,8 +2,9 @@
 //
 // Switching the active tenant (ADR 0010): to one of the user's active
 // memberships with a role in this app, as auth.session_memberships() lists
-// them for the live session, and to nothing else; any other id gets the same
-// 404. The switch is a new session with a new id, active in the new tenant.
+// them for the live session once it is locked, and to nothing else; any
+// other id gets the same 404. The switch is a new session with a new id,
+// active in the new tenant.
 // MFA belongs to the user, so a complete console session stays complete.
 
 import { sessionMemberships } from '@pixel-scientists/db';
@@ -22,17 +23,16 @@ export function switchTenantRoutes(deps: RouteDependencies): Route[] {
       const session = sessionOf(context);
       const { requestId } = context;
       const { tokenHash } = detailsOf(session);
-      const target = (await sessionMemberships(deps.api, tokenHash)).find(
-        ({ membershipId, roles }) =>
-          membershipId === input.body.membershipId && appRoles(roles, session.app).length > 0,
-      );
-      if (target === undefined) throw new ApiError(404, undefined, { reason: 'not_found' });
-
       const { ip: address, userAgent } = deps.client(requestId);
       const ip = plainAddress(address);
       const switched = await deps.auth.transaction().execute(async (trx) => {
         const current = await lockSession(trx, session.userId, tokenHash);
         if (current === undefined) return undefined;
+        const target = (await sessionMemberships(deps.api, tokenHash)).find(
+          ({ membershipId, roles }) =>
+            membershipId === input.body.membershipId && appRoles(roles, session.app).length > 0,
+        );
+        if (target === undefined) throw new ApiError(404, undefined, { reason: 'not_found' });
         return {
           token: await rotateSession(trx, current, { tenantId: target.tenantId, ip, userAgent }),
           event: await recordAuthEvent(trx, 'tenant_switched', {
