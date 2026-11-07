@@ -221,6 +221,7 @@ describe('call', () => {
 
 const attach = defineRoute({
   method: 'POST',
+  idempotent: true,
   path: '/portal/applications/:applicationId/files',
   audience: 'portal',
   module: 'grants',

@@ -60,6 +60,7 @@ const fileBytes = { 200: { raw: fileTypes } } as const;
 export const uploadAttachment = defineRoute({
   ...mine,
   method: 'POST',
+  idempotent: true,
   path: '/portal/applications/:applicationId/fields/:fieldId/files',
   summary: "Attach a file to one of a draft's file questions, scanned before it is stored",
   params: z.strictObject({ applicationId: idSchema, fieldId: fieldIdSchema }),

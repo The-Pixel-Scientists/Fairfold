@@ -67,6 +67,7 @@ export const updateProfile = defineRoute({
 export const recordConsent = defineRoute({
   ...ownPerson,
   method: 'POST',
+  idempotent: true,
   path: '/portal/profile/consents',
   summary: 'Record whether you agree to be contacted, for one purpose and channel',
   body: consentChangeSchema,
@@ -84,6 +85,7 @@ export const listMyOrganisations = defineRoute({
 export const createOrganisation = defineRoute({
   ...ownPerson,
   method: 'POST',
+  idempotent: true,
   path: '/portal/organisations',
   summary: 'Add an organisation, with you as its contact',
   body: organisationInputSchema,

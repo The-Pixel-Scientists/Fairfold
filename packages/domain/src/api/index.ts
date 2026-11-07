@@ -25,12 +25,23 @@ export {
   type UploadSignal,
 } from './call.ts';
 export { rawUploadRequestBody } from './json-schema.ts';
-export { fieldProblemSchema, ProblemError, problemSchema, type Problem } from './problem.ts';
+export {
+  fieldProblemSchema,
+  idempotencyProblems,
+  ProblemError,
+  problemSchema,
+  problemTypes,
+  type Problem,
+  type ProblemType,
+} from './problem.ts';
 export { authSessions, type AuthSession } from './access-rules.ts';
 export {
   audiences,
   checkRoute,
   defineRoute,
+  idempotencyHeadersSchema,
+  idempotencyKeyHeader,
+  idempotencyKeySchema,
   methods,
   type Audience,
   type JsonRouteContract,

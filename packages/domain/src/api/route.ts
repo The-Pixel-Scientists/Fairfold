@@ -10,12 +10,13 @@
 // the module defining it loads. Contract tests run checkRoute() over every
 // route.
 
-import type { z } from 'zod';
+import { z } from 'zod';
 
 import { fileTypes } from '../files/types.ts';
 import type { Permission, ScopeRule } from '../platform/access.ts';
 import { moduleIds, type ModuleId } from '../platform/modules.ts';
 import { accessProblems, type AuthSession } from './access-rules.ts';
+import { keysOf, schemaNodes, toJsonSchema } from './json-schema.ts';
 import {
   exportContentTypes,
   isRawBody,
@@ -39,6 +40,26 @@ export const methods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const;
 
 export type Method = (typeof methods)[number];
 
+/** The request header an idempotent route's key travels in (ADR 0028); never a body, query or path value. */
+export const idempotencyKeyHeader = 'Idempotency-Key';
+
+/**
+ * A version 4 or 7 uuid in its 36-character form, in either case, compared
+ * in lower case. Stricter than z.uuid(), which takes every version and the
+ * nil and max uuids.
+ */
+export const idempotencyKeySchema = z
+  .stringFormat(
+    'uuid',
+    /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[47][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/,
+  )
+  .toLowerCase();
+
+/** An idempotent route's request headers, for its schema and the OpenAPI document: the key, required. */
+export const idempotencyHeadersSchema = z.looseObject({
+  [idempotencyKeyHeader.toLowerCase()]: idempotencyKeySchema,
+});
+
 interface RouteBase {
   readonly method: Method;
   /** Lower case segments, with `:name` for each path parameter. */
@@ -60,6 +81,12 @@ interface RouteBase {
    * problem details.
    */
   readonly responses: Readonly<Record<number, ResponseBody>>;
+  /**
+   * On a POST: a repeat with the same `Idempotency-Key` answers the first
+   * result instead of acting again (ADR 0028). Required on a POST that
+   * answers 201, except on an auth route, which never has it.
+   */
+  readonly idempotent?: true;
 }
 
 /** A signed-in route: a permission held in the active tenant, and the records it may reach. */
@@ -121,13 +148,15 @@ export function checkRoute(route: RouteContract): string[] {
   if ((route.method === 'GET' || route.method === 'DELETE') && route.body !== undefined) {
     problems.push(`A ${route.method} route takes no body.`);
   }
-  problems.push(...accessProblems(route));
+  problems.push(...accessProblems(route), ...markerProblems(route));
 
   const pathParams = rest.filter((segment) => segment.startsWith(':')).map((s) => s.slice(1));
   problems.push(...paramProblems(pathParams, route.params));
   for (const part of ['params', 'query'] as const) {
     const schema = route[part];
-    if (schema !== undefined) problems.push(...requestProblems(route.path, part, schema));
+    if (schema !== undefined) {
+      problems.push(...requestProblems(route.path, part, schema), ...keyNameProblems(part, schema));
+    }
   }
   const { body } = route;
   if (isRawBody(body)) {
@@ -136,7 +165,7 @@ export function checkRoute(route: RouteContract): string[] {
       problems.push('Only a console or portal POST route takes a raw upload body.');
     }
   } else if (body !== undefined) {
-    problems.push(...requestProblems(route.path, 'body', body));
+    problems.push(...requestProblems(route.path, 'body', body), ...keyNameProblems('body', body));
   }
 
   const responses = Object.entries(route.responses);
@@ -152,6 +181,38 @@ export function checkRoute(route: RouteContract): string[] {
     else problems.push(...rawBodyProblems(status, body, allowed));
   }
   return problems;
+}
+
+function markerProblems(route: RouteContract): string[] {
+  const { idempotent } = route as { idempotent?: unknown };
+  const problems: string[] = [];
+  const creates = route.method === 'POST' && Object.hasOwn(route.responses, 201);
+  if (creates && route.audience !== 'auth' && idempotent !== true) {
+    problems.push('A POST that creates must be idempotent.');
+  }
+  if (idempotent === undefined) return problems;
+  if (idempotent !== true) problems.push('idempotent is true or left out.');
+  if (route.method !== 'POST') problems.push('Only a POST route is idempotent.');
+  if (route.audience === 'auth') problems.push('An auth route is never idempotent.');
+  return problems;
+}
+
+/** The idempotency key travels in its header, never in a request schema, in any spelling. */
+function keyNameProblems(part: 'params' | 'query' | 'body', schema: z.ZodType): string[] {
+  const problems = new Set<string>();
+  for (const io of ['input', 'output'] as const) {
+    const root = toJsonSchema(schema, io);
+    for (const node of root === undefined ? [] : schemaNodes(root)) {
+      for (const key of keysOf(node)) {
+        if (key.toLowerCase().replace(/[-_]/g, '').includes('idempotencykey')) {
+          problems.add(
+            `${part} names "${key}"; the key travels in the ${idempotencyKeyHeader} header.`,
+          );
+        }
+      }
+    }
+  }
+  return [...problems];
 }
 
 function isMember(audience: Audience): boolean {
