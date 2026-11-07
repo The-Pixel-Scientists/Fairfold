@@ -36,6 +36,12 @@ export const app: SchemaCatalogue = {
     ['app.apply_retention(text)', ['app_worker']],
     // The erasure job, once the party is erased (ADR 0027).
     ['app.destroy_subject_key(uuid)', ['app_worker']],
+    // A join table's triggers link and release a file (ADR 0030).
+    ['app.link_file(uuid)', ['app_api']],
+    ['app.release_file(uuid)', ['app_api']],
+    // The file sweep and file erasure (ADR 0030).
+    ['app.delete_swept_file(uuid)', ['app_worker']],
+    ['app.erase_file(uuid, uuid)', ['app_worker']],
   ],
   definerFunctions: [
     [
@@ -183,6 +189,43 @@ export const app: SchemaCatalogue = {
         ],
         // The tenant policies, TO PUBLIC, admit it; the app roles' UPDATE
         // and DELETE denials do not name it.
+        policies: [],
+      },
+    ],
+    [
+      'app.delete_swept_file(uuid)',
+      {
+        owner: 'owner_app_delete_swept_file',
+        rights: [
+          'USAGE on schema app',
+          'EXECUTE on function app.current_tenant_id()',
+          ...['tenant_id', 'id', 'scan_state', 'scanned_at', 'linked_at', 'released_at'].map(
+            (column) => `SELECT on column app.file.${column}`,
+          ),
+          'DELETE on app.file',
+        ],
+        policies: ['app.file policy sweep_delete'],
+      },
+    ],
+    [
+      'app.erase_file(uuid, uuid)',
+      {
+        owner: 'owner_app_erase_file',
+        rights: [
+          'USAGE on schema app',
+          'USAGE on schema party',
+          'EXECUTE on function app.current_tenant_id()',
+          ...['tenant_id', 'id', 'erased_at'].map(
+            (column) => `SELECT on column app.file.${column}`,
+          ),
+          'UPDATE on column app.file.erased_at',
+          ...['tenant_id', 'id', 'kind', 'permission', 'status', 'filters'].map(
+            (column) => `SELECT on column app.job_request.${column}`,
+          ),
+          ...['tenant_id', 'id', 'status'].map(
+            (column) => `SELECT on column party.party.${column}`,
+          ),
+        ],
         policies: [],
       },
     ],
