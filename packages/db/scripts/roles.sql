@@ -73,6 +73,7 @@ DECLARE
     'owner_app_purge_expired_audit',           -- S11-97
     'owner_app_apply_retention',               -- app.apply_retention(policy), S11-102
     'owner_party_erase_party',                 -- S11-106
+    'owner_party_is_erased',                   -- S11-106, party.is_erased()
     'owner_grants_clear_answer_fields',        -- S11-106
     'owner_app_destroy_subject_key',           -- S11-106, only if ADR 0027 chooses crypto-shredding
     'owner_app_reapply_erasure_ledger',        -- S11-109

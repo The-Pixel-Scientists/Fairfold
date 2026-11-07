@@ -48,6 +48,7 @@ export const OWNER_ROLES = [
   'owner_app_purge_expired_audit',
   'owner_app_apply_retention',
   'owner_party_erase_party',
+  'owner_party_is_erased',
   'owner_grants_clear_answer_fields',
   'owner_app_destroy_subject_key',
   'owner_app_reapply_erasure_ledger',
