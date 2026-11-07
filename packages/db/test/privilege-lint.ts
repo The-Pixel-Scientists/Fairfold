@@ -26,7 +26,8 @@
 //   app_queue hold rights only in their own schemas, beyond those listed in
 //   OWN_SCHEMAS (ADR 0003, "Roles").
 // - No default privileges grant anything to a role other than the objects'
-//   owner, so nothing a migration creates starts with a grant.
+//   owner, so nothing a migration creates starts with a grant, beyond
+//   BACKUP_DEFAULTS.
 // - There is no publication: logical replication ignores row-level security.
 // - On each of AUDIT_TABLES, app roles hold no right but INSERT and SELECT,
 //   and cannot insert a column the database sets (ADR 0003, "Checks").
@@ -37,7 +38,7 @@
 
 import type pg from 'pg';
 
-import { findRoleProblems } from '../scripts/roles.ts';
+import { BACKUP_ROLE, findRoleProblems } from '../scripts/roles.ts';
 import { APP_ROLES, type AppRole } from './connect.ts';
 
 /** The functions that app roles may execute, and by whom. */
@@ -188,6 +189,19 @@ export const DEFINER_FUNCTIONS: ReadonlyMap<string, DefinerFunction> = new Map([
 export const EXTENSION_SCHEMA = 'ext';
 const EXTENSION = 'pg_trgm';
 const EXTENSION_USERS = ['app_api', 'app_worker'];
+
+/**
+ * The other named exception: the database privileges script lets
+ * backup_reader read every schema, table and sequence migrator creates, so
+ * that pg_dump reads what a migration adds (roles.sql). These are the only
+ * default privileges approved, for migrator in every schema, as
+ * "<privilege> on new <objects>".
+ */
+export const BACKUP_DEFAULTS: readonly string[] = [
+  'USAGE on new schemas',
+  'SELECT on new tables',
+  'SELECT on new sequences',
+];
 
 /** The pinned search_path of every approved definer function, as pg_proc stores it. */
 const DEFINER_CONFIG = 'search_path=pg_catalog, pg_temp';
@@ -457,7 +471,7 @@ async function definerOwnerProblems(client: pg.ClientBase): Promise<string[]> {
   return problems;
 }
 
-/** Default privileges that grant anything to a role other than the objects' owner. */
+/** Default privileges that grant anything to a role other than the objects' owner, beyond BACKUP_DEFAULTS. */
 async function defaultPrivilegeProblems(client: pg.ClientBase): Promise<string[]> {
   const { rows } = await client.query<{
     owner: string;
@@ -477,11 +491,19 @@ async function defaultPrivilegeProblems(client: pg.ClientBase): Promise<string[]
       WHERE a.grantee <> d.defaclrole
       ORDER BY 1, 2, 3, 4, 5`,
   );
-  return rows.map(({ owner, schema, kind, grantee, privilege }) => {
+  const problems: string[] = [];
+  for (const { owner, schema, kind, grantee, privilege } of rows) {
+    const right = `${privilege} on new ${DEFAULT_ACL_OBJECTS[kind] ?? kind}`;
+    const backup =
+      owner === 'migrator' &&
+      schema === null &&
+      grantee === BACKUP_ROLE &&
+      BACKUP_DEFAULTS.includes(right);
+    if (backup) continue;
     const where = schema === null ? '' : ` in schema ${schema}`;
-    const objects = DEFAULT_ACL_OBJECTS[kind] ?? kind;
-    return `Default privileges for role ${owner}${where} grant ${privilege} on new ${objects} to ${grantee}.`;
-  });
+    problems.push(`Default privileges for role ${owner}${where} grant ${right} to ${grantee}.`);
+  }
+  return problems;
 }
 
 async function roleProblems(client: pg.ClientBase, excepted: readonly string[]): Promise<string[]> {

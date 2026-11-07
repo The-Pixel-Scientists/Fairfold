@@ -3,8 +3,9 @@
 // The rights checks that ADR 0003 rule 4 and its role table add to the
 // schema lint: grant options, rights outside a role's own schema, default
 // privileges, schema grants to PUBLIC, rights on the audit tables, the
-// approved definer functions and their owners, and pg_trgm's schema. The schema-lint test covers
-// the rest, and runs these against the migrated database.
+// approved definer functions and their owners, and pg_trgm's schema. The
+// schema-lint test covers the rest, and runs these against the migrated
+// database.
 
 import { describe, expect, it } from 'vitest';
 
@@ -27,6 +28,9 @@ describe('privilege lint', () => {
           GRANT SELECT ON TABLES TO app_worker;
         ALTER DEFAULT PRIVILEGES FOR ROLE migrator IN SCHEMA app
           GRANT EXECUTE ON FUNCTIONS TO PUBLIC;
+        ALTER DEFAULT PRIVILEGES FOR ROLE migrator IN SCHEMA app
+          GRANT SELECT ON TABLES TO backup_reader;
+        ALTER DEFAULT PRIVILEGES FOR ROLE migrator GRANT INSERT ON TABLES TO backup_reader;
       `);
       return findPrivilegeProblems(client, [...EXCEPTED_SCHEMAS.keys()]);
     });
@@ -40,6 +44,9 @@ describe('privilege lint', () => {
         'PUBLIC holds USAGE on schema app.',
         'Default privileges for role migrator in schema app grant SELECT on new tables to app_worker.',
         'Default privileges for role migrator in schema app grant EXECUTE on new functions to PUBLIC.',
+        // backup_reader's exception covers only its reads, in every schema.
+        'Default privileges for role migrator in schema app grant SELECT on new tables to backup_reader.',
+        'Default privileges for role migrator grant INSERT on new tables to backup_reader.',
       ].sort(),
     );
   });
@@ -96,42 +103,22 @@ describe('privilege lint', () => {
     );
   });
 
-  describe('the pg_trgm schema (ADR 0025)', () => {
-    const install = `
-      CREATE SCHEMA ext;
-      CREATE EXTENSION pg_trgm WITH SCHEMA ext;
-      GRANT USAGE ON SCHEMA ext TO app_api, app_worker;
-    `;
-
-    it('accepts pg_trgm in schema ext, its operators and EXECUTE left to PUBLIC included, used by migrator, app_api and app_worker', async () => {
-      const problems = await asMigratorRolledBack(async (client) => {
-        await client.query(install);
-        return findSchemaProblems(client, classification);
-      });
-      expect(problems).toEqual([]);
-    });
-
-    it('reports anything else in it, and any other use of it', async () => {
-      const problems = await asMigratorRolledBack(async (client) => {
-        await client.query(`${install}
-          GRANT USAGE ON SCHEMA ext TO app_auth;
-          GRANT CREATE ON SCHEMA ext TO app_worker;
-          CREATE FUNCTION ext.lint_extra() RETURNS integer LANGUAGE sql RETURN 1;
-          REVOKE EXECUTE ON FUNCTION ext.lint_extra() FROM PUBLIC;
-        `);
-        return findPrivilegeProblems(client, [...EXCEPTED_SCHEMAS.keys()]);
-      });
-      expect(problems.sort()).toEqual(
-        [
-          'function ext.lint_extra() is in schema ext but not part of pg_trgm.',
-          'app_api cannot execute ext.lint_extra().',
-          'app_worker cannot execute ext.lint_extra().',
-          'USAGE on schema ext is held by app_api, app_auth, app_worker, migrator, not app_api, app_worker, migrator.',
-          'app_worker holds CREATE on schema ext, which only its owner may.',
-          'Role app_worker can create objects in schema ext.',
-          'Role app_auth holds USAGE on schema ext, outside its own schema auth.',
-        ].sort(),
+  // The database privileges script installs pg_trgm in schema ext, which
+  // belongs to the superuser, before any migration. Only that owner can
+  // change the schema, so the checks that report anything else in it are
+  // tested as the superuser in packages/db/scripts/roles.db.test.ts.
+  it('accepts pg_trgm in schema ext as the database privileges script installs it (ADR 0025)', async () => {
+    const { extension, problems } = await asMigratorRolledBack(async (client) => {
+      const { rows } = await client.query<{ schema: string }>(
+        `SELECT extnamespace::regnamespace::text AS schema
+           FROM pg_catalog.pg_extension WHERE extname = 'pg_trgm'`,
       );
+      return {
+        extension: rows,
+        problems: await findSchemaProblems(client, classification),
+      };
     });
+    expect(extension).toEqual([{ schema: 'ext' }]);
+    expect(problems).toEqual([]);
   });
 });

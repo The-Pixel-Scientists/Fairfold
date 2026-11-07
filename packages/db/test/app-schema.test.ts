@@ -47,7 +47,7 @@ async function sqlState(work: Promise<unknown>): Promise<string | undefined> {
 }
 
 describe('the app schema', () => {
-  it('is owned by migrator, and the app roles and function owners may only use it', async () => {
+  it('is owned by migrator, and the app roles, function owners and backup_reader may only use it', async () => {
     const acl = await withClient('app_api', (client) => ownerAndGrants(client, SCHEMA_ACL));
     expect(acl).toEqual({
       owner: 'migrator',
@@ -55,6 +55,8 @@ describe('the app schema', () => {
         ...APP_ROLES.map((role) => `${role} USAGE`),
         'migrator CREATE',
         'migrator USAGE',
+        // pg_dump reads every schema (database-privileges.sql).
+        'backup_reader USAGE',
         // The functions of migration 0006 read or write tables in app.
         'owner_app_create_tenant USAGE',
         'owner_app_public_tenant USAGE',

@@ -110,12 +110,14 @@ describe('migrations', { timeout: 30_000 }, () => {
       }
 
       // With every migration rolled back, no schema is left but PostgreSQL's
-      // own, its public schema and the migration history.
+      // own, its public schema, the migration history and pg_trgm's schema
+      // ext, which the database privileges script makes before any migration
+      // (ADR 0025).
       const { rows } = await sql<{ name: string }>`
         SELECT nspname AS name FROM pg_catalog.pg_namespace
          WHERE NOT pg_catalog.starts_with(nspname, 'pg_') AND nspname <> 'information_schema'
          ORDER BY 1`.execute(trx);
-      expect(rows.map((row) => row.name)).toEqual(['migrations', 'public']);
+      expect(rows.map((row) => row.name)).toEqual(['ext', 'migrations', 'public']);
 
       for (const [index, { name, up }] of migrations.entries()) {
         if (!up) throw new Error(`Migration ${name} has no up.`);
