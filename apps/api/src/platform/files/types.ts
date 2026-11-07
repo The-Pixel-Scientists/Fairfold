@@ -37,6 +37,12 @@ export interface RequestFiles {
    * or other tenant's file is a 404. With `audit`, writes the staff download event.
    */
   send(fileId: string, options: { readonly audit: boolean }): Promise<FileReply>;
+  /**
+   * A staff member's deletion of a withheld file (ADR 0030): the file becomes
+   * infected with no hash or key, its link stays, and the sweep removes the
+   * object. Any other file is a 404. The caller checks the permission first.
+   */
+  deleteWithheld(fileId: string): Promise<void>;
 }
 
 /** What the service needs of the request it serves. */
@@ -46,6 +52,8 @@ export interface FileRequest {
   /** The acting membership: who created the file. */
   readonly membershipId: string;
   readonly audit: RequestAudit;
+  /** Runs the work once the request has committed; a failure there answers the request. */
+  afterCommit(work: () => Promise<void>): void;
 }
 
 /** The service: binds the file operations to one request. */
@@ -64,6 +72,9 @@ export type FileTables = {
     sha256: Buffer | null;
     storage_key: string | null;
     scan_state: Column<string, undefined>;
+    scan_version: number | null;
+    erased_at: Date | null;
+    updated_by: string | null;
     created_by: string;
     created_at: Column<Date, undefined>;
   };

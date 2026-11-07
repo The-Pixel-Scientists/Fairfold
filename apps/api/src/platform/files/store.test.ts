@@ -15,6 +15,7 @@ import type { FileType } from '@pixel-scientists/domain/files';
 
 import type { Verdict } from './clamd.ts';
 import type { Storage } from './storage.ts';
+import { createSlots } from './slots.ts';
 import { createStore } from './store.ts';
 import type { StoreInput } from './types.ts';
 
@@ -68,11 +69,13 @@ function setup(options: { verdict?: () => Promise<Verdict>; maxStores?: number }
     tenant: TENANT,
     membershipId: MEMBER,
     audit,
+    afterCommit: () => undefined,
   };
   const store = createStore({
     storage,
     scan: options.verdict ?? (() => Promise.resolve('clean')),
-    maxStores: options.maxStores ?? 4,
+    slots: createSlots(options.maxStores ?? 4),
+    version: () => Promise.resolve(27_850),
   });
   const input: StoreInput = {
     name: 'Accounts 2025.pdf',
@@ -152,6 +155,7 @@ describe('store', () => {
           scan_state: 'clean',
           sha256: createHash('sha256').update(pdf).digest(),
           storage_key: `clean/${TENANT}/${FILE}`,
+          scan_version: 27_850,
         },
       ],
     ]);

@@ -12,7 +12,6 @@ import { createHash } from 'node:crypto';
 import {
   fileNameMatchesType,
   fileNameSchema,
-  fileRefusalMessages,
   MAX_FILE_BYTES,
   sniffFileType,
   type FileRefusal,
@@ -20,14 +19,17 @@ import {
 
 import { ApiError } from '../../problems.ts';
 import type { Verdict } from './clamd.ts';
+import type { Slots } from './slots.ts';
 import type { Storage } from './storage.ts';
 import type { FileRequest, FileTables, StoreInput, StoreResult } from './types.ts';
 
 export interface StoreDependencies {
   readonly storage: Storage;
   readonly scan: (bytes: Uint8Array) => Promise<Verdict>;
-  /** Stores allowed at once in this process. */
-  readonly maxStores: number;
+  /** The process's scan slots, shared with rescans at download. */
+  readonly slots: Slots;
+  /** clamd's signature version now, or null if it cannot say. */
+  readonly version: () => Promise<number | null>;
 }
 
 /** What a refused scan is called to the person. */
@@ -37,8 +39,6 @@ const refusalFor: Record<Exclude<Verdict, 'clean'>, FileRefusal> = {
 };
 
 export function createStore(deps: StoreDependencies) {
-  let running = 0;
-
   return async function store(request: FileRequest, input: StoreInput): Promise<StoreResult> {
     const { bytes } = input;
     const name = fileNameSchema.safeParse(input.name);
@@ -52,14 +52,7 @@ export function createStore(deps: StoreDependencies) {
     }
     if (!fileNameMatchesType(name.data, type)) return { refusal: 'wrong_extension' };
 
-    if (running >= deps.maxStores) {
-      throw new ApiError(503, fileRefusalMessages.scanner_busy, {
-        reason: 'scanner_busy',
-        headers: { 'retry-after': '5' },
-      });
-    }
-    running++;
-    try {
+    return deps.slots.run(async () => {
       const db = request.tx.$extendTables<FileTables>();
       const { id, created_at } = await db
         .insertInto('app.file')
@@ -73,6 +66,8 @@ export function createStore(deps: StoreDependencies) {
         .returning(['id', 'created_at'])
         .executeTakeFirstOrThrow();
 
+      // Read before the scan, so a newer database that arrives meanwhile is scanned again at download.
+      const version = await deps.version();
       const verdict = await deps.scan(bytes);
       const changes = {
         'app.file.content_type': { after: type },
@@ -101,6 +96,7 @@ export function createStore(deps: StoreDependencies) {
           scan_state: 'clean',
           sha256: createHash('sha256').update(bytes).digest(),
           storage_key: key,
+          scan_version: version,
         })
         .where('id', '=', id)
         .execute();
@@ -114,8 +110,6 @@ export function createStore(deps: StoreDependencies) {
           uploadedAt: created_at.toISOString(),
         },
       };
-    } finally {
-      running--;
-    }
+    });
   };
 }

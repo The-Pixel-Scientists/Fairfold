@@ -21,7 +21,11 @@ import {
   type RawUploadBody,
   type RouteContract,
 } from '@pixel-scientists/domain/api';
-import { decodeFileNameHeader, fileNameHeader } from '@pixel-scientists/domain/files';
+import {
+  decodeFileNameHeader,
+  fileNameHeader,
+  MAX_FILE_BYTES,
+} from '@pixel-scientists/domain/files';
 import { messages, modules } from '@pixel-scientists/domain/platform';
 import type {
   FastifyInstance,
@@ -35,7 +39,7 @@ import { z } from 'zod';
 
 import type { MemberContext, RequestContext, SessionRead } from '../context.ts';
 import type { InTenant, TenantTransaction } from '../database.ts';
-import type { FileService } from '../platform/files/index.ts';
+import type { Admission, FileService, UploadGate } from '../platform/files/index.ts';
 import { ApiError, handleError, handleNotFound, PROBLEM_CONTENT_TYPE } from '../problems.ts';
 import { asMember, checkSession, type ScopeInput, type ScopeResolvers } from '../policy/index.ts';
 import { requestHash, withIdempotencyKey } from './idempotency.ts';
@@ -135,6 +139,8 @@ export interface RouteDependencies {
   resolvers: ScopeResolvers;
   /** Binds the file service to a request as `context.files`. Without it, using it fails. */
   files?: FileService;
+  /** Counts and limits raw uploads before their bodies are read. Without it, none is limited. */
+  uploads?: UploadGate;
 }
 
 const PROBLEM_STATUSES: Record<RouteContract['audience'], readonly number[]> = {
@@ -158,6 +164,7 @@ const UPLOAD_CONTENT_TYPE =
 const noFiles: FileService = () => ({
   store: () => Promise.reject(new Error('The API was built without file storage.')),
   send: () => Promise.reject(new Error('The API was built without file storage.')),
+  deleteWithheld: () => Promise.reject(new Error('The API was built without file storage.')),
 });
 
 /** Set on a route's config by registerRoutes() alone, so nothing else can pass for a contract route. */
@@ -287,6 +294,8 @@ export function registerRoutes(
   const fileNames = new WeakMap<FastifyRequest, string>();
   // The valid `Idempotency-Key` of each request to an idempotent route.
   const keys = new WeakMap<FastifyRequest, string>();
+  // The place and charge of each raw upload that passed the upload gate.
+  const admissions = new WeakMap<FastifyRequest, Admission>();
 
   // A raw upload's bytes, as a buffer: its route's limit is the body limit.
   if (routes.some((r) => isRawBody(r.contract.body))) {
@@ -316,12 +325,21 @@ export function registerRoutes(
     const name = decodeFileNameHeader(typeof header === 'string' ? header : undefined);
     if (name === null) throw new ApiError(400, FILE_NAME_DETAIL, { reason: 'bad_file_name' });
     const input: ScopeInput = { params: params?.data, query: undefined, body: undefined };
-    await asMember(
+    const membershipId = await asMember(
       deps.inTenant,
       { route: contract, context, input, resolvers: deps.resolvers },
-      () => Promise.resolve(),
+      (_tx, caller) => Promise.resolve(caller.membership.id),
     );
     fileNames.set(request, name);
+    if (deps.uploads !== undefined) {
+      const admission = await deps.uploads.admit(
+        request,
+        membershipId,
+        isRawBody(contract.body) ? contract.body.maxBytes : MAX_FILE_BYTES,
+      );
+      admissions.set(request, admission);
+      request.raw.once('close', admission.bodyRead);
+    }
   };
 
   for (const { contract, handler, bodyLimit, replay } of routes) {
@@ -379,6 +397,7 @@ export function registerRoutes(
           keys.set(request, key.data);
         }
         if (rawUpload !== undefined) {
+          admissions.get(request)?.bodyRead();
           const name = fileNames.get(request);
           if (name === undefined || !Buffer.isBuffer(request.body)) {
             done(new ApiError(415, UPLOAD_CONTENT_TYPE, { reason: 'not_octet_stream' }));
@@ -415,6 +434,9 @@ export function registerRoutes(
                 tenant: caller.session.tenant,
                 membershipId: caller.membership.id,
                 audit: caller.audit,
+                afterCommit: (work) => {
+                  caller.afterCommit(work);
+                },
               });
               const member = { ...caller, files };
               const key = keys.get(request);
@@ -432,7 +454,10 @@ export function registerRoutes(
                   status,
                 },
                 () => handler({ tx, context: member, input }),
-                (id) => replay({ tx, context: member, input, id }),
+                async (id) => {
+                  await admissions.get(request)?.refund();
+                  return replay({ tx, context: member, input, id });
+                },
               );
             },
           );

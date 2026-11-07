@@ -141,6 +141,7 @@ describe('a raw upload route with the policy satisfied', () => {
       return {
         store: () => Promise.reject(new Error('unused')),
         send: () => Promise.reject(new Error('unused')),
+        deleteWithheld: () => Promise.reject(new Error('unused')),
       };
     };
     const session = testSession({ app: 'console' });
