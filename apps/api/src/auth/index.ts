@@ -38,6 +38,7 @@ import { authenticatorRoutes } from './authenticators/routes.ts';
 import { backupCodeRoutes } from './backup-codes/routes.ts';
 import { createBetterAuth } from './better-auth.ts';
 import { clientTracker } from './clients.ts';
+import { emailChangeRoutes } from './email-change/routes.ts';
 import { copyAuthEvent, recordAuthEvent } from './events.ts';
 import { appResolver } from './hosts.ts';
 import { invitationRoutes } from './invitation-accept.ts';
@@ -215,6 +216,7 @@ export function createAuth(settings: AuthSettings, deps: AuthDependencies): Auth
     ...invitationRoutes(routeDeps),
     ...authenticatorRoutes(routeDeps, totpKey),
     passwordChangeRoute(routeDeps),
+    ...emailChangeRoutes(routeDeps),
   ];
   const users = auth.$extendTables<AuthTables>();
   const invitations = {
