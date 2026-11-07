@@ -67,6 +67,11 @@ describe('the app schema', () => {
         // The retention functions, migrations 0031 and 0032.
         'owner_app_purge_expired_audit USAGE',
         'owner_app_apply_retention USAGE',
+        // The erasure functions, migration 0033.
+        'owner_party_erase_party USAGE',
+        'owner_grants_clear_answer_fields USAGE',
+        'owner_app_destroy_subject_key USAGE',
+        'owner_party_is_erased USAGE',
       ].sort(),
     });
   });
@@ -85,7 +90,7 @@ describe('app.current_tenant_id()', () => {
     ]);
   });
 
-  it('can be executed by the app roles, migrator and the retention function owners only', async () => {
+  it('can be executed by the app roles, migrator and the retention and erasure function owners only', async () => {
     const acl = await withClient('app_api', (client) =>
       ownerAndGrants(client, FUNCTION_ACL, ['app.current_tenant_id()']),
     );
@@ -97,6 +102,11 @@ describe('app.current_tenant_id()', () => {
         // The retention functions' owners, migrations 0031 and 0032.
         'owner_app_purge_expired_audit',
         'owner_app_apply_retention',
+        // The erasure functions, migration 0033.
+        'owner_party_erase_party',
+        'owner_grants_clear_answer_fields',
+        'owner_app_destroy_subject_key',
+        'owner_party_is_erased',
       ]
         .map((role) => `${role} EXECUTE`)
         .sort(),

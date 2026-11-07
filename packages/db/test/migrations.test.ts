@@ -112,6 +112,10 @@ describe('migrations', { timeout: 30_000 }, () => {
       // and their tests leave behind. Row-level security hides those rows
       // from migrator, so TRUNCATE them too.
       await sql`TRUNCATE app.tenant_module, app.config_version`.execute(trx);
+      // And 0033's down refuses while a party is erased, which the erasure
+      // tests leave behind. Erased parties cannot be changed back, so empty
+      // the party tables and every table that refers to them.
+      await sql`TRUNCATE party.party CASCADE`.execute(trx);
       // After the loop, before[i] is the schema with the first i migrations applied.
       const before = [await snapshot(trx)];
       for (const { name, down } of [...migrations].reverse()) {

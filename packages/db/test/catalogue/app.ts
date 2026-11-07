@@ -34,6 +34,8 @@ export const app: SchemaCatalogue = {
     ['app.purge_expired_audit()', ['app_worker']],
     // Every other retention policy, per tenant (ADR 0003).
     ['app.apply_retention(text)', ['app_worker']],
+    // The erasure job, once the party is erased (ADR 0027).
+    ['app.destroy_subject_key(uuid)', ['app_worker']],
   ],
   definerFunctions: [
     [
@@ -140,6 +142,47 @@ export const app: SchemaCatalogue = {
         // No column outside the audit tables has a tenant_policy rule yet,
         // so it has no targets, and no rights on any table.
         rights: ['USAGE on schema app', 'EXECUTE on function app.current_tenant_id()'],
+        policies: [],
+      },
+    ],
+    [
+      'app.destroy_subject_key(uuid)',
+      {
+        owner: 'owner_app_destroy_subject_key',
+        // Never INSERT on occurred_at, retain_until or actor_member_kind,
+        // nor on wrapped_key: it only ever clears a key.
+        rights: [
+          'USAGE on schema app',
+          'USAGE on schema party',
+          'EXECUTE on function app.current_tenant_id()',
+          ...['tenant_id', 'id', 'status'].map(
+            (column) => `SELECT on column party.party.${column}`,
+          ),
+          ...['tenant_id', 'subject_party_id', 'id', 'destroyed_at'].map(
+            (column) => `SELECT on column app.subject_key.${column}`,
+          ),
+          ...['tenant_id', 'subject_party_id', 'destroyed_at'].map(
+            (column) => `INSERT on column app.subject_key.${column}`,
+          ),
+          ...['wrapped_key', 'destroyed_at'].map(
+            (column) => `UPDATE on column app.subject_key.${column}`,
+          ),
+          ...['tenant_id', 'policy', 'days'].map(
+            (column) => `SELECT on column app.retention_policy.${column}`,
+          ),
+          ...[
+            'tenant_id',
+            'request_id',
+            'actor_kind',
+            'action',
+            'entity_type',
+            'entity_id',
+            'subject_party_id',
+            'changes',
+          ].map((column) => `INSERT on column app.audit_event.${column}`),
+        ],
+        // The tenant policies, TO PUBLIC, admit it; the app roles' UPDATE
+        // and DELETE denials do not name it.
         policies: [],
       },
     ],

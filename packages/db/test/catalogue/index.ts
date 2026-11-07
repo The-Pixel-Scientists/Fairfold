@@ -8,7 +8,9 @@
 import type { AppRole } from '../connect.ts';
 import { app } from './app.ts';
 import { auth } from './auth.ts';
+import { grants } from './grants.ts';
 import { migrations } from './migrations.ts';
+import { party } from './party.ts';
 import { pgboss } from './pgboss.ts';
 
 export { CURRENT_TENANT_ID_DEFINITION } from './app.ts';
@@ -47,7 +49,14 @@ export interface SchemaCatalogue {
   readonly rlsExcepted?: string;
 }
 
-const SCHEMAS: Readonly<Record<string, SchemaCatalogue>> = { app, auth, pgboss, migrations };
+const SCHEMAS: Readonly<Record<string, SchemaCatalogue>> = {
+  app,
+  auth,
+  party,
+  grants,
+  pgboss,
+  migrations,
+};
 
 /** Every schema's entries for `key`, checking that each names only its own schema. */
 function merged<T>(pick: (catalogue: SchemaCatalogue) => Entries<T> | undefined): [string, T][] {

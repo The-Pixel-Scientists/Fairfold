@@ -26,6 +26,11 @@ const RELEASE_EMAIL_RIGHTS = [
     (column) => `SELECT on column party.person.${column}`,
   ),
   'SELECT on app.audit_event',
+  // The erasure job's functions (migration 0033), its only other rights there.
+  'EXECUTE on function grants.clear_answer_fields(uuid,text[])',
+  'EXECUTE on function party.erase_party(uuid,uuid)',
+  // The erased-party guards call it on the worker's writes (migration 0033).
+  'EXECUTE on function party.is_erased(uuid,uuid)',
 ];
 
 describe("app_worker's release email rights", { timeout: 60_000 }, () => {
