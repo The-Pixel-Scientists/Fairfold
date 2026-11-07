@@ -52,11 +52,14 @@ describe('recordAudit', () => {
   });
 
   it.each(['platform.tenant.deleted', 'grants.nothing.happened', 'platform.tenant'])(
-    'refuses %s, which no list defines',
+    'refuses %s, which no list defines, without repeating it',
     async (action) => {
-      await expect(
-        recordAudit(trx, user, { action: action as 'platform.tenant.created', entityId }),
-      ).rejects.toThrow(`Audit action ${action} is not in any module's list.`);
+      const refusal = recordAudit(trx, user, {
+        action: action as 'platform.tenant.created',
+        entityId,
+      });
+      await expect(refusal).rejects.toThrow(/^Audit action is not in any module's list\.$/);
+      await expect(refusal).rejects.not.toThrow(action);
       expect(insertAuditEvent).not.toHaveBeenCalled();
     },
   );

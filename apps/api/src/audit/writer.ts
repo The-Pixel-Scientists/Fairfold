@@ -33,7 +33,7 @@ export async function recordAudit<DB>(
   event: AuditEvent,
 ): Promise<void> {
   if (!isAuditAction(event.action)) {
-    throw new Error(`Audit action ${event.action} is not in any module's list.`);
+    throw new Error("Audit action is not in any module's list.");
   }
   await insertAuditEvent(trx, {
     requestId: actor.requestId,
