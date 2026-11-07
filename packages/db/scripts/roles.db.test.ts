@@ -11,6 +11,7 @@ import { randomBytes } from 'node:crypto';
 import pg from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
+import { DEFINER_FUNCTIONS } from '../test/catalogue/index.ts';
 import { findPrivilegeProblems } from '../test/privilege-lint.ts';
 import { EXCEPTED_SCHEMAS } from '../test/schema-lint.ts';
 import {
@@ -32,8 +33,13 @@ import { MAINTENANCE_DATABASE, readDatabaseName, readServer, readSetting } from 
 const env = process.env;
 const testDatabase = readDatabaseName(env, 'TPS_TEST_DB_NAME');
 
+/** The owners of the approved definer functions, from the catalogue. */
+const USED_OWNERS: ReadonlySet<string> = new Set(
+  [...DEFINER_FUNCTIONS.values()].map(({ owner }) => owner),
+);
+
 /** The owners created ahead for later tasks' functions, which own nothing yet. */
-const UNUSED_OWNERS = OWNER_ROLES.slice(5);
+const UNUSED_OWNERS: readonly string[] = OWNER_ROLES.filter((role) => !USED_OWNERS.has(role));
 
 async function connect(database: string, user?: LoginRole): Promise<pg.Client> {
   const client = new pg.Client({
@@ -230,15 +236,24 @@ describe('roles.sql', () => {
   });
 
   it('creates the owners of later functions owning nothing and holding no right anywhere', async () => {
-    const { rows } = await asSuperuser(
-      MAINTENANCE_DATABASE,
-      `SELECT r.rolname, d.deptype
-         FROM pg_catalog.pg_shdepend d
-         JOIN pg_catalog.pg_roles r ON r.oid = d.refobjid
-        WHERE d.refclassid = 'pg_catalog.pg_authid'::pg_catalog.regclass
-          AND r.rolname IN (${UNUSED_OWNERS.map((role) => `'${role}'`).join(', ')})`,
+    // Every definer owner the catalogue names is one roles.sql creates, so
+    // the used and unused owners together are exactly OWNER_ROLES.
+    const ownerRoles: readonly string[] = OWNER_ROLES;
+    expect([...USED_OWNERS].filter((owner) => !ownerRoles.includes(owner))).toEqual([]);
+    expect(USED_OWNERS.size + UNUSED_OWNERS.length).toBe(OWNER_ROLES.length);
+    expect(USED_OWNERS.has('owner_app_tenant_ids')).toBe(true);
+    expect(UNUSED_OWNERS).not.toContain('owner_app_tenant_ids');
+
+    const { rows } = await withClient(MAINTENANCE_DATABASE, (client) =>
+      client.query<{ rolname: string; deptype: string }>(
+        `SELECT r.rolname, d.deptype
+           FROM pg_catalog.pg_shdepend d
+           JOIN pg_catalog.pg_roles r ON r.oid = d.refobjid
+          WHERE d.refclassid = 'pg_catalog.pg_authid'::pg_catalog.regclass
+            AND r.rolname = ANY($1::text[])`,
+        [UNUSED_OWNERS],
+      ),
     );
-    expect(UNUSED_OWNERS).toHaveLength(20);
     expect(rows).toEqual([]);
   });
 
