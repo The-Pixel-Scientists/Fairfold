@@ -218,7 +218,7 @@ export async function lockSession(
  * Replace a locked session with a new one, with a new id and token, in
  * `trx`. Only `change` differs: its user, app and absolute end carry over,
  * so a new state never extends a session, and so does its last
- * re-authentication unless `change` says it is now.
+ * re-authentication unless `change` says it is now (true) or none (false).
  */
 export function rotateSession(
   trx: Transaction<unknown>,
@@ -226,7 +226,7 @@ export function rotateSession(
   change: {
     readonly mfa?: MfaState;
     readonly tenantId?: string;
-    readonly reauthenticated?: true;
+    readonly reauthenticated?: boolean | undefined;
     readonly ip: string;
     readonly userAgent?: string | undefined;
   },

@@ -10,8 +10,15 @@
 // with a new id and token, gives back its own charge and the sign-in's, each
 // to the device or address it was charged to, and keeps the device.
 // A wrong one is counted on the session, which is discarded at the fifth.
+// A backup code takes the same path (backup-codes/routes.ts), so its
+// failures count towards the same five.
 
-import { chargeRateLimits, refundSignIn, signInScopes } from '@pixel-scientists/db';
+import {
+  chargeRateLimits,
+  refundSignIn,
+  signInScopes,
+  type Transaction,
+} from '@pixel-scientists/db';
 import { confirmTotp, enrolTotp, verifyTotp } from '@pixel-scientists/domain/auth';
 import { productName } from '@pixel-scientists/domain/platform';
 
@@ -19,7 +26,7 @@ import type { MfaState, RequestContext, RequestSession } from '../context.ts';
 import { ApiError } from '../problems.ts';
 import { route, type Route } from '../routes/register.ts';
 import { clearedCookie } from './cookies.ts';
-import { copyAuthEvent, recordAuthEvent, type AuthEvent } from './events.ts';
+import { copyAuthEvent, recordAuthEvent, type AuthEvent, type AuthEventDetails } from './events.ts';
 import { plainAddress } from './limits.ts';
 import { countedClient, rememberDevice } from './limits/devices.ts';
 import { answerWithSession, sessionOf, type RouteDependencies } from './routes.ts';
@@ -27,6 +34,28 @@ import { detailsOf, lockSession, rotateSession } from './sessions.ts';
 import { tooMany } from './sign-up.ts';
 import type { AuthTables } from './tables.ts';
 import { newSecret, useCode, type TotpKey } from './totp.ts';
+
+/** What a right code did, in the attempt's transaction. */
+export interface Accepted {
+  readonly events: readonly AuthEvent[];
+  /** Runs once the transaction commits, with the account's address. */
+  readonly notify?: (email: string) => void;
+  /**
+   * False if the new session must not count as recently re-authenticated
+   * (a backup code, which ADR 0010 does not accept for step-up), so it
+   * passes no step-up check until the user steps up.
+   */
+  readonly reauthenticated?: false;
+}
+
+/**
+ * Checks a code in the attempt's transaction, after the user and session are
+ * locked, and uses it up if it is right. Undefined for a wrong code.
+ */
+export type CodeCheck = (
+  trx: Transaction<unknown>,
+  details: AuthEventDetails & { readonly userId: string },
+) => Promise<Accepted | undefined>;
 
 /** Wrong codes a session waiting for one may send before it is discarded (ADR 0010). */
 const MAX_FAILURES = 5;
@@ -57,15 +86,14 @@ function sendNotice(deps: RouteDependencies, to: string, requestId: string): voi
   });
 }
 
-/** Confirm a new authenticator, or complete a sign-in, with a code. */
-async function completeWithCode(
+/** Confirm a new authenticator (`enrol`), or complete a sign-in (`verify`), with a code. */
+export async function completeWithCode(
   deps: RouteDependencies,
-  key: TotpKey,
   context: RequestContext,
-  code: string,
-  use: 'confirm' | 'verify',
+  state: 'enrol' | 'verify',
+  check: CodeCheck,
 ) {
-  const session = waitingFor(context, use === 'confirm' ? 'enrol' : 'verify');
+  const session = waitingFor(context, state);
   const { requestId } = context;
   const { userId, tenant } = session;
   const { ip: address, userAgent } = deps.client(requestId);
@@ -81,11 +109,12 @@ async function completeWithCode(
 
   const outcome = await deps.auth.transaction().execute(async (trx) => {
     // Confirming also sets two_factor_enabled, so it locks the user for that update.
-    const lock = use === 'confirm' ? 'no key update' : 'share';
+    const lock = state === 'enrol' ? 'no key update' : 'share';
     const current = await lockSession(trx, userId, detailsOf(session).tokenHash, lock);
     if (current === undefined) return undefined;
     const db = trx.$extendTables<AuthTables>();
-    if (await useCode(trx, key, userId, code, use)) {
+    const accepted = await check(trx, details);
+    if (accepted !== undefined) {
       // Give back this attempt's charge, and the sign-in's, which waited for
       // MFA, to the device, or else the address that sign-in came from.
       await refundSignIn(trx, counted);
@@ -93,17 +122,13 @@ async function completeWithCode(
         await refundSignIn(trx, { ...client, ip: plainAddress(current.ip_address) });
       }
       const device = await rememberDevice(trx, deps, requestId, session.app, userId);
-      const events: AuthEvent[] = [];
-      if (use === 'confirm') {
-        await db
-          .updateTable('auth.user')
-          .set({ two_factor_enabled: true })
-          .where('id', '=', userId)
-          .execute();
-        events.push(await recordAuthEvent(trx, 'mfa_enrolled', details));
-      }
-      const token = await rotateSession(trx, current, { mfa: 'complete', ip, userAgent });
-      return { token, events, device };
+      const token = await rotateSession(trx, current, {
+        mfa: 'complete',
+        reauthenticated: accepted.reauthenticated,
+        ip,
+        userAgent,
+      });
+      return { token, events: accepted.events, device, notify: accepted.notify };
     }
     const failures = current.mfa_failures + 1;
     const discarded = failures >= MAX_FAILURES;
@@ -120,13 +145,13 @@ async function completeWithCode(
     for (const scope of charged.reached) {
       events.push(await recordAuthEvent(trx, 'rate_limit_reached', { ...details, reason: scope }));
     }
-    return { token: undefined, events, discarded };
+    return { token: undefined, events, discarded, notify: undefined };
   });
   if (outcome === undefined) throw new ApiError(401, undefined, { reason: 'no_session' });
   for (const event of outcome.events) await copyAuthEvent(deps, event, tenant);
 
   if (outcome.token !== undefined) {
-    if (use === 'confirm') sendNotice(deps, email, requestId);
+    outcome.notify?.(email);
     const { body } = await answerWithSession(deps, requestId, outcome.token, email);
     if (outcome.device !== undefined) deps.setHeader(requestId, 'set-cookie', outcome.device);
     return body;
@@ -161,12 +186,33 @@ export function mfaRoutes(deps: RouteDependencies, totpKey: () => Promise<TotpKe
       return { key: secret.key, uri: secret.uri };
     }),
 
-    route(confirmTotp, async ({ context, input }) =>
-      completeWithCode(deps, await totpKey(), context, input.body.code, 'confirm'),
-    ),
+    route(confirmTotp, async ({ context, input }) => {
+      const key = await totpKey();
+      return completeWithCode(deps, context, 'enrol', async (trx, details) => {
+        if (!(await useCode(trx, key, details.userId, input.body.code, 'confirm')))
+          return undefined;
+        await trx
+          .$extendTables<AuthTables>()
+          .updateTable('auth.user')
+          .set({ two_factor_enabled: true })
+          .where('id', '=', details.userId)
+          .execute();
+        return {
+          events: [await recordAuthEvent(trx, 'mfa_enrolled', details)],
+          notify: (email) => {
+            sendNotice(deps, email, details.requestId);
+          },
+        };
+      });
+    }),
 
-    route(verifyTotp, async ({ context, input }) =>
-      completeWithCode(deps, await totpKey(), context, input.body.code, 'verify'),
-    ),
+    route(verifyTotp, async ({ context, input }) => {
+      const key = await totpKey();
+      return completeWithCode(deps, context, 'verify', async (trx, details) =>
+        (await useCode(trx, key, details.userId, input.body.code, 'verify'))
+          ? { events: [] }
+          : undefined,
+      );
+    }),
   ];
 }
