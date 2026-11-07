@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// The platform's queues (migration 0029): each is registered with its kind
+// The platform's queues (migrations 0029 and 0043): each is registered with its kind
 // and a dead-letter queue <queue>.dead of the same kind, each can be
 // defined in code under its registered name, and no other queue is
 // registered but pg-boss's cron queue (migration 0036) and the job tests'
@@ -14,7 +14,7 @@ import { defineQueue, eventJobQueue } from '../../src/jobs/queue.ts';
 import { queueRegistrationProblems } from '../../src/jobs/registration.ts';
 import { databaseSettings, withClient } from '../connect.ts';
 
-const PLATFORM = ['platform.fan_out', 'platform.audit_purge'];
+const PLATFORM = ['platform.fan_out', 'platform.audit_purge', 'platform.file_fan_out'];
 const TENANT = [
   'platform.file_scan',
   'platform.idempotency_purge',
