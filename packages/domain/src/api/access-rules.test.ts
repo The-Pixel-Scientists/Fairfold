@@ -95,4 +95,21 @@ describe('accessProblems for auth and public routes', () => {
     expect(problemsWith(publicRoute, auth)).toEqual(['Only auth routes state a session.']);
     expect(problemsWith({ ...publicRoute, session: undefined }, auth)).toEqual([]);
   });
+
+  it('let an auth route need step-up only with a complete session', () => {
+    expect(problemsWith({ session: 'complete', stepUp: true }, auth)).toEqual([]);
+    expect(problemsWith({ session: 'complete', stepUp: false }, auth)).toEqual([]);
+    for (const session of authSessions.filter((value) => value !== 'complete')) {
+      expect(problemsWith({ session, stepUp: true }, auth), session).toEqual([
+        'An auth route needs step-up only as stepUp: true or false, with a complete session.',
+      ]);
+    }
+    for (const stepUp of ['yes', 1, null]) {
+      expect(problemsWith({ session: 'complete', stepUp }, auth)).not.toEqual([]);
+    }
+    const publicRoute = { audience: 'public', session: undefined, stepUp: true };
+    expect(problemsWith(publicRoute, auth)).toEqual([
+      'Only console, portal and auth routes can need step-up.',
+    ]);
+  });
 });
