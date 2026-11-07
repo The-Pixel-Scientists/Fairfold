@@ -120,6 +120,8 @@ test.describe('a programme manager setting up and reading assessment', () => {
       'Show how each reviewer scored the submission',
     );
     await page.keyboard.press('Escape');
+    // The dialog gives focus back to the row just after it closes.
+    await expect(row).toBeFocused();
     await page.keyboard.press('Enter');
     await expect(page.getByRole('dialog', { name: /^Scores for / })).toBeVisible();
   });
