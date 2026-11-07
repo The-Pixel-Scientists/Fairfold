@@ -74,45 +74,50 @@ async function codeOf(attempt: Promise<unknown>): Promise<unknown> {
 }
 
 beforeAll(async () => {
-  stub = await startStub((req, response) => {
-    const path = req.url ?? '/';
-    const chain = /^\/chain\/(\d+)$/.exec(path);
-    if (chain) {
-      const left = Number(chain[1]);
-      if (left === 0) response.end('arrived');
-      else response.writeHead(302, { location: `/chain/${String(left - 1)}` }).end();
-    } else if (path.startsWith('/to/')) {
-      response.writeHead(302, { location: decodeURIComponent(path.slice(4)) }).end();
-    } else if (path === '/big') response.end(Buffer.alloc(1024 * 1024 + 1));
-    else if (path === '/exact') response.end(Buffer.alloc(1024 * 1024));
-    else if (path === '/stream') {
-      response.write(Buffer.alloc(600 * 1024));
-      response.write(Buffer.alloc(600 * 1024));
-      response.end();
-    } else if (path === '/gzip') {
-      response
-        .writeHead(200, { 'content-encoding': 'gzip' })
-        .end(gzipSync(Buffer.alloc(50 * 1024 * 1024)));
-    } else if (path === '/two-encodings') {
-      response
-        .writeHead(200, [
-          ['content-encoding', 'identity'],
-          ['content-encoding', 'identity'],
-        ])
-        .end('hello');
-    } else if (path === '/identity') {
-      response.writeHead(200, { 'content-encoding': 'identity' }).end('hello');
-    } else if (path === '/head-gzip') {
-      response.writeHead(200, { 'content-encoding': 'gzip' }).end();
-    } else if (path === '/stall-headers') return;
-    else if (path === '/drip') {
-      response.writeHead(200);
-      const timer = setInterval(() => response.write('x'), 100);
-      response.on('close', () => {
-        clearInterval(timer);
-      });
-    } else response.end('hello');
-  });
+  stub = await startStub(
+    (req, response) => {
+      const path = req.url ?? '/';
+      const chain = /^\/chain\/(\d+)$/.exec(path);
+      if (chain) {
+        const left = Number(chain[1]);
+        if (left === 0) response.end('arrived');
+        else response.writeHead(302, { location: `/chain/${String(left - 1)}` }).end();
+      } else if (path.startsWith('/to/')) {
+        response.writeHead(302, { location: decodeURIComponent(path.slice(4)) }).end();
+      } else if (path === '/big') response.end(Buffer.alloc(1024 * 1024 + 1));
+      else if (path === '/exact') response.end(Buffer.alloc(1024 * 1024));
+      else if (path === '/stream') {
+        response.write(Buffer.alloc(600 * 1024));
+        response.write(Buffer.alloc(600 * 1024));
+        response.end();
+      } else if (path === '/gzip') {
+        response
+          .writeHead(200, { 'content-encoding': 'gzip' })
+          .end(gzipSync(Buffer.alloc(50 * 1024 * 1024)));
+      } else if (path === '/two-encodings') {
+        response
+          .writeHead(200, [
+            ['content-encoding', 'identity'],
+            ['content-encoding', 'identity'],
+          ])
+          .end('hello');
+      } else if (path === '/identity') {
+        response.writeHead(200, { 'content-encoding': 'identity' }).end('hello');
+      } else if (path === '/head-gzip') {
+        response.writeHead(200, { 'content-encoding': 'gzip' }).end();
+      } else if (path === '/stall-headers') return;
+      else if (path === '/drip') {
+        response.writeHead(200);
+        const timer = setInterval(() => response.write('x'), 100);
+        response.on('close', () => {
+          clearInterval(timer);
+        });
+      } else response.end('hello');
+    },
+    (_req, socket) => {
+      socket.write('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\n\r\n');
+    },
+  );
 });
 
 afterAll(async () => {
@@ -144,7 +149,7 @@ describe('node:https through the outbound agent', () => {
     await new Promise<void>((resolve, reject) => {
       // Deliberate: a request that turns certificate checking off, to prove the agent overrides it.
       const checkingOff = false;
-      // nosemgrep: bypass-tls-verification
+      // nosemgrep: problem-based-packs.insecure-transport.js-node.bypass-tls-verification.bypass-tls-verification
       httpsGet('https://stub.test/', { agent, rejectUnauthorized: checkingOff }, (response) => {
         response.resume();
         resolve();
@@ -200,6 +205,33 @@ describe('node:https through the outbound agent', () => {
       expect(['address_refused', 'unresolvable']).toContain(await codeOf(attempt));
     }
     expect(dials).toEqual([]);
+  });
+
+  it('refuses an Upgrade request, and a 101 the server sends anyway', async () => {
+    const agent = agentFor(() => stub.port);
+    const upgrading = new Promise((resolve, reject) => {
+      httpsGet('https://stub.test/upgrade', { agent, headers: { Upgrade: 'websocket' } }, resolve)
+        .on('upgrade', resolve)
+        .on('error', reject);
+    });
+    expect(await codeOf(upgrading)).toBe('method_refused');
+
+    // The header is added after the agent saw the request, so only the 101 itself is refused.
+    let upgraded = false;
+    const late = new Promise((resolve, reject) => {
+      const req = httpsRequest('https://stub.test/upgrade', { agent })
+        .on('upgrade', () => {
+          upgraded = true;
+          resolve(undefined);
+        })
+        .on('response', resolve)
+        .on('error', reject);
+      req.setHeader('Connection', 'Upgrade');
+      req.setHeader('Upgrade', 'websocket');
+      req.end();
+    });
+    expect(await codeOf(late)).toBe('method_refused');
+    expect(upgraded).toBe(false);
   });
 
   it('refuses a UNIX socket path and a tunnel', async () => {

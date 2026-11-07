@@ -12,6 +12,7 @@ import { createServer, type Server } from 'node:https';
 import { isIP, type AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import type { Duplex } from 'node:stream';
 
 import type { Resolve } from '../src/outbound/connect.ts';
 
@@ -53,7 +54,10 @@ function makeCertificate(): { key: string; cert: string } {
 
 export type StubHandler = (request: IncomingMessage, response: ServerResponse) => void;
 
-export async function startStub(handler: StubHandler): Promise<Stub> {
+/** Answers an Upgrade request, which the server would otherwise treat as a plain one. */
+export type StubUpgrade = (request: IncomingMessage, socket: Duplex) => void;
+
+export async function startStub(handler: StubHandler, upgrade?: StubUpgrade): Promise<Stub> {
   const { key, cert } = makeCertificate();
   const serverNames: string[] = [];
   const requests: IncomingMessage['headers'][] = [];
@@ -65,6 +69,7 @@ export async function startStub(handler: StubHandler): Promise<Stub> {
   server.on('secureConnection', (socket) => {
     serverNames.push(socket.servername || '');
   });
+  if (upgrade) server.on('upgrade', upgrade);
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   return {
     port: (server.address() as AddressInfo).port,

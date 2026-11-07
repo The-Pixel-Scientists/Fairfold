@@ -77,7 +77,10 @@ export class OutboundHttpsAgent extends HttpsAgent {
   ): undefined {
     const host = options.host ?? '';
     const { port } = options;
-    if (options.method === 'CONNECT' || options.socketPath !== undefined) {
+    const headers = options.headers as Record<string, unknown> | undefined;
+    const upgrades =
+      headers !== undefined && Object.keys(headers).some((n) => n.toLowerCase() === 'upgrade');
+    if (options.method === 'CONNECT' || upgrades || options.socketPath !== undefined) {
       callback?.(new OutboundError('method_refused'), undefined as unknown as Duplex);
       return undefined;
     }
@@ -154,11 +157,18 @@ export class OutboundHttpsAgent extends HttpsAgent {
     });
     const emit = req.emit.bind(req) as (event: string | symbol, ...args: unknown[]) => boolean;
     req.emit = (event: string | symbol, ...args: unknown[]) => {
+      if (event === 'upgrade' || event === 'connect') {
+        // A 101 or a tunnel would skip the checks below and any later limit.
+        (args[1] as Duplex | undefined)?.destroy();
+        abort('method_refused');
+        return false;
+      }
       if (event !== 'response') return emit(event, ...args);
       const res = args[0] as IncomingMessage;
       clearTimeout(headers);
       try {
         if (refused) throw new OutboundError('timeout');
+        if (res.statusCode === 101) throw new OutboundError('method_refused');
         // Compressed bytes could expand far past the limit in a caller's decoder.
         const encoding = res.headers['content-encoding'] as string | string[] | undefined;
         if (req.method !== 'HEAD' && encoding !== undefined && !isIdentity(encoding)) {
