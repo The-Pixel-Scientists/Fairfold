@@ -12,6 +12,8 @@ import { connect, type Socket } from 'node:net';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 
+import { SIGNATURE_VERSION_TTL_SECONDS } from '@pixel-scientists/domain/files';
+
 import type { FileSettings } from './settings.ts';
 
 export type Verdict = 'clean' | 'infected' | 'error';
@@ -88,4 +90,61 @@ export function scan(settings: FileSettings['clamd'], bytes: Uint8Array): Promis
       );
     });
   });
+}
+
+/** clamd's `VERSION` reply is `ClamAV <program>/<signature version>/<date>`. */
+export function parseVersion(reply: string): number | null {
+  const match = /^ClamAV [^/\r\n]+\/(\d{1,9})\/[^\r\n]*$/.exec(reply);
+  return match === null ? null : Number(match[1]);
+}
+
+/** The signature database version clamd runs, or null if it cannot say. */
+export function signatureVersion(settings: FileSettings['clamd']): Promise<number | null> {
+  return new Promise((resolve) => {
+    const socket: Socket = connect({ host: settings.host, port: settings.port });
+    let reply = Buffer.alloc(0);
+    const finish = (version: number | null): void => {
+      clearTimeout(timer);
+      socket.destroy();
+      resolve(version);
+    };
+    const timer = setTimeout(() => {
+      finish(null);
+    }, settings.timeoutMs);
+    socket.on('error', () => {
+      finish(null);
+    });
+    socket.on('close', () => {
+      finish(null);
+    });
+    socket.on('connect', () => {
+      socket.write('zVERSION\0');
+    });
+    socket.on('data', (chunk: Buffer) => {
+      reply = Buffer.concat([reply, chunk]);
+      const end = reply.indexOf(0);
+      if (end === -1) {
+        if (reply.length > MAX_REPLY_BYTES) finish(null);
+        return;
+      }
+      finish(end === reply.length - 1 ? parseVersion(reply.toString('latin1', 0, end)) : null);
+    });
+  });
+}
+
+/** The signature version, asked for again only after the cache's lifetime; an unknown version is never kept. */
+export function cachedVersion(
+  read: () => Promise<number | null>,
+  now: () => number = Date.now,
+): () => Promise<number | null> {
+  let kept: { readonly version: number; readonly until: number } | undefined;
+  return async () => {
+    if (kept !== undefined && kept.until > now()) return kept.version;
+    const version = await read();
+    kept =
+      version === null
+        ? undefined
+        : { version, until: now() + SIGNATURE_VERSION_TTL_SECONDS * 1000 };
+    return version;
+  };
 }
