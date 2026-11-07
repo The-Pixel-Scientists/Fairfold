@@ -47,9 +47,26 @@ export type RetentionRule =
   /** Kept while the person's account exists, and deleted with it. */
   | { readonly kind: 'account_lifetime' };
 
+/**
+ * A column of answers classified field by field (ADR 0027, "Form answers"):
+ * each answer takes its question's class from the form version the row
+ * pinned in `versionColumn`, whose definition is `definition.column` of
+ * `definition.table`. Read the answers' classes only through
+ * packages/db/src/classification-answers.ts.
+ */
+export interface PerFieldClassification {
+  readonly versionColumn: string;
+  readonly definition: { readonly table: string; readonly column: string };
+}
+
 export interface FieldClassification {
+  /**
+   * For a per-field column, the most sensitive any of its values can be, so
+   * a reader that does not know per-field columns treats it at that level.
+   */
   readonly sensitivity: Sensitivity;
   readonly retention: RetentionRule;
+  readonly perField?: PerFieldClassification;
 }
 
 /** Columns by table: `{ 'schema.table': { column: classification } }`. */

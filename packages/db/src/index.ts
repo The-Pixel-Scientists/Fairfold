@@ -12,6 +12,12 @@ export {
   type FieldChange,
 } from './audit.ts';
 export {
+  answersAtOrBelow,
+  classifyAnswers,
+  pinnedDefinitions,
+  type ClassifiedAnswer,
+} from './classification-answers.ts';
+export {
   CLIENT_ROLES,
   createDatabase,
   type ClientRole,
