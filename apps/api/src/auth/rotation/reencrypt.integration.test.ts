@@ -38,13 +38,14 @@ import { reencryptSecrets, rotationKeys } from './reencrypt.ts';
 
 const OLD = new Secret('rotation test secret, key version forty-one');
 const NEW = new Secret('rotation test secret, key version forty-two');
-const before = rotationKeys(new Map([[41, OLD]]));
-const keys = rotationKeys(
-  new Map([
+const before = rotationKeys({ current: 41, versions: new Map([[41, OLD]]) });
+const keys = rotationKeys({
+  current: 42,
+  versions: new Map([
     [41, OLD],
     [42, NEW],
   ]),
-);
+});
 const TOTP_PLAIN = randomBytes(16).toString('hex');
 const CLIENT_SECRET = `client secret ${randomUUID()}`;
 const PRIVATE_KEY = `private key ${randomUUID()}`;
@@ -57,7 +58,6 @@ const env = {
   TPS_DB_PORT: String(settings.port),
   TPS_DB_NAME: settings.database,
   TPS_DB_APP_AUTH_PASSWORD: settings.password,
-  TPS_AUTH_SECRET: NEW.reveal(),
   TPS_CONSOLE_ORIGIN: 'https://console.example.org',
   TPS_PORTAL_ORIGIN: 'https://apply.example.org',
 };
@@ -80,22 +80,22 @@ const sender: Sender = {
   },
 };
 
-async function run(secrets: ReadonlyMap<number, Secret> | undefined) {
+/** Both versions, as an operator sets them, with 42 sealing new values. */
+const rotating = {
+  TPS_AUTH_SECRET_41: OLD.reveal(),
+  TPS_AUTH_SECRET_42: NEW.reveal(),
+  TPS_AUTH_SECRET_CURRENT: '42',
+};
+
+async function run(secrets: Record<string, string>) {
   const out: string[] = [];
   const err: string[] = [];
   const code = await runSecretReencryption(
-    env,
+    { ...env, ...secrets },
     { out: (text) => out.push(text), err: (text) => err.push(text) },
-    secrets === undefined ? { sender } : { secrets, sender },
+    { sender },
   );
   return { code, out, err, text: [...out, ...err].join('\n') };
-}
-
-function keysMap(): Map<number, Secret> {
-  return new Map([
-    [41, OLD],
-    [42, NEW],
-  ]);
 }
 
 let active: TestTenant;
@@ -179,22 +179,29 @@ beforeAll(async () => {
 
 describe('the secret re-encryption command', { timeout: 60_000 }, () => {
   it('refuses to start with one key version or failing auth settings', async () => {
-    const one = await run(undefined);
-    expect(one.code).toBe(2);
-    expect(one.err).toEqual([
-      'Only one auth key version is configured, so there is nothing to re-encrypt.',
+    for (const one of [
+      { TPS_AUTH_SECRET: NEW.reveal() },
+      { TPS_AUTH_SECRET_42: NEW.reveal() },
+    ] as Record<string, string>[]) {
+      const result = await run(one);
+      expect(result.code).toBe(2);
+      expect(result.err).toEqual([
+        'Only one auth key version is configured, so there is nothing to re-encrypt.',
+      ]);
+    }
+    const short = await run({ ...rotating, TPS_AUTH_SECRET_41: 'too short' });
+    expect(short.code).toBe(2);
+    expect(short.err).toEqual(['TPS_AUTH_SECRET_41 must be at least 32 bytes.']);
+    const unnamed = await run({ ...rotating, TPS_AUTH_SECRET_CURRENT: '' });
+    expect(unnamed.code).toBe(2);
+    expect(unnamed.err).toEqual([
+      'More than one auth key version is set, so set TPS_AUTH_SECRET_CURRENT.',
     ]);
-    const short = await runSecretReencryption(
-      { ...env, TPS_AUTH_SECRET: 'too short' },
-      { out: () => undefined, err: () => undefined },
-      { secrets: keysMap(), sender },
-    );
-    expect(short).toBe(2);
     expect((await twoFactor())?.secret.startsWith('$ba$41$')).toBe(true);
   });
 
-  it('re-encrypts TOTP and SSO secrets to the newest version, and records the counts', async () => {
-    const result = await run(keysMap());
+  it('re-encrypts TOTP and SSO secrets to the current version, and records the counts', async () => {
+    const result = await run(rotating);
     expect(result.code).toBe(0);
 
     const row = await twoFactor();
@@ -254,7 +261,7 @@ describe('the secret re-encryption command', { timeout: 60_000 }, () => {
   it('changes nothing when run again', async () => {
     const [totp, oidc] = [await twoFactor(), providers[0]];
     const sealed = oidc && (await provider(oidc.tenant, oidc.id));
-    const again = await run(keysMap());
+    const again = await run(rotating);
     expect(again.code).toBe(0);
     expect(again.out.slice(0, 2)).toEqual([
       'Re-encrypted 0 TOTP secrets to key version 42.',
