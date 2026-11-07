@@ -104,11 +104,19 @@ export async function createApplicant(page: Page): Promise<string> {
   return address;
 }
 
-/** From the open programme to the new application's page. */
+/**
+ * From the seed's open programme to the new application's page. The builder
+ * journeys, which run first, add programmes of the same title with forms of
+ * their own, so the seed's is told apart by its summary.
+ */
 export async function startApplication(page: Page): Promise<void> {
   await page.goto('/northfield/programmes');
   await expect(h1(page, 'Programmes you can apply to')).toBeVisible();
-  await page.getByRole('link', { name: /^Read more and apply for Community Spaces Fund/ }).click();
+  await page
+    .getByRole('listitem')
+    .filter({ hasText: 'Grants of £5,000 to £25,000 for community groups' })
+    .getByRole('link', { name: /^Read more and apply for Community Spaces Fund/ })
+    .click();
   await expect(h1(page, 'Community Spaces Fund')).toBeVisible();
   await expect(page.getByText(/UK time/).first()).toBeVisible();
   await page.getByRole('link', { name: 'Start application' }).click();
