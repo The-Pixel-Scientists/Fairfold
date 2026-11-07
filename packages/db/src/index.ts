@@ -36,6 +36,7 @@ export {
   type RateLimitClient,
   type RateLimitScope,
 } from './rate-limits.ts';
+export { asOperator, withOperator } from './operator.ts';
 export { sessionContext, touchSession, type SessionContextRow } from './sessions.ts';
 export { isLoopbackHost, readSecret, readSetting, type Env } from './settings.ts';
 export { TenantLeakError, withTenant, type TenantId } from './tenant-context.ts';
