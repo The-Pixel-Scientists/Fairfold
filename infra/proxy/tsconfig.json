@@ -1,0 +1,11 @@
+// The reverse proxy's stack specs, which run on Node.js under Playwright.
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "../../node_modules/.cache/tsc/infra-proxy",
+    "tsBuildInfoFile": "../../node_modules/.cache/tsc/infra-proxy/tsconfig.tsbuildinfo",
+    "types": ["node"]
+  },
+  "include": ["*.ts"],
+  "references": [{ "path": "../../tsconfig.tooling.json" }]
+}
