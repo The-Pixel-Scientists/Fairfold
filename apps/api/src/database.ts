@@ -16,7 +16,7 @@ import type { LogoType } from '@pixel-scientists/domain/platform';
 import type { FastifyBaseLogger } from 'fastify';
 
 import type { Config } from './config.ts';
-import { counterStore, type CounterStore } from './limits/store.ts';
+import { counterStore, type CounterStore, type UploadCounters } from './limits/store.ts';
 
 /**
  * The transaction a request runs in, with its tenant set. A module types it to
@@ -51,7 +51,7 @@ export interface ApiDatabase {
   /** For routes that need no session. */
   publicTenants: PublicTenants;
   /** The request limits' counters, in no tenant (S11-36). */
-  requestLimits: CounterStore;
+  requestLimits: CounterStore & UploadCounters;
   /** Closes the pool. */
   close(): Promise<void>;
 }
