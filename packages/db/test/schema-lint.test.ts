@@ -5,7 +5,13 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { classification, type ClassificationRegistry } from '../classification.ts';
+import {
+  classification,
+  mergeSchemaMaps,
+  subjectPaths,
+  type ClassificationRegistry,
+  type SubjectPathRegistry,
+} from '../classification.ts';
 import { APP_ROLES, asMigratorRolledBack, withClient } from './connect.ts';
 import { findSchemaProblems, hasTenantTerm, TENANT_TERM } from './schema-lint.ts';
 
@@ -214,6 +220,64 @@ describe('schema lint', () => {
         'classification.ts names app.lint_gone.note, which does not exist.',
       ].sort(),
     );
+  });
+});
+
+describe('subject paths (ADR 0027)', () => {
+  it('reports each missing or broken path', async () => {
+    const field = (sensitivity: 'internal' | 'personal') =>
+      ({ sensitivity, retention: { kind: 'tenant_lifetime' } }) as const;
+    const columns = { id: field('internal'), tenant_id: field('internal') };
+    const registry: ClassificationRegistry = {
+      ...classification,
+      'app.lint_none': { ...columns, note: field('personal') },
+      'app.lint_unlinked': { ...columns, note: field('personal') },
+      'app.lint_columns': { ...columns, party_id: field('internal'), user_id: field('internal') },
+    };
+    const paths: SubjectPathRegistry = {
+      ...subjectPaths,
+      'app.lint_unlinked': { kind: 'unlinked', reason: ' ' },
+      'app.lint_columns': { kind: 'party', column: 'missing' },
+      'app.lint_party': { kind: 'party', column: 'party_id' },
+      'app.lint_account': { kind: 'account', column: 'user_id' },
+      'app.lint_join': { kind: 'join', column: 'party_id', table: 'grants.application' },
+      'app.lint_dead_end': { kind: 'join', column: 'id', table: 'app.lint_unlinked' },
+      'app.lint_gone': { kind: 'party', column: 'id' },
+    };
+
+    const problems = await asMigratorRolledBack(async (client) => {
+      for (const table of ['lint_none', 'lint_unlinked', 'lint_columns']) {
+        await client.query(`CREATE TABLE app.${table} (id uuid PRIMARY KEY, tenant_id uuid)`);
+      }
+      // Plain uuid columns, with no foreign key to what each path names.
+      for (const table of ['lint_party', 'lint_account', 'lint_join']) {
+        await client.query(
+          `CREATE TABLE app.${table} (id uuid PRIMARY KEY, party_id uuid, user_id uuid)`,
+        );
+      }
+      await client.query(`CREATE TABLE app.lint_dead_end (
+        id uuid PRIMARY KEY REFERENCES app.lint_unlinked (id))`);
+      return findSchemaProblems(client, registry, paths);
+    });
+
+    expect(problems.filter((problem) => problem.includes('subject path'))).toEqual(
+      [
+        'app.lint_none has a personal or special category column and no subject path.',
+        'app.lint_unlinked has an unlinked subject path, so it needs a reason and every column kept for a fixed 366 days or less.',
+        'app.lint_columns has a subject path through missing, which does not exist.',
+        'app.lint_party has a subject path through party_id, which is not a foreign key to party.party or party.person or party.organisation.',
+        'app.lint_account has a subject path through user_id, which is not a foreign key to auth.user.',
+        'app.lint_join has a subject path through party_id, which is not a foreign key to grants.application.',
+        'app.lint_dead_end has a subject path that does not reach a party or an account.',
+        'classification.ts gives a subject path for app.lint_gone, which does not exist.',
+      ].sort(),
+    );
+  });
+
+  it("refuses a path for a table outside its file's schema", () => {
+    expect(() =>
+      mergeSchemaMaps({ app: { 'grants.application': { kind: 'party', column: 'id' } } }),
+    ).toThrow(/^classification\/app\.ts names grants\.application, outside its schema\.$/);
   });
 });
 
