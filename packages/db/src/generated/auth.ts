@@ -15,9 +15,11 @@ export type Timestamp = ColumnType<Date, Date | string, Date | string>;
 
 export interface AuthAccount {
   account_id: string;
+  breach_check_pending_since: Timestamp | null;
   created_at: Generated<Timestamp>;
   id: Generated<string>;
   password: string | null;
+  password_breached_at: Timestamp | null;
   provider_id: string;
   sso_issuer: string | null;
   sso_provider_id: string | null;
