@@ -6,15 +6,19 @@ import type { ReactNode } from 'react';
 
 import { Screen } from '../../auth/Screen.tsx';
 import { tabLinkClassName } from '../../shell/navLink.ts';
+import { SSO_PATH } from '../sso/paths.ts';
 import type { Loaded } from './useLoad.ts';
 
-const sections = [
+const base = [
   { to: '/settings', label: 'General' },
   { to: '/settings/look', label: 'Look' },
   { to: '/settings/modules', label: 'Modules' },
 ] as const;
 
-function Sections() {
+/** The pages of the settings section. Single sign-on shows only to those who can manage it. */
+export function SettingsSections() {
+  const sso = useCan('platform.sso.manage');
+  const sections = sso ? [...base, { to: SSO_PATH, label: 'Single sign-on' }] : base;
   return (
     <nav aria-label="Settings">
       <ul role="list" className="flex flex-wrap gap-x-6 border-b border-divider">
@@ -45,7 +49,7 @@ function Frame({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div className="flex max-w-3xl flex-col gap-stack">
       <PageHeading>{title}</PageHeading>
-      <Sections />
+      <SettingsSections />
       {children}
     </div>
   );

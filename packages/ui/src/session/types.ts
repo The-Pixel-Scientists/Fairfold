@@ -16,6 +16,8 @@ export interface SessionData {
   readonly mfa: 'enrol' | 'verify' | 'complete' | 'not_required';
   /** When the session ends unless used (ISO 8601). */
   readonly expiresAt: string;
+  /** Until when the last re-authentication counts as recent (ISO 8601), or null. */
+  readonly recentAuthUntil?: string | null;
   readonly user: { readonly email: string };
   readonly permissions: readonly string[];
   readonly activeMembership: SessionMembership | null;
