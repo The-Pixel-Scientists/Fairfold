@@ -14,6 +14,16 @@ platform.warehouse.exported: Warehouse exported
 platform.file.uploaded: File uploaded
 platform.file.refused: File refused
 platform.file.downloaded: File downloaded
+platform.retention_policy.changed: Retention policy changed
+platform.retention.applied: Retention applied
+platform.subject_access.requested: Subject access requested
+platform.subject_access.completed: Subject access completed
+platform.erasure.requested: Erasure requested
+platform.erasure.completed: Erasure completed
+platform.erasure.failed: Erasure failed
+platform.subject_key.destroyed: Subject key destroyed
+platform.audit_event.purged: Audit event purged
+platform.audit_log.exported: Audit log exported
 platform.auth.account_created: Account created
 platform.auth.sign_in_succeeded: Sign-in succeeded
 platform.auth.sign_in_failed: Sign-in failed
