@@ -2,7 +2,7 @@
 //
 // The catalogue test's allowlists for the app schema.
 
-import { APP_ROLES } from '../connect.ts';
+import { RIGHTS_ROLES } from '../connect.ts';
 import type { SchemaCatalogue } from './index.ts';
 
 /**
@@ -19,7 +19,7 @@ RETURN (NULLIF(current_setting('app.tenant_id'::text, true), ''::text))::uuid
 export const app: SchemaCatalogue = {
   executableBy: [
     // Every tenant policy calls it, whichever role runs the query.
-    ['app.current_tenant_id()', APP_ROLES],
+    ['app.current_tenant_id()', RIGHTS_ROLES],
     // Public tenant pages and sign-in, with no tenant set (ADR 0019).
     ['app.public_tenant(text)', ['app_api', 'app_auth']],
     ['app.public_tenant_logo(text)', ['app_api']],

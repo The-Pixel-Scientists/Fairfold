@@ -5,7 +5,7 @@
 // schema's tables and functions. The entries for the database as a whole,
 // rather than one schema, are at the end of this file.
 
-import type { AppRole } from '../connect.ts';
+import type { AppRole, SetRole } from '../connect.ts';
 import { app } from './app.ts';
 import { auth } from './auth.ts';
 import { grants } from './grants.ts';
@@ -29,7 +29,7 @@ type Entries<T> = readonly (readonly [string, T])[];
 /** One schema's entries. */
 export interface SchemaCatalogue {
   /** The functions app roles may execute, and by whom. */
-  readonly executableBy?: Entries<readonly AppRole[]>;
+  readonly executableBy?: Entries<readonly (AppRole | SetRole)[]>;
   /** The approved SECURITY DEFINER functions (ADR 0003), by signature. */
   readonly definerFunctions?: Entries<DefinerFunction>;
   /** Tables without tenant_id, each with its reason. */
@@ -78,7 +78,7 @@ function schemasWith(pick: (catalogue: SchemaCatalogue) => string | undefined): 
   });
 }
 
-export const EXECUTABLE_BY: ReadonlyMap<string, readonly AppRole[]> = new Map(
+export const EXECUTABLE_BY: ReadonlyMap<string, readonly (AppRole | SetRole)[]> = new Map(
   merged((catalogue) => catalogue.executableBy),
 );
 

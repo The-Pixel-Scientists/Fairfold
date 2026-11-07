@@ -4,11 +4,13 @@
 // 0026, ADR 0024): a row names a membership exactly when its author is a
 // user, app_api writes only user rows, an update by app_api makes an
 // operator's switch a member's, and a wave 1 switch is kept from every other
-// tenant. Since 0039 app_worker, as the operator, adds only operator rows
-// that switch a module on, in the tenant set, and never changes a row.
+// tenant. Since 0040 app_operator, which app_worker may SET ROLE to, adds
+// only operator rows that switch a module on, in the tenant set, and never
+// changes a row (operator-role.test.ts covers app_worker on its own).
 
 import { randomUUID } from 'node:crypto';
 
+import type pg from 'pg';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { expectCrossTenantDenial } from '../cross-tenant.ts';
@@ -48,6 +50,13 @@ const versionRow = (change: Row = {}): Row => ({
   diff: {},
   ...change,
 });
+
+/** Like asRoleIn, as app_worker set to app_operator, as withOperator() does. */
+const asOperatorIn = <T>(tenantId: string, work: (client: pg.Client) => Promise<T>) =>
+  asRoleIn('app_worker', tenantId, async (client) => {
+    await client.query('SET LOCAL ROLE app_operator');
+    return work(client);
+  });
 
 const operatorSwitch = { updated_by: null, updated_by_kind: 'operator' };
 const operatorVersion = { author_id: null, author_kind: 'operator' };
@@ -169,8 +178,8 @@ describe('app.config_version authors', { timeout: 30_000 }, () => {
   });
 });
 
-describe('app_worker as the operator', { timeout: 30_000 }, () => {
-  // Only the columns app_worker may write: no membership.
+describe('app_operator', { timeout: 30_000 }, () => {
+  // Only the columns app_operator may write: no membership.
   const workerSwitch = (owner: string, change: Row = {}): Row => ({
     tenant_id: owner,
     module: 'grants',
@@ -189,7 +198,7 @@ describe('app_worker as the operator', { timeout: 30_000 }, () => {
   });
 
   it('adds an operator switch that turns a module on, and its version', async () => {
-    await asRoleIn('app_worker', tenant.id, async (client) => {
+    await asOperatorIn(tenant.id, async (client) => {
       for (const [table, row] of [
         ['app.tenant_module', workerSwitch(tenant.id)],
         ['app.config_version', workerVersion(tenant.id)],
@@ -230,14 +239,14 @@ describe('app_worker as the operator', { timeout: 30_000 }, () => {
       () => workerVersion(tenant.id, { author_kind: 'user' }),
     ],
   ])('refuses %s', async (_, table, row: () => Row) => {
-    await asRoleIn('app_worker', tenant.id, async (client) => {
+    await asOperatorIn(tenant.id, async (client) => {
       const { text, values } = insertStatement(client, table, row());
       expect(await outcome(client, text, values)).toBe('42501');
     });
   });
 
   it('never changes or removes a switch or a version', async () => {
-    await asRoleIn('app_worker', tenant.id, async (client) => {
+    await asOperatorIn(tenant.id, async (client) => {
       for (const statement of [
         'UPDATE app.tenant_module SET enabled = true',
         'DELETE FROM app.tenant_module',
@@ -259,7 +268,7 @@ describe('app_worker as the operator', { timeout: 30_000 }, () => {
         updated_by: await addMember(client, owner),
       }),
     );
-    await asRoleIn('app_worker', owner.id, async (client) => {
+    await asOperatorIn(owner.id, async (client) => {
       const { rowCount } = await client.query(
         `INSERT INTO app.tenant_module (tenant_id, module, enabled, updated_by_kind)
          VALUES ($1, 'grants', true, 'operator') ON CONFLICT (tenant_id, module) DO NOTHING`,
@@ -278,7 +287,7 @@ describe('app_worker as the operator', { timeout: 30_000 }, () => {
       await insertRow(client, 'app.config_version', workerVersion(a.id));
     });
     for (const set of [b.id, '']) {
-      await asRoleIn('app_worker', set, async (client) => {
+      await asOperatorIn(set, async (client) => {
         for (const table of ['app.tenant_module', 'app.config_version']) {
           const { rowCount } = await client.query(`SELECT 1 FROM ${table} WHERE tenant_id = $1`, [
             a.id,

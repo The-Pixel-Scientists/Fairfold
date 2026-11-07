@@ -13,6 +13,22 @@ import type { DatabaseSettings } from '../src/database.ts';
 export const APP_ROLES = ['app_api', 'app_worker', 'app_auth', 'app_queue'] as const;
 export type AppRole = (typeof APP_ROLES)[number];
 
+/**
+ * The NOLOGIN app roles, each with the one login role that may SET ROLE to
+ * it (ADR 0009): operator commands run as app_operator through app_worker.
+ */
+export const SET_ROLES = { app_operator: 'app_worker' } as const satisfies Record<
+  string,
+  LoginRole
+>;
+export type SetRole = keyof typeof SET_ROLES;
+
+/** Every role whose rights the privilege lint and cross-tenant tests check. */
+export const RIGHTS_ROLES: readonly (AppRole | SetRole)[] = [
+  ...APP_ROLES,
+  ...(Object.keys(SET_ROLES) as SetRole[]),
+];
+
 const env = process.env;
 
 export function connectionSettings(role: LoginRole): {
@@ -59,6 +75,18 @@ export async function withClient<T>(
   } finally {
     await client.end();
   }
+}
+
+/** Run `work` with a client connected as `role`, or set to it if it cannot log in. */
+export function withRoleClient<T>(
+  role: LoginRole | SetRole,
+  work: (client: pg.Client) => Promise<T>,
+): Promise<T> {
+  if (!(role in SET_ROLES)) return withClient(role as LoginRole, work);
+  return withClient(SET_ROLES[role as SetRole], async (client) => {
+    await client.query(`SET ROLE ${client.escapeIdentifier(role)}`);
+    return work(client);
+  });
 }
 
 /**

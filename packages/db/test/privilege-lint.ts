@@ -14,7 +14,8 @@
 //   to its owner role, which owns nothing else and holds exactly the rights
 //   and policies listed (ADR 0003, "Approved definer functions").
 //
-// For the app roles and the database:
+// For the app roles, with app_operator, which app_worker may SET ROLE to
+// (RIGHTS_ROLES), and the database:
 // - The roles match the roles script (findRoleProblems in
 //   packages/db/scripts/roles.ts): attributes, memberships and settings.
 // - No setting applies to every role in this database or in all of them,
@@ -50,7 +51,7 @@ import {
   OWN_SCHEMAS,
   PUBLIC_RIGHTS,
 } from './catalogue/index.ts';
-import { APP_ROLES } from './connect.ts';
+import { RIGHTS_ROLES } from './connect.ts';
 
 /** The pinned search_path of every approved definer function, as pg_proc stores it. */
 const DEFINER_CONFIG = 'search_path=pg_catalog, pg_temp';
@@ -133,7 +134,7 @@ async function privilegeProblems(client: pg.ClientBase): Promise<string[]> {
          OR (grantee IN (SELECT oid FROM pg_catalog.pg_roles WHERE rolname = ANY ($1::text[]))
              AND privilege IN ('TRUNCATE', 'REFERENCES', 'TRIGGER'))
       ORDER BY 1, 2, 3`,
-    [APP_ROLES],
+    [RIGHTS_ROLES],
   );
   return rows
     .filter(
@@ -155,7 +156,7 @@ async function appRoleGrantProblems(client: pg.ClientBase): Promise<string[]> {
   const problems: string[] = [];
   for (const { role, schema, object, privilege, grantable } of await heldRights(
     client,
-    APP_ROLES,
+    RIGHTS_ROLES,
   )) {
     const right = `${privilege} on ${object}`;
     if (grantable) problems.push(`Role ${role} holds ${right} with grant option.`);
@@ -338,7 +339,7 @@ async function roleProblems(client: pg.ClientBase, excepted: readonly string[]):
                             WHERE datname = pg_catalog.current_database()))
         AND r.rolname = ANY ($1::text[])
       ORDER BY 1, 2`,
-    [APP_ROLES],
+    [RIGHTS_ROLES],
   );
   for (const { role, object } of owned.rows) problems.push(`Role ${role} owns ${object}.`);
 
@@ -351,7 +352,7 @@ async function roleProblems(client: pg.ClientBase, excepted: readonly string[]):
          OR (n.nspname = ANY ($2::text[])
              AND pg_catalog.has_schema_privilege(r.name, n.oid, 'USAGE'))
       ORDER BY 1, 2`,
-    [APP_ROLES, excepted],
+    [RIGHTS_ROLES, excepted],
   );
   for (const { role, schema, can_create } of schemas.rows) {
     problems.push(
@@ -369,7 +370,7 @@ async function roleProblems(client: pg.ClientBase, excepted: readonly string[]):
               AS can_temp
        FROM pg_catalog.unnest($1::text[]) AS r(name)
       ORDER BY 1`,
-    [APP_ROLES],
+    [RIGHTS_ROLES],
   );
   for (const { role, can_create, can_temp } of database.rows) {
     if (can_create) problems.push(`Role ${role} can create schemas in this database.`);
@@ -431,7 +432,7 @@ async function auditTableProblems(client: pg.ClientBase): Promise<string[]> {
       WHERE a.attname IN ('occurred_at', 'retain_until', 'actor_member_kind')
         AND NOT a.attisdropped
         AND pg_catalog.has_column_privilege(r.name, a.attrelid, a.attnum, 'INSERT')`,
-    [AUDIT_TABLES, APP_ROLES],
+    [AUDIT_TABLES, RIGHTS_ROLES],
   );
   return rows.map((row) => row.problem);
 }
@@ -457,7 +458,7 @@ async function functionProblems(client: pg.ClientBase): Promise<string[]> {
        JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace
       WHERE ${NON_SYSTEM_SCHEMA}
       ORDER BY 1`,
-    [APP_ROLES],
+    [RIGHTS_ROLES],
   );
 
   const problems: string[] = [];

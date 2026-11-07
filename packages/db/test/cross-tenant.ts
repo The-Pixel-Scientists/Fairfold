@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
 // The cross-tenant denial test that every tenant table needs (architecture
-// rule 2), for any table. As each app role with a grant on the table, with
-// tenant B set, it proves that tenant A's rows cannot be read, changed,
+// rule 2), for any table. As each app role with a grant on the table, a
+// NOLOGIN one through SET ROLE, with tenant B set, it proves that tenant A's rows cannot be read, changed,
 // removed or added to, and that B's rows cannot be moved to A; with no
 // tenant set, that no row matches and nothing can be added. A refused
 // statement must fail with 42501, for a missing grant or a row-level
@@ -14,7 +14,7 @@ import type pg from 'pg';
 import { expect } from 'vitest';
 
 import type { LoginRole } from '../scripts/roles.ts';
-import { APP_ROLES, withClient } from './connect.ts';
+import { RIGHTS_ROLES, withClient, withRoleClient, type SetRole } from './connect.ts';
 import { tenantColumn } from './schema-lint.ts';
 import {
   addTestTenant,
@@ -72,11 +72,11 @@ export async function expectCrossTenantDenial(table: string, row: RowFactory): P
       newRowA: await committedIn(migrator, tenantA.id, async (client) => row(client, tenantA)),
     };
 
-    const { rows } = await migrator.query<{ role: LoginRole }>(
+    const { rows } = await migrator.query<{ role: LoginRole | SetRole }>(
       `SELECT r.role FROM pg_catalog.unnest($1::text[]) AS r(role)
         WHERE pg_catalog.has_any_column_privilege(r.role, $2::regclass, 'SELECT, INSERT, UPDATE')
            OR pg_catalog.has_table_privilege(r.role, $2::regclass, 'DELETE')`,
-      [APP_ROLES, table],
+      [RIGHTS_ROLES, table],
     );
     expect(rows, `no app role has a grant on ${table}`).not.toEqual([]);
     for (const { role } of rows) await expectDenialAs(role, fixtures);
@@ -88,9 +88,9 @@ export async function expectCrossTenantDenial(table: string, row: RowFactory): P
   });
 }
 
-async function expectDenialAs(role: LoginRole, fixtures: Fixtures): Promise<void> {
+async function expectDenialAs(role: LoginRole | SetRole, fixtures: Fixtures): Promise<void> {
   const { table, tenantA, tenantB, rowA, rowB, rowsB } = fixtures;
-  await withClient(role, async (client) => {
+  await withRoleClient(role, async (client) => {
     const quoted = quoteTable(client, table);
     const tenant = client.escapeIdentifier(tenantColumn(table));
     const { rows } = await client.query<{
