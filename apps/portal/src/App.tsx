@@ -8,6 +8,8 @@ import type { ReactNode } from 'react';
 
 import { endSession, loadSession } from './api.ts';
 import { applyRoutes } from './apply/routes.ts';
+import AccountPage from './account/AccountPage.tsx';
+import EmailChangePage from './account/EmailChangePage.tsx';
 import CheckEmailPage from './auth/CheckEmailPage.tsx';
 import CompleteSignUpPage from './auth/CompleteSignUpPage.tsx';
 import ForgotPasswordPage from './auth/ForgotPasswordPage.tsx';
@@ -27,9 +29,11 @@ import OrganisationPage from './party/OrganisationPage.tsx';
 import OrganisationsPage from './party/OrganisationsPage.tsx';
 import ProfilePage from './party/ProfilePage.tsx';
 import {
+  ACCOUNT_PATH,
   ADD_ORGANISATION_PATH,
   CHECK_EMAIL_PATH,
   COMPLETE_SIGN_UP_PATH,
+  EMAIL_CHANGE_PATH,
   FORGOT_PASSWORD_PATH,
   FUTURE_FUNDING_PATH,
   HOME_PATH,
@@ -91,6 +95,8 @@ export const tenantRoutes: readonly RouteDefinition[] = [
   },
   { path: RESET_PASSWORD_PATH, title: 'Choose a new password', component: ResetPasswordPage },
   { path: SIGNED_OUT_PATH, title: 'You have signed out', component: SignedOutPage },
+  { path: ACCOUNT_PATH, title: 'Your account', component: AccountPage },
+  { path: EMAIL_CHANGE_PATH, title: 'Confirm your new email address', component: EmailChangePage },
   { path: PROFILE_PATH, title: 'Your details', component: ProfilePage },
   { path: ORGANISATIONS_PATH, title: 'Your organisations', component: OrganisationsPage },
   { path: ADD_ORGANISATION_PATH, title: 'Add your organisation', component: OrganisationPage },
