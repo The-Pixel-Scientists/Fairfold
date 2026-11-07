@@ -160,4 +160,15 @@ describe('loadAuthSettings', () => {
       'TPS_CONSOLE_PATH_PREFIX is used only when console and portal share a host.',
     ]);
   });
+
+  it('turns the breach check on unless it is off, and refuses any other value', () => {
+    expect(loadAuthSettings(valid).breachCheck).toBe(true);
+    expect(loadAuthSettings({ ...valid, TPS_AUTH_BREACH_CHECK: 'on' }).breachCheck).toBe(true);
+    expect(loadAuthSettings({ ...valid, TPS_AUTH_BREACH_CHECK: 'off' }).breachCheck).toBe(false);
+    for (const value of ['OFF', 'false', '0', 'no']) {
+      expect(problems({ ...valid, TPS_AUTH_BREACH_CHECK: value })).toEqual([
+        'TPS_AUTH_BREACH_CHECK must be on or off.',
+      ]);
+    }
+  });
 });

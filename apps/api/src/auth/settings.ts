@@ -13,6 +13,9 @@
 //   TPS_CONSOLE_PATH_PREFIX                   only when both apps share one
 //                                             host: the console's fixed path
 //                                             prefix, such as /console
+//   TPS_AUTH_BREACH_CHECK                     on (the default) or off: the
+//                                             breached-password check; off
+//                                             only for offline installs
 //
 // The trusted proxies are TPS_API_TRUST_PROXY, which config.ts reads; Fastify
 // derives each request's host through them.
@@ -33,6 +36,8 @@ export interface AuthSettings {
   readonly origins: Readonly<Record<App, string>>;
   /** Set exactly when both apps share one host: the console is served under it. */
   readonly consolePathPrefix?: string;
+  /** Whether new and pending passwords are checked against known breaches (ADR 0010). */
+  readonly breachCheck: boolean;
 }
 
 const MINIMUM_SECRET_BYTES = 32;
@@ -135,6 +140,11 @@ export function loadAuthSettings(env: Env, readFile?: (path: string) => string):
     );
   }
 
+  const breachCheck = env['TPS_AUTH_BREACH_CHECK'] || 'on';
+  if (breachCheck !== 'on' && breachCheck !== 'off') {
+    problems.push('TPS_AUTH_BREACH_CHECK must be on or off.');
+  }
+
   if (problems.length > 0) throw new ConfigError(problems);
   return {
     development,
@@ -142,5 +152,6 @@ export function loadAuthSettings(env: Env, readFile?: (path: string) => string):
     databasePassword: new Secret(password as string),
     origins: { console: consoleOrigin as string, portal: portalOrigin as string },
     ...(prefix === undefined ? {} : { consolePathPrefix: prefix }),
+    breachCheck: breachCheck === 'on',
   };
 }

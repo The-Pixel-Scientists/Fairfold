@@ -141,6 +141,7 @@ beforeAll(async () => {
     TPS_DEV: '1',
     TPS_DB_HOST: api.host,
     TPS_AUTH_SECRET: newToken(),
+    TPS_AUTH_BREACH_CHECK: 'off',
     TPS_DB_APP_AUTH_PASSWORD: connectionSettings('app_auth').password,
     TPS_CONSOLE_ORIGIN: ORIGINS.console,
     TPS_PORTAL_ORIGIN: ORIGINS.portal,

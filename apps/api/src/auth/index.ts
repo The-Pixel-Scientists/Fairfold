@@ -48,6 +48,8 @@ import { deviceKeys } from './limits/device-cookie.ts';
 import { revokeDevices } from './limits/devices.ts';
 import { revokeSessionsForMembership, type MembershipChange } from './memberships.ts';
 import { passkeyRoutes } from './passkeys/routes.ts';
+import { lookUpPassword, type BreachAnswer } from './password/range.ts';
+import { recordBreachCheckSetting } from './password/setting.ts';
 import { loadCommonPasswords } from './passwords.ts';
 import { mfaRoutes } from './mfa.ts';
 import { passwordChangeRoute } from './password-change/route.ts';
@@ -93,6 +95,11 @@ export interface Auth extends AuthModule {
   ): Promise<Invitation>;
   /** Revoke a member's sessions active in their tenant, in the change's transaction (memberships.ts). */
   revokeSessionsForMembership(trx: Transaction<unknown>, change: MembershipChange): Promise<number>;
+  /**
+   * At start-up: record the breached-password check setting if it differs
+   * from the last one recorded (password/setting.ts). True if it did.
+   */
+  recordBreachCheckSetting(): Promise<boolean>;
   /** Waits for work after responses, such as sign-up emails, then closes the module's database pools. */
   close(): Promise<void>;
 }
@@ -105,6 +112,8 @@ export interface AuthDependencies {
   readonly sender?: Sender;
   /** The common-password list. The bundled one (passwords.ts) if left out. */
   readonly commonPasswords?: ReadonlySet<string>;
+  /** Tests only: a local fake in place of the breached-password service. */
+  readonly lookUpPassword?: (password: string) => Promise<BreachAnswer>;
 }
 
 const READS = new Set(['GET', 'HEAD']);
@@ -183,6 +192,7 @@ export function createAuth(settings: AuthSettings, deps: AuthDependencies): Auth
     settings,
     sender: deps.sender,
     commonPasswords,
+    lookUpPassword: deps.lookUpPassword ?? ((password) => lookUpPassword(password)),
     keepIdentifier: identifierKeeper(settings.secret),
     devices: deviceKeys(settings.secret),
     client: (requestId) => {
@@ -310,6 +320,7 @@ export function createAuth(settings: AuthSettings, deps: AuthDependencies): Auth
       await copyAuthEvent({ api, auth, log: deps.log }, event, tenant);
       return count;
     },
+    recordBreachCheckSetting: () => recordBreachCheckSetting(auth, settings.breachCheck),
     async close() {
       await Promise.all(running);
       await Promise.all([api.destroy(), auth.destroy()]);

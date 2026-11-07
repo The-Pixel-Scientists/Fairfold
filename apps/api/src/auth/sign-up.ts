@@ -30,6 +30,7 @@ import { route, type Route } from '../routes/register.ts';
 import { newToken } from './cookies.ts';
 import { recordAuthEvent } from './events.ts';
 import { plainAddress } from './limits.ts';
+import { checkNewPassword } from './password/policy.ts';
 import { hashPassword, isCommonPassword } from './passwords.ts';
 import type { RouteDependencies } from './routes.ts';
 import type { AuthTables } from './tables.ts';
@@ -207,7 +208,12 @@ export function signUpRoutes(deps: RouteDependencies): Route[] {
         .where('expires_at', '>', (eb) => eb.fn<Date>('now'))
         .executeTakeFirst();
       if (live === undefined) throw linkNotValid;
-      refuseCommonPassword(deps.commonPasswords, password);
+      const pending = await checkNewPassword(
+        deps,
+        context.requestId,
+        deps.commonPasswords,
+        password,
+      );
       const hash = await hashPassword(password);
       // The link is spent even when the address already has an account, so it never costs a second hash.
       const created = await deps.auth.transaction().execute(async (trx) => {
@@ -236,6 +242,7 @@ export function signUpRoutes(deps: RouteDependencies): Route[] {
             account_id: user.id,
             provider_id: 'credential',
             password: hash,
+            breach_check_pending_since: pending ? new Date() : null,
           })
           .execute();
         await recordAuthEvent(trx, 'account_created', {

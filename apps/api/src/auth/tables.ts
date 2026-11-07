@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
 // The columns the auth module reads and writes (migrations 0002 to 0004,
-// 0015, 0025 and 0030). The auth tables are reached as app_auth; the app
+// 0015, 0025, 0030 and 0034). The auth tables are reached as app_auth; the app
 // tables as app_api, inside withTenant().
 
 import type { Generated } from '@pixel-scientists/db';
@@ -18,7 +18,15 @@ export type AuthTables = {
     status: Generated<string>;
     two_factor_enabled: Generated<boolean>;
   };
-  'auth.account': { user_id: string; account_id: string; provider_id: string; password: string };
+  'auth.account': {
+    user_id: string;
+    account_id: string;
+    provider_id: string;
+    password: string;
+    /** The breached-password check's state (password/policy.ts, migration 0034). */
+    breach_check_pending_since: Date | null;
+    password_breached_at: Date | null;
+  };
   'auth.verification': { identifier: string; value: string; expires_at: Date };
   'auth.two_factor': {
     user_id: string;
@@ -44,6 +52,7 @@ export type AuthTables = {
   };
   'auth.audit_event': {
     id: Generated<string>;
+    occurred_at: Generated<Date>;
     request_id: string;
     code: AuthEventCode;
     reason: string | null;
