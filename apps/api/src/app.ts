@@ -18,6 +18,7 @@ import type { AuthModule } from './context.ts';
 import type { InTenant } from './database.ts';
 import type { FileService } from './platform/files/index.ts';
 import { withTenantScope, type ScopeResolvers } from './policy/index.ts';
+import { registerLimits, type LimitOptions } from './limits/index.ts';
 import { createReadinessCheck, healthRoutes } from './routes/health.ts';
 import { openApiRoutes } from './routes/openapi.ts';
 import {
@@ -47,6 +48,8 @@ export interface AppOptions {
   resolvers?: ScopeResolvers;
   /** Addresses or ranges of the reverse proxies to trust. None by default. */
   trustProxy?: readonly string[];
+  /** The counters and key behind the request limits (S11-36). Without them, nothing is limited. */
+  limits?: LimitOptions;
   /** Traces and request metrics. Without it, or while it is off, nothing is recorded. */
   telemetry?: Telemetry;
 }
@@ -78,6 +81,11 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
   });
 
   if (options.telemetry !== undefined) registerTelemetry(app, options.telemetry);
+  // After telemetry, so a refusal is traced; before anything reads the request.
+  const limitSessions =
+    options.limits === undefined
+      ? (read: AuthModule['readSession']) => read
+      : registerLimits(app, options.limits);
 
   await app.register(swagger, {
     openapi: {
@@ -104,7 +112,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
 
   if (options.auth !== undefined) await app.register(options.auth.plugin);
   const deps = {
-    readSession: options.auth?.readSession.bind(options.auth) ?? signedOut,
+    readSession: limitSessions(options.auth?.readSession.bind(options.auth) ?? signedOut),
     inTenant: options.inTenant ?? noDatabase,
     files: options.files,
     resolvers: withTenantScope(options.resolvers ?? {}),
