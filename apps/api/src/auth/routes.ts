@@ -13,6 +13,8 @@ import {
 } from '@pixel-scientists/db';
 import { getSession, signOut, type Session } from '@pixel-scientists/domain/auth';
 import {
+  moduleOn,
+  moduleSchema,
   permissionsFor,
   roles,
   type App,
@@ -66,9 +68,24 @@ export function appRoles(names: readonly string[], app: App): Role[] {
 }
 
 /**
+ * The permissions whose module is on by moduleOn(), given the tenant's stored
+ * switches by module. A permission whose first segment is not a module is
+ * dropped.
+ */
+export function onModulePermissions(
+  permissions: readonly Permission[],
+  stored: ReadonlyMap<string, boolean>,
+): Permission[] {
+  return permissions.filter((permission) => {
+    const module = moduleSchema.safeParse(permission.split('.', 1)[0]);
+    return module.success && moduleOn(module.data, stored.get(module.data));
+  });
+}
+
+/**
  * The session's active membership in its app, with its roles for that app,
- * and the permissions they give less those of modules switched off for the
- * tenant (no row means on). None if it has no role in this app.
+ * and the permissions they give in the modules on for the tenant by
+ * moduleOn(). None if it has no role in this app.
  */
 async function activeMembership(
   api: Kysely<unknown>,
@@ -89,17 +106,14 @@ async function activeMembership(
     if (row === undefined) return null;
     const held = appRoles(row.roles, app);
     if (held.length === 0) return null;
-    const off = await db
+    const switches = await db
       .selectFrom('app.tenant_module')
-      .select('module')
-      .where('enabled', '=', false)
+      .select(['module', 'enabled'])
       .execute();
-    const offModules = new Set(off.map(({ module }) => module));
+    const stored = new Map(switches.map(({ module, enabled }) => [module, enabled]));
     return {
       membership: { id: row.id, tenant: { slug: row.slug, name: row.name }, roles: held },
-      permissions: permissionsFor(held, app).filter(
-        (permission) => !offModules.has(permission.split('.', 1)[0] ?? ''),
-      ),
+      permissions: onModulePermissions(permissionsFor(held, app), stored),
     };
   });
 }

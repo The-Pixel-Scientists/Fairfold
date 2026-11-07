@@ -9,7 +9,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { createDatabase, type Kysely, type TenantId } from '@pixel-scientists/db';
-import { permissionsFor } from '@pixel-scientists/domain/platform';
+import { permissionsFor, type Permission } from '@pixel-scientists/domain/platform';
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -29,7 +29,11 @@ import { createLogger } from '../logger.ts';
 import { hashToken, newToken } from './cookies.ts';
 import { copyAuthEvent, recordAuthEvent } from './events.ts';
 import { createAuth, loadAuthSettings, type Auth } from './index.ts';
+import { onModulePermissions } from './routes.ts';
 import { issueSession } from './sessions.ts';
+
+/** The wave 1 tools, off for a tenant without their row (ADR 0024). */
+const WAVE_1 = /^(crm|assure|forms|privacy|insight)\./;
 
 const CONSOLE = 'https://console.example.org';
 const PORTAL = 'https://apply.example.org';
@@ -162,8 +166,21 @@ describe('reading a session', { timeout: 30_000 }, () => {
       },
       memberships: [{ id: member.membershipId }],
     });
-    expect(body['permissions']).toEqual(permissionsFor(['tenant_admin'], 'console'));
+    expect(body['permissions']).toEqual(
+      permissionsFor(['tenant_admin'], 'console').filter((permission) => !WAVE_1.test(permission)),
+    );
     expect(body['recentAuthUntil']).not.toBeNull();
+  });
+
+  it("gives an administrator of a tenant with no module rows grants' and the platform's permissions only", async () => {
+    const all = permissionsFor(['tenant_admin'], 'console');
+    expect(all.filter((permission) => WAVE_1.test(permission))).not.toEqual([]);
+    const permissions = (await readSession(await addSession(member))).json<{
+      permissions: string[];
+    }>().permissions;
+    expect(permissions.some((permission) => permission.startsWith('grants.'))).toBe(true);
+    expect(permissions.some((permission) => permission.startsWith('platform.'))).toBe(true);
+    expect(permissions.filter((permission) => WAVE_1.test(permission))).toEqual([]);
   });
 
   it('maps a session waiting for MFA, which holds nothing in any tenant', async () => {
@@ -246,7 +263,28 @@ describe('reading a session', { timeout: 30_000 }, () => {
     const permissions = (await readSession(await addSession(other))).json<{
       permissions: string[];
     }>().permissions;
-    expect(permissions).toEqual(all.filter((permission) => !permission.startsWith('grants.')));
+    expect(permissions).toEqual(
+      all.filter((permission) => !permission.startsWith('grants.') && !WAVE_1.test(permission)),
+    );
+  });
+});
+
+describe('keeping the permissions of modules that are on', () => {
+  const all = permissionsFor(['tenant_admin'], 'console');
+  const of = (module: string) => all.filter((permission) => permission.startsWith(`${module}.`));
+
+  it("keeps a wave 1 tool's permissions only when its row switches it on", () => {
+    expect(of('forms')).not.toEqual([]);
+    const kept = onModulePermissions(all, new Map([['forms', true]]));
+    expect(kept).toEqual(expect.arrayContaining(of('forms')));
+    expect(kept.filter((permission) => WAVE_1.test(permission))).toEqual(of('forms'));
+    expect(onModulePermissions(all, new Map([['forms', false]]))).not.toEqual(
+      expect.arrayContaining(of('forms')),
+    );
+  });
+
+  it('drops a permission whose prefix is not a module', () => {
+    expect(onModulePermissions(['unknown.thing.do' as Permission], new Map())).toEqual([]);
   });
 });
 
