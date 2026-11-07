@@ -11,8 +11,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@pixel-scientists/assure": "workspace:*",
+    "@pixel-scientists/crm": "workspace:*",
     "@pixel-scientists/domain": "workspace:*",
+    "@pixel-scientists/forms": "workspace:*",
     "@pixel-scientists/grants": "workspace:*",
+    "@pixel-scientists/insight": "workspace:*",
+    "@pixel-scientists/privacy": "workspace:*",
     "@pixel-scientists/ui": "workspace:*",
     "react": "19.3.0",
     "react-dom": "19.3.0"

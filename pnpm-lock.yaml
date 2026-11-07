@@ -261,12 +261,27 @@ importers:
 
   apps/console:
     dependencies:
+      '@pixel-scientists/assure':
+        specifier: workspace:*
+        version: link:../../modules/assure
+      '@pixel-scientists/crm':
+        specifier: workspace:*
+        version: link:../../modules/crm
       '@pixel-scientists/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@pixel-scientists/forms':
+        specifier: workspace:*
+        version: link:../../modules/forms
       '@pixel-scientists/grants':
         specifier: workspace:*
         version: link:../../modules/grants
+      '@pixel-scientists/insight':
+        specifier: workspace:*
+        version: link:../../modules/insight
+      '@pixel-scientists/privacy':
+        specifier: workspace:*
+        version: link:../../modules/privacy
       '@pixel-scientists/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -523,6 +538,9 @@ importers:
 
   packages/ui:
     dependencies:
+      '@pixel-scientists/domain':
+        specifier: workspace:*
+        version: link:../domain
       radix-ui:
         specifier: 1.6.7
         version: 1.6.7(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
