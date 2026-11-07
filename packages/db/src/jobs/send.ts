@@ -53,6 +53,7 @@ export interface SendJobOptions<D> {
 function adapter<DB>(db: Kysely<DB>): Db {
   return {
     executeSql: async (text, values = []) => ({
+      // nosemgrep: tps-no-raw-sql -- pg-boss's Db interface hands over its own statement text with values bound separately; the only name in that text is a queue name from defineQueue(), which sendJob() checks and pg-boss validates
       rows: (await db.executeQuery(CompiledQuery.raw(text, values))).rows,
     }),
   };
