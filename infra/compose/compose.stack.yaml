@@ -299,7 +299,7 @@ services:
   # Catches every email the API sends. SMTP listens on the API's loopback
   # address only; the inbox is at http://127.0.0.1:<stackMail port>.
   mailpit:
-    image: axllent/mailpit:v1.31.3@sha256:ed9b00c609e77e99c79b93f1178255ebc271868920f2c69a8d166bd5634ed10d
+    image: axllent/mailpit:v1.33.0@sha256:9b3a463be15354c0f0eba91697d80e3e0d8a5623ef0e627cacc836bc17fd5231
     <<: [*hardening, *read-only]
     network_mode: service:api
     environment:
