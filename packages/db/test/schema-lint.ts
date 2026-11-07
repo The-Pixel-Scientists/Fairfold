@@ -74,6 +74,10 @@ export const NON_TENANT_TABLES: ReadonlyMap<string, string> = new Map([
       ['auth.verification', 'Emailed links come before any tenant is known.'],
       ['auth.two_factor', 'MFA belongs to the account, whatever the tenant.'],
       ['auth.rate_limit', 'Sign-in limits count identifiers and addresses, not tenants.'],
+      [
+        'auth.device',
+        'A device cookie belongs to an account, whatever the tenant, and grants no tenant.',
+      ],
       ['auth.audit_event', 'Some auth events have no tenant, such as a failed sign-in.'],
       ['auth.audit_copy_pending', 'It holds only an auth event id and a time.'],
     ] as const

@@ -6,7 +6,10 @@
 // which is no later than 90 days after it ended. Auth events are kept 12
 // months; their typed identifiers and IP addresses are personal. Ids are
 // internal, as in every schema, while a user_id that links a row to a person
-// is personal. Hashes, encrypted secrets and counters are internal.
+// is personal. Hashes, encrypted secrets and counters are internal, except a
+// device's hash and the counter keyed by it, which are online identifiers. A
+// device goes 12 months after issue, or 30 days after revocation if that is
+// sooner (limits/devices.ts in apps/api/src/auth deletes it).
 
 import type {
   ClassificationRegistry,
@@ -35,6 +38,8 @@ const counterPersonal = fixed('personal', 2, 'updated_at');
 const audit = fixed('internal', 366, 'occurred_at');
 const auditPersonal = fixed('personal', 366, 'occurred_at');
 const pending = fixed('internal', 366, 'created_at');
+const device = fixed('internal', 366, 'issued_at');
+const devicePersonal = fixed('personal', 366, 'issued_at');
 
 export const auth: ClassificationRegistry = {
   'auth.user': {
@@ -99,11 +104,23 @@ export const auth: ClassificationRegistry = {
     scope: counter,
     identifier: counterPersonal,
     client_ip: counterPersonal,
+    device_id: counterPersonal,
     count: counter,
     window_started_at: counter,
     blocked_until: counter,
     created_at: counter,
     updated_at: counter,
+  },
+  'auth.device': {
+    id: device,
+    user_id: devicePersonal,
+    device_hash: devicePersonal,
+    key_version: device,
+    issued_at: device,
+    last_used_at: device,
+    revoked_at: device,
+    created_at: device,
+    updated_at: device,
   },
   'auth.audit_event': {
     id: audit,
@@ -141,5 +158,6 @@ export const authSubjects: SubjectPathRegistry = {
     kind: 'unlinked',
     reason: 'Sign-in limits count typed identifiers and addresses, not accounts.',
   },
+  'auth.device': { kind: 'account', column: 'user_id' },
   'auth.audit_event': { kind: 'account', column: 'user_id' },
 };
