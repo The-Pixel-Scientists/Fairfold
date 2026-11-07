@@ -5,6 +5,10 @@
 // platform queues can be scheduled and no payload names a tenant. The first
 // entries arrive with the jobs they run (retention, S11-107).
 
-import type { JobSchedule } from '@pixel-scientists/db/jobs';
+import { defineSchedule, type JobSchedule } from '@pixel-scientists/db/jobs';
 
-export const schedules: readonly JobSchedule[] = [];
+import { fanOutQueue } from './jobs/index.ts';
+
+export const schedules: readonly JobSchedule[] = [
+  defineSchedule(fanOutQueue, '0 * * * *', { target: 'platform.idempotency_purge' }),
+];
