@@ -4,6 +4,8 @@
 // the test database as app_api, with a session stand-in, two tenants with
 // their staff, and readers for the rows a request left behind.
 
+import { randomUUID } from 'node:crypto';
+
 import { encodeFileNameHeader } from '@pixel-scientists/domain/files';
 import { defaultEmailTemplates } from '@pixel-scientists/grants/contracts';
 import type { LightMyRequestResponse } from 'fastify';
@@ -214,22 +216,33 @@ export async function startProgrammeApi(port: string, mail?: Mail, files?: FileS
     payload?: unknown,
     app: 'console' | 'portal' = member?.app ?? 'console',
     recentAuthAt: Date | null = null,
+    key: string = randomUUID(),
   ) =>
     api.inject({
       method,
       url: `/api${url}`,
-      ...(member === undefined ? {} : { headers: sessionHeaders(member, app, recentAuthAt) }),
+      headers: {
+        ...(method === 'POST' ? { 'idempotency-key': key } : {}),
+        ...(member === undefined ? {} : sessionHeaders(member, app, recentAuthAt)),
+      },
       ...(payload === undefined ? {} : { payload: payload as object }),
     });
 
   /** A raw upload: the file's bytes as the body, its name in the `File-Name` header. */
-  const upload = (member: Member | undefined, url: string, name: string, bytes: Buffer) =>
+  const upload = (
+    member: Member | undefined,
+    url: string,
+    name: string,
+    bytes: Buffer,
+    key: string = randomUUID(),
+  ) =>
     api.inject({
       method: 'POST',
       url: `/api${url}`,
       headers: {
         'content-type': 'application/octet-stream',
         'file-name': encodeFileNameHeader(name),
+        'idempotency-key': key,
         ...(member === undefined ? {} : sessionHeaders(member)),
       },
       payload: bytes,

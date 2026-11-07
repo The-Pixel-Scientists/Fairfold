@@ -109,7 +109,7 @@ function call(
   return api.inject({
     method,
     url: `/api/console/team${path}`,
-    headers,
+    headers: { ...headers, 'idempotency-key': randomUUID() },
     ...(payload === undefined ? {} : { payload }),
   });
 }
@@ -364,6 +364,41 @@ describe('invitations', { timeout: 60_000 }, () => {
     expect(sent.at(-1)?.text).toContain(`/${tenant.slug}/invitation#token=`);
     const [event] = await events(tenant, 'platform.invitation.sent', invitation.id);
     expect(event?.actor_id).toBe(admin.membershipId);
+  });
+
+  it('replays the same key with the same invitation, one email and one event', async () => {
+    const key = randomUUID();
+    const body = { email: `${testSlug()}@example.test`, roles: ['reviewer'] };
+    const invite = () =>
+      api.inject({
+        method: 'POST',
+        url: '/api/console/team/invitations',
+        headers: {
+          ...stand.as({
+            app: admin.app,
+            session: testSession({
+              app: admin.app,
+              userId: admin.userId,
+              tenant: admin.tenant.id,
+              recentAuthAt: new Date(Date.now() - 60_000),
+            }),
+          }),
+          'idempotency-key': key,
+        },
+        payload: body,
+      });
+    const first = await invite();
+    const mails = sent.length;
+
+    const again = await invite();
+
+    expect(first.statusCode, first.body).toBe(201);
+    expect(again.statusCode, again.body).toBe(201);
+    expect(again.json()).toEqual(first.json());
+    expect(sent).toHaveLength(mails);
+    expect(
+      await events(tenant, 'platform.invitation.sent', first.json<Invitation>().id),
+    ).toHaveLength(1);
   });
 
   it('refuses roles it does not offer, extra keys and a bad address', async () => {
