@@ -10,10 +10,10 @@ import type { Kysely } from '@pixel-scientists/db';
 import { betterAuth } from 'better-auth';
 import { twoFactor } from 'better-auth/plugins/two-factor';
 
-import { ConfigError } from '../config.ts';
+import { ConfigError, type Secret } from '../config.ts';
 import { authAdapter } from './adapter.ts';
 import { hashPassword, verifyPassword } from './passwords.ts';
-import type { AuthSettings } from './settings.ts';
+import type { AuthSecrets, AuthSettings } from './settings.ts';
 
 /**
  * The only header Better Auth reads a client address from. Our routes set it
@@ -50,10 +50,26 @@ function refuseOverrides(): void {
   }
 }
 
+/**
+ * Better Auth's versioned secrets, the current one first. Version 1 also
+ * opens values stored with no version, from before versions were set.
+ */
+export function betterAuthSecrets({ current, versions }: AuthSecrets) {
+  const order = [current, ...[...versions.keys()].filter((version) => version !== current)];
+  const legacy = versions.get(1);
+  return {
+    secrets: order.map((version) => ({
+      version,
+      value: (versions.get(version) as Secret).reveal(),
+    })),
+    ...(legacy === undefined ? {} : { secret: legacy.reveal() }),
+  };
+}
+
 export function createBetterAuth(settings: AuthSettings, db: Kysely<unknown>) {
   refuseOverrides();
   return betterAuth({
-    secret: settings.secret.reveal(),
+    ...betterAuthSecrets(settings.secrets),
     basePath: '/api/auth',
     trustedOrigins: [...new Set([settings.origins.console, settings.origins.portal])],
     database: authAdapter(db),

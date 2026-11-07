@@ -7,6 +7,11 @@
 //   TPS_AUTH_SECRET or TPS_AUTH_SECRET_FILE   at least 32 bytes; never a known
 //                                             default, nor a development value
 //                                             outside TPS_DEV=1
+//   TPS_AUTH_SECRET_<n>(_FILE)                key version n (1 to 999), checked
+//                                             the same way; TPS_AUTH_SECRET is
+//                                             version 1
+//   TPS_AUTH_SECRET_CURRENT                   the version that seals new values;
+//                                             needed when more than one is set
 //   TPS_DB_APP_AUTH_PASSWORD(_FILE)           the app_auth role's password
 //   TPS_CONSOLE_ORIGIN, TPS_PORTAL_ORIGIN     each app's exact origin: https,
 //                                             or http only for localhost names
@@ -26,10 +31,19 @@ import type { App } from '@pixel-scientists/domain/platform';
 import { ConfigError, Secret } from '../config.ts';
 import { normaliseHost } from './hosts.ts';
 
+/** The auth secret by key version (ADR 0010, "Secrets at rest"). */
+export interface AuthSecrets {
+  /** The version that seals new values. */
+  readonly current: number;
+  readonly versions: ReadonlyMap<number, Secret>;
+}
+
 export interface AuthSettings {
   /** TPS_DEV=1. */
   readonly development: boolean;
+  /** The current version's secret: keys for values that are not kept long. */
   readonly secret: Secret;
+  readonly secrets: AuthSecrets;
   /** The app_auth role's password. */
   readonly databasePassword: Secret;
   /** Each app's origin, as a browser sends it in `Origin`. */
@@ -88,19 +102,73 @@ function secretOrProblem(
   }
 }
 
+const VERSIONED = /^TPS_AUTH_SECRET_([1-9][0-9]{0,2})(?:_FILE)?$/;
+const VERSION = /^[1-9][0-9]{0,2}$/;
+
+/** The auth secret's variable for each key version that is set. */
+function secretNames(env: Env, problems: string[]): Map<number, string> {
+  const names = new Map<number, string>();
+  for (const [name, value] of Object.entries(env)) {
+    if (!value || !name.startsWith('TPS_AUTH_SECRET_')) continue;
+    if (name === 'TPS_AUTH_SECRET_FILE' || name === 'TPS_AUTH_SECRET_CURRENT') continue;
+    const version = VERSIONED.exec(name)?.[1];
+    if (version === undefined) {
+      problems.push(`${name} is not a setting. Name key versions TPS_AUTH_SECRET_1 to _999.`);
+    } else names.set(Number(version), `TPS_AUTH_SECRET_${version}`);
+  }
+  if (env['TPS_AUTH_SECRET'] || env['TPS_AUTH_SECRET_FILE'] || names.size === 0) {
+    if (names.has(1)) {
+      problems.push('Set TPS_AUTH_SECRET or TPS_AUTH_SECRET_1, not both: each is version 1.');
+    } else names.set(1, 'TPS_AUTH_SECRET');
+  }
+  return new Map([...names].sort(([a], [b]) => a - b));
+}
+
+/** Each key version's checked secret and the current version, or undefined after a problem. */
+function readSecrets(
+  env: Env,
+  development: boolean,
+  readFile: ((path: string) => string) | undefined,
+  problems: string[],
+): AuthSecrets | undefined {
+  const names = secretNames(env, problems);
+  const versions = new Map<number, Secret>();
+  const seen = new Set<string>();
+  for (const [version, name] of names) {
+    const secret = secretOrProblem(env, name, readFile);
+    if (typeof secret !== 'string') problems.push(secret.problem);
+    else if (Buffer.byteLength(secret, 'utf8') < MINIMUM_SECRET_BYTES) {
+      problems.push(`${name} must be at least ${String(MINIMUM_SECRET_BYTES)} bytes.`);
+    } else if (KNOWN_DEFAULTS.has(secret) || (DEVELOPMENT_VALUE.test(secret) && !development)) {
+      problems.push(`${name} is a published value. Set a random one of at least 32 bytes.`);
+    } else if (seen.has(secret)) {
+      problems.push(`${name} repeats another key version's secret. Set a new random one.`);
+    } else {
+      seen.add(secret);
+      versions.set(version, new Secret(secret));
+    }
+  }
+
+  const named = env['TPS_AUTH_SECRET_CURRENT'] || undefined;
+  let current: number | undefined;
+  if (named !== undefined) {
+    if (VERSION.test(named) && names.has(Number(named))) current = Number(named);
+    else problems.push('TPS_AUTH_SECRET_CURRENT must name a key version that is set.');
+  } else if (names.size === 1) {
+    current = [...names.keys()][0];
+  } else {
+    problems.push('More than one auth key version is set, so set TPS_AUTH_SECRET_CURRENT.');
+  }
+  return current === undefined || versions.size < names.size ? undefined : { current, versions };
+}
+
 /** Read and check the settings, or throw a ConfigError naming every problem. */
 export function loadAuthSettings(env: Env, readFile?: (path: string) => string): AuthSettings {
   const problems: string[] = [];
   const development = env['TPS_DEV'] === '1';
   const developmentServer = development && isLoopbackHost(env['TPS_DB_HOST'] ?? '');
 
-  const secret = secretOrProblem(env, 'TPS_AUTH_SECRET', readFile);
-  if (typeof secret !== 'string') problems.push(secret.problem);
-  else if (Buffer.byteLength(secret, 'utf8') < MINIMUM_SECRET_BYTES) {
-    problems.push(`TPS_AUTH_SECRET must be at least ${String(MINIMUM_SECRET_BYTES)} bytes.`);
-  } else if (KNOWN_DEFAULTS.has(secret) || (DEVELOPMENT_VALUE.test(secret) && !development)) {
-    problems.push('TPS_AUTH_SECRET is a published value. Set a random one of at least 32 bytes.');
-  }
+  const secrets = readSecrets(env, development, readFile, problems);
 
   const password = secretOrProblem(env, 'TPS_DB_APP_AUTH_PASSWORD', readFile);
   if (typeof password !== 'string') problems.push(password.problem);
@@ -145,10 +213,11 @@ export function loadAuthSettings(env: Env, readFile?: (path: string) => string):
     problems.push('TPS_AUTH_BREACH_CHECK must be on or off.');
   }
 
-  if (problems.length > 0) throw new ConfigError(problems);
+  if (problems.length > 0 || secrets === undefined) throw new ConfigError(problems);
   return {
     development,
-    secret: new Secret(secret as string),
+    secret: secrets.versions.get(secrets.current) as Secret,
+    secrets,
     databasePassword: new Secret(password as string),
     origins: { console: consoleOrigin as string, portal: portalOrigin as string },
     ...(prefix === undefined ? {} : { consolePathPrefix: prefix }),
