@@ -42,7 +42,8 @@ export interface AppAuditEvent {
 }
 
 export interface AppConfigVersion {
-  author_id: string;
+  author_id: string | null;
+  author_kind: Generated<string>;
   created_at: Generated<Timestamp>;
   diff: Json;
   entity_id: string;
@@ -149,7 +150,8 @@ export interface AppTenantModule {
   module: string;
   tenant_id: string;
   updated_at: Generated<Timestamp>;
-  updated_by: string;
+  updated_by: string | null;
+  updated_by_kind: Generated<string>;
 }
 
 export interface AppTenantTheme {

@@ -106,6 +106,12 @@ describe('migrations', { timeout: 30_000 }, () => {
       // leave behind. The round trip starts with none, as a fresh database
       // does; TRUNCATE, which only the owner may run, is rolled back below.
       await sql`TRUNCATE auth.audit_copy_pending, auth.audit_event`.execute(trx);
+      // Likewise 0026's down refuses while a module switch or a configuration
+      // version has the operator as its author, and 0021's while a switch
+      // names a wave 1 tool, which tenant creation, the operator's backfill
+      // and their tests leave behind. Row-level security hides those rows
+      // from migrator, so TRUNCATE them too.
+      await sql`TRUNCATE app.tenant_module, app.config_version`.execute(trx);
       // After the loop, before[i] is the schema with the first i migrations applied.
       const before = [await snapshot(trx)];
       for (const { name, down } of [...migrations].reverse()) {

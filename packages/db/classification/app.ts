@@ -88,6 +88,7 @@ export const app: ClassificationRegistry = {
     enabled: internal,
     updated_at: internal,
     updated_by: internal,
+    updated_by_kind: internal,
   },
   'app.tenant_theme': {
     tenant_id: internal,
@@ -107,6 +108,7 @@ export const app: ClassificationRegistry = {
     entity_id: internal,
     version: internal,
     author_id: internal,
+    author_kind: internal,
     diff: internal,
     created_at: internal,
   },
