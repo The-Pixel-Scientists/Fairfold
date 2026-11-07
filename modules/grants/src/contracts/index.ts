@@ -6,6 +6,47 @@
 import '@pixel-scientists/domain/jitless';
 
 export {
+  adjustmentListSchema,
+  adjustmentSchema,
+  submissionAdjustmentsSchema,
+  type Adjustment,
+  type AdjustmentList,
+  type SubmissionAdjustments,
+} from './adjustments/answers.ts';
+export {
+  closingTimeWords,
+  effectiveClosingTime,
+  monitoringClosingTime,
+  shownMonitoringClosingTime,
+  type AdjustmentTiming,
+  type ApplicationTiming,
+} from './adjustments/closing.ts';
+export {
+  grantAdjustmentInputSchema,
+  revokeAdjustmentInputSchema,
+  type GrantAdjustmentInput,
+  type RevokeAdjustmentInput,
+} from './adjustments/inputs.ts';
+export {
+  adjustmentKinds,
+  adjustmentKindSchema,
+  adjustmentReasons,
+  adjustmentReasonSchema,
+  revokeReasons,
+  revokeReasonSchema,
+  type AdjustmentKind,
+  type AdjustmentReason,
+  type RevokeReason,
+} from './adjustments/lists.ts';
+export { adjustmentMessages, type AdjustmentMessage } from './adjustments/messages.ts';
+export {
+  adjustmentRoutes,
+  grantAdjustment,
+  listRoundAdjustments,
+  listSubmissionAdjustments,
+  revokeAdjustment,
+} from './adjustments/routes.ts';
+export {
   answersSavedSchema,
   applicationListSchema,
   applicationSchema,
@@ -24,6 +65,23 @@ export {
   type OpenRoundList,
 } from './applications/answers.ts';
 export {
+  assistedApplicationSchema,
+  assistedAuditActions,
+  assistedListSchema,
+  assistedRoutes,
+  assistedSummarySchema,
+  checkAssistedEligibility,
+  getAssistedApplication,
+  listAssistedApplications,
+  saveAssistedAnswers,
+  startAssistedApplication,
+  startAssistedInputSchema,
+  submitAssistedApplication,
+  type AssistedApplication,
+  type AssistedList,
+  type StartAssistedInput,
+} from './applications/assisted.ts';
+export {
   saveAnswersInputSchema,
   startApplicationInputSchema,
   submitApplicationInputSchema,
@@ -36,10 +94,13 @@ export {
   applicationStatusSchema,
   eligibilityOutcomes,
   eligibilityOutcomeSchema,
+  submissionRouteLabels,
+  submissionRouteSchema,
   submissionStatuses,
   submissionStatusSchema,
   type ApplicationStatus,
   type EligibilityOutcome,
+  type SubmissionRoute,
   type SubmissionStatus,
 } from './applications/lists.ts';
 export {
@@ -213,6 +274,35 @@ export {
   sendDecisionEmails,
 } from './decisions/routes.ts';
 export {
+  monitoringAnswerSchema,
+  monitoringFormSchema,
+  monitoringResponseSchema,
+  privacyNoticeVersionSchema,
+  roundMonitoringFormSchema,
+  type MonitoringAnswer,
+  type MonitoringForm,
+  type MonitoringResponse,
+  type RoundMonitoringForm,
+} from './monitoring/answers.ts';
+export { monitoringDefinitionProblems, type MonitoringProblem } from './monitoring/check.ts';
+export {
+  monitoringResponseInputSchema,
+  roundMonitoringFormInputSchema,
+  type MonitoringResponseInput,
+  type RoundMonitoringFormInput,
+} from './monitoring/inputs.ts';
+export { monitoringMessages, type MonitoringMessage } from './monitoring/messages.ts';
+export { monitoringQuestions, monitoringTemplate, preferNotToSay } from './monitoring/questions.ts';
+export {
+  getMonitoringForm,
+  getMonitoringResponse,
+  getRoundMonitoringForm,
+  monitoringRoutes,
+  saveMonitoringResponse,
+  setRoundMonitoringForm,
+  withdrawMonitoringResponse,
+} from './monitoring/routes.ts';
+export {
   amountAwarded,
   grantIdentifier,
   MAX_EXPORT_GRANTS,
@@ -367,7 +457,43 @@ export {
   updateRound,
 } from './programme/routes.ts';
 export {
+  reminderHistorySchema,
+  reminderSettingAnswerSchema,
+  reminderSettingSchema,
+  type ReminderHistory,
+  type ReminderSetting,
+  type ReminderSettingAnswer,
+} from './reminders/answers.ts';
+export {
+  MAX_DRAFT_REMINDERS,
+  MAX_OVERDUE_REMINDERS,
+  reminderSettingConfigEntityType,
+  reminderSettingDiff,
+  reminderSettingInputSchema,
+  type ReminderSettingInput,
+} from './reminders/inputs.ts';
+export {
+  reminderKinds,
+  reminderKindSchema,
+  reminderOutcomes,
+  reminderOutcomeSchema,
+  reminderReasons,
+  reminderReasonSchema,
+  type ReminderKind,
+  type ReminderOutcome,
+  type ReminderReason,
+} from './reminders/lists.ts';
+export { reminderMessages, type ReminderMessage } from './reminders/messages.ts';
+export {
+  getReminderSetting,
+  listAssignmentReminders,
+  listSubmissionReminders,
+  reminderRoutes,
+  saveReminderSetting,
+} from './reminders/routes.ts';
+export {
   eligibilityCheckSchema,
+  memberRefSchema,
   stageMoveResultSchema,
   submissionCursorSchema,
   submissionEventSchema,
@@ -375,6 +501,7 @@ export {
   submissionSchema,
   submissionSummarySchema,
   type EligibilityCheck,
+  type MemberRef,
   type StageMoveResult,
   type Submission,
   type SubmissionEvent,
