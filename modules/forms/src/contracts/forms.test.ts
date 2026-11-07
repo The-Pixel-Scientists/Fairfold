@@ -99,7 +99,7 @@ describe('formDefinitionInputSchema', () => {
       problems(
         formDefinitionInputSchema,
         definition([
-          { id: 'f_one', type: 'short_text', label: 'Name‮' },
+          { id: 'f_one', type: 'short_text', label: 'Name\u202e' },
           { id: 'f_two', type: 'short_text', label: 'Town', hint: '  ' },
         ]),
       ),

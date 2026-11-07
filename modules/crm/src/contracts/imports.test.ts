@@ -76,7 +76,7 @@ describe('import row errors', () => {
     const errors = importRowErrors('organisation', {
       name: '=HYPERLINK("https://example.org","x")',
       legal_form: 'Trust',
-      address_line1: '1 High‮Street',
+      address_line1: '1 High\u202eStreet',
       postcode: 'NOTPC',
       identifier_scheme: 'GB-XX',
       identifier: '1',
