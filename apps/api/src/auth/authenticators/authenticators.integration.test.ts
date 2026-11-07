@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
 // Replacing and removing the authenticator app, against the test database
-// (ADR 0010): step-up on a clock, the pending secret beside the current one,
-// one use of the confirming code, the last-factor rule across tenants, and
-// everything revoked, recorded, copied and emailed, with no secret or code
-// anywhere it should not be.
+// (ADR 0010): an applicant's optional one, step-up on a clock, the pending
+// secret beside the current one, one use of the confirming code, the
+// last-factor rule across tenants, and everything revoked, recorded, copied
+// and emailed, with no secret or code anywhere it should not be.
 
 import { randomBytes } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -204,7 +204,7 @@ async function verifyWith(tenant: TestTenant, user: User, codes: string[]) {
 
 /**
  * Mark the user's portal sessions as having proven their factor, as a portal
- * session that verified a code would be; portal sign-in does not offer that yet.
+ * session that verified a code would be, for a secret no test reads codes from.
  */
 const proveFactor = (userId: string) =>
   migrator(
@@ -447,8 +447,8 @@ describe('removing the authenticator app', { timeout: 120_000 }, () => {
     const token = await signIn(tenantA, user, 'portal');
     const other = await signIn(tenantA, user, 'portal');
     const bystanderToken = await signIn(tenantB, bystander, 'portal');
-    // A password alone does not remove the factor it guards.
-    expect((await remove(token, 'portal')).statusCode).toBe(403);
+    // A password alone does not remove the factor it guards: the session waits for it.
+    expect((await remove(token, 'portal')).statusCode).toBe(401);
     await proveFactor(user.userId);
     sendResult = { sent: false, code: 'failed' };
     sent.length = 0;
@@ -495,6 +495,27 @@ describe('removing the authenticator app', { timeout: 120_000 }, () => {
   });
 });
 
+describe('an applicant’s authenticator app', { timeout: 120_000 }, () => {
+  it('is optional, and once set up, portal sign-in waits for its code', async () => {
+    const user = await addUser([]);
+    const token = await signIn(tenantA, user, 'portal');
+    const secret = fromBase32((await start(token, 'portal')).json<{ key: string }>().key);
+    const step = await freshStep();
+    expect((await confirm(token, codeAt(secret, step), 'portal')).statusCode).toBe(204);
+    expect(await events(user.userId)).toEqual([
+      { code: 'mfa_enrolled', reason: 'totp_change', tenant_id: tenantA.id },
+      { code: 'sessions_revoked', reason: 'mfa_changed', tenant_id: tenantA.id },
+    ]);
+
+    const pending = await signIn(tenantA, user, 'portal');
+    expect((await session(pending, 'portal')).json<{ mfa: string }>().mfa).toBe('verify');
+    const code = { code: codeAt(secret, step + 1) };
+    const verified = await call('POST', '/auth/totp/verify', pending, code, 'portal', user.ip);
+    expect(verified.statusCode).toBe(200);
+    expect(verified.json<{ mfa: string }>().mfa).toBe('complete');
+  });
+});
+
 describe('a session that has not proven the account’s factor', { timeout: 120_000 }, () => {
   it.each(['their own tenant', 'another tenant'])(
     'changes nothing for staff signed in to the portal of %s with the password alone',
@@ -510,14 +531,13 @@ describe('a session that has not proven the account’s factor', { timeout: 120_
         events: await events(user.userId),
       };
 
-      const refused = await start(portal, 'portal');
-      expect(refused.statusCode).toBe(403);
-      expect(refused.json<{ detail: string }>().detail).toMatch(/authenticator app/);
+      // Portal sign-in waits for the account's factor, so the policy refuses each.
+      expect((await start(portal, 'portal')).statusCode).toBe(401);
       expect((await confirm(portal, codeAt(pending, await freshStep()), 'portal')).statusCode).toBe(
-        403,
+        401,
       );
-      expect((await remove(portal, 'portal')).statusCode).toBe(403);
-      expect((await changePassword(portal, 'portal')).statusCode).toBe(403);
+      expect((await remove(portal, 'portal')).statusCode).toBe(401);
+      expect((await changePassword(portal, 'portal')).statusCode).toBe(401);
 
       expect(await twoFactor(user.userId)).toEqual(before.twoFactor);
       expect(await passwordHash(user.userId)).toEqual(before.password);

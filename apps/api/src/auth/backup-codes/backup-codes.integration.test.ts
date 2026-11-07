@@ -285,8 +285,9 @@ describe('making backup codes', { timeout: 120_000 }, () => {
 
   it('refuses a portal session that has not proven the account’s authenticator', async () => {
     const { user } = await signedIn();
+    // Portal sign-in waits for the factor too, so the policy refuses it first.
     const portal = await signIn(user, 'portal');
-    expect((await generate(portal, 'portal')).statusCode).toBe(403);
+    expect((await generate(portal, 'portal')).statusCode).toBe(401);
     expect(await storedCodes(user.userId)).toBeNull();
   });
 });

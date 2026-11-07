@@ -5,10 +5,11 @@
 // device cookie for the account, and a delayed attempt is refused without
 // checking the password. An unknown address costs a dummy hash, and every
 // failure gets the same problem. Success issues a session for the resolved
-// app with the slug's tenant active: a console session waits for MFA, which
-// gives the charge back and keeps the device when it completes, and a portal
-// one needs none and does both now. A portal sign-in with no membership in
-// the tenant makes the person an applicant there.
+// app with the slug's tenant active. It waits for MFA if the account holds a
+// factor, in either app, or to enrol one in the console; MFA's completion
+// gives the charge back and keeps the device. A portal session for an
+// account with no factor needs none and does both now. A portal sign-in
+// with no membership in the tenant makes the person an applicant there.
 
 import {
   chargeRateLimits,
@@ -21,9 +22,9 @@ import {
 import { signIn } from '@pixel-scientists/domain/auth';
 
 import { recordAudit } from '../audit/writer.ts';
-import type { MfaState } from '../context.ts';
 import { ApiError } from '../problems.ts';
 import { route, type Route } from '../routes/register.ts';
+import { factorsOf } from './authenticators/guard.ts';
 import { hashToken, sessionCookie } from './cookies.ts';
 import { copyAuthEvent, recordAuthEvent } from './events.ts';
 import { plainAddress } from './limits.ts';
@@ -116,16 +117,6 @@ export function signInRoutes(deps: RouteDependencies): Route[] {
       if (account.status !== 'active' || !account.email_verified) return refuse('not_active');
 
       const userId = account.id;
-      let mfa: MfaState = 'not_required';
-      if (app === 'console') {
-        const totp = await users
-          .selectFrom('auth.two_factor')
-          .select('user_id')
-          .where('user_id', '=', userId)
-          .where('verified', '=', true)
-          .executeTakeFirst();
-        mfa = totp === undefined ? 'enrol' : 'verify';
-      }
       const verified = account.password;
       const issued = await deps.auth.transaction().execute(async (trx) => {
         // Take turns with a reset or revocation for the user, then make sure
@@ -133,8 +124,10 @@ export function signInRoutes(deps: RouteDependencies): Route[] {
         // replaced meanwhile does not sign in.
         if (!(await lockUser(trx, userId, 'share'))) return 'not_active';
         if ((await currentPassword(trx, userId)) !== verified) return 'bad_password';
-        // A console sign-in's charge is given back, and its device kept,
-        // only once MFA completes.
+        const factors = await factorsOf(trx, userId);
+        const mfa = factors.length > 0 ? 'verify' : app === 'console' ? 'enrol' : 'not_required';
+        // A sign-in that waits for MFA has its charge given back, and its
+        // device kept, only once MFA completes.
         let device: string | undefined;
         if (mfa === 'not_required') {
           await refundSignIn(trx, counted);

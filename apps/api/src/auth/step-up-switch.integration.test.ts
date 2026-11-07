@@ -2,8 +2,8 @@
 //
 // Step-up, switching tenant and the session's memberships against the test
 // database (ADR 0010), in the full API with every module's routes: step-up
-// with password and code, as a new session, its limits, and its 5 minutes on
-// a clock; switching only to the user's own active memberships in this app;
+// with password and code, or the password alone for an account with no
+// factor, as a new session, its limits, and its 5 minutes on a clock; switching only to the user's own active memberships in this app;
 // and a walk of every route with a session waiting for MFA and with a
 // complete one.
 
@@ -319,16 +319,58 @@ describe('step-up', { timeout: 120_000 }, () => {
     expect(statuses).toEqual([401, 401, 401, 401, 401, 429]);
   });
 
-  it('refuses a portal session', async () => {
+  it('lets a portal account with no factor step up with its password alone', async () => {
     const user = await addUser([]);
     const portal = await signIn(tenant, user, 'portal');
-    const response = await post(
-      '/auth/step-up',
-      portal,
-      { password: PASSWORD, code: '000000' },
-      { app: 'portal', ip: user.ip },
+    const options = { app: 'portal', ip: user.ip };
+    const withCode = { password: PASSWORD, code: '000000' };
+    expect((await post('/auth/step-up', portal, withCode, options)).statusCode).toBe(401);
+    const wrong = { password: 'not the password at all' };
+    expect((await post('/auth/step-up/password', portal, wrong, options)).statusCode).toBe(401);
+
+    const response = await post('/auth/step-up/password', portal, { password: PASSWORD }, options);
+    expect(response.statusCode).toBe(200);
+    const next = tokenOf(response, 'portal') ?? '';
+    expect(next).not.toBe('');
+    expect(next).not.toBe(portal);
+    expect((await getSession(portal, 'portal')).statusCode).toBe(401);
+    const until = Date.parse(response.json<{ recentAuthUntil: string }>().recentAuthUntil);
+    expect(Math.abs(until - (Date.now() + 5 * 60_000))).toBeLessThan(5000);
+    expect(await events(user.userId, 'step_up_completed')).toEqual([
+      { tenant_id: tenant.id, reason: null },
+    ]);
+  });
+
+  it('takes a password alone from no account with a factor', async () => {
+    const staff = await addUser([tenant]);
+    const { token } = await signedIn(tenant, staff);
+    const options = { ip: staff.ip };
+    expect(
+      (await post('/auth/step-up/password', token, { password: PASSWORD }, options)).statusCode,
+    ).toBe(401);
+
+    // An applicant who added a passkey since signing in.
+    const applicant = await addUser([]);
+    const portal = await signIn(tenant, applicant, 'portal');
+    await migrator(
+      `INSERT INTO auth.passkey (user_id, credential_id, public_key, counter, name, device_type,
+                                 backed_up)
+       VALUES ($1, $2, 'AQID', 0, 'Phone', 'multiDevice', true)`,
+      [applicant.userId, randomBytes(16).toString('base64url')],
     );
-    expect(response.statusCode).toBe(403);
+    const refused = await post(
+      '/auth/step-up/password',
+      portal,
+      { password: PASSWORD },
+      { app: 'portal', ip: applicant.ip },
+    );
+    expect(refused.statusCode).toBe(401);
+    for (const user of [staff, applicant]) {
+      expect(await events(user.userId, 'sign_in_failed')).toEqual([
+        { tenant_id: tenant.id, reason: 'step_up_factor_required' },
+      ]);
+      expect(await events(user.userId, 'step_up_completed')).toEqual([]);
+    }
   });
 });
 
