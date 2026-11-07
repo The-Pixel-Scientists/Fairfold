@@ -1,8 +1,10 @@
 # ADR 0030: Files after upload, and the reverse proxy
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-10-27
 - **Deciders:** Aaron Gardner
+
+Accepted by Aaron Gardner on 28 October 2026, with nginx (official, Alpine) as the reverse proxy.
 
 ## Context
 
