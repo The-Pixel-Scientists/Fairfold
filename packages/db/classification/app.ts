@@ -202,6 +202,8 @@ export const app: ClassificationRegistry = {
     entity_id: audit,
     changes: audit,
     subject_party_id: audit,
+    job_id: audit,
+    origin_membership_id: audit,
   },
   // The queue register (ADR 0009): platform configuration.
   'app.job_queue': {

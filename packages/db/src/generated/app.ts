@@ -34,7 +34,9 @@ export interface AppAuditEvent {
   entity_id: string;
   entity_type: string;
   id: Generated<string>;
+  job_id: string | null;
   occurred_at: Generated<Timestamp>;
+  origin_membership_id: string | null;
   request_id: string;
   retain_until: Timestamp;
   subject_party_id: string | null;
