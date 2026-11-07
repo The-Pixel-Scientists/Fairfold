@@ -7,7 +7,13 @@
 
 import { defineRoute, type RouteContract } from '@pixel-scientists/domain/api';
 import { authRoutes } from '@pixel-scientists/domain/auth';
-import { permissions, type ModuleId, type Permission } from '@pixel-scientists/domain/platform';
+import {
+  permissions,
+  scopeRules,
+  type ModuleId,
+  type Permission,
+  type ScopeRule,
+} from '@pixel-scientists/domain/platform';
 import {
   getLogo,
   getPublicTenant,
@@ -30,12 +36,12 @@ import { route, type Route } from './register.ts';
 // Building the application loads Fastify and its plugins, which is slow on a cold start.
 vi.setConfig({ testTimeout: 15_000 });
 
-const everyScope: ScopeResolvers = {
-  assigned_review: () => Promise.resolve(true),
-  own_person: () => Promise.resolve(true),
-  own_organisation: () => Promise.resolve(true),
-  own_application: () => Promise.resolve(true),
-};
+/** Every scope rule but `tenant`, which the platform adds, lets the request through. */
+const everyScope: ScopeResolvers = Object.fromEntries(
+  (Object.keys(scopeRules) as ScopeRule[])
+    .filter((rule) => rule !== 'tenant')
+    .map((rule) => [rule, () => Promise.resolve(true)]),
+);
 
 /** Reaching the database is how a test sees that the policy let a request through. */
 const PASSED = 409;
@@ -499,7 +505,7 @@ function permissionRoute(permission: Permission): RouteContract {
   const granted = permissions[permission];
   return defineRoute({
     method: 'POST',
-    path: `/${granted.app}/probes/${permission.replaceAll('.', '-')}`,
+    path: `/${granted.app}/probes/${permission.replaceAll(/[._]/g, '-')}`,
     audience: granted.app,
     module: permission.split('.')[0] as ModuleId,
     permission,
@@ -563,6 +569,11 @@ describe('the policy before the transaction', () => {
     expect(memberRoutes).toHaveLength(permissionRoutes.length);
   });
 
+  it('gives each permission its own probe path', () => {
+    const paths = new Set(permissionRoutes.map((contract) => contract.path));
+    expect(paths.size).toBe(permissionRoutes.length);
+  });
+
   it('refuses a request with no session, 401, before it opens a transaction', async () => {
     for (const contract of memberRoutes) expect(await status(contract), contract.path).toBe(401);
     expect(transaction.calls()).toBe(0);
@@ -598,7 +609,22 @@ describe('the policy before the transaction', () => {
     const stepUp = memberRoutes.filter((contract) => 'stepUp' in contract && contract.stepUp);
     expect(stepUp.map((contract) => contract.path)).toEqual([
       '/console/probes/platform-members-manage',
+      '/console/probes/platform-audit-export',
+      '/console/probes/platform-retention-manage',
+      '/console/probes/platform-subject-access-request',
+      '/console/probes/platform-erasure-request',
+      '/console/probes/platform-sso-manage',
+      '/console/probes/platform-approvals-decide',
       '/console/probes/grants-decisions-release',
+      '/console/probes/grants-monitoring-disclose',
+      '/console/probes/crm-records-export',
+      '/console/probes/crm-parties-merge',
+      '/console/probes/crm-imports-run',
+      '/console/probes/assure-screening-decide',
+      '/console/probes/forms-retention-manage',
+      '/console/probes/forms-responses-export',
+      '/console/probes/privacy-requests-export',
+      '/console/probes/privacy-requests-erase',
     ]);
     const ago = (minutes: number) => new Date(Date.now() - minutes * 60_000);
     for (const contract of stepUp) {
