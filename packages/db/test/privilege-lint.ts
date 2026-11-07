@@ -56,6 +56,9 @@ export const EXECUTABLE_BY: ReadonlyMap<string, readonly AppRole[]> = new Map<
   ['app.public_tenant_logo(text)', ['app_api']],
   // The operator command alone (ADR 0019).
   ['app.create_tenant(text, text)', ['app_worker']],
+  // The bounded purges of expired keys and counters (ADR 0028).
+  ['app.delete_expired_idempotency_keys(integer)', ['app_worker']],
+  ['app.delete_expired_request_limits(integer)', ['app_worker']],
 ]);
 
 interface DefinerFunction {

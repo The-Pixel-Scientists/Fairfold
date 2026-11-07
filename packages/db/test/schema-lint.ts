@@ -51,8 +51,8 @@ import {
 } from './privilege-lint.ts';
 
 /** Tables in an application schema without tenant_id, each with its reason. */
-export const NON_TENANT_TABLES: ReadonlyMap<string, string> = new Map(
-  (
+export const NON_TENANT_TABLES: ReadonlyMap<string, string> = new Map([
+  ...(
     [
       [
         'auth.user',
@@ -66,11 +66,18 @@ export const NON_TENANT_TABLES: ReadonlyMap<string, string> = new Map(
       ['auth.audit_event', 'Some auth events have no tenant, such as a failed sign-in.'],
       ['auth.audit_copy_pending', 'It holds only an auth event id and a time.'],
     ] as const
-  ).map(([table, reason]) => [
-    table,
-    `${reason} On ADR 0003's allowlist: only app_auth and the function owners have grants.`,
-  ]),
-);
+  ).map(
+    ([table, reason]) =>
+      [
+        table,
+        `${reason} On ADR 0003's allowlist: only app_auth and the function owners have grants.`,
+      ] as const,
+  ),
+  [
+    'app.request_limit',
+    'Hashed client keys and counters for rate limits; holds no tenant data (ADR 0028).',
+  ],
+]);
 
 /** Tenant tables whose own id is the tenant, each with its reason. */
 export const TENANT_KEYED_BY_ID: ReadonlyMap<string, string> = new Map([

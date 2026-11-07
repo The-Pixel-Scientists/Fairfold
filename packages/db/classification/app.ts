@@ -25,6 +25,14 @@ const invitation: FieldClassification = {
   sensitivity: 'internal',
   retention: { kind: 'fixed', days: 90, from: 'expires_at' },
 };
+const idempotencyKey: FieldClassification = {
+  sensitivity: 'internal',
+  retention: { kind: 'fixed', days: 2, from: 'created_at' },
+};
+const requestLimit: FieldClassification = {
+  sensitivity: 'internal',
+  retention: { kind: 'fixed', days: 1, from: 'window_start' },
+};
 const audit: FieldClassification = {
   sensitivity: 'internal',
   retention: { kind: 'tenant_policy', policy: 'audit', minimumDays: 365 },
@@ -41,6 +49,8 @@ export const notKept: ReadonlySet<string> = new Set([
   'app.config_version.diff',
   'app.file.sha256',
   'app.invitation.token_hash',
+  'app.idempotency_key.request_hash',
+  'app.request_limit.key_hash',
   'app.audit_event.changes',
 ]);
 
@@ -139,6 +149,31 @@ export const app: ClassificationRegistry = {
     created_by: invitation,
     updated_at: invitation,
     updated_by: invitation,
+  },
+  // An idempotency key (ADR 0028): kept 2 days, its 24-hour expiry plus a
+  // margin for the purge. The request hash digests values that may be
+  // personal, so it is classified as they may be.
+  'app.idempotency_key': {
+    tenant_id: idempotencyKey,
+    id: idempotencyKey,
+    membership_id: idempotencyKey,
+    route_id: idempotencyKey,
+    key: idempotencyKey,
+    request_hash: { ...idempotencyKey, sensitivity: 'personal' },
+    state: idempotencyKey,
+    status: idempotencyKey,
+    created_id: idempotencyKey,
+    created_at: idempotencyKey,
+    expires_at: idempotencyKey,
+  },
+  // A rate-limit counter (ADR 0028), holding no tenant data: kept 1 day from
+  // its window. Its key hash is a pseudonymous client identifier.
+  'app.request_limit': {
+    bucket: requestLimit,
+    key_hash: { ...requestLimit, sensitivity: 'personal' },
+    window_start: requestLimit,
+    count: requestLimit,
+    expires_at: requestLimit,
   },
   'app.audit_event': {
     tenant_id: audit,
