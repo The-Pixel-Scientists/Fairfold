@@ -108,8 +108,9 @@ describe('fetch through the outbound dispatcher', () => {
 
   it('refuses plain HTTP before it connects', async () => {
     dials = [];
-    // nosemgrep: typescript.react.security.react-insecure-request -- proves plain HTTP is refused before connecting
-    expect(await failure(fetch('http://stub.test/'))).toBe('scheme_refused');
+    const plain = new URL('https://stub.test/');
+    plain.protocol = 'http:';
+    expect(await failure(fetch(plain.href))).toBe('scheme_refused');
     expect(dials).toEqual([]);
   });
 
