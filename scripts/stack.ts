@@ -64,6 +64,8 @@ const SECRETS = [
   'TPS_STACK_STORAGE_ADMIN_SECRET_KEY',
   'TPS_STACK_STORAGE_WRITE_SECRET_KEY',
   'TPS_STACK_STORAGE_READ_SECRET_KEY',
+  'TPS_STACK_STORAGE_SCANNER_SECRET_KEY',
+  'TPS_STACK_STORAGE_REMOVAL_SECRET_KEY',
   'TPS_STACK_STORAGE_JWT_WRITE_KEY',
   'TPS_STACK_STORAGE_JWT_READ_KEY',
   'TPS_STACK_STORAGE_JWT_FILER_WRITE_KEY',
@@ -109,23 +111,36 @@ function secret(secrets: Readonly<Record<string, string>>, name: string): string
 }
 
 /**
- * SeaweedFS's S3 identities (ADR 0047): admin may only create the bucket,
- * write may only write under clean/, and read may only read there. The
- * access key ids match compose.stack.yaml.
+ * SeaweedFS's S3 identities (ADR 0030, 0047): admin may only create the
+ * bucket, write may only write under clean/, read may only read there,
+ * scanner reads clean/ and reads and writes withheld/, and removal (the
+ * worker's) lists and deletes under clean/ and withheld/. The access key ids
+ * match compose.stack.yaml.
  */
 export function storageIdentities(secrets: Readonly<Record<string, string>>): string {
-  const identity = (name: string, purpose: string, action: string) => ({
+  const identity = (name: string, purpose: string, actions: string | string[]) => ({
     name,
     credentials: [
       { accessKey: name, secretKey: secret(secrets, `TPS_STACK_STORAGE_${purpose}_SECRET_KEY`) },
     ],
-    actions: [action],
+    actions: [actions].flat(),
   });
   return JSON.stringify({
     identities: [
       identity('tps-admin', 'ADMIN', `Admin:${STACK_BUCKET}`),
       identity('tps-write', 'WRITE', `Write:${STACK_BUCKET}/clean/*`),
       identity('tps-read', 'READ', `Read:${STACK_BUCKET}/clean/*`),
+      identity('tps-scanner', 'SCANNER', [
+        `Read:${STACK_BUCKET}/clean/*`,
+        `Read:${STACK_BUCKET}/withheld/*`,
+        `Write:${STACK_BUCKET}/withheld/*`,
+      ]),
+      identity('tps-removal', 'REMOVAL', [
+        `List:${STACK_BUCKET}/clean/*`,
+        `Delete:${STACK_BUCKET}/clean/*`,
+        `List:${STACK_BUCKET}/withheld/*`,
+        `Delete:${STACK_BUCKET}/withheld/*`,
+      ]),
     ],
   });
 }

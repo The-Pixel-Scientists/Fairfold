@@ -181,6 +181,9 @@ services:
       TPS_STORAGE_WRITE_SECRET_ACCESS_KEY_FILE: /run/secrets/storage_write_secret_key
       TPS_STORAGE_READ_ACCESS_KEY_ID: tps-read
       TPS_STORAGE_READ_SECRET_ACCESS_KEY_FILE: /run/secrets/storage_read_secret_key
+      # Reads clean/ and reads and writes withheld/ (ADR 0030).
+      TPS_STORAGE_SCANNER_ACCESS_KEY_ID: tps-scanner
+      TPS_STORAGE_SCANNER_SECRET_ACCESS_KEY_FILE: /run/secrets/storage_scanner_secret_key
       TPS_CLAMD_HOST: clamav
       TPS_CLAMD_PORT: '3310'
       # ADR 0047: 5 seconds after clamd's MaxScanTime.
@@ -194,6 +197,7 @@ services:
       - { source: subject_kek, <<: *node-secret }
       - { source: storage_write_secret_key, <<: *node-secret }
       - { source: storage_read_secret_key, <<: *node-secret }
+      - { source: storage_scanner_secret_key, <<: *node-secret }
     networks: [database, web, api, files, scan]
     ports:
       # Mailpit's inbox, published here because Mailpit uses this network.
@@ -379,10 +383,24 @@ services:
       TPS_CLAMD_HOST: clamav
       TPS_CLAMD_PORT: '3310'
       TPS_CLAMD_TIMEOUT_MS: '25000'
+      TPS_FILES_MAX_STORES: '4'
+      TPS_STORAGE_WRITE_ACCESS_KEY_ID: tps-write
+      TPS_STORAGE_WRITE_SECRET_ACCESS_KEY_FILE: /run/secrets/storage_write_secret_key
+      TPS_STORAGE_READ_ACCESS_KEY_ID: tps-read
+      TPS_STORAGE_READ_SECRET_ACCESS_KEY_FILE: /run/secrets/storage_read_secret_key
+      TPS_STORAGE_SCANNER_ACCESS_KEY_ID: tps-scanner
+      TPS_STORAGE_SCANNER_SECRET_ACCESS_KEY_FILE: /run/secrets/storage_scanner_secret_key
+      # Lists and deletes under clean/ and withheld/; the API never has it.
+      TPS_STORAGE_REMOVAL_ACCESS_KEY_ID: tps-removal
+      TPS_STORAGE_REMOVAL_SECRET_ACCESS_KEY_FILE: /run/secrets/storage_removal_secret_key
     secrets:
       - { source: app_worker_password, <<: *node-secret }
       - { source: app_queue_password, <<: *node-secret }
       - { source: subject_kek, <<: *node-secret }
+      - { source: storage_write_secret_key, <<: *node-secret }
+      - { source: storage_read_secret_key, <<: *node-secret }
+      - { source: storage_scanner_secret_key, <<: *node-secret }
+      - { source: storage_removal_secret_key, <<: *node-secret }
     networks: [database, files, scan]
     depends_on:
       migrate:
@@ -453,6 +471,10 @@ secrets:
     environment: TPS_STACK_STORAGE_WRITE_SECRET_KEY
   storage_read_secret_key:
     environment: TPS_STACK_STORAGE_READ_SECRET_KEY
+  storage_scanner_secret_key:
+    environment: TPS_STACK_STORAGE_SCANNER_SECRET_KEY
+  storage_removal_secret_key:
+    environment: TPS_STACK_STORAGE_REMOVAL_SECRET_KEY
 
 volumes:
   postgres-data:

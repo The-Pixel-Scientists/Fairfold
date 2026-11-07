@@ -51,6 +51,8 @@ const storageSecrets = Object.fromEntries(
     'ADMIN_SECRET_KEY',
     'WRITE_SECRET_KEY',
     'READ_SECRET_KEY',
+    'SCANNER_SECRET_KEY',
+    'REMOVAL_SECRET_KEY',
     'JWT_WRITE_KEY',
     'JWT_READ_KEY',
     'JWT_FILER_WRITE_KEY',
@@ -76,6 +78,25 @@ describe('storageIdentities', () => {
           name: 'tps-read',
           credentials: [{ accessKey: 'tps-read', secretKey: 'read_secret_key-for-tests' }],
           actions: ['Read:tps-files/clean/*'],
+        },
+        {
+          name: 'tps-scanner',
+          credentials: [{ accessKey: 'tps-scanner', secretKey: 'scanner_secret_key-for-tests' }],
+          actions: [
+            'Read:tps-files/clean/*',
+            'Read:tps-files/withheld/*',
+            'Write:tps-files/withheld/*',
+          ],
+        },
+        {
+          name: 'tps-removal',
+          credentials: [{ accessKey: 'tps-removal', secretKey: 'removal_secret_key-for-tests' }],
+          actions: [
+            'List:tps-files/clean/*',
+            'Delete:tps-files/clean/*',
+            'List:tps-files/withheld/*',
+            'Delete:tps-files/withheld/*',
+          ],
         },
       ],
     });
