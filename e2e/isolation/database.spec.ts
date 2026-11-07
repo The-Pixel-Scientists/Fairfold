@@ -63,7 +63,7 @@ test.describe('isolation in the database', () => {
     expect(stale, `Denial tests for tables that do not exist: ${stale.join(', ')}`).toEqual([]);
   });
 
-  test('the catalogue holds the funder tables, and the tables with no tenant are few and on the lint’s list', () => {
+  test('the catalogue holds the funder tables, and the tables with no tenant are few and on an allowlist', () => {
     expect(tenantTables.length).toBeGreaterThan(25);
     for (const table of [
       'app.tenant',
@@ -75,8 +75,15 @@ test.describe('isolation in the database', () => {
       expect(tenantTables, table).toContain(table);
     }
     expect(TENANT_KEYED_BY_ID.has('app.tenant')).toBe(true);
+    // A closed list, so a tenant table cannot join NON_TENANT_TABLES to skip
+    // its denial test: auth's tables, pg-boss's (ADR 0009) and these alone.
+    const named = new Set(['app.job_queue', 'app.request_limit']);
+    const others: string[] = [];
     for (const [table, reason] of NON_TENANT_TABLES) {
-      expect(table.startsWith('auth.'), `${table}: ${reason}`).toBe(true);
+      if (table.startsWith('auth.') || table.startsWith('pgboss.')) continue;
+      expect(named.has(table), `${table} is not on the allowlist: ${reason}`).toBe(true);
+      others.push(table);
     }
+    expect(others.sort()).toEqual([...named].sort());
   });
 });
