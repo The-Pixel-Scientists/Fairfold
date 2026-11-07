@@ -274,6 +274,12 @@ export {
   sendDecisionEmails,
 } from './decisions/routes.ts';
 export {
+  applicationSubmitted,
+  decisionReleased,
+  submissionTimings,
+  type SubmissionTiming,
+} from './events/events.ts';
+export {
   monitoringAnswerSchema,
   monitoringFormSchema,
   monitoringResponseSchema,
@@ -457,6 +463,16 @@ export {
   updateRound,
 } from './programme/routes.ts';
 export {
+  grantsPartyKeys,
+  grantsPartyKeysExcluded,
+  grantsRepointConflicts,
+  grantsRepointCountsSchema,
+  grantsRepointTables,
+  type GrantsRepoint,
+  type GrantsRepointCounts,
+  type GrantsRepointTable,
+} from './party/repoint.ts';
+export {
   reminderHistorySchema,
   reminderSettingAnswerSchema,
   reminderSettingSchema,
@@ -522,11 +538,16 @@ export {
   submissionRoutes,
 } from './submissions/routes.ts';
 export {
+  allowedPurposes,
   defaultEmailTemplates,
   emailTemplatesInputSchema,
   mergeFields,
   mergeFieldsFor,
   mergeFieldsIn,
+  purposeAllowed,
+  templatePurposes,
+  templatePurposeSchema,
   type EmailTemplatesInput,
   type MergeField,
+  type TemplatePurpose,
 } from './programme/templates.ts';
