@@ -16,7 +16,8 @@
 //
 //   --test   Use TPS_TEST_DB_NAME instead of TPS_DB_NAME.
 //
-// Settings come from the environment (settings.ts). In development,
+// Settings come from the environment (settings.ts). A server that is not on
+// this machine needs TPS_DB_TLS, as the API does. In development,
 // `pnpm db:migrate`, `pnpm db:rollback` and `pnpm db:drop` supply them.
 // Test set-up can import the same steps.
 
@@ -36,7 +37,7 @@ import {
   MAINTENANCE_DATABASE,
   readDatabaseName,
   readSecret,
-  readServer,
+  readServerConnection,
   readSetting,
   type Env,
 } from './settings.ts';
@@ -72,7 +73,7 @@ async function withSuperuser<T>(
   work: (client: pg.Client) => Promise<T>,
 ): Promise<T> {
   const client = new pg.Client({
-    ...readServer(env),
+    ...readServerConnection(env),
     database,
     user: readSetting(env, 'TPS_DB_SUPERUSER'),
     password: readSecret(env, 'TPS_DB_SUPERUSER_PASSWORD'),
@@ -149,7 +150,7 @@ export async function migrateDatabase(
   direction: 'up' | 'down',
 ): Promise<void> {
   const pool = new pg.Pool({
-    ...readServer(env),
+    ...readServerConnection(env),
     database,
     user: 'migrator',
     password: readSecret(env, 'TPS_DB_MIGRATOR_PASSWORD'),
