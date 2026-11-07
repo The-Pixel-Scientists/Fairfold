@@ -309,6 +309,17 @@ export {
   withdrawMonitoringResponse,
 } from './monitoring/routes.ts';
 export {
+  getApplicantThread,
+  getStaffThread,
+  markApplicantThreadRead,
+  markStaffThreadRead,
+  messageRoutes,
+  sendApplicantMessage,
+  sendMessageInputSchema,
+  sendStaffMessage,
+  type SendMessageInput,
+} from './messages/routes.ts';
+export {
   amountAwarded,
   grantIdentifier,
   MAX_EXPORT_GRANTS,
@@ -379,6 +390,18 @@ export {
   publishFormDraft,
   saveFormDraft,
 } from './forms/routes.ts';
+export {
+  addNote,
+  addNoteInputSchema,
+  listMentionableMembers,
+  listNotes,
+  mentionableMembersSchema,
+  noteListSchema,
+  noteRoutes,
+  type AddNoteInput,
+  type MentionableMembers,
+  type NoteList,
+} from './notes/routes.ts';
 export {
   criterionSchema,
   emailTemplateSchema,
