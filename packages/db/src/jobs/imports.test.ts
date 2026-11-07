@@ -9,6 +9,8 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+import * as jobs from './index.ts';
+
 const ROOT = join(import.meta.dirname, '..', '..', '..', '..');
 const SOURCE = /\.(?:[cm]?[jt]s|tsx)$/;
 const IMPORT = /(?:from|import\(|require\()\s*['"]pg-boss['"]/;
@@ -42,4 +44,23 @@ describe('pg-boss', () => {
       expect(found).toEqual([]);
     },
   );
+});
+
+describe('the ./jobs entry', () => {
+  const manifest = JSON.parse(
+    readFileSync(join(import.meta.dirname, '..', '..', 'package.json'), 'utf8'),
+  ) as { exports: Record<string, string> };
+
+  it('is exported as src/jobs/index.ts, with no wider deep path into src', () => {
+    expect(manifest.exports['./jobs']).toBe('./src/jobs/index.ts');
+    const deep = Object.entries(manifest.exports).filter(
+      ([key, target]) => key.includes('*') && !target.startsWith('./src/generated/'),
+    );
+    expect(deep).toEqual([]);
+  });
+
+  it('does not export the internal queueing path', () => {
+    expect(Object.keys(jobs)).not.toContain('sendEventJob');
+    expect(Object.keys(jobs)).not.toContain('currentTenant');
+  });
 });

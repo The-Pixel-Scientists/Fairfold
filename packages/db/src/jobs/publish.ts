@@ -15,7 +15,7 @@ import type { Transaction } from 'kysely';
 import type { z } from 'zod';
 
 import { eventJobQueue } from './queue.ts';
-import { currentTenant, JobSendError, sendJob, type JobContext } from './send.ts';
+import { currentTenant, JobSendError, sendEventJob, type JobContext } from './send.ts';
 
 export interface PublishContext extends JobContext {
   /** The membership whose action caused the event, or null for the system (ADR 0034). */
@@ -48,6 +48,6 @@ export async function publish<DB, E extends EventDefinition>(
     data,
   });
   for (const module of eventSubscribers(event.name)) {
-    await sendJob(trx, eventJobQueue(module), { event: envelope }, context);
+    await sendEventJob(trx, eventJobQueue(module), envelope, context);
   }
 }

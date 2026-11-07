@@ -7,6 +7,7 @@
 // job commits or rolls back with the caller's state change. The tenant
 // trigger from migration 0024 stays the backstop.
 
+import type { EventEnvelope } from '@pixel-scientists/domain/events';
 import { CompiledQuery, sql, type Kysely, type Transaction } from 'kysely';
 import { PgBoss, type Db, type SendOptions } from 'pg-boss';
 import type { z } from 'zod';
@@ -127,11 +128,15 @@ function sendOptions<D>(
   return result;
 }
 
+/** Event queues are named `events.<module>` and filled only by publish(). */
+const isEventQueue = (queue: Queue): boolean => queue.name.startsWith('events.');
+
 /**
  * Send a job on `queue` in the caller's transaction, and return its id, or
  * null when a job with the same singleton key suppressed it. `queue` must be
- * the instance defineQueue() or eventJobQueue() returned. A tenant queue
- * needs a tenant set on `trx`; a platform queue needs none.
+ * the instance defineQueue() returned; an event queue is refused, since only
+ * publish() sends to one. A tenant queue needs a tenant set on `trx`; a
+ * platform queue needs none.
  */
 export async function sendJob<DB, S extends z.ZodObject>(
   trx: Transaction<DB>,
@@ -139,6 +144,35 @@ export async function sendJob<DB, S extends z.ZodObject>(
   data: z.input<S>,
   context: JobContext,
   options: SendJobOptions<z.output<S>> = {},
+): Promise<string | null> {
+  if (isEventQueue(queue)) {
+    throw new JobSendError('invalid_options', `${queue.name} is an event queue; use publish()`);
+  }
+  return send(trx, queue, data, context, options);
+}
+
+/**
+ * Send one event envelope on an event queue. For publish() only: the
+ * package's `./jobs` entry does not export it.
+ */
+export async function sendEventJob<DB>(
+  trx: Transaction<DB>,
+  queue: Queue<z.ZodObject, 'tenant'>,
+  event: EventEnvelope,
+  context: JobContext,
+): Promise<string | null> {
+  if (!isEventQueue(queue)) {
+    throw new JobSendError('invalid_options', `${queue.name} is not an event queue`);
+  }
+  return send(trx, queue, { event }, context, {});
+}
+
+async function send<DB, S extends z.ZodObject>(
+  trx: Transaction<DB>,
+  queue: Queue<S>,
+  data: z.input<S>,
+  context: JobContext,
+  options: SendJobOptions<z.output<S>>,
 ): Promise<string | null> {
   // A look-alike queue could carry any schema, so only the defined instance is trusted.
   if (!isDefinedQueue(queue)) {
@@ -166,6 +200,10 @@ export async function sendJob<DB, S extends z.ZodObject>(
   });
   if (!payload.success) {
     throw new JobSendError('invalid_payload', `${queue.name} at ${issuePaths(payload.error)}`);
+  }
+  // An envelope naming another tenant would reach that tenant's handler (S11-56).
+  if (isEventQueue(queue) && (payload.data['event'] as EventEnvelope).tenantId !== tenant) {
+    throw new JobSendError('invalid_payload', `${queue.name} at event.tenantId`);
   }
   const boss = bosses.get(context.sender);
   if (boss === undefined) throw new Error('Start the job sender with startJobSender().');

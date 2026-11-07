@@ -20,7 +20,7 @@ import { z } from 'zod';
 import { defineEventHandler, runJob } from '../../src/jobs/handler.ts';
 import { publish, type PublishContext } from '../../src/jobs/publish.ts';
 import { eventJobQueue } from '../../src/jobs/queue.ts';
-import { sendJob } from '../../src/jobs/send.ts';
+import { sendEventJob, sendJob } from '../../src/jobs/send.ts';
 import { trustedTenantId, withTenant } from '../../src/tenant-context.ts';
 import { withClient } from '../connect.ts';
 import { createTestTenant, type TestTenant } from '../tenants.ts';
@@ -128,16 +128,45 @@ describe('publish', () => {
   });
 });
 
-describe('sendJob on an event queue', () => {
-  const envelope = (data: Record<string, unknown>) => ({
-    id: randomUUID(),
-    type: submitted.name,
-    tenantId: a.id,
-    sequence: null,
-    occurredAt: new Date().toISOString(),
-    requestId: randomUUID(),
-    causedBy: null,
-    data,
+describe('sending on an event queue', () => {
+  const envelope = (data: Record<string, unknown>, tenantId = a.id) =>
+    ({
+      id: randomUUID(),
+      type: submitted.name,
+      tenantId,
+      sequence: null,
+      occurredAt: new Date().toISOString(),
+      requestId: randomUUID(),
+      causedBy: null,
+      data,
+    }) as EventEnvelope;
+  const sentFor = async (applicationId: string) =>
+    (await eventJobs(submitted.name)).filter(
+      (row) => (row.data['event'] as EventEnvelope).data['applicationId'] === applicationId,
+    );
+
+  it('is refused to sendJob(), which leaves event queues to publish()', async () => {
+    const data = { applicationId: randomUUID() };
+    await expect(
+      inTenant(a, (trx) =>
+        sendJob(trx, eventJobQueue('insight'), { event: envelope(data) }, context()),
+      ),
+    ).rejects.toMatchObject({ name: 'JobSendError', code: 'invalid_options' });
+    expect(await sentFor(data.applicationId)).toEqual([]);
+  });
+
+  it("refuses an envelope for another tenant than the transaction's, and sends nothing", async () => {
+    const data = { applicationId: randomUUID() };
+    await expect(
+      inTenant(a, (trx) =>
+        sendEventJob(trx, eventJobQueue('insight'), envelope(data, b.id), context()),
+      ),
+    ).rejects.toMatchObject({
+      name: 'JobSendError',
+      code: 'invalid_payload',
+      message: expect.stringContaining('event.tenantId') as unknown,
+    });
+    expect(await sentFor(data.applicationId)).toEqual([]);
   });
 
   it.each([
@@ -149,19 +178,18 @@ describe('sendJob on an event queue', () => {
     ],
   ])('refuses %s as invalid_payload and sends nothing', async (_, event) => {
     await expect(
-      inTenant(a, (trx) => sendJob(trx, eventJobQueue('insight'), { event: event() }, context())),
+      inTenant(a, (trx) =>
+        sendEventJob(trx, eventJobQueue('insight'), event() as EventEnvelope, context()),
+      ),
     ).rejects.toMatchObject({ name: 'JobSendError', code: 'invalid_payload' });
     expect(await jobRows(`name = $1 AND data::text LIKE '%example.test%'`, [QUEUE])).toEqual([]);
   });
 
-  it('sends a valid envelope, as publish() does', async () => {
+  it("sends a valid envelope in the transaction's tenant, as publish() does", async () => {
     const data = { applicationId: randomUUID() };
     const queue = eventJobQueue('insight');
-    await inTenant(a, (trx) => sendJob(trx, queue, { event: envelope(data) }, context()));
-    const rows = (await eventJobs(submitted.name)).filter(
-      (row) => (row.data['event'] as EventEnvelope).data['applicationId'] === data.applicationId,
-    );
-    expect(rows).toHaveLength(1);
+    await inTenant(a, (trx) => sendEventJob(trx, queue, envelope(data), context()));
+    expect(await sentFor(data.applicationId)).toHaveLength(1);
   });
 });
 
