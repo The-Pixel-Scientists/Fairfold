@@ -22,6 +22,7 @@ describe('configuration entity types', () => {
       'platform.tenant',
       'platform.theme',
       'platform.module',
+      'platform.retention',
       'crm.segment',
       'assure.checklist',
       'forms.form',
@@ -51,6 +52,7 @@ describe('configuration diffs', () => {
         { field: 'tokens', from: 'unusable', to: null },
       ],
       'platform.module': [{ field: 'enabled', from: true, to: false }],
+      'platform.retention': [{ field: 'days', from: 365, to: 730 }],
       'crm.segment': [
         { path: 'name', from: 'Donors', to: 'Regular donors' },
         { path: `filters.${ITEM}.operator`, from: null, to: 'equals' },
@@ -91,6 +93,18 @@ describe('configuration diffs', () => {
         [{ field: 'tokens', from: 'unusable', to: {} }],
       ],
       'platform.module': [[], [{ field: 'enabled', from: 'on', to: 'off' }]],
+      'platform.retention': [
+        [],
+        [{ field: 'days', from: 365, to: 0 }],
+        [{ field: 'days', from: 365, to: 36_501 }],
+        [{ field: 'days', from: 365, to: 30.5 }],
+        [{ field: 'policy', from: 'audit', to: 'files' }],
+        [{ field: 'days', from: 365, to: 730, partyId: '0b8f3a52-6c1d-4e7a-9f20-3d5c8e1b7a64' }],
+        [
+          { field: 'days', from: 365, to: 730 },
+          { field: 'days', from: 730, to: 1095 },
+        ],
+      ],
       'crm.segment': [
         [],
         [{ path: `filters.${ITEM}.value`, from: null, to: 'Jo Bloggs' }],

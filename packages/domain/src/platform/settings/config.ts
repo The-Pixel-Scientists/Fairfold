@@ -2,9 +2,10 @@
 //
 // What a settings change records in `app.config_version` (architecture rule
 // 10). The entity type names what changed and the entity id is the id of the
-// row changed: `app.tenant`, `app.tenant_theme` or `app.tenant_module`. The
-// diff lists each changed field with its old and new values; the logo is
-// recorded by its type and SHA-256 digest, never its bytes. A funder's own
+// row changed: `app.tenant`, `app.tenant_theme`, `app.tenant_module` or
+// `app.retention_policy`. The diff lists each changed field with its old and
+// new values; the logo is recorded by its type and SHA-256 digest, never its
+// bytes. A retention period is recorded in days only. A funder's own
 // tokens are diffed by token, with null where none was set (ADR 0046).
 // Stored tokens that no longer pass the checks are cleared as a whole and
 // recorded by a marker, never their values.
@@ -24,6 +25,7 @@ export const configEntityTypes = [
   'platform.tenant',
   'platform.theme',
   'platform.module',
+  'platform.retention',
   'crm.segment',
   'assure.checklist',
   'forms.form',
@@ -84,6 +86,8 @@ export const configDiffSchemas = {
     )
     .min(1),
   'platform.module': z.tuple([change('enabled', z.boolean())]),
+  // Changed only under platform.retention.manage, which takes step-up.
+  'platform.retention': z.tuple([change('days', z.int().min(1).max(36_500))]),
   'crm.segment': pathChanges(new RegExp(`^(?:name|description|${FILTER})$`)),
   'assure.checklist': pathChanges(
     new RegExp(`^(?:name|description|items\\.${ITEM}\\.(?:label|help|kind|required|position))$`),
