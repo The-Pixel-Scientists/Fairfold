@@ -101,6 +101,15 @@ export const messages = {
   // Team.
   chooseRole: 'Choose at least one role.',
 
+  // Retention and erasure.
+  retentionDays: 'Enter a whole number of days from 1 to 36,500.',
+  retentionTooShort: (minimumDays: number) =>
+    `This is shorter than the platform allows for this data. Enter ${plural(minimumDays, 'day')} or more.`,
+  erasureReason: 'Choose why this data is being erased.',
+  erasureConfirm: 'Confirm that you understand erasure cannot be undone.',
+  erasureStaffMember:
+    'This person is a member of your team. Remove their membership first, then ask again to erase their data.',
+
   // Money.
   currency: 'Enter the amount in pounds.',
 } as const;
