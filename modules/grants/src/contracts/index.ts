@@ -510,6 +510,7 @@ export {
   type GrantsRepointCounts,
   type GrantsRepointTable,
 } from './party/repoint.ts';
+export * from './public/index.ts';
 export {
   reminderHistorySchema,
   reminderSettingAnswerSchema,
