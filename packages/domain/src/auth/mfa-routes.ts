@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// The MVP1 MFA routes (ADR 0010): setting up and using an authenticator app,
-// and step-up. Only a session waiting for MFA reaches the TOTP routes, so a
-// complete session can neither swap the authenticator nor guess codes, and
-// applicants, who are never asked for MFA in MVP1, cannot enrol. Changing an
-// authenticator from a complete session will be its own step-up route.
+// The MFA routes at sign-in (ADR 0010): setting up and using an
+// authenticator app, and step-up. Only a session waiting for MFA reaches the
+// TOTP routes here, so a complete session can neither swap the authenticator
+// nor guess codes; changing it from a complete session takes step-up
+// (account-routes.ts).
 
 import { z } from 'zod';
 
@@ -49,6 +49,12 @@ export const verifyTotp = defineRoute({
   responses: { 200: sessionSchema },
 });
 
+/**
+ * Step-up for an account with TOTP. An account with none uses
+ * stepUpWithPassword, and a passkey has its own route (passkey-routes.ts);
+ * the server refuses a way the account cannot use, with the same answer as
+ * a wrong password.
+ */
 export const stepUp = defineRoute({
   ...common,
   method: 'POST',
@@ -56,5 +62,15 @@ export const stepUp = defineRoute({
   summary: 'Confirm it is you before a sensitive action',
   session: 'complete',
   body: z.strictObject({ password: currentPasswordSchema, code: totpCodeSchema }),
+  responses: { 200: sessionSchema },
+});
+
+export const stepUpWithPassword = defineRoute({
+  ...common,
+  method: 'POST',
+  path: '/auth/step-up/password',
+  summary: 'Confirm it is you with your password, on an account without MFA',
+  session: 'complete',
+  body: z.strictObject({ password: currentPasswordSchema }),
   responses: { 200: sessionSchema },
 });

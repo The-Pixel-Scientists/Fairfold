@@ -1,20 +1,44 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// The first release's auth routes (ADR 0010): email-first sign-up, password
-// sign-in and reset, sign-out, the session and switching tenant, with the
-// MFA routes from mfa-routes.ts and accepting an invitation from
-// invitation-routes.ts. They have no permission or scope: each states the
-// session it needs instead. Requests that start a sign-up or a password
-// reset answer the same way whether or not the address has an account, and
-// emailed links carry a token that only a POST spends.
+// The auth routes (ADR 0010): email-first sign-up, password sign-in and
+// reset, sign-out, the session and switching tenant here, with MFA and
+// step-up, invitations, backup codes, account changes, passkeys and SSO
+// sign-in from their own files. They have no permission or scope: each
+// states the session it needs instead, and those that change MFA, email,
+// password or SSO settings need step-up. Requests that start a sign-up or a
+// password reset answer the same way whether or not the address has an
+// account, and emailed links carry a token that only a POST spends.
 
 import { z } from 'zod';
 
 import { defineRoute } from '../api/route.ts';
 import { idSchema } from '../id.ts';
 import { slugSchema } from '../platform/tenant.ts';
+import {
+  changePassword,
+  completeEmailChange,
+  confirmTotpChange,
+  removeTotp,
+  requestEmailChange,
+  startTotpChange,
+} from './account-routes.ts';
+import { countBackupCodes, generateBackupCodes, verifyBackupCode } from './backup-code-routes.ts';
 import { acceptInvitation } from './invitation-routes.ts';
-import { confirmTotp, enrolTotp, stepUp, verifyTotp } from './mfa-routes.ts';
+import { confirmTotp, enrolTotp, stepUp, stepUpWithPassword, verifyTotp } from './mfa-routes.ts';
+import {
+  addPasskey,
+  completeSignUpWithPasskey,
+  listPasskeys,
+  passkeyMfaOptions,
+  passkeyRegistrationOptions,
+  passkeySignInOptions,
+  passkeyStepUpOptions,
+  removePasskey,
+  signInWithPasskey,
+  signUpPasskeyOptions,
+  stepUpWithPasskey,
+  verifyPasskeyMfa,
+} from './passkey-routes.ts';
 import {
   currentPasswordSchema,
   emailSchema,
@@ -22,6 +46,7 @@ import {
   sessionSchema,
   tokenSchema,
 } from './schemas.ts';
+import { completeOidc, completeSaml, samlAcs, startSso, startSsoStepUp } from './sso-routes.ts';
 
 const tenantParams = z.strictObject({ slug: slugSchema });
 
@@ -123,4 +148,31 @@ export const authRoutes = {
   requestPasswordReset,
   completePasswordReset,
   acceptInvitation,
+  stepUpWithPassword,
+  generateBackupCodes,
+  countBackupCodes,
+  verifyBackupCode,
+  startTotpChange,
+  confirmTotpChange,
+  removeTotp,
+  requestEmailChange,
+  completeEmailChange,
+  changePassword,
+  passkeyRegistrationOptions,
+  addPasskey,
+  listPasskeys,
+  removePasskey,
+  signUpPasskeyOptions,
+  completeSignUpWithPasskey,
+  passkeySignInOptions,
+  signInWithPasskey,
+  passkeyMfaOptions,
+  verifyPasskeyMfa,
+  passkeyStepUpOptions,
+  stepUpWithPasskey,
+  startSso,
+  startSsoStepUp,
+  completeOidc,
+  samlAcs,
+  completeSaml,
 } as const;
