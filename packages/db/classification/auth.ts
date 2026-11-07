@@ -4,7 +4,8 @@
 // tenants, so their rows last as long as the account. A session's IP address
 // and user agent go with its row, at most 90 days after it was last used,
 // which is no later than 90 days after it ended. Auth events are kept 12
-// months; their typed identifiers and IP addresses are personal. Ids are
+// months; their typed identifiers and IP addresses are personal, and the
+// retention purge's count of the events it deleted is internal. Ids are
 // internal, as in every schema, while a user_id that links a row to a person
 // is personal. Hashes, encrypted secrets and counters are internal, except a
 // device's hash and the counter keyed by it, which are online identifiers. A
@@ -168,6 +169,7 @@ export const auth: ClassificationRegistry = {
     tenant_id: audit,
     identifier: auditPersonal,
     ip_address: auditPersonal,
+    purged_count: audit,
   },
   'auth.audit_copy_pending': {
     auth_event_id: pending,

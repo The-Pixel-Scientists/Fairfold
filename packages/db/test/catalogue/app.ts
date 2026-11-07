@@ -30,6 +30,8 @@ export const app: SchemaCatalogue = {
     ['app.delete_expired_request_limits(integer)', ['app_worker']],
     // The worker's per-tenant fan-out (ADR 0009).
     ['app.tenant_ids()', ['app_worker']],
+    // The audit retention purge (ADR 0003), per tenant and once with none set.
+    ['app.purge_expired_audit()', ['app_worker']],
   ],
   definerFunctions: [
     [
@@ -88,6 +90,45 @@ export const app: SchemaCatalogue = {
           ...['id', 'status'].map((column) => `SELECT on column app.tenant.${column}`),
         ],
         policies: ['app.tenant policy tenant_ids_select'],
+      },
+    ],
+    [
+      'app.purge_expired_audit()',
+      {
+        owner: 'owner_app_purge_expired_audit',
+        // Never INSERT on occurred_at, retain_until or actor_member_kind,
+        // which the database sets (ADR 0003, "Audit retention").
+        rights: [
+          'USAGE on schema app',
+          'USAGE on schema auth',
+          'EXECUTE on function app.current_tenant_id()',
+          ...['tenant_id', 'policy', 'days'].map(
+            (column) => `SELECT on column app.retention_policy.${column}`,
+          ),
+          'DELETE on app.audit_event',
+          ...['id', 'tenant_id', 'retain_until'].map(
+            (column) => `SELECT on column app.audit_event.${column}`,
+          ),
+          ...[
+            'tenant_id',
+            'request_id',
+            'actor_kind',
+            'action',
+            'entity_type',
+            'entity_id',
+            'changes',
+          ].map((column) => `INSERT on column app.audit_event.${column}`),
+          'DELETE on auth.audit_event',
+          ...['id', 'retain_until'].map((column) => `SELECT on column auth.audit_event.${column}`),
+          ...['request_id', 'code', 'purged_count'].map(
+            (column) => `INSERT on column auth.audit_event.${column}`,
+          ),
+        ],
+        policies: ['app.audit_event', 'auth.audit_event'].flatMap((table) =>
+          ['select', 'delete', 'insert'].map(
+            (command) => `${table} policy purge_expired_audit_${command}`,
+          ),
+        ),
       },
     ],
   ],

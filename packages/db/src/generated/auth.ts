@@ -37,6 +37,7 @@ export interface AuthAuditEvent {
   identifier: string | null;
   ip_address: string | null;
   occurred_at: Generated<Timestamp>;
+  purged_count: number | null;
   reason: string | null;
   request_id: string;
   retain_until: Timestamp;

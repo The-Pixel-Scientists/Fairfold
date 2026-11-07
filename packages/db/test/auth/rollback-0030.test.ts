@@ -18,7 +18,11 @@ import { asMigratorRolledBack } from '../connect.ts';
 
 const read = (file: string) => readFile(join(MIGRATIONS_FOLDER, '0030_auth_passkey', file), 'utf8');
 
-/** The passkey table's columns, grants, checks and policies, and the event check. */
+/**
+ * The passkey table's columns, grants, checks and policies. Not the event
+ * check, which later migrations widen; migrations.test.ts checks it round
+ * trip by round trip.
+ */
 async function state(client: pg.Client): Promise<unknown[]> {
   const { rows } = await client.query<{ name: string; value: string | null }>(
     `SELECT a.attname AS name, a.atttypid::regtype::text || ' ' || coalesce(a.attacl::text, '')
@@ -33,8 +37,7 @@ async function state(client: pg.Client): Promise<unknown[]> {
       WHERE polrelid = to_regclass('auth.passkey')
      UNION ALL
      SELECT conname, pg_catalog.pg_get_constraintdef(oid) FROM pg_catalog.pg_constraint
-      WHERE conrelid IN (to_regclass('auth.passkey'), 'auth.audit_event'::regclass)
-        AND (conrelid <> 'auth.audit_event'::regclass OR conname = 'audit_event_code_check')
+      WHERE conrelid = to_regclass('auth.passkey')
      ORDER BY 1, 2`,
   );
   return rows;
