@@ -13,7 +13,6 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
 import {
-  createTestTenant,
   createTestUser,
   insertRow,
   asMigratorIn,
@@ -24,6 +23,7 @@ import { loadConfig } from '../src/config.ts';
 import { openDatabase, type ApiDatabase } from '../src/database.ts';
 import { createLogger } from '../src/logger.ts';
 import { route } from '../src/routes/register.ts';
+import { createGrantsTenant } from './modules-on.ts';
 import {
   expectLooksMissing,
   smtpTestSettings,
@@ -150,7 +150,7 @@ beforeAll(async () => {
   const logger = createLogger({ level: 'silent' });
   database = openDatabase(settings, logger);
 
-  [tenantA, tenantB] = await Promise.all([createTestTenant(), createTestTenant()]);
+  [tenantA, tenantB] = await Promise.all([createGrantsTenant(), createGrantsTenant()]);
   await addPerson(tenantA, 'admin', ['tenant_admin']);
   await addPerson(tenantA, 'manager', ['programme_manager']);
   await addPerson(tenantA, 'reviewer', ['reviewer']);
@@ -309,7 +309,7 @@ describe('the policy against the database', () => {
           .query(
             `INSERT INTO app.tenant_module (tenant_id, module, enabled, updated_by)
              VALUES ($1, 'grants', $2, $3)
-             ON CONFLICT (tenant_id, module) DO UPDATE SET enabled = EXCLUDED.enabled`,
+             ON CONFLICT (tenant_id, module) DO UPDATE SET enabled = EXCLUDED.enabled, updated_by = EXCLUDED.updated_by`,
             [tenantA.id, enabled, people['admin']?.membershipId],
           )
           .then(() => undefined),

@@ -10,17 +10,14 @@ import type { LightMyRequestResponse } from 'fastify';
 import { expect } from 'vitest';
 
 import { addPerson } from '../../../packages/db/test/party/fixtures.ts';
-import {
-  asMigratorIn,
-  createTestTenant,
-  type TestTenant,
-} from '../../../packages/db/test/tenants.ts';
+import { asMigratorIn, type TestTenant } from '../../../packages/db/test/tenants.ts';
 import { buildApp } from '../src/app.ts';
 import { loadConfig } from '../src/config.ts';
 import { openDatabase } from '../src/database.ts';
 import type { FileService } from '../src/platform/files/index.ts';
 import { createLogger } from '../src/logger.ts';
 import { composeModules, type Mail } from '../src/modules.ts';
+import { createGrantsTenant } from './modules-on.ts';
 import { addMember, type Member } from './settings-api.ts';
 import { smtpTestSettings, testAuth, testSession } from './support.ts';
 
@@ -184,7 +181,7 @@ export async function startProgrammeApi(port: string, mail?: Mail, files?: FileS
     ...composeModules({ publicTenants: database.publicTenants, mail }),
   });
 
-  const [tenantA, tenantB] = await Promise.all([createTestTenant(), createTestTenant()]);
+  const [tenantA, tenantB] = await Promise.all([createGrantsTenant(), createGrantsTenant()]);
   const managerA = await addMember(tenantA, 'console', 'programme_manager');
   const ada = await addMember(tenantA, 'console', 'programme_manager');
   await asMigratorIn(tenantA.id, (client) =>

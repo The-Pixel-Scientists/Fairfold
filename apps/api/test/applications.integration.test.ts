@@ -273,7 +273,7 @@ describe('who may use the routes', () => {
           .query(
             `INSERT INTO app.tenant_module (tenant_id, module, enabled, updated_by)
              VALUES ($1, 'grants', $2, $3)
-             ON CONFLICT (tenant_id, module) DO UPDATE SET enabled = EXCLUDED.enabled`,
+             ON CONFLICT (tenant_id, module) DO UPDATE SET enabled = EXCLUDED.enabled, updated_by = EXCLUDED.updated_by`,
             [t.tenantA.id, enabled, t.managerA.membershipId],
           )
           .then(() => undefined),
