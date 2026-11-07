@@ -6,8 +6,10 @@ import { z } from 'zod';
 import { requestProblems } from '../api/schema-rules.ts';
 import { messages } from '../platform/messages.ts';
 import {
+  backupCodeSchema,
   currentPasswordSchema,
   emailSchema,
+  passkeyNameSchema,
   passwordSchema,
   sessionSchema,
   tokenSchema,
@@ -67,6 +69,24 @@ describe('auth input schemas', () => {
       expect(firstMessage(totpCodeSchema.safeParse(code))).toBe(messages.totpCode);
     }
   });
+
+  it('take a backup code of two groups of five from a fixed alphabet, in either case', () => {
+    expect(backupCodeSchema.parse(' ABCDE-12345 ')).toBe('abcde-12345');
+    for (const code of ['abcde12345', 'abcde-1234', 'abcde-123456', 'abcdi-12345', 'abcdo-12345']) {
+      expect(firstMessage(backupCodeSchema.safeParse(code)), code).toBe(messages.backupCode);
+    }
+  });
+
+  it('take a passkey name on one line, of up to 64 characters', () => {
+    expect(passkeyNameSchema.parse('  Work laptop ')).toBe('Work laptop');
+    expect(firstMessage(passkeyNameSchema.safeParse(' '))).toBe(messages.enterPasskeyName);
+    expect(firstMessage(passkeyNameSchema.safeParse('x'.repeat(65)))).toBe(
+      messages.nameTooLong(64),
+    );
+    for (const name of ['Work\nlaptop', 'Work\u202elaptop']) {
+      expect(firstMessage(passkeyNameSchema.safeParse(name))).toBe(messages.tenantNameHidden);
+    }
+  });
 });
 
 describe('sessionSchema', () => {
@@ -121,10 +141,24 @@ describe('sessionSchema', () => {
       { permissions: ['grants.decisions.release'] },
       { memberships: [session.activeMembership] },
       { recentAuthUntil: '2026-10-12T09:30:00Z' },
-      { app: 'portal' },
+      { app: 'portal', mfa: 'enrol' },
     ]) {
       expect(sessionSchema.safeParse({ ...pending, ...change }).success).toBe(false);
     }
+  });
+
+  it('let an applicant with MFA wait for it, and say whether the account has MFA', () => {
+    expect(sessionSchema.safeParse({ ...pending, app: 'portal' }).success).toBe(true);
+    expect(sessionSchema.safeParse({ ...portal, mfa: 'complete' }).success).toBe(true);
+  });
+
+  it('list the tools switched on for the active tenant, when the server says', () => {
+    const on = { ...session, modules: ['grants', 'crm'] };
+    expect(sessionSchema.parse(on)).toEqual(on);
+    for (const modules of [['platform'], ['party'], ['payments']]) {
+      expect(sessionSchema.safeParse({ ...session, modules }).success, modules[0]).toBe(false);
+    }
+    expect(sessionSchema.safeParse({ ...noTenant, modules: ['grants'] }).success).toBe(false);
   });
 
   it('gives a session without an active membership no permissions', () => {
@@ -151,6 +185,6 @@ describe('sessionSchema', () => {
     const applicantInConsole = { ...session, permissions: ['grants.applications.apply'] };
     expect(sessionSchema.safeParse(applicantInConsole).success).toBe(false);
     expect(sessionSchema.safeParse({ ...session, mfa: 'not_required' }).success).toBe(false);
-    expect(sessionSchema.safeParse({ ...portal, mfa: 'complete' }).success).toBe(false);
+    expect(sessionSchema.safeParse({ ...portal, mfa: 'enrol' }).success).toBe(false);
   });
 });

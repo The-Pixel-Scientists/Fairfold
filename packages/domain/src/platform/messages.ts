@@ -66,6 +66,21 @@ export const messages = {
   passwordTooLong: 'Enter a password of 256 characters or fewer.',
   totpCode: 'Enter the 6-digit code from your authenticator app.',
   linkNotValid: 'This link is not valid. Use the link in your latest email, or ask for a new one.',
+  backupCode: 'Enter a backup code of 10 letters and numbers, like abcde-12345.',
+  enterPasskeyName: 'Enter a name for this passkey, like Work laptop.',
+  nameTooLong: (count: number) => `Enter a name of ${count} characters or fewer.`,
+
+  // Single sign-on.
+  httpsAddress:
+    'Enter an address that starts with https://, with a domain name and no user name or password in it.',
+  domainName:
+    'Enter a domain name like example.org, with no https:// or trailing dot. Write an international name in its xn-- form.',
+  certificate:
+    'Paste the certificate in PEM form, from -----BEGIN CERTIFICATE----- to -----END CERTIFICATE-----.',
+  privateKey:
+    'Paste the private key in PEM form, from -----BEGIN PRIVATE KEY----- to -----END PRIVATE KEY-----.',
+  ssoDomainConflict:
+    'Another organisation has already verified this domain. Contact support if it should be yours.',
 
   // Tenants, theme and logo.
   slugFormat:
