@@ -40,6 +40,8 @@ export const party: ClassificationRegistry = {
     kind: internal,
     status: internal,
     merged_into: internal,
+    // When the database marked the party erased (ADR 0027), kept with it.
+    erased_at: internal,
   },
   'party.organisation': {
     ...keyAndActors,

@@ -12,6 +12,7 @@ export {
   ukAddressSchema,
   type UkAddress,
 } from './answers.ts';
+export { cleanAnswers, isBlankText, isNoAnswer } from './clean.ts';
 export { canSee, projectionAudiences, type ProjectionAudience } from './audience.ts';
 export {
   answerClassifications,

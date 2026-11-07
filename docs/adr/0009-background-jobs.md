@@ -88,6 +88,12 @@ If a guard is removed, the exception lapses until a new ADR replaces it.
     completes, fails and retries jobs, runs maintenance and inserts scheduled
     jobs, with the rights that needs and none on tenant tables. Handlers never
     use it.
+  - `app_operator` (Aaron, 29 October 2026; [ADR 0024](0024-no-tool-on-by-default.md))
+    is a `NOLOGIN` role that operator commands in the worker switch to with
+    `SET LOCAL ROLE`, inside a tenant's transaction. `app_worker` is its one
+    member, `WITH ADMIN FALSE, INHERIT FALSE, SET TRUE`, so a worker
+    connection holds none of its rights until then. It holds no right on any
+    job table, and only the inserts ADR 0003 lists for it.
   - No app role may execute `create_queue`, `delete_queue` or the
     `job_table_*` functions; `job_now()` is granted by name. All three can
     read `app.job_queue`.
@@ -225,6 +231,12 @@ applies to every queue's table, enforces the rules below. It refuses any
 
 | Package | Version | Licence | Released | Notes |
 | --- | --- | --- | --- | --- |
-| pg-boss | 12.33.2 | MIT | 2026-09-18 | Very active; 4k stars; Node.js 22.12+; 12.35.0 is too new |
+| pg-boss | 12.35.0 | MIT | 2026-09-26 | Very active; 4k stars; Node.js 22.12+; provenance attested; no advisories in 12 months; no install scripts |
 | graphile-worker (not chosen) | 0.18.0 | MIT | 2026-09-08 | Active; pre-1.0 |
 | bullmq (not chosen) | 6.3.9 | MIT | 2026-09-25 | Active; needs Redis |
+
+Note, 27 October 2026: pg-boss is pinned at 12.35.0 instead of 12.33.2, as
+the consequences above plan ("we take it in the first monthly update once it
+is 7 days old"). No `pgboss` schema exists yet, so the first migration builds
+on schema version 43 and no upgrade migration is needed. The decision itself
+is unchanged.

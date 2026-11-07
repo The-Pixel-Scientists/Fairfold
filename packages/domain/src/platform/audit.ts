@@ -79,6 +79,14 @@ export const platformAuditActions = defineAuditActions('platform', [
   'platform.file.uploaded',
   'platform.file.refused',
   'platform.file.downloaded',
+  // A file withheld at a rescan, restored by the withheld recheck, or deleted
+  // by staff while withheld, and one event per tenant for each sweep and
+  // recheck run, with counts (ADR 0030). Ids, verdicts and counts only.
+  'platform.file.withheld',
+  'platform.file.restored',
+  'platform.file.deleted',
+  'platform.file_sweep.completed',
+  'platform.file_recheck.completed',
   // Retention, subject access, erasure and the audit log itself (E3, ADR
   // 0027). Values are ids, codes, days and counts by table, never a personal
   // value; an event about a person carries them as its subject party id.

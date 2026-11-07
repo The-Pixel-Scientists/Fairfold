@@ -12,7 +12,12 @@ export interface SessionContextRow {
   readonly userId: string;
   readonly tenant: TenantId;
   readonly app: 'console' | 'portal';
-  readonly mfaState: 'enrol' | 'verify' | 'complete' | 'not_required';
+  /**
+   * Where the session stands on MFA, or `password_change_required` once MFA
+   * is complete for an account whose password was found in a breach
+   * (migration 0034).
+   */
+  readonly mfaState: 'enrol' | 'verify' | 'complete' | 'not_required' | 'password_change_required';
   /** When the session ends unless used. */
   readonly expiresAt: Date;
   readonly reauthenticatedAt: Date | null;

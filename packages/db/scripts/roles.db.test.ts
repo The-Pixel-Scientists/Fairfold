@@ -11,6 +11,7 @@ import { randomBytes } from 'node:crypto';
 import pg from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
+import { DEFINER_FUNCTIONS } from '../test/catalogue/index.ts';
 import { findPrivilegeProblems } from '../test/privilege-lint.ts';
 import { EXCEPTED_SCHEMAS } from '../test/schema-lint.ts';
 import {
@@ -22,6 +23,7 @@ import {
   findObjectRightProblems,
   findRoleProblems,
   LOGIN_ROLES,
+  OPERATOR_ROLE,
   OWNER_ROLES,
   readRolePassword,
   type LoginRole,
@@ -32,8 +34,13 @@ import { MAINTENANCE_DATABASE, readDatabaseName, readServer, readSetting } from 
 const env = process.env;
 const testDatabase = readDatabaseName(env, 'TPS_TEST_DB_NAME');
 
+/** The owners of the approved definer functions, from the catalogue. */
+const USED_OWNERS: ReadonlySet<string> = new Set(
+  [...DEFINER_FUNCTIONS.values()].map(({ owner }) => owner),
+);
+
 /** The owners created ahead for later tasks' functions, which own nothing yet. */
-const UNUSED_OWNERS = OWNER_ROLES.slice(5);
+const UNUSED_OWNERS: readonly string[] = OWNER_ROLES.filter((role) => !USED_OWNERS.has(role));
 
 async function connect(database: string, user?: LoginRole): Promise<pg.Client> {
   const client = new pg.Client({
@@ -210,7 +217,7 @@ describe('roles.sql', () => {
       await resetRoles();
     }
     expect(problems).toEqual([
-      'role app_queue was not set up by roles script version 4',
+      'role app_queue was not set up by roles script version 5',
       `role ${BACKUP_ROLE} does not bypass row-level security, so a backup would miss rows`,
       `role ${role} can log in`,
       `role ${role} bypasses row-level security`,
@@ -230,15 +237,24 @@ describe('roles.sql', () => {
   });
 
   it('creates the owners of later functions owning nothing and holding no right anywhere', async () => {
-    const { rows } = await asSuperuser(
-      MAINTENANCE_DATABASE,
-      `SELECT r.rolname, d.deptype
-         FROM pg_catalog.pg_shdepend d
-         JOIN pg_catalog.pg_roles r ON r.oid = d.refobjid
-        WHERE d.refclassid = 'pg_catalog.pg_authid'::pg_catalog.regclass
-          AND r.rolname IN (${UNUSED_OWNERS.map((role) => `'${role}'`).join(', ')})`,
+    // Every definer owner the catalogue names is one roles.sql creates, so
+    // the used and unused owners together are exactly OWNER_ROLES.
+    const ownerRoles: readonly string[] = OWNER_ROLES;
+    expect([...USED_OWNERS].filter((owner) => !ownerRoles.includes(owner))).toEqual([]);
+    expect(USED_OWNERS.size + UNUSED_OWNERS.length).toBe(OWNER_ROLES.length);
+    expect(USED_OWNERS.has('owner_app_tenant_ids')).toBe(true);
+    expect(UNUSED_OWNERS).not.toContain('owner_app_tenant_ids');
+
+    const { rows } = await withClient(MAINTENANCE_DATABASE, (client) =>
+      client.query<{ rolname: string; deptype: string }>(
+        `SELECT r.rolname, d.deptype
+           FROM pg_catalog.pg_shdepend d
+           JOIN pg_catalog.pg_roles r ON r.oid = d.refobjid
+          WHERE d.refclassid = 'pg_catalog.pg_authid'::pg_catalog.regclass
+            AND r.rolname = ANY($1::text[])`,
+        [UNUSED_OWNERS],
+      ),
     );
-    expect(UNUSED_OWNERS).toHaveLength(20);
     expect(rows).toEqual([]);
   });
 
@@ -268,6 +284,59 @@ describe('roles.sql', () => {
 
   it('lets a migration hand a function to its owner, and replace it as that owner, as ADR 0023 sets out', async () => {
     await expectOwnerHandover(testDatabase);
+  });
+
+  it("sets app_operator up with no login and app_worker's SET-only membership alone, and reports any other", async () => {
+    const { rows } = await withClient(MAINTENANCE_DATABASE, (client) =>
+      client.query(
+        `SELECT r.rolcanlogin, r.rolpassword, r.rolsuper, r.rolbypassrls, r.rolcreaterole,
+                r.rolcreatedb, r.rolreplication,
+                array(SELECT format('%s admin=%s inherit=%s set=%s', m.member::regrole, m.admin_option,
+                                    m.inherit_option, m.set_option)
+                        FROM pg_catalog.pg_auth_members m
+                       WHERE m.roleid = r.oid OR m.member = r.oid) AS memberships
+           FROM pg_catalog.pg_authid r WHERE r.rolname = $1`,
+        [OPERATOR_ROLE],
+      ),
+    );
+    expect(rows).toEqual([
+      {
+        rolcanlogin: false,
+        rolpassword: null,
+        rolsuper: false,
+        rolbypassrls: false,
+        rolcreaterole: false,
+        rolcreatedb: false,
+        rolreplication: false,
+        memberships: ['app_worker admin=f inherit=f set=t'],
+      },
+    ]);
+
+    await asSuperuser(
+      MAINTENANCE_DATABASE,
+      `GRANT ${OPERATOR_ROLE} TO app_worker WITH INHERIT TRUE;
+       GRANT ${OPERATOR_ROLE} TO app_api WITH INHERIT FALSE, SET TRUE;`,
+    );
+    let changed: string[];
+    try {
+      changed = await withClient(testDatabase, (client) => findRoleProblems(client));
+    } finally {
+      await resetRoles();
+    }
+    await asSuperuser(MAINTENANCE_DATABASE, `REVOKE ${OPERATOR_ROLE} FROM app_worker`);
+    let missing: string[];
+    try {
+      missing = await withClient(testDatabase, (client) => findRoleProblems(client));
+    } finally {
+      await resetRoles();
+    }
+    expect(changed).toEqual([
+      `app_worker is not a SET-only member of role ${OPERATOR_ROLE}`,
+      `role app_api is a member of role ${OPERATOR_ROLE} with SET, which the roles script does not grant`,
+      `role app_worker is a member of role ${OPERATOR_ROLE} with INHERIT, SET, which the roles script does not grant`,
+    ]);
+    expect(missing).toEqual([`app_worker is not a SET-only member of role ${OPERATOR_ROLE}`]);
+    await expectRolesUnchanged();
   });
 
   it('never repeats a password verifier in its errors', async () => {
@@ -566,7 +635,7 @@ describe('managed mode', () => {
   beforeEach(async () => {
     await asSuperuser(
       MAINTENANCE_DATABASE,
-      [...LOGIN_ROLES, ...OWNER_ROLES]
+      [...LOGIN_ROLES, OPERATOR_ROLE, ...OWNER_ROLES]
         .map((role) => `GRANT ${role} TO ${admin} WITH ADMIN TRUE, INHERIT FALSE, SET FALSE;`)
         .join('\n'),
     );
@@ -603,7 +672,7 @@ describe('managed mode', () => {
         inherit_option: false,
         set_option: false,
         grantor: readSetting(env, 'TPS_DB_SUPERUSER'),
-        roles: LOGIN_ROLES.length + OWNER_ROLES.length,
+        roles: LOGIN_ROLES.length + 1 + OWNER_ROLES.length,
       },
     ]);
     await withClient(database, (client) => assertRoles(client, admin), 'migrator');
@@ -628,7 +697,9 @@ describe('managed mode', () => {
       `role ${member} is a member of role ${role} with ADMIN, which the roles script does not grant`;
     expect(managedProblems).toEqual([adminOnly(other, BACKUP_ROLE)]);
     expect(superuserProblems).toEqual([
-      ...[...LOGIN_ROLES, ...OWNER_ROLES].sort().map((role) => adminOnly(admin, role)),
+      ...[...LOGIN_ROLES, OPERATOR_ROLE, ...OWNER_ROLES]
+        .sort()
+        .map((role) => adminOnly(admin, role)),
       adminOnly(other, BACKUP_ROLE),
     ]);
   });

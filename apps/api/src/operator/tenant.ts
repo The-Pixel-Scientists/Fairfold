@@ -6,12 +6,20 @@
 // work in that tenant's transaction. Semgrep keeps createTenant() out of the
 // rest of the code.
 
-import { createTenant, withTenant, type Kysely, type Transaction } from '@pixel-scientists/db';
+import {
+  createTenant,
+  withOperator,
+  withTenant,
+  type Kysely,
+  type Transaction,
+} from '@pixel-scientists/db';
 
 export interface NewTenant {
   readonly id: string;
   /** Run `work` in a transaction of the new tenant. */
   inTenant<T>(work: (trx: Transaction<unknown>) => Promise<T>): Promise<T>;
+  /** Run `work` as app_operator in a transaction of the new tenant. */
+  asOperator<T>(work: (trx: Transaction<unknown>) => Promise<T>): Promise<T>;
 }
 
 /** Make a tenant. The database refuses a bad, reserved or taken slug. */
@@ -20,5 +28,9 @@ export async function makeTenant(
   tenant: { readonly slug: string; readonly name: string },
 ): Promise<NewTenant> {
   const id = await createTenant(worker, tenant);
-  return { id, inTenant: (work) => withTenant(worker, id, work) };
+  return {
+    id,
+    inTenant: (work) => withTenant(worker, id, work),
+    asOperator: (work) => withOperator(worker, id, work),
+  };
 }

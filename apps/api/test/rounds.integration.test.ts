@@ -10,7 +10,6 @@ import { messages } from '@pixel-scientists/domain/platform';
 import { programmeMessages } from '@pixel-scientists/grants/contracts';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
-import { createTestTenant } from '../../../packages/db/test/tenants.ts';
 import {
   answer,
   money,
@@ -24,6 +23,7 @@ import {
   type ProgrammeApi,
   type Round,
 } from './programme-api.ts';
+import { createGrantsTenant } from './modules-on.ts';
 import { addMember, events } from './settings-api.ts';
 
 // Each request runs a few statements in a transaction, which is slow on a busy machine.
@@ -177,7 +177,7 @@ describe('local times', () => {
   });
 
   it('are read in the zone the round was saved in, and saved again in the tenant’s zone of the day', async () => {
-    const tenant = await createTestTenant();
+    const tenant = await createGrantsTenant();
     const owner = await addMember(tenant, 'console', 'programme_manager');
     const admin = await addMember(tenant, 'console', 'tenant_admin');
     const programme = await answer<Programme>(

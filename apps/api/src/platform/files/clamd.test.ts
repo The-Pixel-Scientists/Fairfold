@@ -6,7 +6,7 @@ import { createServer, type Server, type Socket } from 'node:net';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { parseReply, scan } from './clamd.ts';
+import { parseReply, parseVersion, scan, signatureVersion } from './clamd.ts';
 
 describe('parseReply', () => {
   it('takes only stream: OK as clean', () => {
@@ -159,5 +159,43 @@ describe('scan', () => {
       }),
     );
     expect(await scan(settings(port), Buffer.alloc(5_000_000))).toBe('error');
+  });
+});
+
+describe('signatureVersion', () => {
+  it('reads the signature version from the VERSION reply', async () => {
+    let asked = '';
+    const port = await listen(
+      createServer((socket) => {
+        socket.on('error', () => undefined);
+        socket.on('data', (chunk: Buffer) => {
+          asked = chunk.toString('latin1');
+          socket.end('ClamAV 1.4.3/27850/Wed Oct 28 08:25:00 2026\0');
+        });
+      }),
+    );
+    expect(await signatureVersion(settings(port))).toBe(27_850);
+    expect(asked).toBe('zVERSION\0');
+  });
+
+  it('takes anything else as unknown', async () => {
+    for (const reply of [
+      'ClamAV 1.4.3\0',
+      'ClamAV 1.4.3/x/y\0',
+      'stream: OK\0',
+      'ClamAV 1/2/3\0x',
+    ]) {
+      const port = await listen(
+        createServer((socket) => {
+          socket.on('error', () => undefined);
+          socket.on('data', () => socket.end(reply));
+        }),
+      );
+      expect(await signatureVersion(settings(port)), reply).toBeNull();
+    }
+    expect(parseVersion('ClamAV 1.4.3/27850/date\n')).toBeNull();
+    const closed = await fakeClamd(() => undefined);
+    servers.pop()?.close();
+    expect(await signatureVersion(settings(closed.port))).toBeNull();
   });
 });

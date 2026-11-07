@@ -25,15 +25,18 @@ export {
   type DatabaseSettings,
   type DatabaseTls,
 } from './database.ts';
+export { setLocalLockTimeout } from './lock-timeout.ts';
 export {
   chargeRateLimits,
   EMAIL_SCOPES,
   refundSignIn,
   SIGN_IN_SCOPES,
+  signInScopes,
   type RateLimitCharge,
   type RateLimitClient,
   type RateLimitScope,
 } from './rate-limits.ts';
+export { asOperator, withOperator } from './operator.ts';
 export { sessionContext, touchSession, type SessionContextRow } from './sessions.ts';
 export { isLoopbackHost, readSecret, readSetting, type Env } from './settings.ts';
 export { TenantLeakError, withTenant, type TenantId } from './tenant-context.ts';

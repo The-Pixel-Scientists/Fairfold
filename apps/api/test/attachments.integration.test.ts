@@ -132,6 +132,23 @@ async function submittedWith(open: Open, ...more: [string, string, Buffer][]) {
 }
 
 describe('attaching a file', () => {
+  it('replays the same key with the same file and creates nothing more', async () => {
+    const draft = await aDraft();
+    const key = randomUUID();
+    const url = t.path(draft.id, '/fields/f_accounts/files');
+    const bytes = pdf();
+    const first = await t.upload(t.ann, url, 'Accounts.pdf', bytes, key);
+    const files = await fileCount();
+    const audit = (await events(t.tenantA, 'platform.file.uploaded')).length;
+
+    const again = await t.upload(t.ann, url, 'Accounts.pdf', bytes, key);
+
+    expect(view(again)).toEqual(view(first));
+    expect(await fileCount()).toBe(files);
+    expect(await links(draft.id)).toHaveLength(1);
+    expect((await events(t.tenantA, 'platform.file.uploaded')).length).toBe(audit);
+  });
+
   it('links a clean file, answers 201 with its view, and audits the upload without the name', async () => {
     const draft = await aDraft();
     const bytes = pdf();
@@ -490,7 +507,7 @@ describe('who may use the routes', () => {
           .query(
             `INSERT INTO app.tenant_module (tenant_id, module, enabled, updated_by)
              VALUES ($1, 'grants', $2, $3)
-             ON CONFLICT (tenant_id, module) DO UPDATE SET enabled = EXCLUDED.enabled`,
+             ON CONFLICT (tenant_id, module) DO UPDATE SET enabled = EXCLUDED.enabled, updated_by = EXCLUDED.updated_by`,
             [t.tenantA.id, enabled, t.managerA.membershipId],
           )
           .then(() => undefined),

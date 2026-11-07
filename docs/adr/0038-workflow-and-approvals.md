@@ -168,10 +168,15 @@ membership setting, which any app role can change with `set_config`
 - `app.session_actor()`, an invoker function (no new definer function),
   returns the membership id and the session's `reauthenticated_at` only
   when the setting names a live console session through
-  `auth.session_context()`, that session's active tenant is the current
-  tenant, and its user is the user of `app.current_membership_id()`, whose
-  membership is active. Otherwise it returns nothing, and every trigger
-  below refuses.
+  `auth.session_context()` whose `mfa_state` is `'complete'`, that
+  session's active tenant is the current tenant, and its user is the user
+  of `app.current_membership_id()`, whose membership is active. Otherwise
+  it returns nothing, and every trigger below refuses. A session still at
+  `enrol` or `verify` has proved only a password, so it can neither ask
+  nor decide, and its `reauthenticated_at` never counts as step-up: the
+  decision trigger reads recency only from what `app.session_actor()`
+  returns, so a step-up counts only on a session that finished its second
+  factor.
 - App roles read `auth.session` only through `auth.session_context()`,
   which takes a hash and returns none, so an injected query cannot learn
   another member's token hash. Changing either setting lets it act only as
@@ -354,8 +359,10 @@ moves. Three things make it hold whichever code asks:
   permission, such as a finance "approve payment" route without the flag,
   cannot decide without step-up.
 - The decision trigger checks the session's own `reauthenticated_at`
-  against the database's clock, so a direct query cannot decide without a
-  recent step-up either.
+  against the database's clock, and only on a session whose `mfa_state` is
+  `'complete'` (through `app.session_actor()`), so a direct query cannot
+  decide without a recent step-up either, nor with a password alone.
+  `ctx.workflow.decide()` applies the same two checks.
 
 Withdrawing needs no step-up. Making a request needs whatever the subject
 module's route needs.
@@ -394,6 +401,12 @@ Tests the database work (S12-69) and the service (S12-77) must name:
 - a decision on a session without step-up in the last 5 minutes: refused
   by the service through any route, and by the database, with nothing
   written;
+- a pre-MFA session: a console session at `mfa_state` `enrol` or `verify`,
+  of a colleague who is a valid approver, with `reauthenticated_at` set
+  within the last 5 minutes, asks, approves or closes: `app.session_actor()`
+  returns nothing and the database refuses each with nothing written, and
+  the service refuses the decision; the same session moved to `complete`
+  is then accepted, so the test proves the MFA state is what refused it;
 - a request linked from a second link table (of another definition, with
   the same step id), and a request linked after it is approved or after any
   decision: refused by the database;
@@ -583,9 +596,10 @@ answers each:
   The triggers set the definition key, the count and the dates, refuse
   every other change, refuse any decision on a request with a rejection,
   and refuse any requester, decider or closer other than
-  `app.session_actor()`'s membership. So a direct query cannot approve its
-  own request, lower a count, reopen a request, push past a rejection or
-  decide without a recent step-up. Nor can it ask or decide as someone
+  `app.session_actor()`'s membership, which exists only for a session that
+  completed MFA. So a direct query cannot approve its own request, lower a
+  count, reopen a request, push past a rejection, decide without a recent
+  step-up, or decide on a session that has proved only a password. Nor can it ask or decide as someone
   else, even by tampering with the membership setting (next).
 - **Tampering with the membership setting.** As ADR 0037 says, an injection
   that reaches `set_config` can change `app.membership_id` for one

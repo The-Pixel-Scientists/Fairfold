@@ -46,6 +46,9 @@
     },
     {
       "path": "apps/portal"
+    },
+    {
+      "path": "infra/proxy"
     }
   ]
 }

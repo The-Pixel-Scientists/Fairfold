@@ -21,7 +21,9 @@
 // Commands get the path of the file, never the value.
 //
 // The S3 key pairs come from the seaweedfs-s3 config in the same file:
-// dev-scanner writes and dev-downloads reads (ADR 0047). dev-admin only
+// dev-scanner writes, dev-rescan reads clean/ and reads and writes withheld/,
+// and dev-downloads reads clean/ (ADR 0030, 0047). dev-removal is the
+// worker's and reaches no command here. dev-admin only
 // creates this worktree's bucket (ensureDevBucket) and reaches no command.
 //
 // This is for development only. It sets TPS_DEV=1, and so refuses to
@@ -78,6 +80,8 @@ const FILES = [
   'TPS_STORAGE_WRITE_SECRET_ACCESS_KEY',
   'TPS_STORAGE_READ_ACCESS_KEY_ID',
   'TPS_STORAGE_READ_SECRET_ACCESS_KEY',
+  'TPS_STORAGE_SCANNER_ACCESS_KEY_ID',
+  'TPS_STORAGE_SCANNER_SECRET_ACCESS_KEY',
   'TPS_CLAMD_HOST',
   'TPS_CLAMD_PORT',
   'TPS_CLAMD_TIMEOUT_MS',
@@ -235,6 +239,7 @@ export function developmentValues(
   const clamdPort = publishedPort(service(config, 'clamav'), 'clamav', 3310);
   const writeKey = storageKey(config, 'dev-scanner');
   const readKey = storageKey(config, 'dev-downloads');
+  const scannerKey = storageKey(config, 'dev-rescan');
   const values: Record<string, string> = {
     TPS_DEV: '1',
     TPS_API_PORT: String(names.ports.api),
@@ -258,6 +263,8 @@ export function developmentValues(
     TPS_STORAGE_WRITE_SECRET_ACCESS_KEY: writeKey.secretKey,
     TPS_STORAGE_READ_ACCESS_KEY_ID: readKey.accessKey,
     TPS_STORAGE_READ_SECRET_ACCESS_KEY: readKey.secretKey,
+    TPS_STORAGE_SCANNER_ACCESS_KEY_ID: scannerKey.accessKey,
+    TPS_STORAGE_SCANNER_SECRET_ACCESS_KEY: scannerKey.secretKey,
     TPS_CLAMD_HOST: clamdPort.host_ip ?? '127.0.0.1',
     TPS_CLAMD_PORT: clamdPort.published ?? '',
     // ADR 0047: the API gives up 5 seconds after clamd's MaxScanTime.

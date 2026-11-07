@@ -334,6 +334,15 @@ describe('acceptInvitation', { timeout: 60_000 }, () => {
       'platform.auth.invitation_accepted',
       'platform.membership.created',
     ]);
+    const persons = await rowsIn<{ entity_id: string; subject: string }>(
+      tenant,
+      `SELECT e.entity_id, e.subject_party_id AS subject
+             FROM app.audit_event AS e JOIN party.person AS p ON p.id = e.entity_id
+            WHERE e.action = 'party.person.created' AND e.actor_id = $1 AND p.user_id = $2`,
+      [row?.membership, person.userId],
+    );
+    expect(persons).toHaveLength(1);
+    expect(persons[0]?.subject).toBe(persons[0]?.entity_id);
     expect(
       await migrator('SELECT tenant_id FROM auth.audit_event WHERE user_id = $1 AND code = $2', [
         person.userId,
@@ -410,6 +419,20 @@ describe('acceptInvitation', { timeout: 60_000 }, () => {
     await addMembership(tenant, person.userId, ['reviewer'], 'suspended');
     expect((await accept(token, await sessionFor(person.userId, tenant))).statusCode).toBe(404);
     expect(await statusOf(invitation.id)).toBe('pending');
+  });
+
+  it('refuses an invitation once its inviter is suspended, removed or no longer an admin', async () => {
+    for (const change of ["status = 'suspended'", "status = 'removed'", "roles = '{reviewer}'"]) {
+      const inviter = await addMembership(tenant, (await addAccount()).userId, ['tenant_admin']);
+      const person = await addAccount();
+      const { invitation, token } = await invite(tenant, inviter, person.email, ['tenant_admin']);
+      await asMigratorIn(tenant.id, (client) =>
+        client.query(`UPDATE app.membership SET ${change} WHERE id = $1`, [inviter]),
+      );
+      const response = await accept(token, await sessionFor(person.userId, tenant));
+      expect(response.statusCode, change).toBe(404);
+      expect(await statusOf(invitation.id)).toBe('pending');
+    }
   });
 
   it('lets exactly one of two acceptances at once win', async () => {

@@ -126,6 +126,7 @@ describe('app.invitation', { timeout: 30_000 }, () => {
     ['refuses something that is not an address', { email: 'jo.example.test' }, '23514'],
     ['refuses no roles', { roles: [] }, '23514'],
     ['refuses the applicant role', { roles: ['applicant'] }, '23514'],
+    ['accepts the analyst role', { roles: ['analyst'] }, 'ok'],
     ['refuses an unknown role', { roles: ['owner'] }, '23514'],
     ['refuses a null role', { roles: [null] }, '23514'],
     ['refuses a short token hash', { token_hash: randomBytes(16) }, '23514'],

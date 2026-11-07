@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import { emailChangeLinkPath } from '@pixel-scientists/domain/auth';
 import { grantsRoutes } from '@pixel-scientists/grants/console';
 import { AppShell, NotFoundPage, Router, SessionProvider } from '@pixel-scientists/ui';
 import type { PageDefinition, RouteDefinition } from '@pixel-scientists/ui';
@@ -7,6 +8,7 @@ import { Suspense, lazy } from 'react';
 import type { ReactNode } from 'react';
 
 import { endSession, loadSession } from './api.ts';
+import { ACCOUNT_SECURITY_PATH } from './account/security/paths.ts';
 import CheckEmailPage from './auth/CheckEmailPage.tsx';
 import CompleteSignUpPage from './auth/CompleteSignUpPage.tsx';
 import EnterCodePage from './auth/EnterCodePage.tsx';
@@ -17,9 +19,12 @@ import { Screen } from './auth/Screen.tsx';
 import SetUpAuthenticatorPage from './auth/SetUpAuthenticatorPage.tsx';
 import SignedOutPage from './auth/SignedOutPage.tsx';
 import SignInPage from './auth/SignInPage.tsx';
+import { SSO_FAILED_PATH, SSO_SIGNING_IN_PATH } from './auth/sign-in/paths.ts';
+import { SsoFailedPage, SsoSigningInPage } from './auth/sign-in/SsoLandingPages.tsx';
 import SignUpPage from './auth/SignUpPage.tsx';
 import { AUDIT_LOG_PATH } from './platform/audit-log/paths.ts';
 import { DATA_PATH } from './platform/data/paths.ts';
+import { SSO_PATH } from './platform/sso/paths.ts';
 import { TenantLook } from './platform/settings/look.tsx';
 import { INVITATION_PATH, TEAM_PATH } from './platform/team/paths.ts';
 import { productName, titleSuffix } from './product.ts';
@@ -50,11 +55,21 @@ export const tenantRoutes: readonly RouteDefinition[] = [
   ...memberRoutes([
     ...grantsRoutes,
     {
+      path: ACCOUNT_SECURITY_PATH,
+      title: 'Account security',
+      load: () => import('./account/security/SecurityPage.tsx'),
+    },
+    {
       path: AUDIT_LOG_PATH,
       title: 'Audit log',
       load: () => import('./platform/audit-log/AuditLogPage.tsx'),
     },
     ...moduleRoutes,
+    {
+      path: SSO_PATH,
+      title: 'Single sign-on',
+      load: () => import('./platform/sso/SsoPage.tsx'),
+    },
     { path: DATA_PATH, title: 'Data', load: () => import('./platform/data/DataPage.tsx') },
     { path: TEAM_PATH, title: 'Team', load: () => import('./platform/team/TeamPage.tsx') },
   ]),
@@ -63,6 +78,11 @@ export const tenantRoutes: readonly RouteDefinition[] = [
     path: INVITATION_PATH,
     title: 'Accept your invitation',
     load: () => import('./platform/team/InvitationPage.tsx'),
+  },
+  {
+    path: emailChangeLinkPath,
+    title: 'Confirm your new email address',
+    load: () => import('./account/security/EmailChangePage.tsx'),
   },
   {
     path: '/settings',
@@ -80,6 +100,8 @@ export const tenantRoutes: readonly RouteDefinition[] = [
     load: () => import('./platform/settings/ModulesPage.tsx'),
   },
   { path: '/sign-in', title: 'Sign in', component: SignInPage },
+  { path: SSO_SIGNING_IN_PATH, title: 'Signing you in', component: SsoSigningInPage },
+  { path: SSO_FAILED_PATH, title: 'Single sign-on did not work', component: SsoFailedPage },
   { path: '/sign-up', title: 'Create your account', component: SignUpPage },
   { path: '/sign-up/check-email', title: 'Check your email', component: CheckEmailPage },
   { path: '/sign-up/complete', title: 'Set your password', component: CompleteSignUpPage },

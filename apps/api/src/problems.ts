@@ -12,7 +12,7 @@
 
 import { STATUS_CODES } from 'node:http';
 
-import { problemSchema, type Problem } from '@pixel-scientists/domain/api';
+import { problemSchema, type Problem, type ProblemType } from '@pixel-scientists/domain/api';
 import { messages } from '@pixel-scientists/domain/platform';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
@@ -23,6 +23,11 @@ import { fieldProblems, type FieldProblem, type ValidationEntry } from './valida
 export const PROBLEM_CONTENT_TYPE = 'application/problem+json; charset=utf-8';
 
 export { problemSchema, type Problem };
+
+export interface ProblemKind {
+  readonly type: ProblemType;
+  readonly title: string;
+}
 
 /**
  * An error whose text is safe to show and to log. Throw it for a failure the
@@ -37,6 +42,8 @@ export class ApiError extends SafeError {
   readonly reason: string | undefined;
   /** Headers to send with the problem; only `Retry-After` and `Allow` are kept. */
   readonly headers: Readonly<Record<string, string>> | undefined;
+  /** A problem type other than `about:blank`, with its title (ADR 0028). */
+  readonly kind: ProblemKind | undefined;
 
   /** With no `detail`, the plain text for the status. */
   constructor(
@@ -47,6 +54,7 @@ export class ApiError extends SafeError {
       cause?: unknown;
       reason?: string;
       headers?: Readonly<Record<string, string>>;
+      kind?: ProblemKind;
     } = {},
   ) {
     const text = detail ?? detailFor(status, undefined);
@@ -57,6 +65,7 @@ export class ApiError extends SafeError {
     this.errors = options.errors ?? [];
     this.reason = options.reason;
     this.headers = options.headers;
+    this.kind = options.kind;
   }
 }
 
@@ -134,6 +143,7 @@ interface Failure {
   detail: string;
   errors: readonly FieldProblem[];
   headers?: Record<string, string>;
+  kind?: ProblemKind;
   /** Whether the error was unexpected, so it needs a log line with its stack. */
   unexpected: boolean;
   reason?: string;
@@ -153,6 +163,7 @@ function describe(error: unknown): Failure {
       detail: error.detail,
       errors: error.errors.slice(0, MAX_THROWN_PROBLEMS),
       headers: keptHeaders(error),
+      ...(error.kind === undefined ? {} : { kind: error.kind }),
       unexpected: error.status >= 500,
       ...(error.reason === undefined ? {} : { reason: error.reason }),
     };
@@ -193,10 +204,11 @@ export function sendProblem(
   status: number,
   detail: string,
   errors: readonly FieldProblem[] = [],
+  kind?: ProblemKind,
 ): FastifyReply {
   const problem: Problem = {
-    type: 'about:blank',
-    title: STATUS_CODES[status] ?? 'Error',
+    type: kind?.type ?? 'about:blank',
+    title: kind?.title ?? STATUS_CODES[status] ?? 'Error',
     status,
     detail,
     requestId: request.id,
@@ -229,7 +241,7 @@ export function handleError(error: unknown, request: FastifyRequest, reply: Fast
     return;
   }
   reply.headers(failure.headers ?? {});
-  sendProblem(request, reply, failure.status, failure.detail, failure.errors);
+  sendProblem(request, reply, failure.status, failure.detail, failure.errors, failure.kind);
 }
 
 /** An unknown route reads like any other error. */

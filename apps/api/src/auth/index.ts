@@ -34,16 +34,27 @@ import type { AuthModule } from '../context.ts';
 import type { Sender } from '../email/sender.ts';
 import { ApiError } from '../problems.ts';
 import { isRegisteredFromContract, registerRoutes } from '../routes/register.ts';
-import { createBetterAuth, type BetterAuth } from './better-auth.ts';
+import { setOldestAuditCopyProvider } from '../telemetry/index.ts';
+import { oldestPendingCopy } from './audit-copy/oldest.ts';
+import { authenticatorRoutes } from './authenticators/routes.ts';
+import { backupCodeRoutes } from './backup-codes/routes.ts';
+import { createBetterAuth } from './better-auth.ts';
 import { clientTracker } from './clients.ts';
+import { emailChangeRoutes } from './email-change/routes.ts';
 import { copyAuthEvent, recordAuthEvent } from './events.ts';
 import { appResolver } from './hosts.ts';
 import { invitationRoutes } from './invitation-accept.ts';
 import { createInvitation, type Inviter } from './invitations.ts';
 import { identifierKeeper } from './limits.ts';
+import { deviceKeys } from './limits/device-cookie.ts';
+import { revokeDevices } from './limits/devices.ts';
 import { revokeSessionsForMembership, type MembershipChange } from './memberships.ts';
+import { passkeyRoutes } from './passkeys/routes.ts';
+import { lookUpPassword, type BreachAnswer } from './password/range.ts';
+import { recordBreachCheckSetting } from './password/setting.ts';
 import { loadCommonPasswords } from './passwords.ts';
 import { mfaRoutes } from './mfa.ts';
+import { passwordChangeRoute } from './password-change/route.ts';
 import { authRoutes, type RouteDependencies } from './routes.ts';
 import { revokeAll, sessionReader } from './sessions.ts';
 import type { AuthSettings } from './settings.ts';
@@ -60,9 +71,19 @@ export {
   type Inviter,
 } from './invitations.ts';
 export type { MembershipChange } from './memberships.ts';
+export {
+  revokeAllForUser,
+  revokeOthersForUser,
+  type RevokeContext,
+  type Revoked,
+} from './authenticators/revoke.ts';
 
 export interface Auth extends AuthModule {
-  /** Revoke a user's live sessions, or those active in one tenant, and record it. Returns how many. */
+  /**
+   * Revoke a user's live sessions, or those active in one tenant, and record
+   * it. Revoking them all ("sign out everywhere") revokes the account's
+   * device cookies too. Returns how many sessions.
+   */
   revokeSessions(target: {
     readonly userId: string;
     readonly tenant?: TenantId;
@@ -76,8 +97,11 @@ export interface Auth extends AuthModule {
   ): Promise<Invitation>;
   /** Revoke a member's sessions active in their tenant, in the change's transaction (memberships.ts). */
   revokeSessionsForMembership(trx: Transaction<unknown>, change: MembershipChange): Promise<number>;
-  /** Better Auth's server API and context. */
-  readonly betterAuth: BetterAuth;
+  /**
+   * At start-up: record the breached-password check setting if it differs
+   * from the last one recorded (password/setting.ts). True if it did.
+   */
+  recordBreachCheckSetting(): Promise<boolean>;
   /** Waits for work after responses, such as sign-up emails, then closes the module's database pools. */
   close(): Promise<void>;
 }
@@ -90,6 +114,8 @@ export interface AuthDependencies {
   readonly sender?: Sender;
   /** The common-password list. The bundled one (passwords.ts) if left out. */
   readonly commonPasswords?: ReadonlySet<string>;
+  /** Tests only: a local fake in place of the breached-password service. */
+  readonly lookUpPassword?: (password: string) => Promise<BreachAnswer>;
 }
 
 const READS = new Set(['GET', 'HEAD']);
@@ -144,6 +170,7 @@ export function createAuth(settings: AuthSettings, deps: AuthDependencies): Auth
     password: settings.databasePassword.reveal(),
   });
   const betterAuth = createBetterAuth(settings, auth);
+  setOldestAuditCopyProvider(oldestPendingCopy(auth, deps.log));
 
   const resolve = appResolver(settings);
   const resolveApp = (request: FastifyRequest): App | null =>
@@ -168,7 +195,9 @@ export function createAuth(settings: AuthSettings, deps: AuthDependencies): Auth
     settings,
     sender: deps.sender,
     commonPasswords,
+    lookUpPassword: deps.lookUpPassword ?? ((password) => lookUpPassword(password)),
     keepIdentifier: identifierKeeper(settings.secret),
+    devices: deviceKeys(settings.secret),
     client: (requestId) => {
       const client = clients.get(requestId);
       if (client === undefined) {
@@ -195,9 +224,14 @@ export function createAuth(settings: AuthSettings, deps: AuthDependencies): Auth
   const routes = [
     ...authRoutes(routeDeps),
     ...mfaRoutes(routeDeps, totpKey),
+    ...backupCodeRoutes(routeDeps),
     ...stepUpRoutes(routeDeps, totpKey),
     ...switchTenantRoutes(routeDeps),
     ...invitationRoutes(routeDeps),
+    ...authenticatorRoutes(routeDeps, totpKey),
+    passwordChangeRoute(routeDeps),
+    ...emailChangeRoutes(routeDeps),
+    ...passkeyRoutes(routeDeps),
   ];
   const users = auth.$extendTables<AuthTables>();
   const invitations = {
@@ -269,7 +303,6 @@ export function createAuth(settings: AuthSettings, deps: AuthDependencies): Auth
   return {
     plugin,
     readSession,
-    betterAuth,
     createInvitation: (trx, actor, input) => createInvitation(invitations, trx, actor, input),
     revokeSessionsForMembership: (trx, change) =>
       revokeSessionsForMembership({ api, auth, log: deps.log }, trx, change),
@@ -279,6 +312,8 @@ export function createAuth(settings: AuthSettings, deps: AuthDependencies): Auth
           userId,
           ...(tenant === undefined ? {} : { tenantId: tenant }),
         }),
+        // Signing out everywhere also ends the account's device cookies.
+        devices: tenant === undefined ? await revokeDevices(trx, userId) : 0,
         event: await recordAuthEvent(trx, 'sessions_revoked', {
           requestId,
           userId,
@@ -288,7 +323,9 @@ export function createAuth(settings: AuthSettings, deps: AuthDependencies): Auth
       await copyAuthEvent({ api, auth, log: deps.log }, event, tenant);
       return count;
     },
+    recordBreachCheckSetting: () => recordBreachCheckSetting(auth, settings.breachCheck),
     async close() {
+      setOldestAuditCopyProvider(undefined);
       await Promise.all(running);
       await Promise.all([api.destroy(), auth.destroy()]);
     },

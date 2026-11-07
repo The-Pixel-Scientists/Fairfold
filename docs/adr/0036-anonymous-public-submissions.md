@@ -308,14 +308,26 @@ The challenge and its verification, on the server:
   SHA-256 of the challenge, its index and the nonce start with the
   difficulty's number of zero bits. Several small puzzles vary less in time
   than one large one.
-- The API checks the signature in constant time, the expiry, that the slug
-  and form id match the submit route's, and every solution: one HMAC and 16
-  hashes.
+- The challenge, its signature and the nonces travel as unpadded
+  base64url, and only the canonical encoding is accepted: the schema
+  decodes each field, encodes the bytes again and refuses the request with
+  the proof-invalid problem unless the result equals what was sent. Padding,
+  whitespace, the standard alphabet's `+` and `/`, and non-zero unused
+  trailing bits are all refused, so no two strings decode to one value. The
+  respondent token follows the same rule.
+- The API checks the signature in constant time, over the decoded bytes,
+  the expiry, that the slug and form id match the submit route's, and every
+  solution: one HMAC and 16 hashes.
 - Replay is refused at verification, whatever happens to the request
   afterwards. Once the signature, expiry, binding and solutions check out,
   the API upserts a marker in `app.request_limit`: bucket
-  `public_form_proof`, keyed by `proof_hash`, the SHA-256 of the signed
-  challenge, with a limit of 1. Its `window_start` is the challenge's signed
+  `public_form_proof`, keyed by `proof_hash`, with a limit of 1.
+  `proof_hash` is never a hash of text the client sent. The server derives
+  it from the verified fields alone: the SHA-256 of a fixed binary layout
+  of the decoded challenge's slug, form id, issue time, expiry, difficulty
+  and 16 random bytes. The solutions are not part of it. So one challenge
+  has exactly one `proof_hash` however it was encoded and whichever
+  solutions were sent with it. Its `window_start` is the challenge's signed
   issue time, not the current window, so every use of one challenge lands
   on the same row, and its row expires 24 hours after issue, long after the
   challenge. The upsert is one atomic statement, so of two uses, even at
@@ -530,13 +542,19 @@ the form and version ids. No answer, token, key, proof or client address.
   after a refused or lost submission, which the page starts at once and
   which takes about 2 seconds on a low-end phone.
 - The work this creates: S11-52 (the routes, the token, challenge and proof
-  schemas, the codes and problems, including `form_changed`), S12-44 (the
+  schemas, accepting canonical base64url only, the codes and problems,
+  including `form_changed`), S12-44 (the
   tables, both functions and their tests), S12-59 (the routes,
   verification, the single-use marker, hashing, limits, the fallback switch
   and the staff actions, with a test that one verified proof sent again and
   again with invalid answers gets the proof-invalid problem after its first
   use and raises `public_form` and `public_form_tenant` by at most one
-  each), S12-65 (the console's reference search and spam actions, and
+  each, and a test that one solved challenge re-encoded several ways
+  (padding added, a non-zero trailing bit, `+` and `/` for `-` and `_`)
+  and sent with a second valid set of solutions gets the proof-invalid
+  problem for every copy after the first canonical use, stores one
+  `proof_hash` derived from the verified fields, and raises
+  `public_form_tenant` by exactly one), S12-65 (the console's reference search and spam actions, and
   saying that a change of respondents takes effect at the next publish)
   and S12-89 (the portal and embed pages, the check in the browser, a new
   check after any refused submission, and reloading the form on

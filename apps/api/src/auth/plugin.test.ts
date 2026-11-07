@@ -6,6 +6,7 @@
 
 import { connect } from 'node:net';
 
+import { createDatabase } from '@pixel-scientists/db';
 import { authRoutes } from '@pixel-scientists/domain/auth';
 import { attachmentRoutes } from '@pixel-scientists/grants/contracts';
 import type { FastifyInstance } from 'fastify';
@@ -16,6 +17,7 @@ import { buildApp } from '../app.ts';
 import { ConfigError, Secret } from '../config.ts';
 import { createLogger } from '../logger.ts';
 import { route, type Route } from '../routes/register.ts';
+import { createBetterAuth } from './better-auth.ts';
 import { newToken } from './cookies.ts';
 import { createAuth, loadAuthSettings, type Auth } from './index.ts';
 
@@ -38,6 +40,27 @@ const database = {
 };
 
 const opened: { app: FastifyInstance; auth: Auth }[] = [];
+
+/** Better Auth as createAuth() configures it, for its endpoints and options only. */
+const betterAuth = () =>
+  createBetterAuth(
+    loadAuthSettings(env),
+    createDatabase<unknown>({
+      ...database,
+      role: 'app_auth',
+      password: database.password.reveal(),
+      applicationName: 'tps-unused',
+    }),
+  );
+
+/** A path, and the variants a lenient router might also match. */
+const variants = (path: string) => [
+  path,
+  `${path}/`,
+  path.toUpperCase(),
+  path.replace('/', '//'),
+  path.replace(/[a-z]/, (letter) => `%${letter.charCodeAt(0).toString(16)}`),
+];
 
 afterEach(async () => {
   vi.unstubAllEnvs();
@@ -282,9 +305,9 @@ describe('the request guard', () => {
 });
 
 describe('a raw upload', () => {
-  const upload = route(attachmentRoutes.uploadAttachment, () =>
-    Promise.reject(new Error('No upload reaches its handler without a session.')),
-  );
+  const refuse = () =>
+    Promise.reject(new Error('No upload reaches its handler without a session.'));
+  const upload = route(attachmentRoutes.uploadAttachment, refuse, { replay: refuse });
   const url =
     '/api/portal/applications/0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b/fields/f_accounts/files';
   const send = (headers: Record<string, string>, to = url) =>
@@ -377,38 +400,56 @@ describe('Better Auth', () => {
     }
   });
 
-  it('answers on none of its endpoints; only our contract routes answer', async () => {
-    const { app, auth } = await start();
+  it('is not handed to the rest of the API', async () => {
+    const { auth } = await start();
+    expect(auth).not.toHaveProperty('betterAuth');
+  });
+
+  it('answers on none of its endpoints, in any spelling; only our contract routes answer', async () => {
+    const { app } = await start();
     const ours = new Set(Object.values(authRoutes).map((r) => `${r.method} /api${r.path}`));
     const answered: string[] = [];
-    for (const endpoint of Object.values(auth.betterAuth.api) as {
+    const walked: string[] = [];
+    for (const endpoint of Object.values(betterAuth().api) as {
       path?: string;
       options?: { method?: string | string[] };
     }[]) {
       if (endpoint.path === undefined) continue;
-      const url = `/api/auth${endpoint.path.replaceAll(/:[a-z]+/gi, 'x')}`;
+      walked.push(endpoint.path);
+      const path = endpoint.path.replaceAll(/:[a-z]+/gi, 'x');
       for (const method of [endpoint.options?.method ?? 'GET'].flat()) {
-        const response = await app.inject({
-          method: method as 'GET' | 'POST',
-          url,
-          headers: {
-            host: 'console.example.org',
-            origin: CONSOLE,
-            'content-type': 'application/json',
-          },
-          ...(method === 'GET' ? {} : { payload: '{}' }),
-        });
-        if (response.statusCode !== 404 && !ours.has(`${method} ${url}`)) {
-          answered.push(`${method} ${url} ${String(response.statusCode)}`);
+        if (ours.has(`${method} /api/auth${path}`)) continue;
+        for (const url of variants(path).map((variant) => `/api/auth${variant}`)) {
+          const response = await app.inject({
+            method: method as 'GET' | 'POST',
+            url,
+            headers: {
+              host: 'console.example.org',
+              origin: CONSOLE,
+              'content-type': 'application/json',
+            },
+            ...(method === 'GET' ? {} : { payload: '{}' }),
+          });
+          if (response.statusCode !== 404) {
+            answered.push(`${method} ${url} ${String(response.statusCode)}`);
+          }
         }
       }
     }
     expect(answered).toEqual([]);
+    // Our own routes handle backup codes (ADR 0010): Better Auth's two answer
+    // nothing, and its view-backup-codes is server-only, with no path at all.
+    expect(walked).toEqual(
+      expect.arrayContaining([
+        '/two-factor/verify-backup-code',
+        '/two-factor/generate-backup-codes',
+      ]),
+    );
+    expect((betterAuth().api.viewBackupCodes as { path?: string }).path).toBeUndefined();
   });
 
-  it('is configured to ADR 0010', async () => {
-    const { auth } = await start();
-    const { options } = auth.betterAuth;
+  it('is configured to ADR 0010', () => {
+    const { options } = betterAuth();
     expect(options).toMatchObject({
       basePath: '/api/auth',
       trustedOrigins: [CONSOLE, PORTAL],

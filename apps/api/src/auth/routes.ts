@@ -13,11 +13,15 @@ import {
 } from '@pixel-scientists/db';
 import { getSession, signOut, type Session } from '@pixel-scientists/domain/auth';
 import {
+  moduleOn,
+  moduleSchema,
   permissionsFor,
   roles,
+  switchableModuleIds,
   type App,
   type Permission,
   type Role,
+  type SwitchableModuleId,
 } from '@pixel-scientists/domain/platform';
 
 import type { MfaState, RequestContext, RequestSession } from '../context.ts';
@@ -27,6 +31,8 @@ import { ApiError } from '../problems.ts';
 import { route, type Route } from '../routes/register.ts';
 import { clearedCookie, hashToken, sessionCookie } from './cookies.ts';
 import { copyAuthEvent, recordAuthEvent, type CopyDependencies } from './events.ts';
+import type { DeviceKeys } from './limits/device-cookie.ts';
+import type { BreachAnswer } from './password/range.ts';
 import { requestResetRoute } from './password-reset.ts';
 import { completeResetRoute } from './password-reset-complete.ts';
 import { detailsOf, revoke } from './sessions.ts';
@@ -41,10 +47,18 @@ export interface RouteDependencies extends CopyDependencies {
   readonly sender: Sender | undefined;
   /** The bundled common-password list, or undefined if it did not load: then no password can be set. */
   readonly commonPasswords: ReadonlySet<string> | undefined;
+  /** The breached-password lookup (password/range.ts), unless settings.breachCheck is off. */
+  readonly lookUpPassword: (password: string) => Promise<BreachAnswer>;
   /** A typed identifier as counters and events keep it (limits.ts). */
   readonly keepIdentifier: (typed: string) => string;
+  /** The keys that sign and check device cookies (limits/device-cookie.ts). */
+  readonly devices: DeviceKeys;
   /** The client of the request with this id, as Fastify derived it through the trusted proxies. */
-  readonly client: (requestId: string) => { readonly ip: string; readonly userAgent?: string };
+  readonly client: (requestId: string) => {
+    readonly ip: string;
+    readonly userAgent?: string;
+    readonly cookie?: string;
+  };
   /** Adds a header to the response to the request with this id. */
   readonly setHeader: (requestId: string, name: string, value: string) => void;
   /** Runs work after the response is sent, logging any failure. */
@@ -56,6 +70,7 @@ interface Active {
     Extract<Session, { app: 'console'; mfa: 'complete' }>['activeMembership']
   >;
   readonly permissions: Permission[];
+  readonly modules: SwitchableModuleId[];
 }
 
 /** The roles in `names` that belong to `app`. */
@@ -66,9 +81,32 @@ export function appRoles(names: readonly string[], app: App): Role[] {
 }
 
 /**
+ * The permissions whose module is on by moduleOn(), given the tenant's stored
+ * switches by module. A permission whose first segment is not a module is
+ * dropped.
+ */
+export function onModulePermissions(
+  permissions: readonly Permission[],
+  stored: ReadonlyMap<string, boolean>,
+): Permission[] {
+  return permissions.filter((permission) => {
+    const module = moduleSchema.safeParse(permission.split('.', 1)[0]);
+    return module.success && moduleOn(module.data, stored.get(module.data));
+  });
+}
+
+/**
+ * The switchable modules on by moduleOn(), given the tenant's stored switches
+ * by module: a module without a row is off (ADR 0024).
+ */
+export function onModules(stored: ReadonlyMap<string, boolean>): SwitchableModuleId[] {
+  return switchableModuleIds.filter((module) => moduleOn(module, stored.get(module)));
+}
+
+/**
  * The session's active membership in its app, with its roles for that app,
- * and the permissions they give less those of modules switched off for the
- * tenant (no row means on). None if it has no role in this app.
+ * the permissions they give in the modules on for the tenant by moduleOn(),
+ * and those modules. None if it has no role in this app.
  */
 async function activeMembership(
   api: Kysely<unknown>,
@@ -89,19 +127,30 @@ async function activeMembership(
     if (row === undefined) return null;
     const held = appRoles(row.roles, app);
     if (held.length === 0) return null;
-    const off = await db
+    const switches = await db
       .selectFrom('app.tenant_module')
-      .select('module')
-      .where('enabled', '=', false)
+      .select(['module', 'enabled'])
       .execute();
-    const offModules = new Set(off.map(({ module }) => module));
+    const stored = new Map(switches.map(({ module, enabled }) => [module, enabled]));
     return {
       membership: { id: row.id, tenant: { slug: row.slug, name: row.name }, roles: held },
-      permissions: permissionsFor(held, app).filter(
-        (permission) => !offModules.has(permission.split('.', 1)[0] ?? ''),
-      ),
+      permissions: onModulePermissions(permissionsFor(held, app), stored),
+      modules: onModules(stored),
     };
   });
+}
+
+/**
+ * The answer for a session whose password was found in a data breach
+ * (ADR 0010): it reaches only the password change and sign-out, so the
+ * apps are told to change the password rather than given the session.
+ */
+export function passwordChangeRequired(): ApiError {
+  return new ApiError(
+    403,
+    'This password has appeared in a data breach, so change it before you continue.',
+    { reason: 'password_change_required' },
+  );
 }
 
 /** What the apps see of a session. */
@@ -132,6 +181,7 @@ export async function sessionBody(api: Kysely<unknown>, view: SessionView): Prom
       activeMembership: null,
       memberships: [],
       permissions: [],
+      modules: [],
     } as Session;
   }
   const [active, all] = await Promise.all([
@@ -151,6 +201,7 @@ export async function sessionBody(api: Kysely<unknown>, view: SessionView): Prom
     activeMembership: active?.membership ?? null,
     memberships,
     permissions: active?.permissions ?? [],
+    modules: active?.modules ?? [],
   } as Session;
 }
 
@@ -169,6 +220,7 @@ export async function answerWithSession(
   const session = await sessionContext(deps.api, tokenHash);
   if (session === undefined) throw new Error('The new session could not be read.');
   deps.setHeader(requestId, 'set-cookie', sessionCookie(session.app, token));
+  if (session.mfaState === 'password_change_required') throw passwordChangeRequired();
   const body = await sessionBody(deps.api, {
     userId: session.userId,
     email,
@@ -197,7 +249,9 @@ export function authRoutes(deps: RouteDependencies): Route[] {
 
     route(getSession, async ({ context }) => {
       const session = sessionOf(context);
-      const { expiresAt, reauthenticatedAt, tokenHash } = detailsOf(session);
+      const details = detailsOf(session);
+      if (details.passwordChangeRequired) throw passwordChangeRequired();
+      const { expiresAt, reauthenticatedAt, tokenHash } = details;
       return sessionBody(deps.api, {
         ...session,
         email: await session.email(),

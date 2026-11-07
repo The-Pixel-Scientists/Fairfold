@@ -38,6 +38,10 @@ const requestLimit: FieldClassification = {
   sensitivity: 'internal',
   retention: { kind: 'fixed', days: 1, from: 'window_start' },
 };
+const jobRequest: FieldClassification = {
+  sensitivity: 'internal',
+  retention: { kind: 'fixed', days: 7, from: 'completed_at' },
+};
 const audit: FieldClassification = {
   sensitivity: 'internal',
   retention: { kind: 'tenant_policy', policy: 'audit', minimumDays: 365 },
@@ -57,6 +61,8 @@ export const notKept: ReadonlySet<string> = new Set([
   'app.idempotency_key.request_hash',
   'app.request_limit.key_hash',
   'app.audit_event.changes',
+  'app.job_request.filters',
+  'app.subject_key.wrapped_key',
 ]);
 
 export const app: ClassificationRegistry = {
@@ -88,6 +94,7 @@ export const app: ClassificationRegistry = {
     enabled: internal,
     updated_at: internal,
     updated_by: internal,
+    updated_by_kind: internal,
   },
   'app.tenant_theme': {
     tenant_id: internal,
@@ -107,6 +114,7 @@ export const app: ClassificationRegistry = {
     entity_id: internal,
     version: internal,
     author_id: internal,
+    author_kind: internal,
     diff: internal,
     created_at: internal,
   },
@@ -121,9 +129,10 @@ export const app: ClassificationRegistry = {
     updated_by: internal,
   },
   // An uploaded file (ADR 0047). Its name often names a person. A linked
-  // file follows its record's retention rule, as grants.application's; a
-  // refused (infected or error) row, linked to nothing, follows the
-  // 12-month audit floor, for the retention sweep (S11-102).
+  // file follows its record's retention rule, as grants.application's, and
+  // the file sweep removes it once released; a refused (infected or error)
+  // row, linked to nothing, goes 12 months after its scan, the audit floor
+  // (ADR 0030). An erased row keeps no name, hash or key.
   'app.file': {
     tenant_id: internal,
     id: internal,
@@ -135,8 +144,14 @@ export const app: ClassificationRegistry = {
     storage_key: internal,
     scan_state: internal,
     scanned_at: internal,
+    scan_version: internal,
+    linked_at: internal,
+    released_at: internal,
+    erased_at: internal,
     created_by: internal,
     created_at: internal,
+    updated_by: internal,
+    updated_at: internal,
   },
   // An invitation to the team (ADR 0010). The address names a person who may
   // never join, so every row goes 90 days after it expires, whatever its
@@ -194,13 +209,53 @@ export const app: ClassificationRegistry = {
     entity_id: audit,
     changes: audit,
     subject_party_id: audit,
+    job_id: audit,
+    origin_membership_id: audit,
+  },
+  // The queue register (ADR 0009): platform configuration.
+  'app.job_queue': {
+    name: internal,
+    kind: internal,
+    created_at: internal,
+  },
+  // A job acting for a member (ADR 0009): kept 7 days from completion, as
+  // its output is. Its filters may name the party a subject access request
+  // is about. Its audit event keeps the id, requester and permission.
+  'app.job_request': {
+    tenant_id: jobRequest,
+    id: jobRequest,
+    kind: jobRequest,
+    requested_by: jobRequest,
+    permission: jobRequest,
+    filters: { ...jobRequest, sensitivity: 'personal' },
+    field_ids: jobRequest,
+    output_sensitivity: jobRequest,
+    request_id: jobRequest,
+    status: jobRequest,
+    failure_code: jobRequest,
+    output_file_id: jobRequest,
+    requested_at: jobRequest,
+    updated_at: jobRequest,
+    completed_at: jobRequest,
+    expires_at: jobRequest,
+  },
+  // A subject's data key for audit values (ADR 0027), wrapped by the
+  // platform key: kept with its party, the key itself gone once destroyed.
+  'app.subject_key': {
+    tenant_id: internal,
+    subject_party_id: internal,
+    id: internal,
+    wrapped_key: internal,
+    kek_version: internal,
+    created_at: internal,
+    destroyed_at: internal,
   },
 };
 
 /**
  * Each table's path to the party its rows are about (ADR 0027). A file is
- * about the member who uploaded it, and an invitation about the member it
- * made, if any.
+ * about the member who uploaded it, an invitation about the member it made,
+ * if any, and a job request about the member who asked.
  */
 export const appSubjects: SubjectPathRegistry = {
   'app.membership': { kind: 'account', column: 'user_id' },
@@ -215,4 +270,6 @@ export const appSubjects: SubjectPathRegistry = {
     reason: 'A hashed client key for rate limits, with no account or tenant.',
   },
   'app.audit_event': { kind: 'party', column: 'subject_party_id' },
+  'app.job_request': { kind: 'join', column: 'requested_by', table: 'app.membership' },
+  'app.subject_key': { kind: 'party', column: 'subject_party_id' },
 };

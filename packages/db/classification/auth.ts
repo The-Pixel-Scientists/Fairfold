@@ -4,9 +4,25 @@
 // tenants, so their rows last as long as the account. A session's IP address
 // and user agent go with its row, at most 90 days after it was last used,
 // which is no later than 90 days after it ended. Auth events are kept 12
-// months; their typed identifiers and IP addresses are personal. Ids are
+// months; their typed identifiers and IP addresses are personal, and the
+// retention purge's count of the events it deleted is internal. Ids are
 // internal, as in every schema, while a user_id that links a row to a person
-// is personal. Hashes, encrypted secrets and counters are internal.
+// is personal. Hashes, encrypted secrets and counters are internal, except a
+// device's hash and the counter keyed by it, which are online identifiers. A
+// device goes 12 months after issue, or 30 days after revocation if that is
+// sooner (limits/devices.ts in apps/api/src/auth deletes it).
+//
+// A tenant's SSO set-up is kept while the tenant is a customer, and each
+// row goes when its provider is removed: a domain and a used assertion id
+// with their provider, and an SSO identity with its provider or account.
+// The sealed client secret and signing key, and the DNS token, are
+// internal. An SSO identity's subject is its account_id, personal like a
+// credential account's; its tenant, provider and issuer are internal. A
+// used assertion id goes a day after it expires.
+//
+// A passkey is kept with its account until the user removes it or the
+// account goes. Its credential id, public key and AAGUID are personal
+// account security data, and so is its name, which the user types.
 
 import type {
   ClassificationRegistry,
@@ -35,6 +51,13 @@ const counterPersonal = fixed('personal', 2, 'updated_at');
 const audit = fixed('internal', 366, 'occurred_at');
 const auditPersonal = fixed('personal', 366, 'occurred_at');
 const pending = fixed('internal', 366, 'created_at');
+const device = fixed('internal', 366, 'issued_at');
+const sso: FieldClassification = {
+  sensitivity: 'internal',
+  retention: { kind: 'tenant_lifetime' },
+};
+const replay = fixed('internal', 1, 'expires_at');
+const devicePersonal = fixed('personal', 366, 'issued_at');
 
 export const auth: ClassificationRegistry = {
   'auth.user': {
@@ -72,6 +95,13 @@ export const auth: ClassificationRegistry = {
     password: accountInternal,
     created_at: accountInternal,
     updated_at: accountInternal,
+    tenant_id: accountInternal,
+    sso_provider_id: accountInternal,
+    sso_issuer: accountInternal,
+    // Account security state: kept with the account, and cleared when a
+    // password passes the breach check or is changed (migration 0034).
+    breach_check_pending_since: accountPersonal,
+    password_breached_at: accountPersonal,
   },
   'auth.verification': {
     id: verification,
@@ -99,11 +129,38 @@ export const auth: ClassificationRegistry = {
     scope: counter,
     identifier: counterPersonal,
     client_ip: counterPersonal,
+    device_id: counterPersonal,
     count: counter,
     window_started_at: counter,
     blocked_until: counter,
     created_at: counter,
     updated_at: counter,
+  },
+  'auth.device': {
+    id: device,
+    user_id: devicePersonal,
+    device_hash: devicePersonal,
+    key_version: device,
+    issued_at: device,
+    last_used_at: device,
+    revoked_at: device,
+    created_at: device,
+    updated_at: device,
+  },
+  'auth.passkey': {
+    id: accountInternal,
+    user_id: accountPersonal,
+    credential_id: accountPersonal,
+    public_key: accountPersonal,
+    counter: accountInternal,
+    name: accountPersonal,
+    device_type: accountInternal,
+    backed_up: accountInternal,
+    transports: accountInternal,
+    aaguid: accountPersonal,
+    last_used_at: accountInternal,
+    created_at: accountInternal,
+    updated_at: accountInternal,
   },
   'auth.audit_event': {
     id: audit,
@@ -116,10 +173,68 @@ export const auth: ClassificationRegistry = {
     tenant_id: audit,
     identifier: auditPersonal,
     ip_address: auditPersonal,
+    purged_count: audit,
+    key_version: audit,
+    totp_count: audit,
+    sso_count: audit,
+    backup_notice_count: audit,
+    replayed_event_id: audit,
   },
   'auth.audit_copy_pending': {
     auth_event_id: pending,
     created_at: pending,
+  },
+  'auth.sso_provider': Object.fromEntries(
+    [
+      'tenant_id',
+      'id',
+      'kind',
+      'name',
+      'issuer',
+      'client_id',
+      'client_secret',
+      'authorization_endpoint',
+      'token_endpoint',
+      'jwks_uri',
+      'userinfo_endpoint',
+      'mfa_amr',
+      'mfa_acr',
+      'entity_id',
+      'sso_url',
+      'certificates',
+      'sp_certificate',
+      'sp_private_key',
+      'mfa_contexts',
+      'key_version',
+      'created_at',
+      'created_by',
+      'updated_at',
+      'updated_by',
+    ].map((column) => [column, sso]),
+  ),
+  'auth.sso_domain': Object.fromEntries(
+    [
+      'tenant_id',
+      'id',
+      'provider_id',
+      'domain',
+      'dns_token',
+      'state',
+      'verified_at',
+      'created_at',
+      'created_by',
+      'updated_at',
+      'updated_by',
+    ].map((column) => [column, sso]),
+  ),
+  'auth.saml_replay': {
+    tenant_id: replay,
+    id: replay,
+    provider_id: replay,
+    assertion_id: replay,
+    expires_at: replay,
+    created_at: replay,
+    updated_at: replay,
   },
 };
 
@@ -141,5 +256,7 @@ export const authSubjects: SubjectPathRegistry = {
     kind: 'unlinked',
     reason: 'Sign-in limits count typed identifiers and addresses, not accounts.',
   },
+  'auth.device': { kind: 'account', column: 'user_id' },
+  'auth.passkey': { kind: 'account', column: 'user_id' },
   'auth.audit_event': { kind: 'account', column: 'user_id' },
 };

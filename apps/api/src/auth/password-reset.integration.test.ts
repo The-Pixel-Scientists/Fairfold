@@ -160,6 +160,7 @@ beforeAll(async () => {
     TPS_DEV: '1',
     TPS_DB_HOST: api.host,
     TPS_AUTH_SECRET: newToken(),
+    TPS_AUTH_BREACH_CHECK: 'off',
     TPS_DB_APP_AUTH_PASSWORD: appAuth.password,
     TPS_CONSOLE_ORIGIN: ORIGINS.console,
     TPS_PORTAL_ORIGIN: ORIGINS.portal,
@@ -225,11 +226,18 @@ describe('asking for a reset link', { timeout: 60_000 }, () => {
     expect(sent.filter((email) => email.to === pending)).toHaveLength(1);
   });
 
-  it('emails a link to the reset page of the asking app, the token only in its fragment, kept as a hash for 30 minutes', async () => {
+  it("emails a link to the reset page of the asking app, the token only in its fragment, kept as a hash for 30 minutes by the database's clock", async () => {
     const email = newEmail();
     const userId = await addAccount(email);
-    expect((await requestReset(email, { app: 'console' })).statusCode).toBe(202);
-    const message = await emailTo(email);
+    const now = Date.now.bind(Date);
+    const ahead = vi.spyOn(Date, 'now').mockImplementation(() => now() + 3_600_000);
+    let message: Email;
+    try {
+      expect((await requestReset(email, { app: 'console' })).statusCode).toBe(202);
+      message = await emailTo(email);
+    } finally {
+      ahead.mockRestore();
+    }
     expect(message.subject).toBe('Reset your Fairfold Grants password');
     const token = tokenIn(message);
     expect(Buffer.from(token, 'base64url')).toHaveLength(32);

@@ -61,8 +61,10 @@ describe('loadAuthSettings', () => {
     ]);
   });
 
-  it("refuses Better Auth's default secret, even in development", () => {
-    const secret = 'better-auth-secret-12345678901234567890';
+  it.each([
+    'better-auth-secret-12345678901234567890',
+    'better-auth-secret-that-is-long-enough-for-validation-test',
+  ])("refuses Better Auth's published secret %s, even in development", (secret) => {
     for (const env of [valid, { ...valid, TPS_DEV: '1' }]) {
       expect(problems({ ...env, TPS_AUTH_SECRET: secret })).toEqual([
         'TPS_AUTH_SECRET is a published value. Set a random one of at least 32 bytes.',
@@ -87,6 +89,74 @@ describe('loadAuthSettings', () => {
       },
     );
     expect(unreadable).toEqual(['TPS_AUTH_SECRET_FILE names a file that cannot be read.']);
+  });
+
+  it('reads TPS_AUTH_SECRET alone as key version 1', () => {
+    const { secret, secrets } = loadAuthSettings(valid);
+    expect(secrets.current).toBe(1);
+    expect([...secrets.versions.keys()]).toEqual([1]);
+    expect(secrets.versions.get(1)).toBe(secret);
+  });
+
+  it('reads key versions, and seals with the one TPS_AUTH_SECRET_CURRENT names', () => {
+    const two = newToken();
+    const settings = loadAuthSettings(
+      {
+        ...valid,
+        TPS_AUTH_SECRET_2: undefined,
+        TPS_AUTH_SECRET_2_FILE: '/run/secrets/auth-2',
+        TPS_AUTH_SECRET_CURRENT: '2',
+      },
+      () => `${two}\n`,
+    );
+    expect(settings.secrets.current).toBe(2);
+    expect([...settings.secrets.versions].map(([v, s]) => [v, s.reveal()])).toEqual([
+      [1, SECRET],
+      [2, two],
+    ]);
+    expect(settings.secret.reveal()).toBe(two);
+    expect(JSON.stringify(settings)).not.toContain(two);
+
+    const without = loadAuthSettings({
+      ...valid,
+      TPS_AUTH_SECRET: undefined,
+      TPS_AUTH_SECRET_7: two,
+    });
+    expect(without.secrets.current).toBe(7);
+    expect(without.secrets.versions.has(1)).toBe(false);
+  });
+
+  it('refuses key versions it cannot use, naming each', () => {
+    const two = newToken();
+    expect(problems({ ...valid, TPS_AUTH_SECRET_2: two })).toEqual([
+      'More than one auth key version is set, so set TPS_AUTH_SECRET_CURRENT.',
+    ]);
+    for (const current of ['3', '02', 'two', '0']) {
+      expect(
+        problems({ ...valid, TPS_AUTH_SECRET_2: two, TPS_AUTH_SECRET_CURRENT: current }),
+      ).toEqual(['TPS_AUTH_SECRET_CURRENT must name a key version that is set.']);
+    }
+    expect(problems({ ...valid, TPS_AUTH_SECRET_1: two })).toEqual([
+      'Set TPS_AUTH_SECRET or TPS_AUTH_SECRET_1, not both: each is version 1.',
+    ]);
+    expect(problems({ ...valid, TPS_AUTH_SECRET_2: SECRET, TPS_AUTH_SECRET_CURRENT: '2' })).toEqual(
+      ["TPS_AUTH_SECRET_2 repeats another key version's secret. Set a new random one."],
+    );
+    expect(
+      problems({ ...valid, TPS_AUTH_SECRET_2: 'x'.repeat(31), TPS_AUTH_SECRET_CURRENT: '2' }),
+    ).toEqual(['TPS_AUTH_SECRET_2 must be at least 32 bytes.']);
+    expect(
+      problems({
+        ...valid,
+        TPS_AUTH_SECRET_2: 'dev-auth-secret-for-this-machine-not-a-secret',
+        TPS_AUTH_SECRET_CURRENT: '2',
+      }),
+    ).toEqual(['TPS_AUTH_SECRET_2 is a published value. Set a random one of at least 32 bytes.']);
+    for (const name of ['TPS_AUTH_SECRET_0', 'TPS_AUTH_SECRET_1000', 'TPS_AUTH_SECRET_OLD']) {
+      expect(problems({ ...valid, [name]: two }), name).toEqual([
+        `${name} is not a setting. Name key versions TPS_AUTH_SECRET_1 to _999.`,
+      ]);
+    }
   });
 
   it('refuses a short app_auth password, and a development one unless developing here', () => {
@@ -157,5 +227,16 @@ describe('loadAuthSettings', () => {
     expect(problems({ ...valid, TPS_CONSOLE_PATH_PREFIX: '/console' })).toEqual([
       'TPS_CONSOLE_PATH_PREFIX is used only when console and portal share a host.',
     ]);
+  });
+
+  it('turns the breach check on unless it is off, and refuses any other value', () => {
+    expect(loadAuthSettings(valid).breachCheck).toBe(true);
+    expect(loadAuthSettings({ ...valid, TPS_AUTH_BREACH_CHECK: 'on' }).breachCheck).toBe(true);
+    expect(loadAuthSettings({ ...valid, TPS_AUTH_BREACH_CHECK: 'off' }).breachCheck).toBe(false);
+    for (const value of ['OFF', 'false', '0', 'no']) {
+      expect(problems({ ...valid, TPS_AUTH_BREACH_CHECK: value })).toEqual([
+        'TPS_AUTH_BREACH_CHECK must be on or off.',
+      ]);
+    }
   });
 });

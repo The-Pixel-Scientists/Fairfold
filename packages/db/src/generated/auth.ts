@@ -15,10 +15,15 @@ export type Timestamp = ColumnType<Date, Date | string, Date | string>;
 
 export interface AuthAccount {
   account_id: string;
+  breach_check_pending_since: Timestamp | null;
   created_at: Generated<Timestamp>;
   id: Generated<string>;
-  password: string;
+  password: string | null;
+  password_breached_at: Timestamp | null;
   provider_id: string;
+  sso_issuer: string | null;
+  sso_provider_id: string | null;
+  tenant_id: string | null;
   updated_at: Generated<Timestamp>;
   user_id: string;
 }
@@ -29,16 +34,50 @@ export interface AuthAuditCopyPending {
 }
 
 export interface AuthAuditEvent {
+  backup_notice_count: number | null;
   code: string;
   id: Generated<string>;
   identifier: string | null;
   ip_address: string | null;
+  key_version: number | null;
   occurred_at: Generated<Timestamp>;
+  purged_count: number | null;
   reason: string | null;
+  replayed_event_id: string | null;
   request_id: string;
   retain_until: Timestamp;
+  sso_count: number | null;
   tenant_id: string | null;
+  totp_count: number | null;
   user_id: string | null;
+}
+
+export interface AuthDevice {
+  created_at: Generated<Timestamp>;
+  device_hash: Buffer;
+  id: Generated<string>;
+  issued_at: Generated<Timestamp>;
+  key_version: number;
+  last_used_at: Generated<Timestamp>;
+  revoked_at: Timestamp | null;
+  updated_at: Generated<Timestamp>;
+  user_id: string;
+}
+
+export interface AuthPasskey {
+  aaguid: string | null;
+  backed_up: boolean;
+  counter: Int8;
+  created_at: Generated<Timestamp>;
+  credential_id: string;
+  device_type: string;
+  id: Generated<string>;
+  last_used_at: Timestamp | null;
+  name: string;
+  public_key: string;
+  transports: string | null;
+  updated_at: Generated<Timestamp>;
+  user_id: string;
 }
 
 export interface AuthRateLimit {
@@ -46,11 +85,22 @@ export interface AuthRateLimit {
   client_ip: string | null;
   count: Generated<number>;
   created_at: Generated<Timestamp>;
+  device_id: string | null;
   id: Generated<string>;
   identifier: string | null;
   scope: string;
   updated_at: Generated<Timestamp>;
   window_started_at: Generated<Timestamp>;
+}
+
+export interface AuthSamlReplay {
+  assertion_id: string;
+  created_at: Generated<Timestamp>;
+  expires_at: Timestamp;
+  id: Generated<string>;
+  provider_id: string;
+  tenant_id: string;
+  updated_at: Generated<Timestamp>;
 }
 
 export interface AuthSession {
@@ -69,6 +119,47 @@ export interface AuthSession {
   updated_at: Generated<Timestamp>;
   user_agent: string | null;
   user_id: string;
+}
+
+export interface AuthSsoDomain {
+  created_at: Generated<Timestamp>;
+  created_by: string;
+  dns_token: string;
+  domain: string;
+  id: Generated<string>;
+  provider_id: string;
+  state: Generated<string>;
+  tenant_id: string;
+  updated_at: Generated<Timestamp>;
+  updated_by: string;
+  verified_at: Timestamp | null;
+}
+
+export interface AuthSsoProvider {
+  authorization_endpoint: string | null;
+  certificates: string[] | null;
+  client_id: string | null;
+  client_secret: Buffer | null;
+  created_at: Generated<Timestamp>;
+  created_by: string;
+  entity_id: string | null;
+  id: Generated<string>;
+  issuer: string | null;
+  jwks_uri: string | null;
+  key_version: number | null;
+  kind: string;
+  mfa_acr: string[] | null;
+  mfa_amr: string[] | null;
+  mfa_contexts: string[] | null;
+  name: string;
+  sp_certificate: string | null;
+  sp_private_key: Buffer | null;
+  sso_url: string | null;
+  tenant_id: string;
+  token_endpoint: string | null;
+  updated_at: Generated<Timestamp>;
+  updated_by: string;
+  userinfo_endpoint: string | null;
 }
 
 export interface AuthTwoFactor {
@@ -108,8 +199,13 @@ export interface DB {
   'auth.account': AuthAccount;
   'auth.audit_copy_pending': AuthAuditCopyPending;
   'auth.audit_event': AuthAuditEvent;
+  'auth.device': AuthDevice;
+  'auth.passkey': AuthPasskey;
   'auth.rate_limit': AuthRateLimit;
+  'auth.saml_replay': AuthSamlReplay;
   'auth.session': AuthSession;
+  'auth.sso_domain': AuthSsoDomain;
+  'auth.sso_provider': AuthSsoProvider;
   'auth.two_factor': AuthTwoFactor;
   'auth.user': AuthUser;
   'auth.verification': AuthVerification;

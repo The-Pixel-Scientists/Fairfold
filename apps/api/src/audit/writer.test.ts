@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { insertAuditEvent, type Transaction } from '@pixel-scientists/db';
+import { insertAuditEvent, type AuditEventRow, type Transaction } from '@pixel-scientists/db';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { recordAudit, recordRead, type AuditActor } from './writer.ts';
@@ -66,6 +66,26 @@ describe('recordAudit', () => {
     expect(insertAuditEvent).not.toHaveBeenCalled();
   });
 
+  it.each(['party.person.created', 'grants.application.viewed'])(
+    'refuses %s, which is about a party, without a subject',
+    async (action) => {
+      const refusal = recordAudit(trx, user, {
+        action: action as 'platform.tenant.created',
+        entityId,
+      });
+      await expect(refusal).rejects.toThrow(/^The audit event has no subject\.$/);
+      expect(insertAuditEvent).not.toHaveBeenCalled();
+    },
+  );
+
+  it('records an action whose rule gives it no subject without one', async () => {
+    await recordAudit(trx, user, { action: 'grants.programme.created', entityId });
+    expect(insertAuditEvent).toHaveBeenCalledWith(
+      trx,
+      expect.objectContaining({ action: 'grants.programme.created', subjectPartyId: null }),
+    );
+  });
+
   it('records no membership for the system or the operator', async () => {
     await recordAudit(
       trx,
@@ -79,6 +99,29 @@ describe('recordAudit', () => {
       trx,
       expect.objectContaining({ actorKind: 'operator', actorId: null, changes: {} }),
     );
+  });
+
+  it('records a job as the system, with its job and origin, and a request id of its own', async () => {
+    const jobId = '3f2e1d0c-9b8a-4776-a554-433221100fed';
+    await recordAudit(
+      trx,
+      { kind: 'job', jobId, originMembershipId: membershipId },
+      { action: 'grants.programme.created', entityId },
+    );
+    const [[, row]] = vi.mocked(insertAuditEvent).mock.calls as [[unknown, AuditEventRow]];
+    expect(row).toMatchObject({
+      actorKind: 'system',
+      actorId: null,
+      job: { jobId, originMembershipId: membershipId },
+      changes: {},
+    });
+    expect(row.requestId).toMatch(/^[0-9a-f-]{36}$/);
+    expect([jobId, membershipId, requestId]).not.toContain(row.requestId);
+  });
+
+  it('records no job for any other actor', async () => {
+    await recordAudit(trx, user, { action: 'grants.programme.created', entityId });
+    expect(vi.mocked(insertAuditEvent).mock.calls[0]?.[1]).not.toHaveProperty('job');
   });
 
   it.each(['platform.tenant.deleted', 'grants.nothing.happened', 'platform.tenant'])(

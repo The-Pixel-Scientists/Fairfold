@@ -20,6 +20,7 @@ import { PasswordField } from './PasswordField.tsx';
 import { usePageSearch } from './redirects.ts';
 import type { Notice } from './redirects.ts';
 import { Screen } from './Screen.tsx';
+import { SsoEntry } from './sign-in/SsoEntry.tsx';
 
 const FIELDS = ['email', 'password'] as const;
 
@@ -27,6 +28,8 @@ const noticeText: Record<Notice, string> = {
   timeout: 'You were signed out because your session ended. Sign in to carry on.',
   'account-created': 'Your account is ready. Sign in to start.',
   'password-reset': 'Your password has changed. Sign in with your new password.',
+  'security-changed':
+    'Your sign-in method has changed, so every session was signed out. Sign in again.',
 };
 
 function SignIn() {
@@ -78,6 +81,7 @@ function SignIn() {
       <p className="text-body">
         Do not have an account yet? <Link to="/sign-up">Create an account</Link>
       </p>
+      <SsoEntry />
     </>
   );
 }

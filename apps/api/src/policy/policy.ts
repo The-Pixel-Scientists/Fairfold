@@ -68,6 +68,14 @@ function mfaWaiting(session: RequestSession): boolean {
   return session.mfa === 'enrol' || session.mfa === 'verify';
 }
 
+/** Throws unless the session re-authenticated within the window; a future time never counts. */
+function checkStepUp(session: RequestSession, now: number): void {
+  const at = session.recentAuthAt?.getTime();
+  if (at === undefined || now - at > STEP_UP_WINDOW_MS || at > now) {
+    throw refuse(403, 'step_up', 'Confirm it is you again, then try again.');
+  }
+}
+
 /** Throws unless the session is what the route needs. Reads nothing but the context. */
 export function checkSession(
   route: RouteContract,
@@ -85,6 +93,7 @@ export function checkSession(
       throw refuse(403, 'wrong_session');
     }
     if (route.session === 'complete' && !mfaSettled(session)) throw refuse(401, 'mfa_pending');
+    if (route.stepUp === true) checkStepUp(session, now);
     return;
   }
 
@@ -93,12 +102,7 @@ export function checkSession(
   if (context.app !== route.audience || session.app !== route.audience) {
     throw refuse(403, 'wrong_session');
   }
-  if (route.stepUp === true) {
-    const at = session.recentAuthAt?.getTime();
-    if (at === undefined || now - at > STEP_UP_WINDOW_MS || at > now) {
-      throw refuse(403, 'step_up', 'Confirm it is you again, then try again.');
-    }
-  }
+  if (route.stepUp === true) checkStepUp(session, now);
 }
 
 const auditOf = (tx: TenantTransaction, actor: AuditActor): RequestAudit =>
@@ -141,14 +145,15 @@ export async function asMember<T>(
       .executeTakeFirst();
     if (membership === undefined) throw refuse(403, 'no_membership');
 
-    // A module without a row is on, and only a switchable module can be off.
+    // The platform and party are always on; a switchable module is on only
+    // where its row says so, and a missing row is off (ADR 0024).
     if ((switchableModuleIds as readonly ModuleId[]).includes(route.module)) {
       const switched = await db
         .selectFrom('app.tenant_module')
         .select('enabled')
         .where('module', '=', route.module)
         .executeTakeFirst();
-      if (switched?.enabled === false) throw refuse(404, 'module_off');
+      if (switched?.enabled !== true) throw refuse(404, 'module_off');
     }
 
     const permissions = new Set<Permission>(permissionsFor(membership.roles, session.app));

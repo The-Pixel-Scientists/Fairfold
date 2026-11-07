@@ -11,7 +11,7 @@ import { scramSha256Verifier } from './scram.ts';
 import { isLocalDevelopment, readSecret, readSetting, type Env } from './settings.ts';
 
 /** Bump together with the version in roles.sql and database-privileges.sql. */
-export const ROLES_SCRIPT_VERSION = '4';
+export const ROLES_SCRIPT_VERSION = '5';
 
 /** The login roles that roles.sql creates, in the order it creates them. */
 export const LOGIN_ROLES = [
@@ -48,6 +48,7 @@ export const OWNER_ROLES = [
   'owner_app_purge_expired_audit',
   'owner_app_apply_retention',
   'owner_party_erase_party',
+  'owner_party_is_erased',
   'owner_grants_clear_answer_fields',
   'owner_app_destroy_subject_key',
   'owner_app_reapply_erasure_ledger',
@@ -63,7 +64,17 @@ export const OWNER_ROLES = [
   'owner_party_record_unsubscribe',
   'owner_app_resolve_signature_callback',
   'owner_app_erase_documents',
+  'owner_app_delete_swept_file',
+  'owner_app_erase_file',
 ] as const;
+
+/**
+ * The NOLOGIN role operator commands run as (ADR 0024). Its one member is
+ * OPERATOR_MEMBER, with SET but not INHERIT or ADMIN, and it belongs to no
+ * role, so a worker connection holds its rights only after SET LOCAL ROLE.
+ */
+export const OPERATOR_ROLE = 'app_operator';
+export const OPERATOR_MEMBER = 'app_worker' satisfies LoginRole;
 
 /**
  * How the roles script connects, from TPS_DB_ADMIN_MODE: as a true
@@ -89,7 +100,7 @@ export function readAdminRole(env: Env): string | undefined {
   return readAdminMode(env) === 'managed' ? readSetting(env, 'TPS_DB_SUPERUSER') : undefined;
 }
 
-const ALL_ROLES: readonly string[] = [...LOGIN_ROLES, ...OWNER_ROLES];
+const ALL_ROLES: readonly string[] = [...LOGIN_ROLES, OPERATOR_ROLE, ...OWNER_ROLES];
 
 const ROLES_SQL = new URL('./roles.sql', import.meta.url);
 const DATABASE_PRIVILEGES_SQL = new URL('./database-privileges.sql', import.meta.url);
@@ -238,6 +249,7 @@ interface RoleRow {
   rolbypassrls: boolean;
   version_comment: string | null;
   migrator_can_set: boolean;
+  operator_member_can_set: boolean;
   has_settings: boolean;
 }
 
@@ -273,11 +285,17 @@ export async function findRoleProblems(client: pg.ClientBase, admin?: string): P
                 AND m.set_option AND NOT m.inherit_option AND NOT m.admin_option
             ) AS migrator_can_set,
             EXISTS (
+              SELECT FROM pg_catalog.pg_auth_members m
+              JOIN pg_catalog.pg_roles grantee ON grantee.oid = m.member
+              WHERE m.roleid = r.oid AND grantee.rolname = $2
+                AND m.set_option AND NOT m.inherit_option AND NOT m.admin_option
+            ) AS operator_member_can_set,
+            EXISTS (
               SELECT FROM pg_catalog.pg_db_role_setting s WHERE s.setrole = r.oid
             ) AS has_settings
        FROM pg_catalog.pg_roles r
       WHERE r.rolname = ANY($1::text[])`,
-    [ALL_ROLES],
+    [ALL_ROLES, OPERATOR_MEMBER],
   );
 
   const problems: string[] = [];
@@ -304,13 +322,18 @@ export async function findRoleProblems(client: pg.ClientBase, admin?: string): P
     if (row.rolcreaterole) problems.push(`role ${role} can create roles`);
     if (row.rolcreatedb) problems.push(`role ${role} can create databases`);
     if (row.rolreplication) problems.push(`role ${role} can start replication`);
-    if (!login && !row.migrator_can_set) {
+    if (role === OPERATOR_ROLE) {
+      if (!row.operator_member_can_set) {
+        problems.push(`${OPERATOR_MEMBER} is not a SET-only member of role ${role}`);
+      }
+    } else if (!login && !row.migrator_can_set) {
       problems.push(`migrator is not a SET-only member of role ${role}`);
     }
     if (row.has_settings) problems.push(`role ${role} has its own settings`);
   }
 
-  // Every membership but migrator's SET-only ones in the owners and, in
+  // Every membership but migrator's SET-only ones in the owners,
+  // app_worker's SET-only one in app_operator and, in
   // managed mode, the ADMIN OPTION alone that PostgreSQL gives the admin role
   // on each role it creates, recorded as granted by the bootstrap superuser.
   const memberships = await client.query<MembershipRow>(
@@ -322,12 +345,14 @@ export async function findRoleProblems(client: pg.ClientBase, admin?: string): P
       WHERE (member.rolname = ANY($1::text[]) OR granted.rolname = ANY($1::text[]))
         AND NOT (member.rolname = 'migrator' AND granted.rolname = ANY($2::text[])
                  AND m.set_option AND NOT m.inherit_option AND NOT m.admin_option)
+        AND NOT (member.rolname = $4 AND granted.rolname = $5
+                 AND m.set_option AND NOT m.inherit_option AND NOT m.admin_option)
         AND NOT (member.rolname IS NOT DISTINCT FROM $3::text
                  AND member.rolname <> ALL($1::text[])
                  AND m.grantor = 10::pg_catalog.oid
                  AND m.admin_option AND NOT m.inherit_option AND NOT m.set_option)
       ORDER BY 1, 2`,
-    [ALL_ROLES, OWNER_ROLES, admin ?? null],
+    [ALL_ROLES, OWNER_ROLES, admin ?? null, OPERATOR_MEMBER, OPERATOR_ROLE],
   );
   for (const m of memberships.rows) {
     const options = [

@@ -45,13 +45,15 @@ const toBytes = (data: Chunk): string | Uint8Array =>
       : new Uint8Array(data);
 
 export interface SignInput {
-  readonly method: 'GET' | 'PUT';
+  readonly method: 'GET' | 'PUT' | 'HEAD' | 'DELETE';
   readonly url: URL;
   readonly region: string;
   readonly key: StorageKey;
   /** Hex SHA-256 of the body: of the empty string for a GET. */
   readonly payloadHash: string;
   readonly now: Date;
+  /** Query parameters, which the signature covers; the caller puts the same ones on the URL. */
+  readonly query?: Readonly<Record<string, string>>;
   /** Headers to sign besides host, `x-amz-content-sha256` and `x-amz-date`. */
   readonly headers?: Readonly<Record<string, string>>;
 }
@@ -76,7 +78,7 @@ export async function signRequest(input: SignInput): Promise<Record<string, stri
       hostname: url.hostname,
       port: url.port === '' ? undefined : Number(url.port),
       path: url.pathname,
-      query: {},
+      query: { ...input.query },
       headers: {
         ...input.headers,
         host: url.host,

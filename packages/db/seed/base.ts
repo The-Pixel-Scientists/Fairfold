@@ -5,7 +5,9 @@
 // fictional, from this fixed list, and every address ends in .example. No one
 // has an authenticator yet: staff set up their app at their first sign-in.
 // Eastmoor has its own brand colour, so the two tenants look different;
-// Northfield keeps the default look.
+// Northfield keeps the default look. Each tenant has a row for every tool,
+// grants on and the wave 1 tools off, so none relies on a missing row
+// (ADR 0024).
 
 import type { Scenario } from './scenario.ts';
 

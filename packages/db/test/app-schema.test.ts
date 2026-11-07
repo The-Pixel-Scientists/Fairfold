@@ -47,7 +47,7 @@ async function sqlState(work: Promise<unknown>): Promise<string | undefined> {
 }
 
 describe('the app schema', () => {
-  it('is owned by migrator, and the app roles, function owners and backup_reader may only use it', async () => {
+  it('is owned by migrator, and the app roles, app_operator, function owners and backup_reader may only use it', async () => {
     const acl = await withClient('app_api', (client) => ownerAndGrants(client, SCHEMA_ACL));
     expect(acl).toEqual({
       owner: 'migrator',
@@ -62,6 +62,21 @@ describe('the app schema', () => {
         'owner_app_public_tenant USAGE',
         'owner_app_public_tenant_logo USAGE',
         'owner_auth_session_memberships USAGE',
+        // app.tenant_ids(), migration 0024.
+        'owner_app_tenant_ids USAGE',
+        // The retention functions, migrations 0031 and 0032.
+        'owner_app_purge_expired_audit USAGE',
+        'owner_app_apply_retention USAGE',
+        // The erasure functions, migration 0033.
+        'owner_party_erase_party USAGE',
+        'owner_grants_clear_answer_fields USAGE',
+        'owner_app_destroy_subject_key USAGE',
+        'owner_party_is_erased USAGE',
+        // Operator commands' tables are in app, migration 0040.
+        'app_operator USAGE',
+        // The file sweep and file erasure functions, migration 0042.
+        'owner_app_delete_swept_file USAGE',
+        'owner_app_erase_file USAGE',
       ].sort(),
     });
   });
@@ -80,13 +95,31 @@ describe('app.current_tenant_id()', () => {
     ]);
   });
 
-  it('can be executed by the app roles and migrator only', async () => {
+  it('can be executed by the app roles, app_operator, migrator and the retention, erasure and file function owners only', async () => {
     const acl = await withClient('app_api', (client) =>
       ownerAndGrants(client, FUNCTION_ACL, ['app.current_tenant_id()']),
     );
     expect(acl).toEqual({
       owner: 'migrator',
-      grants: [...APP_ROLES, 'migrator'].map((role) => `${role} EXECUTE`).sort(),
+      grants: [
+        ...APP_ROLES,
+        'migrator',
+        // The retention functions' owners, migrations 0031 and 0032.
+        'owner_app_purge_expired_audit',
+        'owner_app_apply_retention',
+        // The erasure functions, migration 0033.
+        'owner_party_erase_party',
+        'owner_grants_clear_answer_fields',
+        'owner_app_destroy_subject_key',
+        'owner_party_is_erased',
+        // The tenant policies on its tables call it, migration 0040.
+        'app_operator',
+        // The file sweep and file erasure functions, migration 0042.
+        'owner_app_delete_swept_file',
+        'owner_app_erase_file',
+      ]
+        .map((role) => `${role} EXECUTE`)
+        .sort(),
     });
   });
 

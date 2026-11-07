@@ -67,7 +67,10 @@ jobs:
           node-version-file: .node-version
           package-manager-cache: false
       - name: Enable pnpm through Corepack
-        run: corepack enable
+        # Node.js 26 no longer bundles Corepack (ADR 0026).
+        run: |
+          npm install --global --ignore-scripts corepack@0.36.0
+          corepack enable
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Run pnpm check
@@ -87,7 +90,10 @@ jobs:
           node-version-file: .node-version
           package-manager-cache: false
       - name: Enable pnpm through Corepack
-        run: corepack enable
+        # Node.js 26 no longer bundles Corepack (ADR 0026).
+        run: |
+          npm install --global --ignore-scripts corepack@0.36.0
+          corepack enable
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Run pnpm check
@@ -107,7 +113,10 @@ jobs:
           node-version-file: .node-version
           package-manager-cache: false
       - name: Enable pnpm through Corepack
-        run: corepack enable
+        # Node.js 26 no longer bundles Corepack (ADR 0026).
+        run: |
+          npm install --global --ignore-scripts corepack@0.36.0
+          corepack enable
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       # The API's storage and scanner tests need SeaweedFS and clamd. clamd
@@ -163,7 +172,10 @@ jobs:
           node-version-file: .node-version
           package-manager-cache: false
       - name: Enable pnpm through Corepack
-        run: corepack enable
+        # Node.js 26 no longer bundles Corepack (ADR 0026).
+        run: |
+          npm install --global --ignore-scripts corepack@0.36.0
+          corepack enable
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Run the shard's specs against the dev servers, production builds and gallery build
@@ -214,7 +226,10 @@ jobs:
           node-version-file: .node-version
           package-manager-cache: false
       - name: Enable pnpm through Corepack
-        run: corepack enable
+        # Node.js 26 no longer bundles Corepack (ADR 0026).
+        run: |
+          npm install --global --ignore-scripts corepack@0.36.0
+          corepack enable
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Build the release images, migrate, and wait for /health/ready
@@ -326,7 +341,10 @@ jobs:
           node-version-file: .node-version
           package-manager-cache: false
       - name: Enable pnpm through Corepack
-        run: corepack enable
+        # Node.js 26 no longer bundles Corepack (ADR 0026).
+        run: |
+          npm install --global --ignore-scripts corepack@0.36.0
+          corepack enable
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Check dependency licences and SPDX lines
@@ -349,7 +367,10 @@ jobs:
           node-version-file: .node-version
           package-manager-cache: false
       - name: Enable pnpm through Corepack
-        run: corepack enable
+        # Node.js 26 no longer bundles Corepack (ADR 0026).
+        run: |
+          npm install --global --ignore-scripts corepack@0.36.0
+          corepack enable
       - name: Check that every accepted advisory is dated and still in date
         run: |
           today=$(date -u +%Y-%m-%d)

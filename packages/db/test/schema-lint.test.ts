@@ -164,7 +164,7 @@ describe('schema lint', () => {
       return findSchemaProblems(client, registry);
     });
 
-    const allRoles = 'app_api, app_auth, app_queue, app_worker';
+    const allRoles = 'app_api, app_auth, app_operator, app_queue, app_worker';
     expect(problems).toEqual(
       [
         'app.lint_bare does not enable row-level security.',
@@ -271,6 +271,13 @@ describe('subject paths (ADR 0027)', () => {
         'app.lint_dead_end has a subject path that does not reach a party or an account.',
         'classification.ts gives a subject path for app.lint_gone, which does not exist.',
       ].sort(),
+    );
+  });
+
+  it("refuses a column map for a table outside its file's schema", () => {
+    const field = { sensitivity: 'internal', retention: { kind: 'tenant_lifetime' } } as const;
+    expect(() => mergeSchemaMaps({ crm: {}, assure: { 'crm.contact': { id: field } } })).toThrow(
+      /^classification\/assure\.ts names crm\.contact, outside its schema\.$/,
     );
   });
 

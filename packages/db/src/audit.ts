@@ -50,6 +50,14 @@ export interface AuditEventRow {
   readonly changes: AuditChanges;
   /** The party the event is about, in the same tenant (ADR 0027). */
   readonly subjectPartyId?: string | null;
+  /** The job that wrote a `system` event (ADR 0009); only app_worker may name one. */
+  readonly job?: AuditJob;
+}
+
+interface AuditJob {
+  readonly jobId: string;
+  /** The membership whose request caused the job, in the same tenant, if any. */
+  readonly originMembershipId: string | null;
 }
 
 /**
@@ -119,7 +127,8 @@ function mayKeepValues(field: string): boolean {
 /**
  * Insert one event in the transaction's tenant. The database sets its id,
  * occurred_at, retain_until and actor_member_kind, and refuses a subject
- * party from another tenant.
+ * party or originating membership from another tenant. The job columns are
+ * named only for a job's event, as app_api may not insert them.
  */
 export async function insertAuditEvent<DB>(
   trx: Transaction<DB>,
@@ -129,12 +138,17 @@ export async function insertAuditEvent<DB>(
   if (Buffer.byteLength(changes) > MAX_CHANGES_BYTES) {
     throw new Error('Audit changes are larger than 65,536 bytes.');
   }
+  if (row.job && row.actorKind !== 'system') {
+    throw new Error('Only a system event names a job.');
+  }
+  const jobColumns = row.job ? sql`, job_id, origin_membership_id` : sql``;
+  const jobValues = row.job ? sql`, ${row.job.jobId}, ${row.job.originMembershipId}` : sql``;
   await sql`
     INSERT INTO app.audit_event
       (tenant_id, request_id, actor_kind, actor_id, action, entity_type, entity_id, changes,
-       subject_party_id)
+       subject_party_id${jobColumns})
     VALUES (app.current_tenant_id(), ${row.requestId}, ${row.actorKind}, ${row.actorId},
             ${row.action}, ${row.entityType}, ${row.entityId}, ${changes}::jsonb,
-            ${row.subjectPartyId ?? null})
+            ${row.subjectPartyId ?? null}${jobValues})
   `.execute(trx);
 }

@@ -78,6 +78,7 @@ describe('app.membership', { timeout: 30_000 }, () => {
 
   it.each([
     ['accepts two roles', { roles: ['tenant_admin', 'applicant'] }, 'ok'],
+    ['accepts the data protection lead role', { roles: ['data_protection_lead'] }, 'ok'],
     ['refuses no roles', { roles: [] }, '23514'],
     ['refuses an unknown role', { roles: ['owner'] }, '23514'],
     ['refuses a null role', { roles: [null] }, '23514'],

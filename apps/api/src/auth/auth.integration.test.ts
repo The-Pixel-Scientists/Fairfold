@@ -9,7 +9,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { createDatabase, type Kysely, type TenantId } from '@pixel-scientists/db';
-import { permissionsFor } from '@pixel-scientists/domain/platform';
+import { permissionsFor, type Permission } from '@pixel-scientists/domain/platform';
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -26,10 +26,15 @@ import {
 import { buildApp } from '../app.ts';
 import { Secret } from '../config.ts';
 import { createLogger } from '../logger.ts';
-import { hashToken, newToken } from './cookies.ts';
+import { createBetterAuth, type BetterAuth } from './better-auth.ts';
+import { hashToken, newToken, TIMEOUTS } from './cookies.ts';
 import { copyAuthEvent, recordAuthEvent } from './events.ts';
 import { createAuth, loadAuthSettings, type Auth } from './index.ts';
+import { onModulePermissions, onModules } from './routes.ts';
 import { issueSession } from './sessions.ts';
+
+/** The wave 1 tools, off for a tenant without their row (ADR 0024). */
+const WAVE_1 = /^(crm|assure|forms|privacy|insight)\./;
 
 const CONSOLE = 'https://console.example.org';
 const PORTAL = 'https://apply.example.org';
@@ -39,6 +44,7 @@ const logger = createLogger({ level: 'silent' });
 let app: FastifyInstance;
 let auth: Auth;
 let authDb: Kysely<unknown>;
+let betterAuth: BetterAuth;
 
 interface Member {
   tenant: TestTenant;
@@ -132,6 +138,7 @@ beforeAll(async () => {
     applicationName: 'tps-db-tests',
     maxConnections: 1,
   });
+  betterAuth = createBetterAuth(settings, authDb);
   app = await buildApp({ logger, checkDatabase: () => Promise.resolve(), auth });
 });
 
@@ -145,6 +152,14 @@ describe('reading a session', { timeout: 30_000 }, () => {
   let member: Member;
   beforeAll(async () => {
     member = await addMember(await createTestTenant());
+    await asMigratorIn(member.tenant.id, (client) =>
+      insertRow(client, 'app.tenant_module', {
+        tenant_id: member.tenant.id,
+        module: 'grants',
+        enabled: true,
+        updated_by: member.membershipId,
+      }),
+    );
   });
 
   it("maps a live console session, with the membership's roles and permissions", async () => {
@@ -161,9 +176,27 @@ describe('reading a session', { timeout: 30_000 }, () => {
         roles: ['tenant_admin'],
       },
       memberships: [{ id: member.membershipId }],
+      modules: ['grants'],
     });
-    expect(body['permissions']).toEqual(permissionsFor(['tenant_admin'], 'console'));
+    expect(body['permissions']).toEqual(
+      permissionsFor(['tenant_admin'], 'console').filter((permission) => !WAVE_1.test(permission)),
+    );
     expect(body['recentAuthUntil']).not.toBeNull();
+  });
+
+  it('gives an administrator of a tenant with no module rows only what moduleOn() leaves on', async () => {
+    const all = permissionsFor(['tenant_admin'], 'console');
+    expect(all.filter((permission) => WAVE_1.test(permission))).not.toEqual([]);
+    const bare = await addMember(await createTestTenant());
+    const { permissions, modules } = (await readSession(await addSession(bare))).json<{
+      permissions: string[];
+      modules: string[];
+    }>();
+    // ADR 0024: a module without a row is off, so no tool is listed or permitted.
+    expect(modules).toEqual([]);
+    expect(permissions.some((permission) => permission.startsWith('grants.'))).toBe(false);
+    expect(permissions.some((permission) => permission.startsWith('platform.'))).toBe(true);
+    expect(permissions.filter((permission) => WAVE_1.test(permission))).toEqual([]);
   });
 
   it('maps a session waiting for MFA, which holds nothing in any tenant', async () => {
@@ -185,6 +218,7 @@ describe('reading a session', { timeout: 30_000 }, () => {
       app: 'portal',
       activeMembership: null,
       permissions: [],
+      modules: [],
     });
   });
 
@@ -243,10 +277,44 @@ describe('reading a session', { timeout: 30_000 }, () => {
         updated_by: other.membershipId,
       }),
     );
-    const permissions = (await readSession(await addSession(other))).json<{
+    const { permissions, modules } = (await readSession(await addSession(other))).json<{
       permissions: string[];
-    }>().permissions;
-    expect(permissions).toEqual(all.filter((permission) => !permission.startsWith('grants.')));
+      modules: string[];
+    }>();
+    expect(modules).toEqual([]);
+    expect(permissions).toEqual(
+      all.filter((permission) => !permission.startsWith('grants.') && !WAVE_1.test(permission)),
+    );
+  });
+});
+
+describe('keeping the permissions of modules that are on', () => {
+  const all = permissionsFor(['tenant_admin'], 'console');
+  const of = (module: string) => all.filter((permission) => permission.startsWith(`${module}.`));
+
+  it("keeps a wave 1 tool's permissions only when its row switches it on", () => {
+    expect(of('forms')).not.toEqual([]);
+    const kept = onModulePermissions(all, new Map([['forms', true]]));
+    expect(kept).toEqual(expect.arrayContaining(of('forms')));
+    expect(kept.filter((permission) => WAVE_1.test(permission))).toEqual(of('forms'));
+    expect(onModulePermissions(all, new Map([['forms', false]]))).not.toEqual(
+      expect.arrayContaining(of('forms')),
+    );
+  });
+
+  it('lists only the switchable modules whose row switches them on', () => {
+    const stored = new Map([
+      ['crm', true],
+      ['grants', true],
+      ['forms', false],
+      ['platform', true],
+    ]);
+    expect(onModules(stored)).toEqual(['grants', 'crm']);
+    expect(onModules(new Map())).toEqual([]);
+  });
+
+  it('drops a permission whose prefix is not a module', () => {
+    expect(onModulePermissions(['unknown.thing.do' as Permission], new Map())).toEqual([]);
   });
 });
 
@@ -412,10 +480,31 @@ describe('revokeSessions', { timeout: 30_000 }, () => {
   });
 });
 
+describe('session timeouts', () => {
+  it('are the same in both session functions as in the API', async () => {
+    const rows = await asMigrator(
+      String.raw`SELECT p.proname AS name, t[1] AS app,
+              extract(epoch FROM t[2]::interval)::int AS idle,
+              extract(epoch FROM t[3]::interval)::int AS absolute
+         FROM pg_proc AS p, regexp_matches(pg_get_functiondef(p.oid),
+              '\(''(\w+)''::text,\s*''([^'']+)''::interval,\s*''([^'']+)''::interval\)', 'g') AS t
+        WHERE p.oid IN ('auth.session_context(bytea)'::regprocedure,
+                        'auth.session_memberships(bytea)'::regprocedure)
+        ORDER BY 1, 2`,
+      [],
+    );
+    expect(rows).toEqual(
+      ['session_context', 'session_memberships'].flatMap((name) =>
+        Object.entries(TIMEOUTS).map(([app, timeout]) => ({ name, app, ...timeout })),
+      ),
+    );
+  });
+});
+
 describe("Better Auth's adapter", { timeout: 30_000 }, () => {
   it('stores a session token only as its hash, and finds a session by its token alone', async () => {
     const member = await addMember(await createTestTenant());
-    const context = await auth.betterAuth.$context;
+    const context = await betterAuth.$context;
     const created = await context.internalAdapter.createSession(member.userId, false, {
       app: 'portal',
       mfaState: 'not_required',

@@ -108,7 +108,12 @@ const send = (
   url: string,
   payload?: unknown,
 ) =>
-  api.inject({ method, url: `/api${url}`, headers: as(member), ...(payload ? { payload } : {}) });
+  api.inject({
+    method,
+    url: `/api${url}`,
+    headers: { ...as(member), 'idempotency-key': randomUUID() },
+    ...(payload ? { payload } : {}),
+  });
 
 const organisationBody = (change: Record<string, unknown> = {}) => ({
   name: 'Northfield Allotment Society',
@@ -649,7 +654,7 @@ describe('who may use the routes', () => {
           .query(
             `INSERT INTO app.tenant_module (tenant_id, module, enabled, updated_by)
              VALUES ($1, 'grants', $2, $3)
-             ON CONFLICT (tenant_id, module) DO UPDATE SET enabled = EXCLUDED.enabled`,
+             ON CONFLICT (tenant_id, module) DO UPDATE SET enabled = EXCLUDED.enabled, updated_by = EXCLUDED.updated_by`,
             [tenantA.id, enabled, manager.membershipId],
           )
           .then(() => undefined),

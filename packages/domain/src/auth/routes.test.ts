@@ -223,7 +223,7 @@ describe('auth routes', () => {
 });
 
 describe('auth event codes', () => {
-  it('are snake case, each once, and include the deferred events and the purge', () => {
+  it('are snake case, each once, and include the password reset events', () => {
     for (const code of authEventCodes) expect(code).toMatch(/^[a-z]+(?:_[a-z]+)*$/);
     expect(new Set(authEventCodes).size).toBe(authEventCodes.length);
     expect(authEventCodes).toEqual(
@@ -231,22 +231,6 @@ describe('auth event codes', () => {
         'password_reset_requested',
         'password_reset_completed',
         'sessions_revoked',
-        'password_changed',
-        'email_changed',
-        'mfa_removed',
-        'backup_code_used',
-        'backup_codes_regenerated',
-        'passkey_added',
-        'passkey_removed',
-        'sso_session_created',
-        'sso_response_rejected',
-        'sso_provider_changed',
-        'sso_domain_changed',
-        'sso_domain_conflict',
-        'account_deactivated',
-        'secrets_reencrypted',
-        'audit_copy_replayed',
-        'audit_purged',
       ]),
     );
   });

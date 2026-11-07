@@ -16,6 +16,7 @@ import {
 } from '@pixel-scientists/domain/platform/team';
 
 import type { Auth } from '../../auth/index.ts';
+import { ApiError } from '../../problems.ts';
 import { route, type Handler, type Route } from '../../routes/register.ts';
 import { inviteMemberHandler, revokeInvitationHandler } from './invitations.ts';
 import {
@@ -37,7 +38,11 @@ const getTeamHandler: Handler<typeof getTeam> = async ({ tx }) => ({
 export function teamRoutes(auth: TeamAuth): readonly Route[] {
   return [
     route(getTeam, getTeamHandler),
-    route(inviteMember, inviteMemberHandler(auth)),
+    route(inviteMember, inviteMemberHandler(auth), {
+      replay: async ({ tx, id }) =>
+        (await pendingInvitations(tx)).find((invitation) => invitation.id === id) ??
+        Promise.reject(new ApiError(404, undefined, { reason: 'not_found' })),
+    }),
     route(revokeInvitation, revokeInvitationHandler),
     route(changeMemberRoles, changeMemberRolesHandler(auth)),
     route(suspendMember, suspendMemberHandler(auth)),

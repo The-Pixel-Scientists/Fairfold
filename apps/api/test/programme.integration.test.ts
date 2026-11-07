@@ -11,7 +11,6 @@ import { randomUUID } from 'node:crypto';
 import { defaultEmailTemplates, programmeMessages } from '@pixel-scientists/grants/contracts';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
-import { asMigratorIn, createTestTenant, insertRow } from '../../../packages/db/test/tenants.ts';
 import {
   answer,
   everyRoute,
@@ -26,6 +25,7 @@ import {
   type Round,
   type Stage,
 } from './programme-api.ts';
+import { createGrantsTenant, switchModule } from './modules-on.ts';
 import { addMember, events } from './settings-api.ts';
 import { expectLooksMissing } from './support.ts';
 
@@ -197,7 +197,7 @@ describe('programmes', () => {
   });
 
   it('lists programmes by title, each with its rounds, the latest opening first', async () => {
-    const tenant = await createTestTenant();
+    const tenant = await createGrantsTenant();
     const owner = await addMember(tenant, 'console', 'programme_manager');
     const make = (title: string) =>
       answer<Programme>(
@@ -383,7 +383,7 @@ describe('configuration history', () => {
 
 describe('the module switch', () => {
   it('answers 404 on every route for a tenant with grants switched off, and for that tenant only', async () => {
-    const tenant = await createTestTenant();
+    const tenant = await createGrantsTenant();
     const owner = await addMember(tenant, 'console', 'programme_manager');
     const programme = await answer<Programme>(
       t.send(owner, 'POST', '/console/programmes', programmeBody()),
@@ -400,14 +400,7 @@ describe('the module switch', () => {
     expect(routes).toHaveLength(15);
     expect((await t.send(owner, 'GET', `/console/rounds/${round.id}`)).statusCode).toBe(200);
 
-    await asMigratorIn(tenant.id, (client) =>
-      insertRow(client, 'app.tenant_module', {
-        tenant_id: tenant.id,
-        module: 'grants',
-        enabled: false,
-        updated_by: owner.membershipId,
-      }),
-    );
+    await switchModule(tenant, 'grants', false);
 
     for (const [method, url, body] of routes) {
       expect((await t.send(owner, method, url, body)).statusCode, `${method} ${url}`).toBe(404);

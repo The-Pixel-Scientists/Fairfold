@@ -30,6 +30,17 @@ export const fileRefusalMessages: Readonly<Record<FileRefusal, string>> = {
   scanner_busy: 'We are checking other files. Wait a minute, then try again.',
 };
 
+/**
+ * What people see about a withheld file (ADR 0030). A download of one gets
+ * the same 404 as a missing file, so these are for the record's screens only.
+ */
+export const fileWithheldMessages = {
+  applicant:
+    'This file is held back because a later virus check flagged it. While the application is a draft, you can add another copy.',
+  staff:
+    'This file is held back because a later virus check flagged it, so it cannot be downloaded. It is checked again with each virus update and comes back if it passes. You can ask the applicant for another copy or delete this one.',
+} as const;
+
 export const fileNameMessages = {
   characters: 'Rename the file without slashes or hidden characters, then upload it again.',
   length: 'Give the file a name of 1 to 200 characters, then upload it again.',

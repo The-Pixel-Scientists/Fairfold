@@ -6,19 +6,45 @@
 // prints which, to standard error, and exits with status 1 before it opens a
 // port or a database connection.
 
+// Installs the outbound rules (ADR 0010). Keep it first: it must run before any
+// other module loads and can make a request.
+import './outbound/install.ts';
+
 import { buildApp } from './app.ts';
 import { loadAuthSettings, createAuth, type AuthSettings } from './auth/index.ts';
+import { recordBreachSetting } from './breach-setting.ts';
 import { ConfigError, loadConfig, type Config } from './config.ts';
 import { openDatabase } from './database.ts';
-import { createFileService, loadFileSettings, type FileSettings } from './platform/files/index.ts';
+import {
+  createFileService,
+  createScannerStorage,
+  createStorage,
+  loadFileSettings,
+  uploadGate,
+  type FileSettings,
+} from './platform/files/index.ts';
 import { createSender } from './email/sender.ts';
 import { createSmtpTransport } from './email/transport.ts';
+import { loadLimitSettings, type LimitSettings } from './limits/index.ts';
 import { createLogger } from './logger.ts';
 import { composeModules } from './modules.ts';
+import { pinnedFetch } from './outbound/pinned.ts';
+import {
+  loadTelemetrySettings,
+  startTelemetry,
+  type TelemetrySettings,
+} from './telemetry/index.ts';
 
 /** Both groups of settings, with every problem in either reported together. */
 function readSettings():
-  { config: Config; authSettings: AuthSettings; fileSettings: FileSettings } | undefined {
+  | {
+      config: Config;
+      authSettings: AuthSettings;
+      fileSettings: FileSettings;
+      telemetrySettings: TelemetrySettings;
+      limitSettings: LimitSettings;
+    }
+  | undefined {
   const problems: string[] = [];
   const read = <T>(load: () => T): T | undefined => {
     try {
@@ -34,11 +60,19 @@ function readSettings():
   const config = read(() => loadConfig(process.env));
   const authSettings = read(() => loadAuthSettings(process.env));
   const fileSettings = read(() => loadFileSettings(process.env));
-  if (config === undefined || authSettings === undefined || fileSettings === undefined) {
+  const telemetrySettings = read(() => loadTelemetrySettings(process.env));
+  const limitSettings = read(() => loadLimitSettings(process.env));
+  if (
+    config === undefined ||
+    authSettings === undefined ||
+    fileSettings === undefined ||
+    telemetrySettings === undefined ||
+    limitSettings === undefined
+  ) {
     process.stderr.write(`${new ConfigError(problems).message}\n`);
     return undefined;
   }
-  return { config, authSettings, fileSettings };
+  return { config, authSettings, fileSettings, telemetrySettings, limitSettings };
 }
 
 async function main(): Promise<void> {
@@ -47,7 +81,8 @@ async function main(): Promise<void> {
     process.exitCode = 1;
     return;
   }
-  const { config, authSettings, fileSettings } = settings;
+  const { config, authSettings, fileSettings, telemetrySettings, limitSettings } = settings;
+  const telemetry = startTelemetry({ service: 'api', settings: telemetrySettings });
 
   const logger = createLogger({ level: config.logLevel });
   const database = openDatabase(config.database, logger);
@@ -60,22 +95,34 @@ async function main(): Promise<void> {
   } catch (error) {
     if (error instanceof ConfigError) process.stderr.write(`${error.message}\n`);
     else logger.fatal({ err: error }, 'The auth module could not be created');
+    await telemetry.shutdown();
     await database.close();
     process.exitCode = 1;
     return;
   }
-  // Closed in order: the pools of the auth module, then the API's.
+  // Closed in order: telemetry, the pools of the auth module, then the API's.
   const closeAll = async (): Promise<void> => {
+    await telemetry.shutdown();
     await auth.close();
     await database.close();
   };
+  if (!(await recordBreachSetting(auth, logger))) {
+    await closeAll();
+    process.exitCode = 1;
+    return;
+  }
   let app;
   try {
     app = await buildApp({
       logger,
       checkDatabase: () => database.check(),
       inTenant: database.inTenant,
-      files: createFileService(fileSettings),
+      // The object store is a fixed destination: its own pinned client, not the global one.
+      files: createFileService(
+        fileSettings,
+        createStorage(fileSettings.storage, pinnedFetch(fileSettings.storage.endpoint)),
+        createScannerStorage(fileSettings.storage, pinnedFetch(fileSettings.storage.endpoint)),
+      ),
       auth,
       ...composeModules({
         publicTenants: database.publicTenants,
@@ -84,6 +131,9 @@ async function main(): Promise<void> {
         mail: { sender, portalOrigin: authSettings.origins.portal },
       }),
       trustProxy: config.trustProxy,
+      limits: { store: database.requestLimits, key: limitSettings.key },
+      uploads: uploadGate({ store: database.requestLimits, key: limitSettings.key }),
+      telemetry,
     });
   } catch (error) {
     // A route that cannot be served safely stops the API here, naming the route.

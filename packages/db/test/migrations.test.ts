@@ -85,6 +85,20 @@ async function snapshot(trx: Kysely<unknown>): Promise<string[]> {
   return rows.map((row) => row.line);
 }
 
+/**
+ * A day's partition of pgboss.queue_stats, or one of its indexes. 0024's up
+ * makes them for today and tomorrow by pgboss.job_now() and pg-boss makes
+ * more as days pass, so they differ from a snapshot taken on an older
+ * database. Its down drops them with the schema pgboss, which the empty
+ * schema check below proves.
+ */
+const STATS_DAY = /(?<![\w$])pgboss\.queue_stats_\d{8}(?:_pkey|_[a-z_]+_idx)?(?![\w$])/;
+
+/** The snapshot without lines about a day's partition of queue statistics. */
+async function stableSnapshot(trx: Kysely<unknown>): Promise<string[]> {
+  return (await snapshot(trx)).filter((line) => !STATS_DAY.test(line));
+}
+
 describe('migrations', { timeout: 30_000 }, () => {
   it('each down.sql restores exactly the schema from before its up.sql', async () => {
     const provider = new SqlFolderMigrationProvider(MIGRATIONS_FOLDER);
@@ -101,12 +115,30 @@ describe('migrations', { timeout: 30_000 }, () => {
     });
     const trx = await db.startTransaction().execute();
     try {
+      // Auth events are append-only, and 0023's down refuses while any it
+      // cannot express exist (rollback-0023.test.ts), which the API's tests
+      // leave behind. The round trip starts with none, as a fresh database
+      // does; TRUNCATE, which only the owner may run, is rolled back below.
+      await sql`TRUNCATE auth.audit_copy_pending, auth.audit_event`.execute(trx);
+      // Likewise 0026's down refuses while a module switch or a configuration
+      // version has the operator as its author, and 0021's while a switch
+      // names a wave 1 tool, which tenant creation, the operator's backfill
+      // and their tests leave behind. Row-level security hides those rows
+      // from migrator, so TRUNCATE them too.
+      await sql`TRUNCATE app.tenant_module, app.config_version`.execute(trx);
+      // And 0033's down refuses while a party is erased, which the erasure
+      // tests leave behind. Erased parties cannot be changed back, so empty
+      // the party tables and every table that refers to them.
+      await sql`TRUNCATE party.party CASCADE`.execute(trx);
+      // And 0041's down refuses while a file is withheld or erased. Empty
+      // app.file and every table that refers to it.
+      await sql`TRUNCATE app.file CASCADE`.execute(trx);
       // After the loop, before[i] is the schema with the first i migrations applied.
-      const before = [await snapshot(trx)];
+      const before = [await stableSnapshot(trx)];
       for (const { name, down } of [...migrations].reverse()) {
         if (!down) throw new Error(`Migration ${name} has no down.`);
         await down(trx);
-        before.unshift(await snapshot(trx));
+        before.unshift(await stableSnapshot(trx));
       }
 
       // With every migration rolled back, no schema is left but PostgreSQL's
@@ -122,7 +154,18 @@ describe('migrations', { timeout: 30_000 }, () => {
       for (const [index, { name, up }] of migrations.entries()) {
         if (!up) throw new Error(`Migration ${name} has no up.`);
         await up(trx);
-        expect(await snapshot(trx), `schema after ${name}`).toEqual(before[index + 1]);
+        expect(await stableSnapshot(trx), `schema after ${name}`).toEqual(before[index + 1]);
+      }
+
+      // The partitions left out above are still made: today's and tomorrow's.
+      const { rows: days } = await sql<{ day: string }>`
+        SELECT to_char((pgboss.job_now() AT TIME ZONE 'UTC')::date + i, 'YYYYMMDD') AS day
+          FROM generate_series(0, 1) AS i`.execute(trx);
+      const relations = (await snapshot(trx)).filter((line) => line.startsWith('relation '));
+      for (const { day } of days) {
+        expect(relations, `queue_stats_${day}`).toContainEqual(
+          expect.stringMatching(new RegExp(`^relation pgboss\\.queue_stats_${day} r `)),
+        );
       }
     } finally {
       await trx.rollback().execute();

@@ -79,12 +79,9 @@ describe("the CI stack job's patterns for the manager's journeys", () => {
   };
 
   it('pick out each spec that signs in as the manager, once, the outcome journey first', () => {
-    const runs = [
-      ...setting('MANAGER_JOURNEYS').split(' '),
-      setting('SUBMISSIONS_JOURNEY'),
-      ...setting('APPLICATIONS_JOURNEYS').split(' '),
-      setting('PROGRAMME_JOURNEY'),
-    ];
+    const runs = ['MANAGER_JOURNEYS', 'REVIEW_JOURNEYS', 'PROGRAMME_JOURNEY'].flatMap((name) =>
+      setting(name).split(' '),
+    );
     expect(runs.map(matches)).toEqual([
       ['apps/portal/e2e/outcome-journey.spec.ts'],
       ['apps/console/e2e/form-builder-journey.spec.ts'],
@@ -98,9 +95,23 @@ describe("the CI stack job's patterns for the manager's journeys", () => {
     expect(runs.flatMap(matches).sort()).toEqual(specs.filter(signsIn).sort());
   });
 
-  it('keep every one of them out of the run of the other specs', () => {
-    expect(ci).toContain(
-      'specs --grep-invert "$SUBMISSIONS_JOURNEY|$PROGRAMME_JOURNEY|${MANAGER_JOURNEYS// /|}|${APPLICATIONS_JOURNEYS// /|}"',
-    );
+  it('run each list in a part of its own, on the scenario it needs, one file at a time', () => {
+    for (const [part, scenario, journeys] of [
+      ['manager journeys', 'configured', 'MANAGER_JOURNEYS'],
+      ['review journeys', 'applications', 'REVIEW_JOURNEYS'],
+      ['programme journey', 'base', 'PROGRAMME_JOURNEY'],
+    ]) {
+      expect(ci).toContain(`- { part: '${part}', scenario: ${scenario}, journeys: ${journeys} }`);
+    }
+    expect(ci).toContain('for journey in ${!JOURNEYS}; do');
+    expect(ci).toContain('specs --grep "$journey" --workers 1');
+  });
+
+  it('keep every one of them out of the spec shards, which run on the configured scenario', () => {
+    for (const n of [1, 2, 3]) {
+      expect(ci).toContain(`- { part: 'specs, ${n} of 3', scenario: configured, shard: ${n}/3 }`);
+    }
+    expect(ci).toContain('all="$MANAGER_JOURNEYS $REVIEW_JOURNEYS $PROGRAMME_JOURNEY"');
+    expect(ci).toContain('specs --shard "$SHARD" --grep-invert "${all// /|}"');
   });
 });

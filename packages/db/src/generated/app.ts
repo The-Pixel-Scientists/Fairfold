@@ -34,7 +34,9 @@ export interface AppAuditEvent {
   entity_id: string;
   entity_type: string;
   id: Generated<string>;
+  job_id: string | null;
   occurred_at: Generated<Timestamp>;
+  origin_membership_id: string | null;
   request_id: string;
   retain_until: Timestamp;
   subject_party_id: string | null;
@@ -42,7 +44,8 @@ export interface AppAuditEvent {
 }
 
 export interface AppConfigVersion {
-  author_id: string;
+  author_id: string | null;
+  author_kind: Generated<string>;
   created_at: Generated<Timestamp>;
   diff: Json;
   entity_id: string;
@@ -56,14 +59,20 @@ export interface AppFile {
   content_type: string;
   created_at: Generated<Timestamp>;
   created_by: string;
+  erased_at: Timestamp | null;
   id: Generated<string>;
+  linked_at: Timestamp | null;
   name: string;
+  released_at: Timestamp | null;
   scan_state: Generated<string>;
+  scan_version: number | null;
   scanned_at: Timestamp | null;
   sha256: Buffer | null;
   size_bytes: Int8;
   storage_key: string | null;
   tenant_id: string;
+  updated_at: Generated<Timestamp>;
+  updated_by: string | null;
 }
 
 export interface AppIdempotencyKey {
@@ -95,6 +104,31 @@ export interface AppInvitation {
   updated_by: string | null;
 }
 
+export interface AppJobQueue {
+  created_at: Generated<Timestamp>;
+  kind: string;
+  name: string;
+}
+
+export interface AppJobRequest {
+  completed_at: Timestamp | null;
+  expires_at: Timestamp | null;
+  failure_code: string | null;
+  field_ids: string[];
+  filters: Json;
+  id: Generated<string>;
+  kind: string;
+  output_file_id: string | null;
+  output_sensitivity: string;
+  permission: string;
+  request_id: string;
+  requested_at: Generated<Timestamp>;
+  requested_by: string;
+  status: Generated<string>;
+  tenant_id: string;
+  updated_at: Generated<Timestamp>;
+}
+
 export interface AppMembership {
   created_at: Generated<Timestamp>;
   created_by: string | null;
@@ -109,7 +143,7 @@ export interface AppMembership {
 
 export interface AppRequestLimit {
   bucket: string;
-  count: number;
+  count: Int8;
   expires_at: Generated<Timestamp>;
   key_hash: Buffer;
   window_start: Timestamp;
@@ -124,6 +158,16 @@ export interface AppRetentionPolicy {
   tenant_id: string;
   updated_at: Generated<Timestamp>;
   updated_by: string;
+}
+
+export interface AppSubjectKey {
+  created_at: Generated<Timestamp>;
+  destroyed_at: Timestamp | null;
+  id: Generated<string>;
+  kek_version: number | null;
+  subject_party_id: string;
+  tenant_id: string;
+  wrapped_key: Buffer | null;
 }
 
 export interface AppTenant {
@@ -143,7 +187,8 @@ export interface AppTenantModule {
   module: string;
   tenant_id: string;
   updated_at: Generated<Timestamp>;
-  updated_by: string;
+  updated_by: string | null;
+  updated_by_kind: Generated<string>;
 }
 
 export interface AppTenantTheme {
@@ -164,9 +209,12 @@ export interface DB {
   'app.file': AppFile;
   'app.idempotency_key': AppIdempotencyKey;
   'app.invitation': AppInvitation;
+  'app.job_queue': AppJobQueue;
+  'app.job_request': AppJobRequest;
   'app.membership': AppMembership;
   'app.request_limit': AppRequestLimit;
   'app.retention_policy': AppRetentionPolicy;
+  'app.subject_key': AppSubjectKey;
   'app.tenant': AppTenant;
   'app.tenant_module': AppTenantModule;
   'app.tenant_theme': AppTenantTheme;

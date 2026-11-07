@@ -72,11 +72,17 @@ write.
 | `app_api`, `app_worker` | API, and job handlers in the worker | Explicit grants only |
 | `app_queue` | pg-boss's own connection in the worker ([ADR 0009](0009-background-jobs.md)) | Grants in schema `pgboss`; outside it, only `USAGE` on schema `app`, `SELECT` on `app.job_queue` and `EXECUTE` on `app.current_tenant_id()`, which the job trigger uses |
 | `app_auth` | `apps/api/src/auth` only | Grants in schema `auth`; outside it, only `USAGE` on schema `app` and `EXECUTE` on `app.current_tenant_id()`, which its policies call |
+| `app_operator` | Operator commands in `apps/api/src/operator/` only, through `SET LOCAL ROLE` from `app_worker` ([ADR 0024](0024-no-tool-on-by-default.md); Aaron, 29 October 2026) | `NOLOGIN`. Explicit grants only: the module switch, configuration version and audit event inserts ADR 0024 lists, each held by restrictive policies to the tenant set, the operator as author and no membership; no `UPDATE` or `DELETE` |
 | One owner per approved definer function | That function | `NOLOGIN`; owns only its function; exactly the grants listed below |
 
 - Every role above is `NOSUPERUSER`, `NOBYPASSRLS`, `NOCREATEROLE`,
   `NOCREATEDB` and `NOREPLICATION`, and belongs to no other role. The app
   roles own nothing.
+- One membership is allowed besides those of [ADR 0023](0023-function-owner-memberships.md):
+  `app_worker` in `app_operator`, `WITH ADMIN FALSE, INHERIT FALSE, SET
+  TRUE`. A worker connection holds none of `app_operator`'s grants until it
+  runs `SET LOCAL ROLE app_operator`, which ends with the transaction. No
+  other role is a member of `app_operator`, and it is a member of none.
 - A roles script in `packages/db/scripts/` creates the roles and resets their
   attributes. It is idempotent and versioned, and the install and upgrade
   procedures run it as superuser before migrating. It also revokes from
@@ -102,7 +108,8 @@ write.
    `WITH CHECK` explicitly.
 4. A command that no app role may run on a table has no grant and a
    restrictive policy: `AS RESTRICTIVE FOR <command> TO app_api, app_worker,
-   app_queue, app_auth USING (false)`, or `WITH CHECK (false)` for `INSERT`.
+   app_queue, app_auth, app_operator USING (false)`, or `WITH CHECK (false)`
+   for `INSERT`.
 5. `app.current_tenant_id()` is `STABLE` and returns
    `NULLIF(current_setting('app.tenant_id', true), '')::uuid`. With no tenant
    set, every policy matches nothing; a test proves it for every tenant table.
@@ -133,6 +140,13 @@ The allowlist and named exceptions, each known to the catalogue test by name:
 | --- | --- | --- | --- |
 | `app.tenant_ids()` | `app_worker` | Ids of active tenants | `SELECT (id, status)` on `app.tenant`, with the policy above |
 | `app.purge_expired_audit()` | `app_worker` | A count | On both audit tables: `SELECT` on `id`, `retain_until` and any `tenant_id`, `DELETE`, and `INSERT` on every column except `occurred_at` and `retain_until`, with a `SELECT`, `DELETE` and `INSERT` policy `TO` it on each; `SELECT` on the `app.retention_policy` columns the trigger reads; `EXECUTE` on `app.current_tenant_id()` |
+| `app.apply_retention(policy)` | `app_worker` | One row per target with its deleted and anonymised counts; refuses with no tenant set, for `audit`, and for any policy without targets. Owner `owner_app_apply_retention` | `EXECUTE` on `app.current_tenant_id()`, and only its targets' rights, which the migration adding a target grants; none yet |
+| `app.destroy_subject_key(subject_party_id)` | `app_worker` | Whether it destroyed the key of an erased party ([ADR 0027](0027-erasure-across-modules-and-audit.md)). Owner `owner_app_destroy_subject_key` | `SELECT` on `tenant_id`, `id` and `status` of `party.party`; `SELECT` on `tenant_id`, `subject_party_id`, `id` and `destroyed_at`, `INSERT` on `tenant_id`, `subject_party_id` and `destroyed_at`, and `UPDATE` on `wrapped_key` and `destroyed_at` of `app.subject_key`; `SELECT` on the `app.retention_policy` columns the trigger reads; `INSERT` on `app.audit_event` columns except `occurred_at`, `retain_until` and `actor_member_kind`; `EXECUTE` on `app.current_tenant_id()` |
+| `party.is_erased(tenant_id, party_id)` | `app_api`, `app_worker` | Whether the party is erased, read under `FOR KEY SHARE` ([ADR 0027](0027-erasure-across-modules-and-audit.md)). Owner `owner_party_is_erased` | `SELECT` on `tenant_id`, `id` and `status`, and `UPDATE` on `updated_at` (for the lock only; it updates nothing) of `party.party`; `EXECUTE` on `app.current_tenant_id()` |
+| `party.erase_party(party_id, job_request_id)` | `app_worker` | Counts of what it cleared, for a running erasure request ([ADR 0027](0027-erasure-across-modules-and-audit.md)). Owner `owner_party_erase_party` | `SELECT` and `UPDATE` on the personal columns of `party.person`, `party.organisation`, `party.organisation_snapshot` and `party.value_history` it clears, and on `party.party.status`; `SELECT` on the columns it reads in `app.job_request`, `app.membership` and `app.retention_policy`; `INSERT` on `app.audit_event` columns except `occurred_at`, `retain_until` and `actor_member_kind`; `EXECUTE` on `app.current_tenant_id()` and `party.is_erased()` |
+| `grants.clear_answer_fields(application_id, field_ids)` | `app_worker` | 1 if it removed the listed answers from an erased applicant's application, else 0 ([ADR 0027](0027-erasure-across-modules-and-audit.md)). Owner `owner_grants_clear_answer_fields` | `SELECT` on `tenant_id`, `id`, `applicant_person_id` and `answers`, and `UPDATE` on `answers`, of `grants.application`; `SELECT` on `tenant_id`, `id` and `status` of `party.party`; `EXECUTE` on `app.current_tenant_id()` |
+| `app.delete_swept_file(file_id)` | `app_worker` | Whether it deleted the file's row: only a released file's, or a refused (`infected` or `error`) one's that no record links, 12 months after its scan; refuses with no tenant set ([ADR 0030](0030-files-and-reverse-proxy.md)). Owner `owner_app_delete_swept_file` | `SELECT` on `tenant_id`, `id`, `scan_state`, `scanned_at`, `linked_at` and `released_at`, and `DELETE`, on `app.file`, with a restrictive `DELETE` policy `TO` it holding it to those rows; `EXECUTE` on `app.current_tenant_id()` |
+| `app.erase_file(file_id, job_request_id)` | `app_worker` | Whether it set the file's `erased_at`, only for a running erasure request of this tenant whose party is already erased ([ADR 0027](0027-erasure-across-modules-and-audit.md)); writes no audit event, the erasure's own covers it. Owner `owner_app_erase_file` | `SELECT` on `tenant_id`, `id` and `erased_at`, and `UPDATE` on `erased_at`, of `app.file`; `SELECT` on `tenant_id`, `id`, `kind`, `permission`, `status` and `filters` of `app.job_request`; `SELECT` on `tenant_id`, `id` and `status` of `party.party`; `EXECUTE` on `app.current_tenant_id()` |
 | `auth.session_context(token_hash)` | `app_api` | User id, active tenant, app, MFA state and expiry of a live session; nothing otherwise ([ADR 0010](0010-authentication-security-rules.md)) | `SELECT` on the columns it reads in `auth.session` and `auth.user` |
 | `auth.sso_providers_by_key_version(version)` | `app_auth` | Ids and tenant ids of SSO providers whose secrets use that key version, for re-encryption, whatever the tenant's status | `SELECT` on `id`, `tenant_id` and the key version column of `auth.sso_provider`, with the policy above |
 

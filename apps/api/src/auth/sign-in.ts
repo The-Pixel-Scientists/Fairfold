@@ -1,38 +1,51 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
 // Password sign-in to a tenant's console or portal (ADR 0010). The attempt
-// is charged to its limits first, and a delayed attempt is refused without
+// is charged to its limits first, its device's alone if it has a valid
+// device cookie for the account, and a delayed attempt is refused without
 // checking the password. An unknown address costs a dummy hash, and every
 // failure gets the same problem. Success issues a session for the resolved
-// app with the slug's tenant active: a console session waits for MFA, which
-// gives the charge back when it completes, and a portal one needs none and
-// gives it back now. A portal sign-in with no membership in the tenant makes
-// the person an applicant there.
+// app with the slug's tenant active. It waits for MFA if the account holds a
+// factor, in either app, or to enrol one in the console; MFA's completion
+// gives the charge back and keeps the device. A portal session for an
+// account with no factor needs none and does both now. A portal sign-in
+// with no membership in the tenant makes the person an applicant there.
+//
+// Once the password is verified, an account whose breach check is pending
+// is looked up again (password/policy.ts). An account whose password is
+// found breached signs in only if it holds a factor, and its session is
+// then restricted to changing the password once MFA completes; without a
+// factor it gets no session, and the attempt is given back.
 
 import {
   chargeRateLimits,
   refundSignIn,
   sessionContext,
-  SIGN_IN_SCOPES,
+  signInScopes,
   withTenant,
   type TenantId,
 } from '@pixel-scientists/db';
 import { signIn } from '@pixel-scientists/domain/auth';
 
 import { recordAudit } from '../audit/writer.ts';
-import type { MfaState } from '../context.ts';
 import { ApiError } from '../problems.ts';
 import { route, type Route } from '../routes/register.ts';
+import { factorsOf } from './authenticators/guard.ts';
 import { hashToken, sessionCookie } from './cookies.ts';
 import { copyAuthEvent, recordAuthEvent } from './events.ts';
 import { plainAddress } from './limits.ts';
+import { countedClient, rememberDevice } from './limits/devices.ts';
+import { recheckAtSignIn, recordRecheck } from './password/policy.ts';
 import { verifyNothing, verifyPassword } from './passwords.ts';
-import { sessionBody, type RouteDependencies } from './routes.ts';
+import { passwordChangeRequired, sessionBody, type RouteDependencies } from './routes.ts';
 import { currentPassword, issueSession, lockUser } from './sessions.ts';
 import { appOf, tenantOf, tooMany } from './sign-up.ts';
 import type { AuthTables, TenantTables } from './tables.ts';
 
 const SIGN_IN_FAILED = 'The email address or password is not right. Check them and try again.';
+const PASSWORD_BREACHED =
+  'This password has appeared in a data breach, so it can no longer be used to sign in. ' +
+  'Choose "Forgot your password?" to get a reset link by email, then set a new password.';
 
 /** Make the user an applicant in the tenant, as app_api, unless they hold a membership there. */
 async function joinAsApplicant(
@@ -75,8 +88,9 @@ export function signInRoutes(deps: RouteDependencies): Route[] {
       const ip = plainAddress(address);
       const identifier = deps.keepIdentifier(email);
       const client = { identifier, ip };
+      const counted = await countedClient(deps, requestId, app, email, client);
 
-      const charged = await chargeRateLimits(deps.auth, SIGN_IN_SCOPES, client);
+      const charged = await chargeRateLimits(deps.auth, signInScopes(counted), counted);
       if (charged.refused) throw tooMany(deps, requestId, charged.retryAfter);
 
       const account = await users
@@ -84,7 +98,14 @@ export function signInRoutes(deps: RouteDependencies): Route[] {
         .leftJoin('auth.account as a', (join) =>
           join.onRef('a.user_id', '=', 'u.id').on('a.provider_id', '=', 'credential'),
         )
-        .select(['u.id', 'u.status', 'u.email_verified', 'a.password'])
+        .select([
+          'u.id',
+          'u.status',
+          'u.email_verified',
+          'a.password',
+          'a.breach_check_pending_since',
+          'a.password_breached_at',
+        ])
         .where('u.email', '=', email)
         .executeTakeFirst();
       const matched = account?.password
@@ -113,26 +134,43 @@ export function signInRoutes(deps: RouteDependencies): Route[] {
       if (account.status !== 'active' || !account.email_verified) return refuse('not_active');
 
       const userId = account.id;
-      let mfa: MfaState = 'not_required';
-      if (app === 'console') {
-        const totp = await users
-          .selectFrom('auth.two_factor')
-          .select('user_id')
-          .where('user_id', '=', userId)
-          .where('verified', '=', true)
-          .executeTakeFirst();
-        mfa = totp === undefined ? 'enrol' : 'verify';
-      }
       const verified = account.password;
+      const recheck = await recheckAtSignIn(
+        deps,
+        requestId,
+        account.breach_check_pending_since,
+        password,
+      );
+      const breached = account.password_breached_at !== null || recheck === 'breached';
       const issued = await deps.auth.transaction().execute(async (trx) => {
         // Take turns with a reset or revocation for the user, then make sure
         // the password checked above is still theirs: one that a reset has
         // replaced meanwhile does not sign in.
         if (!(await lockUser(trx, userId, 'share'))) return 'not_active';
         if ((await currentPassword(trx, userId)) !== verified) return 'bad_password';
-        // A console sign-in's charge is given back only once MFA completes.
-        if (mfa === 'not_required') await refundSignIn(trx, client);
+        if (recheck !== undefined) await recordRecheck(trx, userId, recheck);
+        const factors = await factorsOf(trx, userId);
+        if (breached && factors.length === 0) {
+          await refundSignIn(trx, counted);
+          await recordAuthEvent(trx, 'sign_in_failed', {
+            requestId,
+            userId,
+            tenant: tenant.id,
+            ...client,
+            reason: 'password_breached',
+          });
+          return { breached: true } as const;
+        }
+        const mfa = factors.length > 0 ? 'verify' : app === 'console' ? 'enrol' : 'not_required';
+        // A sign-in that waits for MFA has its charge given back, and its
+        // device kept, only once MFA completes.
+        let device: string | undefined;
+        if (mfa === 'not_required') {
+          await refundSignIn(trx, counted);
+          device = await rememberDevice(trx, deps, requestId, app, userId);
+        }
         return {
+          device,
           token: await issueSession(trx, {
             userId,
             app,
@@ -151,7 +189,10 @@ export function signInRoutes(deps: RouteDependencies): Route[] {
         };
       });
       if (typeof issued === 'string') return refuse(issued);
-      const { token, event } = issued;
+      if ('breached' in issued) {
+        throw new ApiError(403, PASSWORD_BREACHED, { reason: 'password_breached' });
+      }
+      const { token, event, device } = issued;
 
       // The new session is the source of its tenant from here on.
       const tokenHash = hashToken(token);
@@ -160,6 +201,8 @@ export function signInRoutes(deps: RouteDependencies): Route[] {
       if (app === 'portal') await joinAsApplicant(deps, session.tenant, userId, requestId);
       await copyAuthEvent(deps, event, session.tenant);
       deps.setHeader(requestId, 'set-cookie', sessionCookie(app, token));
+      if (device !== undefined) deps.setHeader(requestId, 'set-cookie', device);
+      if (session.mfaState === 'password_change_required') throw passwordChangeRequired();
       return sessionBody(deps.api, {
         userId,
         email,

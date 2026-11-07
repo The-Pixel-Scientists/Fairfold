@@ -1,10 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// The codes of `auth.audit_event` (ADR 0010): first the first release's
-// auth, then the deferred features (account changes, backup codes, passkeys,
-// SSO and the operator's commands), whose handlers write them, and the purge
-// of `auth.audit_event` itself (S11-97). Each needs the table's check to
-// allow it before a handler writes it.
+// The codes `auth.audit_event` accepts (ADR 0010), for the first release's
+// auth: email-first sign-up, password sign-in and reset, TOTP for staff,
+// step-up, switching tenant and invitations; then changing or removing an
+// authenticator and the password when signed in; then backup codes; then
+// changing the email address; then passkeys; then the audit retention
+// purge's count of what it deleted; then the operator's breached-password
+// check setting, recorded at start-up when it changes; then the secret
+// re-encryption command's run; then each copy the audit-copy replay command
+// writes to a tenant's audit log. The others in ADR 0010's list join with
+// the feature that first writes them, whose migration widens the table's
+// check in the same change: the list and the check stay equal.
 
 export const authEventCodes = [
   'account_created',
@@ -21,22 +27,17 @@ export const authEventCodes = [
   'password_reset_completed',
   'sessions_revoked',
   'invitation_accepted',
-  'password_changed',
-  'email_changed',
   'mfa_removed',
+  'password_changed',
   'backup_code_used',
   'backup_codes_regenerated',
+  'email_changed',
   'passkey_added',
   'passkey_removed',
-  'sso_session_created',
-  'sso_response_rejected',
-  'sso_provider_changed',
-  'sso_domain_changed',
-  'sso_domain_conflict',
-  'account_deactivated',
-  'secrets_reencrypted',
-  'audit_copy_replayed',
   'audit_purged',
+  'password_check_setting_changed',
+  'secrets_re_encrypted',
+  'audit_copy_replayed',
 ] as const;
 
 export type AuthEventCode = (typeof authEventCodes)[number];

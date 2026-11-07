@@ -13,13 +13,21 @@
 // session is either committed before a revocation reads the sessions, and
 // revoked by it, or issued after the revocation commits, by a transaction
 // that then sees its changes, such as a new password.
+//
+// A session whose account holds a breached password (password/policy.ts)
+// reaches only the password change, sign-out and the session read: on every
+// other route it reads as no session at all. On those three it reads as
+// complete, as stored, with passwordChangeRequired in its details.
 
 import { sessionContext, touchSession, type Kysely, type Transaction } from '@pixel-scientists/db';
+import type { RouteContract } from '@pixel-scientists/domain/api';
+import { changePassword, getSession, signOut } from '@pixel-scientists/domain/auth';
 import type { App } from '@pixel-scientists/domain/platform';
 import type { FastifyRequest } from 'fastify';
 
 import type { MfaState, RequestSession, SessionRead } from '../context.ts';
-import { hashToken, newToken, readToken } from './cookies.ts';
+import { isRegisteredFromContract } from '../routes/register.ts';
+import { hashToken, newToken, readToken, TIMEOUTS } from './cookies.ts';
 import type { AuthTables } from './tables.ts';
 
 /** What readSession() learnt beyond the context, for the auth routes. */
@@ -28,6 +36,22 @@ export interface SessionDetails {
   readonly expiresAt: Date;
   readonly reauthenticatedAt: Date | null;
   readonly ip: string;
+  /** MFA is complete but the password must be changed first (ADR 0010). */
+  readonly passwordChangeRequired: boolean;
+}
+
+/** The routes a session that must change its password reaches. */
+const WHILE_CHANGE_REQUIRED: ReadonlySet<RouteContract> = new Set<RouteContract>([
+  changePassword,
+  getSession,
+  signOut,
+]);
+
+/** The contract of the route the request matched, if it was registered from one. */
+function contractOf(request: FastifyRequest): RouteContract | undefined {
+  const { config } = request.routeOptions;
+  if (!isRegisteredFromContract({ config })) return undefined;
+  return (config as { contract?: RouteContract }).contract;
 }
 
 const details = new WeakMap<RequestSession, SessionDetails>();
@@ -58,6 +82,13 @@ export function sessionReader(deps: SessionDependencies) {
     const tokenHash = hashToken(token);
     const row = await sessionContext(deps.api, tokenHash);
     if (row === undefined || row.app !== app) return { app, session: null };
+    const passwordChangeRequired = row.mfaState === 'password_change_required';
+    if (passwordChangeRequired) {
+      const contract = contractOf(request);
+      if (contract === undefined || !WHILE_CHANGE_REQUIRED.has(contract)) {
+        return { app, session: null };
+      }
+    }
     await touchSession(deps.auth, tokenHash);
 
     let email: Promise<string> | undefined;
@@ -65,7 +96,7 @@ export function sessionReader(deps: SessionDependencies) {
       userId: row.userId,
       app,
       tenant: row.tenant,
-      mfa: row.mfaState,
+      mfa: passwordChangeRequired ? 'complete' : row.mfaState,
       recentAuthAt: row.reauthenticatedAt,
       email: () =>
         (email ??= users
@@ -80,16 +111,11 @@ export function sessionReader(deps: SessionDependencies) {
       expiresAt: row.expiresAt,
       reauthenticatedAt: row.reauthenticatedAt,
       ip: request.ip,
+      passwordChangeRequired,
     });
     return { app, session };
   };
 }
-
-/** How long a session may last at most, by app (ADR 0010). */
-const ABSOLUTE_MS: Readonly<Record<App, number>> = {
-  console: 12 * 3600_000,
-  portal: 24 * 3600_000,
-};
 
 export interface NewSession {
   readonly userId: string;
@@ -169,7 +195,7 @@ export async function issueSession(trx: Transaction<unknown>, next: NewSession):
       app: next.app,
       active_tenant_id: next.tenantId,
       mfa_state: next.mfa,
-      expires_at: next.expiresAt ?? new Date(Date.now() + ABSOLUTE_MS[next.app]),
+      expires_at: next.expiresAt ?? new Date(Date.now() + TIMEOUTS[next.app].absolute * 1000),
       reauthenticated_at: reauthenticated === true ? eb.fn<Date>('now') : reauthenticated || null,
       ip_address: next.ip,
       user_agent: next.userAgent?.slice(0, 1024) ?? null,
@@ -224,7 +250,7 @@ export async function lockSession(
  * Replace a locked session with a new one, with a new id and token, in
  * `trx`. Only `change` differs: its user, app and absolute end carry over,
  * so a new state never extends a session, and so does its last
- * re-authentication unless `change` says it is now.
+ * re-authentication unless `change` says it is now (true) or none (false).
  */
 export function rotateSession(
   trx: Transaction<unknown>,
@@ -232,7 +258,7 @@ export function rotateSession(
   change: {
     readonly mfa?: MfaState;
     readonly tenantId?: string;
-    readonly reauthenticated?: true;
+    readonly reauthenticated?: boolean | undefined;
     readonly ip: string;
     readonly userAgent?: string | undefined;
   },

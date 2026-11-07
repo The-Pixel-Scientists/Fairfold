@@ -70,6 +70,15 @@ describe('saving answers', () => {
     expect(await events(t.tenantA, 'grants.application.created')).toHaveLength(before);
   });
 
+  it('stores blank and invisible-only text as no answer, and refuses it on submit', async () => {
+    const { draft } = await start();
+    const saved = await t.saved(t.ann, draft, { ...complete, f_title: ' ​⁠﻿ ' });
+    expect((await stored(draft.id))?.answers).toMatchObject({ f_title: null });
+    const refused = await t.submit(t.ann, saved);
+    expect(refused.statusCode).toBe(400);
+    expect(refused.json<Problem>().errors?.map(({ field }) => field)).toEqual(['f_title']);
+  });
+
   it('refuses answers based on an older version, and a second tab changes nothing', async () => {
     const { draft } = await start();
     await answer(t.save(t.ann, draft, { f_title: 'First tab' }));

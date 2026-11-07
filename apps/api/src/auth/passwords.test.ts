@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import type * as Crypto from 'node:crypto';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it, vi } from 'vitest';
 
 import {
   hashPassword,
@@ -15,6 +16,16 @@ import {
   verifyNothing,
   verifyPassword,
 } from './passwords.ts';
+
+const derived = vi.hoisted(() => ({ count: 0 }));
+vi.mock('node:crypto', async (importOriginal) => {
+  const crypto = await importOriginal<typeof Crypto>();
+  const argon2: typeof crypto.argon2 = (...args) => {
+    derived.count += 1;
+    crypto.argon2(...args);
+  };
+  return { ...crypto, argon2 };
+});
 
 /** The check on auth.account.password (migration 0004). */
 const STORED =
@@ -43,8 +54,10 @@ describe('password hashes', () => {
     expect(await verifyPassword('$scrypt$abc$def', 'anything at all')).toBe(false);
   });
 
-  it('cost a dummy verification for an address without a password', async () => {
+  it('cost one verification for an address without a password, the first time too', async () => {
+    const before = derived.count;
     expect(await verifyNothing('anything at all')).toBe(false);
+    expect(derived.count - before).toBe(1);
   });
 });
 

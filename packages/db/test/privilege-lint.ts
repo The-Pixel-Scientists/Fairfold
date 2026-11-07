@@ -14,7 +14,8 @@
 //   to its owner role, which owns nothing else and holds exactly the rights
 //   and policies listed (ADR 0003, "Approved definer functions").
 //
-// For the app roles and the database:
+// For the app roles, with app_operator, which app_worker may SET ROLE to
+// (RIGHTS_ROLES), and the database:
 // - The roles match the roles script (findRoleProblems in
 //   packages/db/scripts/roles.ts): attributes, memberships and settings.
 // - No setting applies to every role in this database or in all of them,
@@ -39,209 +40,21 @@
 import type pg from 'pg';
 
 import { BACKUP_ROLE, findRoleProblems } from '../scripts/roles.ts';
-import { APP_ROLES, type AppRole } from './connect.ts';
-
-/** The functions that app roles may execute, and by whom. */
-export const EXECUTABLE_BY: ReadonlyMap<string, readonly AppRole[]> = new Map<
-  string,
-  readonly AppRole[]
->([
-  // Every tenant policy calls it, whichever role runs the query.
-  ['app.current_tenant_id()', APP_ROLES],
-  // How the API learns about a session, without any grant in schema auth.
-  ['auth.session_context(bytea)', ['app_api']],
-  // A session's memberships, for switching tenant (ADR 0019).
-  ['auth.session_memberships(bytea)', ['app_api']],
-  // Public tenant pages and sign-in, with no tenant set (ADR 0019).
-  ['app.public_tenant(text)', ['app_api', 'app_auth']],
-  ['app.public_tenant_logo(text)', ['app_api']],
-  // The operator command alone (ADR 0019).
-  ['app.create_tenant(text, text)', ['app_worker']],
-  // The bounded purges of expired keys and counters (ADR 0028).
-  ['app.delete_expired_idempotency_keys(integer)', ['app_worker']],
-  ['app.delete_expired_request_limits(integer)', ['app_worker']],
-]);
-
-interface DefinerFunction {
-  readonly owner: string;
-  /** Every right the owner holds, as "<privilege> on <object>". */
-  readonly rights: readonly string[];
-  /** Every policy that names the owner, as "<table> policy <name>". */
-  readonly policies: readonly string[];
-}
-
-/** The approved SECURITY DEFINER functions (ADR 0003), by signature. */
-export const DEFINER_FUNCTIONS: ReadonlyMap<string, DefinerFunction> = new Map([
-  [
-    'auth.session_context(bytea)',
-    {
-      owner: 'owner_auth_session_context',
-      rights: [
-        'USAGE on schema auth',
-        ...['id', 'status'].map((column) => `SELECT on column auth.user.${column}`),
-        ...[
-          'token_hash',
-          'user_id',
-          'active_tenant_id',
-          'app',
-          'mfa_state',
-          'expires_at',
-          'created_at',
-          'last_seen_at',
-          'reauthenticated_at',
-          'revoked_at',
-        ].map((column) => `SELECT on column auth.session.${column}`),
-      ],
-      policies: [
-        'auth.session policy session_context_select',
-        'auth.user policy session_context_select',
-      ],
-    },
-  ],
-  [
-    'auth.session_memberships(bytea)',
-    {
-      owner: 'owner_auth_session_memberships',
-      rights: [
-        'USAGE on schema app',
-        'USAGE on schema auth',
-        ...['id', 'status'].map((column) => `SELECT on column auth.user.${column}`),
-        ...[
-          'token_hash',
-          'user_id',
-          'app',
-          'mfa_state',
-          'expires_at',
-          'created_at',
-          'last_seen_at',
-          'revoked_at',
-        ].map((column) => `SELECT on column auth.session.${column}`),
-        ...['id', 'tenant_id', 'user_id', 'roles', 'status'].map(
-          (column) => `SELECT on column app.membership.${column}`,
-        ),
-        ...['id', 'slug', 'name', 'status'].map(
-          (column) => `SELECT on column app.tenant.${column}`,
-        ),
-      ],
-      policies: [
-        'app.membership policy session_memberships_select',
-        'app.tenant policy session_memberships_select',
-        'auth.session policy session_memberships_select',
-        'auth.user policy session_memberships_select',
-      ],
-    },
-  ],
-  [
-    'app.public_tenant(text)',
-    {
-      owner: 'owner_app_public_tenant',
-      rights: [
-        'USAGE on schema app',
-        ...['id', 'slug', 'name', 'status'].map(
-          (column) => `SELECT on column app.tenant.${column}`,
-        ),
-        ...['tenant_id', 'brand_colour', 'preset', 'logo_type', 'tokens'].map(
-          (column) => `SELECT on column app.tenant_theme.${column}`,
-        ),
-      ],
-      policies: [
-        'app.tenant policy public_tenant_select',
-        'app.tenant_theme policy public_tenant_select',
-      ],
-    },
-  ],
-  [
-    'app.public_tenant_logo(text)',
-    {
-      owner: 'owner_app_public_tenant_logo',
-      rights: [
-        'USAGE on schema app',
-        ...['id', 'slug', 'status'].map((column) => `SELECT on column app.tenant.${column}`),
-        ...['tenant_id', 'logo', 'logo_type'].map(
-          (column) => `SELECT on column app.tenant_theme.${column}`,
-        ),
-      ],
-      policies: [
-        'app.tenant policy public_tenant_logo_select',
-        'app.tenant_theme policy public_tenant_logo_select',
-      ],
-    },
-  ],
-  [
-    'app.create_tenant(text, text)',
-    {
-      owner: 'owner_app_create_tenant',
-      rights: [
-        'USAGE on schema app',
-        ...['id', 'slug', 'name'].map((column) => `INSERT on column app.tenant.${column}`),
-      ],
-      policies: ['app.tenant policy create_tenant_insert'],
-    },
-  ],
-]);
-
-/**
- * The one named exception (ADR 0025): pg_trgm's schema, made by the database
- * privileges script. Schema USAGE is its access control, since a managed
- * database may leave EXECUTE on its functions with PUBLIC, so PUBLIC may
- * execute them and app_api and app_worker must be able to.
- */
-export const EXTENSION_SCHEMA = 'ext';
-const EXTENSION = 'pg_trgm';
-const EXTENSION_USERS = ['app_api', 'app_worker'];
-
-/**
- * The other named exception: the database privileges script lets
- * backup_reader read every schema, table and sequence migrator creates, so
- * that pg_dump reads what a migration adds (roles.sql). These are the only
- * default privileges approved, for migrator in every schema, as
- * "<privilege> on new <objects>".
- */
-export const BACKUP_DEFAULTS: readonly string[] = [
-  'USAGE on new schemas',
-  'SELECT on new tables',
-  'SELECT on new sequences',
-];
+import {
+  AUDIT_TABLES,
+  BACKUP_DEFAULTS,
+  DEFINER_FUNCTIONS,
+  EXECUTABLE_BY,
+  EXTENSION,
+  EXTENSION_SCHEMA,
+  EXTENSION_USERS,
+  OWN_SCHEMAS,
+  PUBLIC_RIGHTS,
+} from './catalogue/index.ts';
+import { RIGHTS_ROLES } from './connect.ts';
 
 /** The pinned search_path of every approved definer function, as pg_proc stores it. */
 const DEFINER_CONFIG = 'search_path=pg_catalog, pg_temp';
-
-/** The append-only audit tables, whose occurred_at and retain_until the database sets. */
-export const AUDIT_TABLES: readonly string[] = ['app.audit_event', 'auth.audit_event'];
-
-/** Rights PUBLIC may hold, as "<privilege> on <object>", each with its reason. */
-export const PUBLIC_RIGHTS: ReadonlyMap<string, string> = new Map([
-  [
-    'USAGE on schema public',
-    "PostgreSQL's own grant on the public schema, which no migration uses. Remove this entry once the database privileges script revokes it.",
-  ],
-]);
-
-/**
- * The schema each of app_auth and app_queue has its rights in, and the only
- * rights, as "<privilege> on <object>", it may hold outside it (ADR 0003).
- */
-export const OWN_SCHEMAS: ReadonlyMap<string, { schema: string; outside: readonly string[] }> =
-  new Map([
-    [
-      'app_auth',
-      {
-        schema: 'auth',
-        outside: [
-          'USAGE on schema app',
-          'EXECUTE on function app.current_tenant_id()',
-          'EXECUTE on function app.public_tenant(text)',
-        ],
-      },
-    ],
-    [
-      'app_queue',
-      {
-        schema: 'pgboss',
-        outside: ['USAGE on schema app', 'EXECUTE on function app.current_tenant_id()'],
-      },
-    ],
-  ]);
 
 /** Any schema but PostgreSQL's own. */
 export const NON_SYSTEM_SCHEMA = `NOT pg_catalog.starts_with(n.nspname, 'pg_')
@@ -321,7 +134,7 @@ async function privilegeProblems(client: pg.ClientBase): Promise<string[]> {
          OR (grantee IN (SELECT oid FROM pg_catalog.pg_roles WHERE rolname = ANY ($1::text[]))
              AND privilege IN ('TRUNCATE', 'REFERENCES', 'TRIGGER'))
       ORDER BY 1, 2, 3`,
-    [APP_ROLES],
+    [RIGHTS_ROLES],
   );
   return rows
     .filter(
@@ -343,7 +156,7 @@ async function appRoleGrantProblems(client: pg.ClientBase): Promise<string[]> {
   const problems: string[] = [];
   for (const { role, schema, object, privilege, grantable } of await heldRights(
     client,
-    APP_ROLES,
+    RIGHTS_ROLES,
   )) {
     const right = `${privilege} on ${object}`;
     if (grantable) problems.push(`Role ${role} holds ${right} with grant option.`);
@@ -355,7 +168,7 @@ async function appRoleGrantProblems(client: pg.ClientBase): Promise<string[]> {
   return problems;
 }
 
-interface HeldRight {
+export interface HeldRight {
   role: string;
   schema: string | null;
   object: string;
@@ -367,7 +180,10 @@ interface HeldRight {
  * The rights `roles` hold in every schema, including PostgreSQL's own, and
  * on the database, leaving out an owner's rights on what it owns.
  */
-async function heldRights(client: pg.ClientBase, roles: readonly string[]): Promise<HeldRight[]> {
+export async function heldRights(
+  client: pg.ClientBase,
+  roles: readonly string[],
+): Promise<HeldRight[]> {
   const { rows } = await client.query<HeldRight>(
     `SELECT r.rolname AS role, o.schema, o.object, a.privilege_type AS privilege,
             a.is_grantable AS grantable
@@ -523,7 +339,7 @@ async function roleProblems(client: pg.ClientBase, excepted: readonly string[]):
                             WHERE datname = pg_catalog.current_database()))
         AND r.rolname = ANY ($1::text[])
       ORDER BY 1, 2`,
-    [APP_ROLES],
+    [RIGHTS_ROLES],
   );
   for (const { role, object } of owned.rows) problems.push(`Role ${role} owns ${object}.`);
 
@@ -536,7 +352,7 @@ async function roleProblems(client: pg.ClientBase, excepted: readonly string[]):
          OR (n.nspname = ANY ($2::text[])
              AND pg_catalog.has_schema_privilege(r.name, n.oid, 'USAGE'))
       ORDER BY 1, 2`,
-    [APP_ROLES, excepted],
+    [RIGHTS_ROLES, excepted],
   );
   for (const { role, schema, can_create } of schemas.rows) {
     problems.push(
@@ -554,7 +370,7 @@ async function roleProblems(client: pg.ClientBase, excepted: readonly string[]):
               AS can_temp
        FROM pg_catalog.unnest($1::text[]) AS r(name)
       ORDER BY 1`,
-    [APP_ROLES],
+    [RIGHTS_ROLES],
   );
   for (const { role, can_create, can_temp } of database.rows) {
     if (can_create) problems.push(`Role ${role} can create schemas in this database.`);
@@ -616,7 +432,7 @@ async function auditTableProblems(client: pg.ClientBase): Promise<string[]> {
       WHERE a.attname IN ('occurred_at', 'retain_until', 'actor_member_kind')
         AND NOT a.attisdropped
         AND pg_catalog.has_column_privilege(r.name, a.attrelid, a.attnum, 'INSERT')`,
-    [AUDIT_TABLES, APP_ROLES],
+    [AUDIT_TABLES, RIGHTS_ROLES],
   );
   return rows.map((row) => row.problem);
 }
@@ -642,7 +458,7 @@ async function functionProblems(client: pg.ClientBase): Promise<string[]> {
        JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace
       WHERE ${NON_SYSTEM_SCHEMA}
       ORDER BY 1`,
-    [APP_ROLES],
+    [RIGHTS_ROLES],
   );
 
   const problems: string[] = [];

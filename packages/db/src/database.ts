@@ -219,6 +219,15 @@ export function poolConfig(settings: DatabaseSettings): pg.PoolConfig {
   };
 }
 
+/**
+ * The driver settings for pg-boss's own connection in the worker, as
+ * app_queue (ADR 0009), checked as for any other client. For the job
+ * runner only: no Kysely client is ever made over it.
+ */
+export function queuePoolConfig(settings: Omit<DatabaseSettings, 'role'>): pg.PoolConfig {
+  return { ...poolConfig({ ...settings, role: 'app_worker' }), user: 'app_queue' };
+}
+
 /** Always a definite value, so PGSSLMODE never decides. */
 function sslOption({ host, tls }: DatabaseSettings): NonNullable<pg.PoolConfig['ssl']> {
   const mode = tls?.mode ?? (isLoopbackHost(host) ? 'disable' : undefined);

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// Fixtures for the auth schema tests (migration 0004).
+// Fixtures for the auth schema tests (migrations 0004, 0022 and 0030).
 
 import { randomBytes } from 'node:crypto';
 
@@ -17,6 +17,8 @@ export const AUTH_TABLES = [
   'auth.verification',
   'auth.two_factor',
   'auth.rate_limit',
+  'auth.device',
+  'auth.passkey',
   'auth.audit_event',
   'auth.audit_copy_pending',
 ] as const;

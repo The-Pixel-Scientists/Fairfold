@@ -51,12 +51,20 @@ describe('privilege lint', () => {
     );
   });
 
-  it('reports rights on an audit table beyond INSERT and SELECT, and INSERT on the columns the database sets', async () => {
+  it('reports rights on an audit table beyond INSERT and SELECT, INSERT on the columns the database sets, and app_operator rights', async () => {
     const problems = await asMigratorRolledBack(async (client) => {
       await client.query(`
         GRANT UPDATE (changes) ON app.audit_event TO app_api;
         GRANT DELETE, INSERT (occurred_at) ON app.audit_event TO app_worker;
         GRANT INSERT ON app.audit_event TO app_api;
+        GRANT UPDATE (action), INSERT (retain_until) ON app.audit_event TO app_operator;
+        GRANT TRUNCATE ON app.tenant_module TO app_operator;
+      `);
+      // Only the function's owner may grant on it.
+      await client.query(`
+        SET LOCAL ROLE owner_app_tenant_ids;
+        GRANT EXECUTE ON FUNCTION app.tenant_ids() TO app_operator;
+        RESET ROLE;
       `);
       return findPrivilegeProblems(client, [...EXCEPTED_SCHEMAS.keys()]);
     });
@@ -69,6 +77,11 @@ describe('privilege lint', () => {
         'Role app_api can insert app.audit_event.actor_member_kind, which the database sets.',
         'Role app_worker holds DELETE on the audit table app.audit_event.',
         'Role app_worker can insert app.audit_event.occurred_at, which the database sets.',
+        // app_operator, which app_worker may SET ROLE to, is checked as well.
+        'Role app_operator holds UPDATE on the audit table app.audit_event.',
+        'Role app_operator can insert app.audit_event.retain_until, which the database sets.',
+        'Role app_operator holds TRUNCATE on app.tenant_module.',
+        'app.tenant_ids() is executable by app_operator, app_worker; EXECUTABLE_BY allows app_worker.',
       ].sort(),
     );
   });

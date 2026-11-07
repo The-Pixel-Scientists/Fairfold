@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
 // The columns the auth module reads and writes (migrations 0002 to 0004,
-// and 0015). The auth tables are reached as app_auth; the app tables as
-// app_api, inside withTenant().
+// 0015, 0025, 0030, 0034 and 0038). The auth tables are reached as app_auth; the app
+// tables as app_api, inside withTenant().
 
 import type { Generated } from '@pixel-scientists/db';
 import type { AuthEventCode } from '@pixel-scientists/domain/auth';
@@ -18,7 +18,15 @@ export type AuthTables = {
     status: Generated<string>;
     two_factor_enabled: Generated<boolean>;
   };
-  'auth.account': { user_id: string; account_id: string; provider_id: string; password: string };
+  'auth.account': {
+    user_id: string;
+    account_id: string;
+    provider_id: string;
+    password: string;
+    /** The breached-password check's state (password/policy.ts, migration 0034). */
+    breach_check_pending_since: Date | null;
+    password_breached_at: Date | null;
+  };
   'auth.verification': { identifier: string; value: string; expires_at: Date };
   'auth.two_factor': {
     user_id: string;
@@ -26,6 +34,8 @@ export type AuthTables = {
     verified: boolean;
     /** A bigint: written as a number, read as text. */
     last_used_step: string | number | null;
+    /** The backup code set as HMACs (backup-codes/codes.ts, migration 0025). */
+    backup_codes: string | null;
   };
   'auth.session': {
     user_id: string;
@@ -42,6 +52,7 @@ export type AuthTables = {
   };
   'auth.audit_event': {
     id: Generated<string>;
+    occurred_at: Generated<Date>;
     request_id: string;
     code: AuthEventCode;
     reason: string | null;
@@ -49,8 +60,17 @@ export type AuthTables = {
     tenant_id: string | null;
     identifier: string | null;
     ip_address: string | null;
+    /** The event an `audit_copy_replayed` event replayed (migration 0038). */
+    replayed_event_id: string | null;
   };
-  'auth.audit_copy_pending': { auth_event_id: string };
+  'auth.passkey': {
+    id: Generated<string>;
+    user_id: string;
+    name: string;
+    created_at: Generated<Date>;
+    last_used_at: Date | null;
+  };
+  'auth.audit_copy_pending': { auth_event_id: string; created_at: Generated<Date> };
   'auth.rate_limit': { scope: string; identifier: string | null };
 };
 

@@ -240,7 +240,7 @@ describe('a clean file', () => {
         `filename*=UTF-8''${encodeURIComponent(name)}`,
       'content-length': String(bytes.length),
       'x-content-type-options': 'nosniff',
-      'cache-control': 'no-store',
+      'cache-control': 'private, no-store',
       'content-security-policy': "default-src 'none'; sandbox",
       'cross-origin-resource-policy': 'same-origin',
     });

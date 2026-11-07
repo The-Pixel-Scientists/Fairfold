@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// Which switchable modules a tenant uses (ADR 0016). A module with no stored
-// state is on. Switching one writes a configuration version and
+// Which switchable modules a tenant uses (ADR 0016). A module is on only
+// where its row says so; no row means off (ADR 0024). Switching one writes a configuration version and
 // `platform.module.switched_on` or `switched_off`; the policy then answers
 // 404 for the module's routes, and sessions drop its permissions.
 
@@ -19,7 +19,10 @@ async function readModules(tx: TenantTransaction) {
     .execute();
   const stored = new Map(rows.map((row) => [row.module, row.enabled]));
   return {
-    modules: switchableModuleIds.map((module) => ({ module, enabled: stored.get(module) ?? true })),
+    modules: switchableModuleIds.map((module) => ({
+      module,
+      enabled: stored.get(module) === true,
+    })),
   };
 }
 
@@ -34,7 +37,7 @@ export const switchModuleHandler: Handler<typeof switchModule> = async ({ tx, co
     .where('module', '=', module)
     .forUpdate()
     .executeTakeFirst();
-  const before = current?.enabled ?? true;
+  const before = current?.enabled === true;
   if (before === enabled) return readModules(tx);
 
   const set = { enabled, updated_by: context.membership.id };

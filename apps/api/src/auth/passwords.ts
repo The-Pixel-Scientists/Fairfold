@@ -57,11 +57,11 @@ export async function verifyPassword(phc: string, password: string): Promise<boo
   return timingSafeEqual(actual, expected);
 }
 
-let dummy: Promise<string> | undefined;
+/** Made as the module loads, so even the first verifyNothing() costs one hash, not two. */
+const dummy = hashPassword(randomBytes(32).toString('base64url'));
 
 /** Spend the time of one verification, for an address with no password, so timing reveals nothing. */
 export async function verifyNothing(password: string): Promise<false> {
-  dummy ??= hashPassword(randomBytes(32).toString('base64url'));
   await verifyPassword(await dummy, password);
   return false;
 }

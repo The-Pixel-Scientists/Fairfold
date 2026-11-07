@@ -141,6 +141,7 @@ beforeAll(async () => {
     TPS_DEV: '1',
     TPS_DB_HOST: api.host,
     TPS_AUTH_SECRET: newToken(),
+    TPS_AUTH_BREACH_CHECK: 'off',
     TPS_DB_APP_AUTH_PASSWORD: appAuth.password,
     TPS_CONSOLE_ORIGIN: ORIGINS.console,
     TPS_PORTAL_ORIGIN: ORIGINS.portal,
@@ -210,10 +211,17 @@ describe('starting a sign-up', { timeout: 60_000 }, () => {
     expect(tokenIn(await emailTo(pending, 2))).not.toBe('');
   });
 
-  it('emails a new address a single-use link to the app it came from, kept only as a hash', async () => {
+  it("emails a new address a single-use link to the app it came from, kept only as a hash, for 24 hours by the database's clock", async () => {
     const email = newEmail();
-    await startSignUp(tenant.slug, email, { app: 'console', ip: newAddress() });
-    const message = await emailTo(email);
+    const now = Date.now.bind(Date);
+    const ahead = vi.spyOn(Date, 'now').mockImplementation(() => now() + 3_600_000);
+    let message: Email;
+    try {
+      await startSignUp(tenant.slug, email, { app: 'console', ip: newAddress() });
+      message = await emailTo(email);
+    } finally {
+      ahead.mockRestore();
+    }
     expect(message.subject).toBe('Finish creating your Fairfold Grants account');
     expect(message.text).toContain('Test tenant');
     const token = tokenIn(message);

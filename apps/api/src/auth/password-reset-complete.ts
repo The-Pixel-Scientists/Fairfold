@@ -5,8 +5,9 @@
 // usable. Then, in one transaction, with completions for the account taking
 // turns: the token and every other reset link of the account are spent, the
 // user is locked against sessions being issued, the new password is set,
-// every session is revoked, the address's sign-in counters and delays are
-// cleared, and the events are recorded. It never signs in and never touches
+// every session and device cookie is revoked, the address's sign-in
+// counters and delays are cleared, the breach state is set for the new
+// password, and the events are recorded. It never signs in and never touches
 // MFA, and the user is emailed a notice.
 
 import { completePasswordReset } from '@pixel-scientists/domain/auth';
@@ -16,11 +17,13 @@ import { ApiError } from '../problems.ts';
 import { route, type Route } from '../routes/register.ts';
 import { recordAuthEvent } from './events.ts';
 import { plainAddress } from './limits.ts';
+import { revokeDevices } from './limits/devices.ts';
 import { hashPassword } from './passwords.ts';
 import { RESET, sendResetEmail, VALUE } from './password-reset.ts';
 import type { RouteDependencies } from './routes.ts';
 import { revokeAll } from './sessions.ts';
-import { refuseCommonPassword, tokenId } from './sign-up.ts';
+import { checkNewPassword, newPasswordState, refuseBreachedAgain } from './password/policy.ts';
+import { tokenId } from './sign-up.ts';
 import type { AuthTables } from './tables.ts';
 
 export function completeResetRoute(deps: RouteDependencies): Route {
@@ -44,7 +47,7 @@ export function completeResetRoute(deps: RouteDependencies): Route {
     if (value === undefined || userId === undefined || tenantId === undefined) {
       throw linkNotValid;
     }
-    refuseCommonPassword(deps.commonPasswords, password);
+    const pending = await checkNewPassword(deps, requestId, deps.commonPasswords, password);
     const hash = await hashPassword(password);
     const ip = plainAddress(deps.client(requestId).ip);
 
@@ -79,17 +82,23 @@ export function completeResetRoute(deps: RouteDependencies): Route {
         .forUpdate()
         .executeTakeFirst();
       if (user === undefined) throw linkNotValid;
+      await refuseBreachedAgain(trx, userId, password);
       const changed = await db
         .updateTable('auth.account')
-        .set({ password: hash })
+        .set({ password: hash, ...newPasswordState(pending) })
         .where('user_id', '=', userId)
         .where('provider_id', '=', 'credential')
         .executeTakeFirst();
       if (changed.numUpdatedRows === 0n) throw linkNotValid;
       await revokeAll(trx, { userId });
+      await revokeDevices(trx, userId);
       await db
         .deleteFrom('auth.rate_limit')
-        .where('scope', 'in', ['sign_in_identifier_ip', 'sign_in_identifier'])
+        .where('scope', 'in', [
+          'sign_in_identifier_ip',
+          'sign_in_identifier',
+          'sign_in_identifier_device',
+        ])
         .where('identifier', '=', user.email)
         .execute();
       const details = { requestId, userId, tenant: tenantId, ip };

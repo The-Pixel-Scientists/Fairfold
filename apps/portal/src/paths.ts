@@ -17,6 +17,9 @@ export const PASSWORD_RESET_SENT_PATH = '/forgot-password/sent';
 export const RESET_PASSWORD_PATH = '/reset-password';
 export const SIGNED_OUT_PATH = '/signed-out';
 
+export const ACCOUNT_PATH = '/account';
+export const EMAIL_CHANGE_PATH = '/email-change';
+
 export const PROFILE_PATH = '/profile';
 export const ORGANISATIONS_PATH = '/organisations';
 export const ADD_ORGANISATION_PATH = '/organisations/new';

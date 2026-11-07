@@ -1,8 +1,10 @@
 # ADR 0030: Files after upload, and the reverse proxy
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-10-27
 - **Deciders:** Aaron Gardner
+
+Accepted by Aaron Gardner on 28 October 2026, with nginx (official, Alpine) as the reverse proxy.
 
 ## Context
 
@@ -335,7 +337,8 @@ never destroys it.
   within a tenant as across tenants.
 - A clean rescan records the new version and time, and the file is sent.
 - A signature match withholds the file. The API locks the file's row
-  (`SELECT ... FOR UPDATE`) and checks it is still clean, writes the bytes
+  (`SELECT ... FOR UPDATE`) and checks it is still clean, not erased, and
+  has the storage key and hash it read the bytes under, writes the bytes
   it holds to `withheld/<tenant id>/<file id>` with the scanner's key, then
   moves the row from `clean` to `withheld` with that storage key, the
   verdict and the version, keeping its hash, and commits, holding the lock
@@ -348,7 +351,8 @@ never destroys it.
   rescans each withheld file last scanned under an older one, one at a
   time. It reads the object with the scanner's key and checks it against
   the hash. If it is clean, the job locks the row as a withhold does, checks
-  it is still withheld, writes the object back under `clean/`, returns the
+  it is still withheld, not erased, and has the storage key and hash it
+  read, writes the object back under `clean/`, returns the
   row to `clean` with the new version, writes `platform.file.restored` and
   commits; the `withheld/` copy is then swept. A match
   records the new version and the file stays withheld. An error changes
@@ -369,7 +373,12 @@ never destroys it.
 - This amends ADR 0047's rule that a final state never changes. A clean row
   may record later clean scans and may move to `withheld`. A withheld row
   may record later scans, return to `clean`, or move to `infected` by a
-  staff deletion. Nothing else changes. The migration that adds the state
+  staff deletion. Nothing else changes. An erased row (its erasure time set)
+  is terminal: the trigger refuses every later change to it but the single
+  setting of its release time, so no rescan, withhold, restore or staff
+  deletion can give it back a storage key, a hash, a scan or another state,
+  and the sweep can still delete a released erased row. The migration that
+  adds the state
   amends migration 0008's `file_scan_columns` check so that a withheld row
   has its scan time, hash and storage key, and its
   `file_storage_key_own_object` check so that the key is
@@ -444,8 +453,9 @@ can run:
   withheld file a staff member deleted stays linked, and its row lives as
   long as its record.
 - **Objects with no row:** any object more than an hour old under
-  `clean/<tenant id>/` without a clean row, or under `withheld/<tenant id>/`
-  without a withheld row, is deleted. This catches a failed commit
+  `clean/<tenant id>/` or `withheld/<tenant id>/` whose row does not point
+  at it (no row, a row in another state, or an erased row, which has no
+  storage key) is deleted. This catches a failed commit
   (ADR 0047), the copy left behind when a file is withheld or restored, a
   staff deletion, and an erased file whose deletion failed. The hour keeps
   the sweep away from an upload still committing, whose key is new.
@@ -462,8 +472,17 @@ can run:
   locks it as any update does. So a copy is either written after the
   sweep's delete, under a row the sweep can no longer act on, or seen by
   the sweep as belonging to its row. The sweep never removes the object a
-  row points at. The sweep and the withheld recheck also run in one
-  platform queue with pg-boss's `singleton` policy, so they never overlap.
+  row points at.
+- **One tenant job per tenant.** As [ADR 0009](0009-background-jobs.md)
+  requires for work across tenants, a daily platform job lists tenants
+  through `app.tenant_ids()` and, from inside each tenant's context, sends
+  that tenant one sweep job and one withheld recheck job on a single tenant
+  queue. The queue uses pg-boss's `singleton` policy with the tenant id as
+  the singleton key, so one tenant's sweep and recheck never overlap and
+  one tenant's job never suppresses another's. Each job lists only its
+  tenant's `clean/<tenant id>/` and `withheld/<tenant id>/` prefixes and
+  calls the definer functions in its tenant's context; no handler touches
+  file rows outside one.
 - Each run writes one audit event per tenant with counts, never names.
 
 Tests, in S11-61 for the definer functions and S11-74 for the API and
@@ -473,6 +492,23 @@ lock, and the restored `clean/` object survives while the stale
 sweep, where the `withheld/` copy survives; and a file that goes clean,
 withheld, clean and withheld again keeps the object its row points at
 throughout.
+
+Erasure races, in the same tasks, each run in both orders of taking the
+lock:
+
+- an erasure racing a withhold at download that read the bytes first: the
+  row ends erased, with no storage key, hash or `withheld` state, and no
+  `withheld/` object survives the next sweep;
+- an erasure racing a restore by the withheld recheck that read the object
+  first: the row ends erased, and no `clean/` object survives the next
+  sweep;
+- on an erased row, every update the trigger allows elsewhere (a recorded
+  rescan, a withhold, a restore, a staff deletion, setting a storage key
+  or hash): refused by the database, while setting its release time once
+  is accepted;
+- the sweep and recheck for one tenant are never active at once, and a
+  running sweep for one tenant does not stop another tenant's from
+  starting.
 
 Keys and bucket:
 
@@ -504,6 +540,10 @@ records whose subject is the erased party, reached through its subject path
 - The change goes through an approved definer function executable by
   `app_worker` only, which refuses unless ADR 0027's guard holds (a job
   request naming the party, or a ledger row in restore mode).
+- The erasure function updates each row under its lock like any other
+  change, and from then on the row is terminal (see "Rescans"), so a
+  withhold or restore that read the bytes before the erasure finds the row
+  erased when it takes the lock, and writes nothing.
 - Once the erasure commits, the worker deletes the objects. The sweep is the
   backstop. A download needs a clean row with a storage key, so an erased
   file is never served, even before its object is gone.
@@ -559,7 +599,8 @@ it exists.
     staff deletion, the hash check on download, the upload counters and its
     limit on upload bodies read at once;
   - the worker gains the sweep, the withheld recheck and object deletion,
-    in one singleton queue, each under the file's row lock, with the scanner
+    as one job per tenant on a tenant queue with a tenant singleton key,
+    each under the file's row lock, with the scanner
     and removal keys and a route to clamd;
   - contracts gain the `/files` path check for raw upload routes, and the
     form engine the floor on a file question's class;

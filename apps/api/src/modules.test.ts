@@ -32,9 +32,12 @@ import {
   submissionRoutes,
 } from '@pixel-scientists/grants/contracts';
 import { partyRoutes } from '@pixel-scientists/party/contracts';
+import { defineQueue } from '@pixel-scientists/db/jobs';
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 
-import { composeModules } from './modules.ts';
+import { collectModuleJobs, composeModules } from './modules.ts';
+import type { ModuleJob } from './worker/registry.ts';
 
 const publicTenants = {
   tenant: () => Promise.resolve(undefined),
@@ -98,6 +101,28 @@ describe('composeModules', () => {
 
     expect(Object.keys(resolvers).sort()).toEqual(
       [...used].filter((rule) => rule !== 'tenant').sort(),
+    );
+  });
+});
+
+describe('collectModuleJobs', () => {
+  const job = (name: string): ModuleJob => ({
+    queue: defineQueue(name, 'tenant', z.strictObject({})),
+    handler: () => Promise.resolve(),
+  });
+
+  it('attaches each registered module job once, whether or not any tenant has the module on', () => {
+    const first = job('fake_module.first');
+    const second = job('fake_module.second');
+
+    expect(collectModuleJobs([{ jobs: [first] }, {}, { jobs: [second] }])).toEqual([first, second]);
+  });
+
+  it('stops start-up on a queue name defined twice', () => {
+    const same = job('fake_module.same');
+
+    expect(() => collectModuleJobs([{ jobs: [same] }, { jobs: [same] }])).toThrow(
+      'fake_module.same is defined twice',
     );
   });
 });

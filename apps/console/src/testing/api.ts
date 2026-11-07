@@ -6,7 +6,7 @@
 import { sessionSchema } from '@pixel-scientists/domain/auth';
 import type { Session } from '@pixel-scientists/domain/auth';
 import { permissionsFor } from '@pixel-scientists/domain/platform';
-import type { Role } from '@pixel-scientists/domain/platform';
+import type { Role, SwitchableModuleId } from '@pixel-scientists/domain/platform';
 import { vi } from 'vitest';
 
 export const northfield = {
@@ -25,6 +25,8 @@ interface SessionOptions {
   memberships?: readonly (typeof northfield | typeof eastmere)[];
   roles?: readonly Role[];
   mfa?: 'enrol' | 'verify' | 'complete';
+  /** The tools switched on for the funder. Grants by default; ignored without an active funder. */
+  modules?: readonly SwitchableModuleId[];
   /** Minutes until the session ends. */
   minutes?: number;
 }
@@ -35,6 +37,7 @@ export function consoleSession(options: SessionOptions = {}): Session {
     active = northfield,
     memberships = [northfield],
     roles = ['programme_manager'],
+    modules = ['grants'],
   } = options;
   const { mfa = 'complete', minutes = 30 } = options;
   const expiresAt = new Date(Date.now() + minutes * 60_000).toISOString();
@@ -64,6 +67,7 @@ export function consoleSession(options: SessionOptions = {}): Session {
     activeMembership: active === null ? null : withRoles(active),
     memberships: memberships.map(withRoles),
     permissions: active === null ? [] : permissionsFor(roles, 'console'),
+    modules: active === null ? [] : modules,
   });
 }
 

@@ -54,7 +54,7 @@ describe('app.tenant_module', { timeout: 30_000 }, () => {
         });
       for (const [module, by, expected] of [
         ['party', member, '23514'],
-        ['crm', member, '23514'],
+        ['payments', member, '23514'],
         ['grants', stranger, '23503'],
       ] as const) {
         const { text, values } = add(module, by);
@@ -71,6 +71,25 @@ describe('app.tenant_module', { timeout: 30_000 }, () => {
       expect(switched.rows).toEqual([{ enabled: true }]);
       expect(await outcome(client, `UPDATE app.tenant_module SET module = 'grants'`)).toBe('42501');
       expect(await outcome(client, 'DELETE FROM app.tenant_module')).toBe('42501');
+    });
+  });
+
+  it('lets a member switch a wave 1 tool on and off', async () => {
+    const { tenant, member } = fixtures;
+    await asRoleIn('app_api', tenant.id, async (client) => {
+      const { text, values } = insertStatement(client, 'app.tenant_module', {
+        tenant_id: tenant.id,
+        module: 'forms',
+        enabled: true,
+        updated_by: member,
+      });
+      expect((await client.query(text, values)).rowCount).toBe(1);
+      const switched = await client.query(
+        `UPDATE app.tenant_module SET enabled = false, updated_by = $1 WHERE module = 'forms'
+         RETURNING enabled`,
+        [member],
+      );
+      expect(switched.rows).toEqual([{ enabled: false }]);
     });
   });
 });

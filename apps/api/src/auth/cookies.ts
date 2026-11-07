@@ -14,8 +14,14 @@ export const SESSION_COOKIES: Readonly<Record<App, string>> = {
   portal: '__Host-tps_portal_session',
 };
 
-/** How long a cookie lasts: the app's absolute timeout. The server ends sessions sooner. */
-const MAX_AGE_SECONDS: Readonly<Record<App, number>> = { console: 12 * 3600, portal: 24 * 3600 };
+/**
+ * Each app's session timeouts in seconds (ADR 0010), which auth.session_context()
+ * and auth.session_memberships() repeat; a test holds the three equal.
+ */
+export const TIMEOUTS: Readonly<Record<App, { idle: number; absolute: number }>> = {
+  console: { idle: 30 * 60, absolute: 12 * 3600 },
+  portal: { idle: 60 * 60, absolute: 24 * 3600 },
+};
 
 /** What a token looks like: ours are 43 characters of base64url, Better Auth's 32 letters and digits. */
 const TOKEN = /^[A-Za-z0-9_-]{32,128}$/;
@@ -28,26 +34,29 @@ export function hashToken(token: string): Buffer {
   return createHash('sha256').update(token, 'utf8').digest();
 }
 
+/** The value of the cookie `name`, or undefined if the header has none or more than one. */
+export function readCookie(cookieHeader: string | undefined, name: string): string | undefined {
+  const values = (cookieHeader ?? '')
+    .split(';')
+    .map((pair) => pair.trim())
+    .filter((pair) => pair.startsWith(`${name}=`))
+    .map((pair) => pair.slice(name.length + 1));
+  return values.length === 1 ? values[0] : undefined;
+}
+
 /**
  * The token in the app's session cookie, or undefined if the request has
  * none, more than one, or one that is not a token.
  */
 export function readToken(cookieHeader: string | undefined, app: App): string | undefined {
-  if (cookieHeader === undefined) return undefined;
-  const name = SESSION_COOKIES[app];
-  const values = cookieHeader
-    .split(';')
-    .map((pair) => pair.trim())
-    .filter((pair) => pair.startsWith(`${name}=`))
-    .map((pair) => pair.slice(name.length + 1));
-  const [value] = values;
-  return values.length === 1 && value !== undefined && TOKEN.test(value) ? value : undefined;
+  const value = readCookie(cookieHeader, SESSION_COOKIES[app]);
+  return value !== undefined && TOKEN.test(value) ? value : undefined;
 }
 
-const ATTRIBUTES = 'Path=/; Secure; HttpOnly; SameSite=Lax';
+export const ATTRIBUTES = 'Path=/; Secure; HttpOnly; SameSite=Lax';
 
 export function sessionCookie(app: App, token: string): string {
-  return `${SESSION_COOKIES[app]}=${token}; ${ATTRIBUTES}; Max-Age=${String(MAX_AGE_SECONDS[app])}`;
+  return `${SESSION_COOKIES[app]}=${token}; ${ATTRIBUTES}; Max-Age=${String(TIMEOUTS[app].absolute)}`;
 }
 
 export function clearedCookie(app: App): string {

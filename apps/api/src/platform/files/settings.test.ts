@@ -13,6 +13,8 @@ describe('loadFileSettings', () => {
     TPS_STORAGE_WRITE_SECRET_ACCESS_KEY: 'write-secret-key',
     TPS_STORAGE_READ_ACCESS_KEY_ID: 'reader',
     TPS_STORAGE_READ_SECRET_ACCESS_KEY: 'read-secret-key',
+    TPS_STORAGE_SCANNER_ACCESS_KEY_ID: 'scanner',
+    TPS_STORAGE_SCANNER_SECRET_ACCESS_KEY: 'scanner-secret-key',
     TPS_CLAMD_HOST: '127.0.0.1',
     TPS_CLAMD_PORT: '3310',
     TPS_CLAMD_TIMEOUT_MS: '25000',
@@ -42,6 +44,21 @@ describe('loadFileSettings', () => {
     expect(loaded.clamd).toEqual({ host: '127.0.0.1', port: 3310, timeoutMs: 25_000 });
     expect(loaded.maxStores).toBe(4);
     expect(JSON.stringify(loaded)).not.toContain('secret-key');
+  });
+
+  it('reads the removal key only where asked, and then requires it', () => {
+    expect(loadFileSettings(env).storage.removal).toBeUndefined();
+    expect(() => loadFileSettings(env, undefined, { removal: true })).toThrow(/REMOVAL/);
+    const loaded = loadFileSettings(
+      {
+        ...env,
+        TPS_STORAGE_REMOVAL_ACCESS_KEY_ID: 'remover',
+        TPS_STORAGE_REMOVAL_SECRET_ACCESS_KEY: 'removal-secret-key',
+      },
+      undefined,
+      { removal: true },
+    );
+    expect(loaded.storage.removal?.accessKeyId).toBe('remover');
   });
 
   it('has no fallback: each missing setting is named', () => {

@@ -15,7 +15,9 @@ FROM node:24.21.0-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea41952009
 
 ARG APP
 WORKDIR /app
-RUN corepack enable
+# Corepack at an exact version (ADR 0026); it installs pnpm from
+# packageManager and checks its hash.
+RUN npm install --global --ignore-scripts corepack@0.36.0 && corepack enable
 COPY . .
 RUN --mount=type=cache,id=tps-pnpm-store,target=/pnpm-store \
     pnpm install --frozen-lockfile --store-dir /pnpm-store --filter "@pixel-scientists/${APP}..."
@@ -40,4 +42,6 @@ COPY --from=build /app/apps/${APP}/dist dist
 COPY --from=build /app/scripts/web-server.ts web-server.ts
 USER node
 EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD ["node", "--eval", "fetch('http://127.0.0.1:8080/').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
 CMD ["node", "web-server.ts", "--root", "dist", "--host", "0.0.0.0", "--port", "8080", "--api", "http://api:3000"]

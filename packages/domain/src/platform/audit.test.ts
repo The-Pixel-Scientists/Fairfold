@@ -42,6 +42,18 @@ describe('platform audit actions', () => {
     );
   });
 
+  it('record withholding, restoring and deleting files, and each sweep and recheck run', () => {
+    expect(platformAuditActions).toEqual(
+      expect.arrayContaining([
+        'platform.file.withheld',
+        'platform.file.restored',
+        'platform.file.deleted',
+        'platform.file_sweep.completed',
+        'platform.file_recheck.completed',
+      ]),
+    );
+  });
+
   it('name their entity type', () => {
     expect(auditEntityType('platform.membership.suspended')).toBe('platform.membership');
     expect(auditEntityType('platform.auth.sign_in_failed')).toBe('platform.auth');

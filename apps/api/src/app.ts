@@ -16,8 +16,9 @@ import { suiteName } from '@pixel-scientists/domain/platform';
 import manifest from '../package.json' with { type: 'json' };
 import type { AuthModule } from './context.ts';
 import type { InTenant } from './database.ts';
-import type { FileService } from './platform/files/index.ts';
+import type { FileService, UploadGate } from './platform/files/index.ts';
 import { withTenantScope, type ScopeResolvers } from './policy/index.ts';
+import { registerLimits, type LimitOptions } from './limits/index.ts';
 import { createReadinessCheck, healthRoutes } from './routes/health.ts';
 import { openApiRoutes } from './routes/openapi.ts';
 import {
@@ -27,6 +28,7 @@ import {
   type Route,
 } from './routes/register.ts';
 import { createServer } from './server.ts';
+import { registerTelemetry, type Telemetry } from './telemetry/index.ts';
 
 export interface AppOptions {
   logger: FastifyBaseLogger;
@@ -46,6 +48,12 @@ export interface AppOptions {
   resolvers?: ScopeResolvers;
   /** Addresses or ranges of the reverse proxies to trust. None by default. */
   trustProxy?: readonly string[];
+  /** The counters and key behind the request limits (S11-36). Without them, nothing is limited. */
+  limits?: LimitOptions;
+  /** Counts and limits raw uploads before their bodies are read (ADR 0030). Without it, none is limited. */
+  uploads?: UploadGate;
+  /** Traces and request metrics. Without it, or while it is off, nothing is recorded. */
+  telemetry?: Telemetry;
 }
 
 const noDatabase: InTenant = () =>
@@ -74,6 +82,13 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     }
   });
 
+  if (options.telemetry !== undefined) registerTelemetry(app, options.telemetry);
+  // After telemetry, so a refusal is traced; before anything reads the request.
+  const limitSessions =
+    options.limits === undefined
+      ? (read: AuthModule['readSession']) => read
+      : registerLimits(app, options.limits);
+
   await app.register(swagger, {
     openapi: {
       openapi: '3.1.0',
@@ -99,9 +114,10 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
 
   if (options.auth !== undefined) await app.register(options.auth.plugin);
   const deps = {
-    readSession: options.auth?.readSession.bind(options.auth) ?? signedOut,
+    readSession: limitSessions(options.auth?.readSession.bind(options.auth) ?? signedOut),
     inTenant: options.inTenant ?? noDatabase,
     files: options.files,
+    uploads: options.uploads,
     resolvers: withTenantScope(options.resolvers ?? {}),
   };
   // Registering inside a plugin applies the prefix.
