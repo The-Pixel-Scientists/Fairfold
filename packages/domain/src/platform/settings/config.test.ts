@@ -6,6 +6,7 @@ import { moduleIds } from '../modules.ts';
 import { configDiffSchemas, configEntityTypes } from './config.ts';
 
 const SHA256 = 'a'.repeat(64);
+const ITEM = '0b8f3a52-6c1d-4e7a-9f20-3d5c8e1b7a64';
 
 describe('configuration entity types', () => {
   it('are named <module>.<entity>, as app.config_version checks', () => {
@@ -14,6 +15,22 @@ describe('configuration entity types', () => {
       expect(moduleIds).toContain(type.split('.')[0]);
     }
     expect(Object.keys(configDiffSchemas)).toEqual([...configEntityTypes]);
+  });
+
+  it('are exactly the platform settings and the wave 1 tools, so an unknown type has no diff', () => {
+    expect(configEntityTypes).toEqual([
+      'platform.tenant',
+      'platform.theme',
+      'platform.module',
+      'crm.segment',
+      'assure.checklist',
+      'forms.form',
+      'insight.report_definition',
+      'insight.disclosure_rule',
+    ]);
+    for (const type of ['crm.list', 'grants.programme', '__proto__', 'toString']) {
+      expect(Object.hasOwn(configDiffSchemas, type), type).toBe(false);
+    }
   });
 });
 
@@ -34,6 +51,24 @@ describe('configuration diffs', () => {
         { field: 'tokens', from: 'unusable', to: null },
       ],
       'platform.module': [{ field: 'enabled', from: true, to: false }],
+      'crm.segment': [
+        { path: 'name', from: 'Donors', to: 'Regular donors' },
+        { path: `filters.${ITEM}.operator`, from: null, to: 'equals' },
+      ],
+      'assure.checklist': [
+        { path: `items.${ITEM}.label`, from: null, to: 'Safeguarding policy seen' },
+        { path: 'items.f_policy.required', from: false, to: true },
+      ],
+      'forms.form': [
+        { field: 'respondents', from: 'signed_in', to: 'both' },
+        { field: 'closesAt', from: null, to: '2026-12-01T17:00:00Z' },
+        { field: 'retentionMonths', from: 24, to: 12 },
+      ],
+      'insight.report_definition': [
+        { path: 'source', from: 'applications', to: 'awards' },
+        { path: `groupBy.${ITEM}`, from: null, to: 'region' },
+      ],
+      'insight.disclosure_rule': [{ field: 'threshold', from: 10, to: 15 }],
     } as const;
     for (const type of configEntityTypes) {
       expect(configDiffSchemas[type].parse(cases[type])).toEqual(cases[type]);
@@ -56,6 +91,35 @@ describe('configuration diffs', () => {
         [{ field: 'tokens', from: 'unusable', to: {} }],
       ],
       'platform.module': [[], [{ field: 'enabled', from: 'on', to: 'off' }]],
+      'crm.segment': [
+        [],
+        [{ path: `filters.${ITEM}.value`, from: null, to: 'Jo Bloggs' }],
+        [{ path: 'name', from: 'a', to: 'b', person: 'Jo Bloggs' }],
+        [{ path: 'members', from: null, to: 3 }],
+      ],
+      'assure.checklist': [
+        [{ path: 'items.0.label', from: null, to: 'Position, not id' }],
+        [{ path: `items.${ITEM}.answer`, from: null, to: 'yes' }],
+        [{ path: '__proto__', from: null, to: 'x' }],
+        [{ path: 'name', from: null, to: { label: 'nested' } }],
+      ],
+      'forms.form': [
+        [],
+        [{ field: 'respondents', from: 'signed_in', to: 'everyone' }],
+        [{ field: 'title', from: 'a', to: 'b', answers: {} }],
+        [{ field: 'owner', from: null, to: 'Jo Bloggs' }],
+        [{ field: 'retentionMonths', from: 12, to: 0 }],
+      ],
+      'insight.report_definition': [
+        [{ path: `filters.${ITEM}.value`, from: null, to: 'ZZ99 9ZZ' }],
+        [{ path: 'results', from: null, to: 3 }],
+      ],
+      'insight.disclosure_rule': [
+        [],
+        [{ field: 'threshold', from: 10, to: 0 }],
+        [{ field: 'floor', from: 10, to: 5 }],
+        [{ field: 'threshold', from: 10, to: 15, reason: 'x' }],
+      ],
     };
     for (const type of configEntityTypes) {
       for (const diff of refused[type]) {
