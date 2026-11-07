@@ -34,6 +34,7 @@ export const listFormVersions = defineRoute({
 export const createFormDraft = defineRoute({
   ...round,
   method: 'POST',
+  idempotent: true,
   path: '/console/rounds/:roundId/form-versions',
   summary: "Start a draft of a round's form from its latest published version, or empty",
   responses: { 201: formVersionSchema },

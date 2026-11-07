@@ -16,7 +16,17 @@ import { Migrator, type Migration, type MigrationProvider } from 'kysely/migrati
 export const MIGRATIONS_FOLDER = fileURLToPath(new URL('../migrations', import.meta.url));
 
 /** The schemas a migration may change: the platform's, then each module's (ADR 0016). */
-export const SCHEMAS = ['app', 'auth', 'party', 'grants'] as const;
+export const SCHEMAS = [
+  'app',
+  'auth',
+  'party',
+  'grants',
+  'crm',
+  'assure',
+  'forms',
+  'privacy',
+  'insight',
+] as const;
 
 const MIGRATION_NAME = /^(\d{4})_([a-z0-9]+)_[a-z0-9]+(?:_[a-z0-9]+)*$/;
 

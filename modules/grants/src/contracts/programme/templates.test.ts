@@ -3,6 +3,7 @@
 import { messageForIssue } from '@pixel-scientists/domain/platform';
 import { describe, expect, it } from 'vitest';
 
+import { reminderKinds, type ReminderKind } from '../reminders/lists.ts';
 import { outcomeIds } from './lists.ts';
 import { programmeMessages } from './messages.ts';
 import {
@@ -11,6 +12,8 @@ import {
   mergeFields,
   mergeFieldsFor,
   mergeFieldsIn,
+  purposeAllowed,
+  templatePurposes,
 } from './templates.ts';
 
 /** The defaults, with one template changed. */
@@ -107,5 +110,33 @@ describe('email templates input', () => {
     expect(emailTemplatesInputSchema.safeParse(extra).success).toBe(false);
     const html = withTemplate('accepted', { html: '<p>Hi</p>' });
     expect(emailTemplatesInputSchema.safeParse(html).success).toBe(false);
+  });
+});
+
+describe('template purposes', () => {
+  it('are a service email or marketing', () => {
+    expect(Object.keys(templatePurposes)).toEqual(['transactional', 'marketing']);
+  });
+
+  it('allow only service emails for every outcome and reminder', () => {
+    for (const email of [...outcomeIds, ...(Object.keys(reminderKinds) as ReminderKind[])]) {
+      expect(purposeAllowed(email, 'transactional'), email).toBe(true);
+      expect(purposeAllowed(email, 'marketing'), email).toBe(false);
+    }
+  });
+
+  it('refuse marketing on an outcome email, saying what to choose', () => {
+    for (const outcome of outcomeIds) {
+      expect(problems(withTemplate(outcome, { purpose: 'marketing' })), outcome).toEqual({
+        [`${outcome}.purpose`]: programmeMessages.serviceEmailOnly,
+      });
+      const parsed = emailTemplatesInputSchema.parse(
+        withTemplate(outcome, { purpose: 'transactional' }),
+      );
+      expect(parsed[outcome].purpose).toBe('transactional');
+    }
+    expect(problems(withTemplate('accepted', { purpose: 'newsletter' }))).toHaveProperty([
+      'accepted.purpose',
+    ]);
   });
 });

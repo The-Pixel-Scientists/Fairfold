@@ -12,6 +12,26 @@ export {
   type ConfigEntityType,
 } from './config.ts';
 export {
+  addEmbedOrigin,
+  embedOriginInputSchema,
+  embedOriginListSchema,
+  embedOriginPattern,
+  embedOriginRoutes,
+  embedOriginRowSchema,
+  embedOriginSchema,
+  getPublicEmbedOrigins,
+  listEmbedOrigins,
+  MAX_EMBED_ORIGIN_LENGTH,
+  MAX_EMBED_ORIGINS,
+  publicEmbedOriginRoutes,
+  publicEmbedOriginsSchema,
+  removeEmbedOrigin,
+  type EmbedOriginInput,
+  type EmbedOriginList,
+  type EmbedOriginRow,
+  type PublicEmbedOrigins,
+} from './embed-origins.ts';
+export {
   getLogo,
   getPublicTenant,
   getSettings,

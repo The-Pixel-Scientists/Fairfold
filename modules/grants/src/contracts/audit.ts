@@ -26,6 +26,13 @@ export const grantsAuditActions = defineAuditActions('grants', [
   'grants.application.created',
   'grants.application.eligibility_checked',
   'grants.application.submitted',
+  // A member submitted it for the applicant through the alternative route
+  // (S11-54), recorded beside `.submitted` with the member as the actor.
+  'grants.application.submitted_on_behalf',
+  // A member saved answers in an assisted draft (S11-54). Unlike an
+  // autosave this is audited, as staff write in the applicant's name: the
+  // answers version and changed field ids, never a value.
+  'grants.application.answers_saved_on_behalf',
   'grants.application.withdrawn',
   'grants.application.stage_changed',
   'grants.application.viewed',
@@ -48,6 +55,47 @@ export const grantsAuditActions = defineAuditActions('grants', [
   // funder's publisher details.
   'grants.export.downloaded',
   'grants.publisher_setting.changed',
+  // Reasonable adjustments (S11-54): ids and the kind only, never the reason
+  // code, which is special category.
+  'grants.adjustment.granted',
+  'grants.adjustment.revoked',
+  // Equality monitoring (ADR 0032): the response and application ids and the
+  // privacy notice version only, never an answer or a field id. `read` is the
+  // applicant viewing their own answers and `disclosed` a rights-request
+  // read, both sensitive reads. Shown only to members who also hold
+  // `grants.monitoring.disclose`.
+  'grants.monitoring.saved',
+  'grants.monitoring.read',
+  'grants.monitoring.withdrawn',
+  'grants.monitoring.disclosed',
+  // A round's reminder setting (S11-54). Reminders sent are kept in their own
+  // outbox, not the audit log.
+  'grants.reminder_setting.updated',
+  // Notes and messages (S12-02). The entity is the application, so the
+  // subject is its applicant (ADR 0027); the note or message id, the side and
+  // counts go in the changes, never a body or a name. `messages_viewed` is
+  // each staff read of a thread, a sensitive read; the applicant's reads of
+  // their own are not.
+  'grants.application.note_added',
+  'grants.application.message_sent',
+  'grants.application.messages_viewed',
+  // Triage, saved views, exports and test sends (S12-07). A bulk change
+  // records one event per application. Changes hold ids, codes and counts
+  // only: never a label's or view's name, a filter value, an address or a
+  // file's contents.
+  'grants.application.owner_changed',
+  'grants.application.labels_changed',
+  'grants.label.created',
+  'grants.label.updated',
+  'grants.label.archived',
+  'grants.saved_view.created',
+  'grants.saved_view.updated',
+  'grants.saved_view.deleted',
+  'grants.export.requested',
+  'grants.board_pack.requested',
+  'grants.email_template.test_sent',
+  'grants.programme_config.exported',
+  'grants.programme_config.imported',
 ]);
 
 export type GrantsAuditAction = (typeof grantsAuditActions)[number];

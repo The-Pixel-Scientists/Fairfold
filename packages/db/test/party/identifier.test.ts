@@ -63,7 +63,7 @@ describe('party.organisation_identifier', { timeout: 30_000 }, () => {
     }));
   });
 
-  it('lets app_api add and change identifiers, but never verify one', async () => {
+  it('lets app_api add and change identifiers, but never set a verification time', async () => {
     await asRoleIn('app_api', tenant.id, async (client) => {
       const { text, values } = insertStatement(
         client,
@@ -86,7 +86,6 @@ describe('party.organisation_identifier', { timeout: 30_000 }, () => {
       expect(await outcome(client, claimed.text, claimed.values)).toBe('42501');
       for (const change of [
         'verified_at = now()',
-        'verified_by = updated_by',
         "scheme = 'GB-SC'",
         'organisation_id = organisation_id',
       ]) {

@@ -5,9 +5,14 @@
 // pages show them (ADR 0019). A membership's user_id links the tenant to a
 // person's account, so it is personal, like party.person.user_id (ADR 0017).
 // Audit events hold ids, codes and public or internal values only (ADR 0003,
-// D12), and are kept under the tenant's audit rule, at least 12 months.
+// D12), and are kept under the tenant's audit rule, at least 12 months; the
+// party an event is about is internal under the same rule (ADR 0027).
 
-import type { ClassificationRegistry, FieldClassification } from '../classification.ts';
+import type {
+  ClassificationRegistry,
+  FieldClassification,
+  SubjectPathRegistry,
+} from '../classification.ts';
 
 const internal: FieldClassification = {
   sensitivity: 'internal',
@@ -25,10 +30,34 @@ const invitation: FieldClassification = {
   sensitivity: 'internal',
   retention: { kind: 'fixed', days: 90, from: 'expires_at' },
 };
+const idempotencyKey: FieldClassification = {
+  sensitivity: 'internal',
+  retention: { kind: 'fixed', days: 2, from: 'created_at' },
+};
+const requestLimit: FieldClassification = {
+  sensitivity: 'internal',
+  retention: { kind: 'fixed', days: 1, from: 'window_start' },
+};
 const audit: FieldClassification = {
   sensitivity: 'internal',
   retention: { kind: 'tenant_policy', policy: 'audit', minimumDays: 365 },
 };
+
+/**
+ * Columns whose values are structured (json, jsonb, bytea) or free text. An
+ * audit event records a change to one by its field id alone, whatever its
+ * sensitivity (D12). The other schemas' maps have no such marker yet (S11-84).
+ */
+export const notKept: ReadonlySet<string> = new Set([
+  'app.tenant_theme.logo',
+  'app.tenant_theme.tokens',
+  'app.config_version.diff',
+  'app.file.sha256',
+  'app.invitation.token_hash',
+  'app.idempotency_key.request_hash',
+  'app.request_limit.key_hash',
+  'app.audit_event.changes',
+]);
 
 export const app: ClassificationRegistry = {
   'app.tenant': {
@@ -126,6 +155,31 @@ export const app: ClassificationRegistry = {
     updated_at: invitation,
     updated_by: invitation,
   },
+  // An idempotency key (ADR 0028): kept 2 days, its 24-hour expiry plus a
+  // margin for the purge. The request hash digests values that may be
+  // personal, so it is classified as they may be.
+  'app.idempotency_key': {
+    tenant_id: idempotencyKey,
+    id: idempotencyKey,
+    membership_id: idempotencyKey,
+    route_id: idempotencyKey,
+    key: idempotencyKey,
+    request_hash: { ...idempotencyKey, sensitivity: 'personal' },
+    state: idempotencyKey,
+    status: idempotencyKey,
+    created_id: idempotencyKey,
+    created_at: idempotencyKey,
+    expires_at: idempotencyKey,
+  },
+  // A rate-limit counter (ADR 0028), holding no tenant data: kept 1 day from
+  // its window. Its key hash is a pseudonymous client identifier.
+  'app.request_limit': {
+    bucket: requestLimit,
+    key_hash: { ...requestLimit, sensitivity: 'personal' },
+    window_start: requestLimit,
+    count: requestLimit,
+    expires_at: requestLimit,
+  },
   'app.audit_event': {
     tenant_id: audit,
     id: audit,
@@ -134,9 +188,31 @@ export const app: ClassificationRegistry = {
     request_id: audit,
     actor_kind: audit,
     actor_id: audit,
+    actor_member_kind: audit,
     action: audit,
     entity_type: audit,
     entity_id: audit,
     changes: audit,
+    subject_party_id: audit,
   },
+};
+
+/**
+ * Each table's path to the party its rows are about (ADR 0027). A file is
+ * about the member who uploaded it, and an invitation about the member it
+ * made, if any.
+ */
+export const appSubjects: SubjectPathRegistry = {
+  'app.membership': { kind: 'account', column: 'user_id' },
+  'app.file': { kind: 'join', column: 'created_by', table: 'app.membership' },
+  'app.invitation': { kind: 'join', column: 'accepted_membership_id', table: 'app.membership' },
+  'app.idempotency_key': {
+    kind: 'unlinked',
+    reason: 'A one-way digest of a request, which names no one and goes after 2 days.',
+  },
+  'app.request_limit': {
+    kind: 'unlinked',
+    reason: 'A hashed client key for rate limits, with no account or tenant.',
+  },
+  'app.audit_event': { kind: 'party', column: 'subject_party_id' },
 };

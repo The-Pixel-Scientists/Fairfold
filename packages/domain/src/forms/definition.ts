@@ -26,12 +26,21 @@ export const LONG_TEXT_MAX_CHARACTERS = 20_000;
 export const TABLE_MAX_ROWS = 50;
 export const CELL_MAX_CHARACTERS = 200;
 
+/**
+ * How sensitive an answer is, from least to most: the classification map's
+ * four levels, in its order (packages/db/classification.ts, ADR 0027).
+ */
+export const classifications = ['public', 'internal', 'personal', 'special_category'] as const;
+
+export type Classification = (typeof classifications)[number];
+
+/** `applicant` is the person who answered: an applicant, or a standalone form's respondent. */
 export const fieldAudiences = ['applicant', 'staff', 'reviewer'] as const;
 
 /**
- * Who sees the answer against an application: a set that always holds the
- * applicant, or `aggregate_only`, where the applicant sees their own answer,
- * staff and reviewers never do, and it counts only in aggregate reports.
+ * Who sees the answer: a set that always holds the person who answered, or
+ * `aggregate_only`, where that person sees their own answer, staff and
+ * reviewers never do, and it counts only in aggregate reports.
  */
 export const audiencesSchema = z.union([
   z.literal('aggregate_only'),
@@ -60,6 +69,12 @@ const question = {
   /** Names or identifies the applicant, so blind reviewers never see it. */
   identity: z.boolean().default(false),
   audiences: audiencesSchema.default([...fieldAudiences]),
+  /**
+   * What subject access, erasure, export and the warehouse may do with the
+   * answer. Optional, with no default, so a version published before it
+   * parses unchanged: read it only through classificationOf().
+   */
+  classification: z.enum(classifications).optional(),
   conditions,
 };
 

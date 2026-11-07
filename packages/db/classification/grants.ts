@@ -5,8 +5,10 @@
 // applicants see them. The rest of the set-up (descriptions, budgets, late
 // policies, stages, rubrics, email templates and application forms) is
 // internal, as are ids, statuses and actors. An application's answers are
-// personal as a whole until each form field carries its own classification;
-// its links to people and organisations are internal ids, as are its
+// classified field by field from the form version it pinned (ADR 0027); the
+// column itself is special category, the most any answer can be, so a
+// reader that does not know per-field columns leaves it out. Its links to
+// people and organisations are internal ids, as are its
 // statuses, times, late flag, eligibility outcomes and file links (ADR
 // 0047). Reviewer pools, assignments, conflict declarations and scores are
 // internal, but for a score's comment, which is personal: a reviewer's
@@ -19,7 +21,11 @@
 // told what and when (ADR 0020), and erasure anonymises a person in place
 // (ADR 0017).
 
-import type { ClassificationRegistry, FieldClassification } from '../classification.ts';
+import type {
+  ClassificationRegistry,
+  FieldClassification,
+  SubjectPathRegistry,
+} from '../classification.ts';
 
 const internal: FieldClassification = {
   sensitivity: 'internal',
@@ -107,12 +113,20 @@ export const grants: ClassificationRegistry = {
     applicant_person_id: internal,
     organisation_id: internal,
     status: internal,
-    answers: personal,
+    answers: {
+      sensitivity: 'special_category',
+      retention: { kind: 'tenant_lifetime' },
+      perField: {
+        versionColumn: 'form_version_id',
+        definition: { table: 'grants.form_version', column: 'definition' },
+      },
+    },
     answers_version: internal,
     stage_id: internal,
     submitted_at: internal,
     submitted_late: internal,
     withdrawn_at: internal,
+    organisation_snapshot_id: internal,
   },
   'grants.eligibility_result': {
     tenant_id: internal,
@@ -203,4 +217,26 @@ export const grants: ClassificationRegistry = {
     funder_name: shown,
     identifier_prefix: shown,
   },
+};
+
+const throughApplication = {
+  kind: 'join',
+  column: 'application_id',
+  table: 'grants.application',
+} as const;
+
+/**
+ * Each table's path to the party its rows are about (ADR 0027): an
+ * application's applicant, reached from the records about the application,
+ * and a decision email's recipient.
+ */
+export const grantsSubjects: SubjectPathRegistry = {
+  'grants.application': { kind: 'party', column: 'applicant_person_id' },
+  'grants.eligibility_result': throughApplication,
+  'grants.stage_transition': throughApplication,
+  'grants.application_file': throughApplication,
+  'grants.assignment': throughApplication,
+  'grants.score': { kind: 'join', column: 'assignment_id', table: 'grants.assignment' },
+  'grants.decision': throughApplication,
+  'grants.decision_email': { kind: 'party', column: 'recipient_person_id' },
 };

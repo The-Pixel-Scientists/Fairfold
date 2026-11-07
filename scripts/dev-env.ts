@@ -31,12 +31,14 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { isIPv4 } from 'node:net';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { parseEnv } from 'node:util';
 
+import { isLoopbackHost } from '../packages/db/src/settings.ts';
 import { currentDevNames, repositoryRoot } from './dev-names.ts';
+
+export { isLoopbackHost };
 
 const COMPOSE_FILE = join(repositoryRoot, 'infra', 'compose', 'compose.dev.yaml');
 const ENV_FILE = join(repositoryRoot, '.env');
@@ -50,6 +52,8 @@ const APP_PASSWORDS = [
   'TPS_DB_APP_AUTH_PASSWORD',
   'TPS_DB_APP_QUEUE_PASSWORD',
 ] as const;
+/** Only the roles script sets it; nothing in development connects as it. */
+const BACKUP_PASSWORD = 'TPS_DB_BACKUP_READER_PASSWORD';
 
 /** Set from the worktree's folder name. Nothing overrides it. */
 const OWN_DATABASES = 'TPS_DEV_DATABASES';
@@ -94,6 +98,7 @@ export const PROFILES = {
     ...SUPERUSER,
     MIGRATOR_PASSWORD,
     ...APP_PASSWORDS,
+    BACKUP_PASSWORD,
     OWN_DATABASES,
   ],
   // Database tests in the db project: the test database only, as the app
@@ -265,16 +270,10 @@ export function developmentValues(
     TPS_DB_SUPERUSER: environmentValue(postgres, 'postgres', 'POSTGRES_USER'),
     TPS_DB_SUPERUSER_PASSWORD: environmentValue(postgres, 'postgres', 'POSTGRES_PASSWORD'),
   };
-  for (const key of [MIGRATOR_PASSWORD, ...APP_PASSWORDS]) {
+  for (const key of [MIGRATOR_PASSWORD, ...APP_PASSWORDS, BACKUP_PASSWORD]) {
     values[key] = environmentValue(postgres, 'postgres', key);
   }
   return values;
-}
-
-/** The same rule as isLoopbackHost in packages/db/scripts/settings.ts. */
-export function isLoopbackHost(host: string): boolean {
-  if (host === 'localhost' || host === '::1' || host === '[::1]') return true;
-  return isIPv4(host) && host.startsWith('127.');
 }
 
 /** The inherited environment without any TPS_ variable, in any letter case. */

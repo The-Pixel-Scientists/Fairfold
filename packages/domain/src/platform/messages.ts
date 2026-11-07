@@ -52,6 +52,12 @@ export const messages = {
   serviceFailed: 'Something went wrong on our side. Try again in a few minutes.',
   noConnection: 'We could not reach the service. Check your connection and try again.',
 
+  // Repeated requests (ADR 0028).
+  keyReusedTitle: 'Already sent with different details',
+  keyReused: 'This was already sent with different details. Start again to send it.',
+  keyInProgressTitle: 'Still being saved',
+  keyInProgress: 'This is still being saved. Wait a moment, then check whether it was saved.',
+
   // Accounts and sign-in.
   email: 'Enter an email address in the correct format, like name@example.com.',
   emailTooLong: 'Enter an email address of 254 characters or fewer.',
@@ -60,6 +66,21 @@ export const messages = {
   passwordTooLong: 'Enter a password of 256 characters or fewer.',
   totpCode: 'Enter the 6-digit code from your authenticator app.',
   linkNotValid: 'This link is not valid. Use the link in your latest email, or ask for a new one.',
+  backupCode: 'Enter a backup code of 10 letters and numbers, like abcde-12345.',
+  enterPasskeyName: 'Enter a name for this passkey, like Work laptop.',
+  nameTooLong: (count: number) => `Enter a name of ${count} characters or fewer.`,
+
+  // Single sign-on.
+  httpsAddress:
+    'Enter an address that starts with https://, with a domain name and no user name or password in it.',
+  domainName:
+    'Enter a domain name like example.org, with no https:// or trailing dot. Write an international name in its xn-- form.',
+  certificate:
+    'Paste the certificate in PEM form, from -----BEGIN CERTIFICATE----- to -----END CERTIFICATE-----.',
+  privateKey:
+    'Paste the private key in PEM form, from -----BEGIN PRIVATE KEY----- to -----END PRIVATE KEY-----.',
+  ssoDomainConflict:
+    'Another organisation has already verified this domain. Contact support if it should be yours.',
 
   // Tenants, theme and logo.
   slugFormat:
@@ -79,6 +100,15 @@ export const messages = {
 
   // Team.
   chooseRole: 'Choose at least one role.',
+
+  // Retention and erasure.
+  retentionDays: 'Enter a whole number of days from 1 to 36,500.',
+  retentionTooShort: (minimumDays: number) =>
+    `This is shorter than the platform allows for this data. Enter ${plural(minimumDays, 'day')} or more.`,
+  erasureReason: 'Choose why this data is being erased.',
+  erasureConfirm: 'Confirm that you understand erasure cannot be undone.',
+  erasureStaffMember:
+    'This person is a member of your team. Remove their membership first, then ask again to erase their data.',
 
   // Money.
   currency: 'Enter the amount in pounds.',

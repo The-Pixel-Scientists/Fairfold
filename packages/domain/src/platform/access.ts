@@ -33,6 +33,13 @@ export const scopeRules = {
    * passed and its closing time has not, and it has a published form.
    */
   open_round: { module: 'grants', app: 'portal' },
+  /** A form response made by the caller. */
+  own_response: { module: 'forms', app: 'portal' },
+  /**
+   * A form taking responses from signed-in people: it has a published
+   * version, its opening time has passed and its closing time has not.
+   */
+  open_form: { module: 'forms', app: 'portal' },
 } as const satisfies Record<string, { module: ModuleId; app: App }>;
 
 export type ScopeRule = keyof typeof scopeRules;
@@ -60,9 +67,56 @@ export const permissions = {
     label: 'Download the warehouse snapshot',
     scopes: ['tenant'],
   },
+  'platform.audit.export': {
+    app: 'console',
+    label: 'Export the audit log',
+    scopes: ['tenant'],
+    stepUp: true,
+  },
+  'platform.search.use': { app: 'console', label: 'Search across tools', scopes: ['tenant'] },
+  'platform.retention.manage': {
+    app: 'console',
+    label: 'Change how long data is kept',
+    scopes: ['tenant'],
+    stepUp: true,
+  },
+  'platform.subject_access.request': {
+    app: 'console',
+    label: "Export a person's data for a subject access request",
+    scopes: ['tenant'],
+    stepUp: true,
+  },
+  'platform.erasure.request': {
+    app: 'console',
+    label: "Erase a person's data",
+    scopes: ['tenant'],
+    stepUp: true,
+  },
+  'platform.sso.manage': {
+    app: 'console',
+    label: 'Set up single sign-on',
+    scopes: ['tenant'],
+    stepUp: true,
+  },
+  'platform.approvals.read': {
+    app: 'console',
+    label: 'View approval requests',
+    scopes: ['tenant'],
+  },
+  'platform.approvals.decide': {
+    app: 'console',
+    label: 'Approve or reject requests',
+    scopes: ['tenant'],
+    stepUp: true,
+  },
   'party.records.read': {
     app: 'console',
     label: 'View organisations and people',
+    scopes: ['tenant'],
+  },
+  'party.records.manage': {
+    app: 'console',
+    label: 'Edit organisations and people, verify identifiers and record relationships',
     scopes: ['tenant'],
   },
   'party.profile.manage': {
@@ -102,6 +156,175 @@ export const permissions = {
   'grants.data.export': {
     app: 'console',
     label: 'Export grants data for 360Giving',
+    scopes: ['tenant'],
+  },
+  'grants.adjustments.manage': {
+    app: 'console',
+    label: 'Grant and revoke reasonable adjustments',
+    scopes: ['tenant'],
+  },
+  'grants.applications.assist': {
+    app: 'console',
+    label: 'Start and submit applications for applicants who need another route',
+    scopes: ['tenant'],
+  },
+  'grants.monitoring.disclose': {
+    app: 'console',
+    label: "Provide a person's equality monitoring answers for their own request",
+    scopes: ['tenant'],
+    stepUp: true,
+  },
+  'crm.records.read': {
+    app: 'console',
+    label: 'Search and view contacts and their timelines',
+    scopes: ['tenant'],
+  },
+  'crm.records.manage': {
+    app: 'console',
+    label: 'Record interactions and external references',
+    scopes: ['tenant'],
+  },
+  'crm.records.export': {
+    app: 'console',
+    label: 'Export contacts',
+    scopes: ['tenant'],
+    stepUp: true,
+  },
+  'crm.duplicates.review': {
+    app: 'console',
+    label: 'Review and dismiss possible duplicates',
+    scopes: ['tenant'],
+  },
+  'crm.parties.merge': {
+    app: 'console',
+    label: 'Merge duplicate organisations and people',
+    scopes: ['tenant'],
+    stepUp: true,
+  },
+  'crm.lists.manage': { app: 'console', label: 'Manage lists', scopes: ['tenant'] },
+  'crm.segments.manage': { app: 'console', label: 'Manage segments', scopes: ['tenant'] },
+  'crm.imports.run': {
+    app: 'console',
+    label: 'Import organisations and people',
+    scopes: ['tenant'],
+    stepUp: true,
+  },
+  'assure.lookup.read': {
+    app: 'console',
+    label: 'View registry lookups and officers',
+    scopes: ['tenant'],
+  },
+  'assure.lookup.run': { app: 'console', label: 'Refresh registry lookups', scopes: ['tenant'] },
+  'assure.lookup.link': {
+    app: 'console',
+    label: 'Link registry officers to people',
+    scopes: ['tenant'],
+  },
+  'assure.screening.read': {
+    app: 'console',
+    label: 'View sanctions screening and match decisions',
+    scopes: ['tenant'],
+  },
+  'assure.screening.run': { app: 'console', label: 'Run sanctions screening', scopes: ['tenant'] },
+  'assure.screening.decide': {
+    app: 'console',
+    label: 'Decide possible sanctions matches',
+    scopes: ['tenant'],
+    stepUp: true,
+  },
+  'assure.duplicates.review': {
+    app: 'console',
+    label: 'Review and dismiss duplicate application flags',
+    scopes: ['tenant'],
+  },
+  'assure.checklists.manage': {
+    app: 'console',
+    label: 'Set up due diligence checklists',
+    scopes: ['tenant'],
+  },
+  'assure.checklists.complete': {
+    app: 'console',
+    label: 'Complete due diligence checklists',
+    scopes: ['tenant'],
+  },
+  'assure.visits.manage': { app: 'console', label: 'Record monitoring visits', scopes: ['tenant'] },
+  'forms.forms.manage': {
+    app: 'console',
+    label: 'Build forms and change their settings',
+    scopes: ['tenant'],
+  },
+  'forms.forms.publish': { app: 'console', label: 'Publish forms', scopes: ['tenant'] },
+  /** Kept apart from building forms: a shorter period destroys responses. */
+  'forms.retention.manage': {
+    app: 'console',
+    label: 'Change how long form responses are kept',
+    scopes: ['tenant'],
+    stepUp: true,
+  },
+  'forms.responses.read': { app: 'console', label: 'View form responses', scopes: ['tenant'] },
+  'forms.responses.manage': {
+    app: 'console',
+    label: 'Mark form responses as spam',
+    scopes: ['tenant'],
+  },
+  'forms.responses.export': {
+    app: 'console',
+    label: 'Export form responses',
+    scopes: ['tenant'],
+    stepUp: true,
+  },
+  'forms.responses.submit': {
+    app: 'portal',
+    label: 'Answer forms',
+    scopes: ['own_response', 'open_form'],
+  },
+  'privacy.requests.manage': {
+    app: 'console',
+    label: 'Log and track data protection requests',
+    scopes: ['tenant'],
+  },
+  'privacy.requests.export': {
+    app: 'console',
+    label: "Export a person's data for their request",
+    scopes: ['tenant'],
+    stepUp: true,
+  },
+  'privacy.requests.erase': {
+    app: 'console',
+    label: "Erase a person's data at their request",
+    scopes: ['tenant'],
+    stepUp: true,
+  },
+  'privacy.breaches.manage': {
+    app: 'console',
+    label: 'Record personal data breaches',
+    scopes: ['tenant'],
+  },
+  'privacy.dpias.manage': {
+    app: 'console',
+    label: 'Write data protection impact assessments',
+    scopes: ['tenant'],
+  },
+  'privacy.processing.manage': {
+    app: 'console',
+    label: 'Keep records of processing',
+    scopes: ['tenant'],
+  },
+  'insight.reports.read': { app: 'console', label: 'Run and view reports', scopes: ['tenant'] },
+  'insight.reports.manage': { app: 'console', label: 'Set up reports', scopes: ['tenant'] },
+  'insight.publications.manage': {
+    app: 'console',
+    label: 'Prepare publications and annual returns',
+    scopes: ['tenant'],
+  },
+  'insight.monitoring.report': {
+    app: 'console',
+    label: 'View equality monitoring totals, with small numbers hidden',
+    scopes: ['tenant'],
+  },
+  'insight.disclosure_rules.manage': {
+    app: 'console',
+    label: 'Raise the thresholds that hide small numbers in reports',
     scopes: ['tenant'],
   },
 } as const satisfies Record<

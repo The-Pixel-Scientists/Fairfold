@@ -47,6 +47,7 @@ export const listProgrammes = defineRoute({
 export const createProgramme = defineRoute({
   ...manage,
   method: 'POST',
+  idempotent: true,
   path: '/console/programmes',
   summary: 'Create a programme, with the default email templates',
   body: programmeInputSchema,
@@ -81,6 +82,7 @@ export const listRounds = defineRoute({
 export const createRound = defineRoute({
   ...programme,
   method: 'POST',
+  idempotent: true,
   path: '/console/programmes/:programmeId/rounds',
   summary: "Add a round to a programme, with the default stages, in the tenant's time zone",
   body: roundInputSchema,

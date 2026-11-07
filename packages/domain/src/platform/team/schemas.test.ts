@@ -20,7 +20,14 @@ function firstMessage(result: { error?: { issues: readonly object[] } }): string
 
 describe('team schemas', () => {
   it('offer the console roles only', () => {
-    expect(consoleRoleSchema.options).toEqual(['tenant_admin', 'programme_manager', 'reviewer']);
+    expect(consoleRoleSchema.options).toEqual([
+      'tenant_admin',
+      'programme_manager',
+      'reviewer',
+      'due_diligence_officer',
+      'data_protection_lead',
+      'analyst',
+    ]);
   });
 
   it('invite by a normalised address with console roles', () => {

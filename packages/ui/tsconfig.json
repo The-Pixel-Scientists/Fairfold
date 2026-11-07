@@ -13,5 +13,10 @@
     "allowJs": true,
     "checkJs": true
   },
-  "include": ["src", "test", "package.json"]
+  "include": ["src", "test", "package.json"],
+  "references": [
+    {
+      "path": "../domain"
+    }
+  ]
 }

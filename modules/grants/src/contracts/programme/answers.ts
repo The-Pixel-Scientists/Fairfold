@@ -9,6 +9,7 @@ import { moneySchema } from '@pixel-scientists/domain/platform';
 import { z } from 'zod';
 
 import { latePolicySchema, programmeStatusSchema } from './lists.ts';
+import { templatePurposeSchema } from './templates.ts';
 
 export const programmeSchema = z.object({
   id: idSchema,
@@ -80,10 +81,11 @@ export const stageListSchema = z.object({ stages: z.array(stageSchema) });
 
 export type StageList = z.infer<typeof stageListSchema>;
 
-/** A template's latest version. */
+/** A template's latest version. Until the server records purposes (S12-53), none reads as a service email. */
 export const emailTemplateSchema = z.object({
   subject: z.string(),
   body: z.string(),
+  purpose: templatePurposeSchema.optional(),
   version: z.int(),
 });
 

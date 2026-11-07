@@ -4,9 +4,17 @@ import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { moduleIds, modules } from '@pixel-scientists/domain/platform';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { SCHEMAS } from './migrations.ts';
 import { compareFolder, generateTypes, parseArguments, readFolder, writeFolder } from './types.ts';
+
+describe('SCHEMAS', () => {
+  it("is every module's schemas, in module order, so each gets a types file", () => {
+    expect(SCHEMAS).toEqual(moduleIds.flatMap((id) => modules[id].schemas));
+  });
+});
 
 describe('parseArguments', () => {
   it('writes by default and compares with --check', () => {

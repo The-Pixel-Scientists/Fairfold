@@ -8,7 +8,7 @@
 // shown as applicants see it and cannot change.
 
 import { call } from '@pixel-scientists/domain/api';
-import type { FormDefinition, FormField } from '@pixel-scientists/domain/forms';
+import type { FormDefinition } from '@pixel-scientists/domain/forms';
 import {
   Button,
   EmptyState,
@@ -21,6 +21,18 @@ import {
   useNavigate,
   WhenLoaded,
 } from '@pixel-scientists/ui';
+import {
+  ConfirmDialog,
+  firstSelection,
+  FormEditor,
+  inWords,
+  loweredProblems,
+  placeOf,
+  Preview,
+  refusedProblems,
+  summaryOf,
+} from '@pixel-scientists/ui/form-builder';
+import type { Problem, Selection } from '@pixel-scientists/ui/form-builder';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { discardFormDraft, publishFormDraft, saveFormDraft } from '../../contracts/index.ts';
@@ -28,42 +40,19 @@ import type { FormVersion, Programme, Round } from '../../contracts/index.ts';
 import { formatMoment } from '../programme/format.ts';
 import { LinkButton, ManagePage, useParam } from '../programme/Page.tsx';
 import { formCrumbs } from './breadcrumbs.ts';
-import { ConfirmDialog } from './ConfirmDialog.tsx';
-import { blankQuestion, blankSection, conditionSources, moved } from './draft.ts';
-import type { Section } from './draft.ts';
-import { FieldEditor } from './FieldEditor.tsx';
-import { ImportFile } from './ImportFile.tsx';
+import { checkDefinition } from './check.ts';
 import { readFormFile } from './formFile.ts';
 import { loadVersion } from './loaders.ts';
-import { FieldList, SectionList } from './Outline.tsx';
 import { formPath } from './paths.ts';
-import { Preview } from './Preview.tsx';
-import {
-  checkDefinition,
-  flaggedIds,
-  inWords,
-  messagesAt,
-  placeOf,
-  refusedProblems,
-  summaryOf,
-} from './problems.ts';
-import type { Problem, Selection } from './problems.ts';
-import { SectionEditor } from './SectionEditor.tsx';
 import { useHeadingFocus } from './useHeadingFocus.ts';
 
 interface Page {
   version: FormVersion;
   round: Round;
   programme: Programme;
+  /** The definitions of the form's published versions, which a draft may not classify lower than. */
+  earlier: readonly FormDefinition[];
 }
-
-const titleOf = (section: Section | undefined) =>
-  section === undefined || section.title === '' ? 'Untitled section' : section.title;
-
-const firstSelection = (definition: FormDefinition): Selection => {
-  const section = definition.sections[0];
-  return { sectionId: section?.id ?? '', fieldId: section?.fields[0]?.id ?? null };
-};
 
 /** What the preview shows when the draft has problems: why, and where to fix them. */
 function PreviewBlocked({ problems }: { problems: readonly Problem[] }) {
@@ -83,6 +72,7 @@ function DraftEditor({
   version,
   round,
   programme,
+  earlier,
   onPublished,
 }: Page & { onPublished: (version: FormVersion) => void }) {
   const navigate = useNavigate();
@@ -91,7 +81,7 @@ function DraftEditor({
   const [definition, setDefinition] = useState(start);
   const [saved, setSaved] = useState(() => JSON.stringify(start));
   const [savedAt, setSavedAt] = useState(version.updatedAt);
-  const [selection, setSelection] = useState(() => firstSelection(start));
+  const [selection, setSelection] = useState<Selection>(() => firstSelection(start));
   const [attempt, setAttempt] = useState(0);
   const [refused, setRefused] = useState<readonly Problem[]>([]);
   const [imported, setImported] = useState<{ attempt: number; messages: string[] }>({
@@ -103,11 +93,14 @@ function DraftEditor({
   const [busy, setBusy] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [announcement, setAnnouncement] = useState('');
-  const focusAfter = useRef<string | null>(null);
   const running = useRef(false);
 
   const checked = useMemo(() => checkDefinition(definition), [definition]);
-  const problems = [...checked.problems, ...refused];
+  const lowered = useMemo(
+    () => (checked.definition === null ? [] : loweredProblems(earlier, checked.definition)),
+    [checked.definition, earlier],
+  );
+  const problems = [...checked.problems, ...lowered, ...refused];
   const dirty = JSON.stringify(definition) !== saved;
   useLeaveGuard(dirty && !leaving);
 
@@ -116,101 +109,15 @@ function DraftEditor({
     if (leaving) navigate(formPath(round.id));
   }, [leaving, navigate, round.id]);
 
-  useEffect(() => {
-    if (focusAfter.current === null) return;
-    document.getElementById(focusAfter.current)?.focus();
-    focusAfter.current = null;
-  }, [definition, selection]);
-
-  const { sections } = definition;
-  const sectionIndex = Math.max(
-    0,
-    sections.findIndex((item) => item.id === selection.sectionId),
-  );
-  const section = sections[sectionIndex];
-  const fieldIndex = section?.fields.findIndex((item) => item.id === selection.fieldId) ?? -1;
-  const field = section?.fields[fieldIndex];
-  const flagged = flaggedIds(attempt > 0 ? problems : [], definition);
-
-  function edit(next: readonly Section[], say = '') {
-    setDefinition({ sections: [...next] });
+  const edit = (next: FormDefinition) => {
+    setDefinition(next);
     setRefused([]);
-    setAnnouncement(say);
-  }
-
-  function select(next: Selection) {
-    setSelection(next);
-    setAnnouncement('');
-  }
-
-  const changeSection = (next: Section) => {
-    edit(sections.map((item, index) => (index === sectionIndex ? next : item)));
   };
-
-  function addSection() {
-    const added = blankSection();
-    focusAfter.current = 'section-title';
-    edit([...sections, added], 'Section added');
-    setSelection({ sectionId: added.id, fieldId: null });
-  }
-
-  function moveSection(by: -1 | 1) {
-    const target = sectionIndex + by;
-    edit(
-      moved(sections, sectionIndex, by),
-      `${titleOf(section)} moved to position ${String(target + 1)} of ${String(sections.length)}`,
-    );
-  }
-
-  function removeSection() {
-    const rest = sections.filter((_, index) => index !== sectionIndex);
-    const next = rest[Math.min(sectionIndex, rest.length - 1)];
-    if (next === undefined) return;
-    focusAfter.current = `outline-${next.id}`;
-    edit(rest, `${titleOf(section)} removed`);
-    setSelection({ sectionId: next.id, fieldId: null });
-  }
-
-  function addField() {
-    if (section === undefined) return;
-    const added = blankQuestion();
-    focusAfter.current = 'field-label';
-    changeSection({ ...section, fields: [...section.fields, added] });
-    setAnnouncement('Question added');
-    setSelection({ sectionId: section.id, fieldId: added.id });
-  }
-
-  const changeField = (next: FormField) => {
-    if (section === undefined) return;
-    changeSection({
-      ...section,
-      fields: section.fields.map((item) => (item.id === next.id ? next : item)),
-    });
-  };
-
-  function moveField(by: -1 | 1) {
-    if (section === undefined || field === undefined) return;
-    changeSection({ ...section, fields: [...moved(section.fields, fieldIndex, by)] });
-    setAnnouncement(
-      `Question moved to position ${String(fieldIndex + by + 1)} of ${String(section.fields.length)}`,
-    );
-  }
-
-  function removeField() {
-    const rest = section?.fields.filter((_, index) => index !== fieldIndex) ?? [];
-    const next = rest[Math.min(fieldIndex, rest.length - 1)];
-    if (section === undefined || next === undefined) return;
-    focusAfter.current = `outline-${next.id}`;
-    changeSection({ ...section, fields: rest });
-    setAnnouncement('Question removed');
-    setSelection({ sectionId: section.id, fieldId: next.id });
-  }
-
   /** Shows what is wrong, starting from the first problem, which is selected so its message is on the page. */
   function showProblems(found: readonly Problem[]) {
     setAttempt((count) => count + 1);
     const { section: s, field: f } = placeOf(found[0]?.path ?? []);
-    const target = s === undefined ? undefined : sections[s];
+    const target = s === undefined ? undefined : definition.sections[s];
     if (target !== undefined) {
       setSelection({
         sectionId: target.id,
@@ -252,10 +159,13 @@ function DraftEditor({
   }
 
   async function startPublish() {
-    if (await save()) {
-      setFailed([]);
-      setAsking('publish');
+    if (!(await save())) return;
+    if (lowered.length > 0) {
+      showProblems(lowered);
+      return;
     }
+    setFailed([]);
+    setAsking('publish');
   }
 
   async function confirm() {
@@ -293,91 +203,12 @@ function DraftEditor({
       return;
     }
     setImported(({ attempt: count }) => ({ attempt: count, messages: [] }));
-    edit(result.definition.sections, 'Form imported. Save the draft to keep it.');
+    edit(result.definition);
+    setAnnouncement('Form imported. Save the draft to keep it.');
     setSelection(firstSelection(result.definition));
   }
 
-  const sectionErrors = messagesAt(problems, sectionIndex, undefined);
-  const fieldErrors = messagesAt(
-    problems,
-    sectionIndex,
-    field === undefined ? undefined : fieldIndex,
-  );
-  const noErrors = new Map<string, string>();
   const name = `version ${String(version.version)}`;
-
-  const edits =
-    section === undefined ? (
-      <EmptyState
-        title="No sections yet"
-        headingLevel="h2"
-        action={
-          <div className="flex flex-wrap gap-2">
-            <Button id="add-section" variant="primary" onClick={addSection}>
-              Add section
-            </Button>
-            <ImportFile replaces={false} onFile={(file) => void importFile(file)} />
-          </div>
-        }
-      >
-        <p>
-          A form has sections, and each section has questions. Add a section to start building it,
-          or import a form from a file.
-        </p>
-      </EmptyState>
-    ) : (
-      <div className="grid items-start gap-x-6 gap-y-8 xl:grid-cols-[11.5rem_minmax(0,1fr)_22rem]">
-        <div className="flex flex-col gap-4">
-          <SectionList
-            sections={sections}
-            currentId={section.id}
-            flagged={flagged}
-            onSelect={(id) => {
-              select({ sectionId: id, fieldId: null });
-            }}
-            onAdd={addSection}
-          />
-          <ImportFile replaces onFile={(file) => void importFile(file)} />
-        </div>
-        <div className="min-w-0">
-          <FieldList
-            section={section}
-            currentId={field?.id ?? null}
-            flagged={flagged}
-            onSelect={(id) => {
-              select({ sectionId: section.id, fieldId: id });
-            }}
-            onAdd={addField}
-          />
-        </div>
-        <div className="max-w-2xl xl:max-w-none">
-          {field === undefined ? (
-            <SectionEditor
-              section={section}
-              position={sectionIndex}
-              count={sections.length}
-              errors={attempt > 0 ? sectionErrors : noErrors}
-              onChange={changeSection}
-              onMove={moveSection}
-              onRemove={removeSection}
-            />
-          ) : (
-            <FieldEditor
-              key={field.id}
-              field={field}
-              sources={conditionSources(definition, field.id)}
-              position={fieldIndex}
-              count={section.fields.length}
-              section={section.title}
-              errors={attempt > 0 ? fieldErrors : noErrors}
-              onChange={changeField}
-              onMove={moveField}
-              onRemove={removeField}
-            />
-          )}
-        </div>
-      </div>
-    );
 
   return (
     <>
@@ -434,7 +265,21 @@ function DraftEditor({
       <Tabs
         label="Form views"
         tabs={[
-          { id: 'edit', label: 'Edit form', content: edits },
+          {
+            id: 'edit',
+            label: 'Edit form',
+            content: (
+              <FormEditor
+                definition={definition}
+                onChange={edit}
+                selection={selection}
+                onSelect={setSelection}
+                problems={problems}
+                showAll={attempt > 0}
+                onImport={(file) => void importFile(file)}
+              />
+            ),
+          },
           {
             id: 'preview',
             label: 'Preview',
@@ -506,7 +351,7 @@ function PublishedView({ version, round, programme }: Page) {
   );
 }
 
-function VersionPage({ version: loaded, round, programme }: Page) {
+function VersionPage({ version: loaded, round, programme, earlier }: Page) {
   const [version, setVersion] = useState(loaded);
   const [announcement, setAnnouncement] = useState('');
   return (
@@ -519,13 +364,14 @@ function VersionPage({ version: loaded, round, programme }: Page) {
           version={version}
           round={round}
           programme={programme}
+          earlier={earlier}
           onPublished={(published) => {
             setAnnouncement(`Version ${String(published.version)} is published.`);
             setVersion(published);
           }}
         />
       ) : (
-        <PublishedView version={version} round={round} programme={programme} />
+        <PublishedView version={version} round={round} programme={programme} earlier={earlier} />
       )}
     </>
   );

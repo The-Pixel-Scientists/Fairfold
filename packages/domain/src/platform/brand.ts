@@ -8,3 +8,16 @@ export const suiteName = 'Fairfold';
 
 /** This product, shown in app headers and page titles. */
 export const productName = `${suiteName} Grants`;
+
+/**
+ * Each tool's plain descriptor, by module id, shown after the suite name, as
+ * in "Fairfold CRM".
+ */
+export const toolNames = {
+  grants: 'Grants',
+  crm: 'CRM',
+  assure: 'Due Diligence',
+  forms: 'Forms',
+  privacy: 'Data Protection',
+  insight: 'Reporting',
+} as const;

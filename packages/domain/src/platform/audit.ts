@@ -60,6 +60,9 @@ export const platformAuditActions = defineAuditActions('platform', [
   'platform.tenant.created',
   'platform.tenant.updated',
   'platform.theme.changed',
+  // An origin allowed or no longer allowed to frame the tenant's embeds (ADR 0035).
+  'platform.embed_origin.added',
+  'platform.embed_origin.removed',
   'platform.module.switched_on',
   'platform.module.switched_off',
   'platform.invitation.sent',
@@ -76,6 +79,19 @@ export const platformAuditActions = defineAuditActions('platform', [
   'platform.file.uploaded',
   'platform.file.refused',
   'platform.file.downloaded',
+  // Retention, subject access, erasure and the audit log itself (E3, ADR
+  // 0027). Values are ids, codes, days and counts by table, never a personal
+  // value; an event about a person carries them as its subject party id.
+  'platform.retention_policy.changed',
+  'platform.retention.applied',
+  'platform.subject_access.requested',
+  'platform.subject_access.completed',
+  'platform.erasure.requested',
+  'platform.erasure.completed',
+  'platform.erasure.failed',
+  'platform.subject_key.destroyed',
+  'platform.audit_event.purged',
+  'platform.audit_log.exported',
   // A tenant's copy of an auth event (ADR 0010), whose entity id is the auth event's id.
   // Accepting an invitation is one of them: `platform.auth.invitation_accepted`.
   ...authEventCodes.map((code) => `platform.auth.${code}` as const),

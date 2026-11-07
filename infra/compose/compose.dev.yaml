@@ -28,6 +28,7 @@ x-postgres-credentials: &postgres-credentials
   TPS_DB_APP_WORKER_PASSWORD: dev-app-worker-password-not-a-secret
   TPS_DB_APP_AUTH_PASSWORD: dev-app-auth-password-not-a-secret
   TPS_DB_APP_QUEUE_PASSWORD: dev-app-queue-password-not-a-secret
+  TPS_DB_BACKUP_READER_PASSWORD: dev-backup-reader-password-not-a-secret
 
 services:
   postgres:

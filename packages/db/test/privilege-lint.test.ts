@@ -2,15 +2,17 @@
 //
 // The rights checks that ADR 0003 rule 4 and its role table add to the
 // schema lint: grant options, rights outside a role's own schema, default
-// privileges, schema grants to PUBLIC, rights on the audit tables, and the
-// approved definer functions and their owners. The schema-lint test covers
-// the rest, and runs these against the migrated database.
+// privileges, schema grants to PUBLIC, rights on the audit tables, the
+// approved definer functions and their owners, and pg_trgm's schema. The
+// schema-lint test covers the rest, and runs these against the migrated
+// database.
 
 import { describe, expect, it } from 'vitest';
 
+import { classification } from '../classification.ts';
 import { asMigratorRolledBack } from './connect.ts';
 import { findPrivilegeProblems } from './privilege-lint.ts';
-import { EXCEPTED_SCHEMAS } from './schema-lint.ts';
+import { EXCEPTED_SCHEMAS, findSchemaProblems } from './schema-lint.ts';
 
 describe('privilege lint', () => {
   it('reports grant options, rights outside own schemas, default privileges and PUBLIC schema grants', async () => {
@@ -26,6 +28,9 @@ describe('privilege lint', () => {
           GRANT SELECT ON TABLES TO app_worker;
         ALTER DEFAULT PRIVILEGES FOR ROLE migrator IN SCHEMA app
           GRANT EXECUTE ON FUNCTIONS TO PUBLIC;
+        ALTER DEFAULT PRIVILEGES FOR ROLE migrator IN SCHEMA app
+          GRANT SELECT ON TABLES TO backup_reader;
+        ALTER DEFAULT PRIVILEGES FOR ROLE migrator GRANT INSERT ON TABLES TO backup_reader;
       `);
       return findPrivilegeProblems(client, [...EXCEPTED_SCHEMAS.keys()]);
     });
@@ -39,6 +44,9 @@ describe('privilege lint', () => {
         'PUBLIC holds USAGE on schema app.',
         'Default privileges for role migrator in schema app grant SELECT on new tables to app_worker.',
         'Default privileges for role migrator in schema app grant EXECUTE on new functions to PUBLIC.',
+        // backup_reader's exception covers only its reads, in every schema.
+        'Default privileges for role migrator in schema app grant SELECT on new tables to backup_reader.',
+        'Default privileges for role migrator grant INSERT on new tables to backup_reader.',
       ].sort(),
     );
   });
@@ -58,6 +66,7 @@ describe('privilege lint', () => {
         'Role app_api holds UPDATE on the audit table app.audit_event.',
         'Role app_api can insert app.audit_event.occurred_at, which the database sets.',
         'Role app_api can insert app.audit_event.retain_until, which the database sets.',
+        'Role app_api can insert app.audit_event.actor_member_kind, which the database sets.',
         'Role app_worker holds DELETE on the audit table app.audit_event.',
         'Role app_worker can insert app.audit_event.occurred_at, which the database sets.',
       ].sort(),
@@ -92,5 +101,24 @@ describe('privilege lint', () => {
         `${owner} is named in auth.account policy lint_extra, which is not approved.`,
       ].sort(),
     );
+  });
+
+  // The database privileges script installs pg_trgm in schema ext, which
+  // belongs to the superuser, before any migration. Only that owner can
+  // change the schema, so the checks that report anything else in it are
+  // tested as the superuser in packages/db/scripts/roles.db.test.ts.
+  it('accepts pg_trgm in schema ext as the database privileges script installs it (ADR 0025)', async () => {
+    const { extension, problems } = await asMigratorRolledBack(async (client) => {
+      const { rows } = await client.query<{ schema: string }>(
+        `SELECT extnamespace::regnamespace::text AS schema
+           FROM pg_catalog.pg_extension WHERE extname = 'pg_trgm'`,
+      );
+      return {
+        extension: rows,
+        problems: await findSchemaProblems(client, classification),
+      };
+    });
+    expect(extension).toEqual([{ schema: 'ext' }]);
+    expect(problems).toEqual([]);
   });
 });

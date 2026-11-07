@@ -5,13 +5,27 @@
 import '../../jitless/index.ts';
 
 export { auditActionLabel } from './label.ts';
-export { listAuditEvents } from './routes.ts';
+export {
+  auditLogRoutes,
+  exportAuditEvents,
+  listAuditEvents,
+  readAuditExport,
+  searchAuditEvents,
+} from './routes.ts';
 export {
   auditCursorSchema,
   auditEventPageSchema,
   auditEventQuerySchema,
   auditEventSchema,
+  auditExportFiltersSchema,
+  auditSearchEventSchema,
+  auditSearchPageSchema,
+  auditSearchSchema,
   type AuditEvent,
   type AuditEventPage,
   type AuditEventQuery,
+  type AuditExportFilters,
+  type AuditSearch,
+  type AuditSearchEvent,
+  type AuditSearchPage,
 } from './schemas.ts';

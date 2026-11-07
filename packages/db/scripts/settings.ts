@@ -6,7 +6,7 @@
 // friends fill these in from the development Compose file
 // (scripts/dev-env.ts).
 
-import { isLoopbackHost, readSetting, type Env } from '../src/settings.ts';
+import { isLoopbackHost, readSecret, readSetting, type Env } from '../src/settings.ts';
 
 export { isLoopbackHost, readSecret, readSetting, type Env } from '../src/settings.ts';
 
@@ -47,6 +47,46 @@ export function readServer(env: Env): ServerSettings {
     throw new Error('TPS_DB_PORT must be a port number from 1 to 65535.');
   }
   return { host, port };
+}
+
+export interface ServerConnection extends ServerSettings {
+  ssl: false | { rejectUnauthorized: true; ca?: string };
+  sslnegotiation: 'postgres';
+}
+
+/**
+ * The server and its TLS options for every connection a script opens, by the
+ * API's rules for TPS_DB_TLS and TPS_DB_TLS_CA and the API client's mapping
+ * (sslOption in ../src/database.ts). `ssl` is always definite and
+ * `sslnegotiation` set, so PGSSLMODE and PGSSLNEGOTIATION cannot weaken them.
+ * The CA is read like the API reads it, through readSecret.
+ */
+export function readServerConnection(
+  env: Env,
+  readFile?: (path: string) => string,
+): ServerConnection {
+  const server = readServer(env);
+  const mode = env['TPS_DB_TLS'] || undefined;
+  if (mode !== undefined && mode !== 'verify-full' && mode !== 'disable') {
+    throw new Error('TPS_DB_TLS must be verify-full or disable.');
+  }
+  const hasCa = Boolean(env['TPS_DB_TLS_CA'] || env['TPS_DB_TLS_CA_FILE']);
+  if (hasCa && mode !== 'verify-full') {
+    throw new Error('TPS_DB_TLS_CA is used only with TPS_DB_TLS=verify-full.');
+  }
+  const resolved = mode ?? (isLoopbackHost(server.host) ? 'disable' : undefined);
+  if (resolved === undefined) {
+    throw new Error(
+      `Set TPS_DB_TLS for the database server at ${server.host} to verify-full, or to disable on a private network. Only a database server on this machine is reached without TLS by default.`,
+    );
+  }
+  let ssl: ServerConnection['ssl'] = false;
+  if (resolved === 'verify-full') {
+    ssl = hasCa
+      ? { rejectUnauthorized: true, ca: readSecret(env, 'TPS_DB_TLS_CA', readFile) }
+      : { rejectUnauthorized: true };
+  }
+  return { ...server, ssl, sslnegotiation: 'postgres' };
 }
 
 /** Whether this is development against a server on this machine. */

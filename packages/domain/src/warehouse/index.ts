@@ -6,6 +6,26 @@
 import '../jitless/index.ts';
 
 export {
+  columnSignature,
+  dataContractChanges,
+  dataContractClasses,
+  dataContractProblems,
+  defineDataContract,
+  publishDataContract,
+  type DataContract,
+  type DataContractClass,
+  type DataContractClasses,
+  type DataContractColumn,
+  type DataContractTable,
+  type PublishedDataContract,
+} from './contract.ts';
+export {
+  contributionProblems,
+  dataContracts,
+  type DataContractModule,
+  type DataContractVersion,
+} from './registry.ts';
+export {
   warehouseTypes,
   type SourceColumn,
   type WarehouseColumn,

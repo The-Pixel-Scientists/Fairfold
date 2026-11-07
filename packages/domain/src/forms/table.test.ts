@@ -370,6 +370,7 @@ describe('projectAnswers on a table', () => {
       staff: ['f_budget', 'f_trustees'],
       reviewer: ['f_budget', 'f_trustees'],
       blind_reviewer: ['f_budget'],
+      respondent: ['f_budget', 'f_trustees'],
     });
     expect(projectAnswers(budgetForm, budgetAnswers, 'staff')['f_trustees']).toBe(
       budgetAnswers.f_trustees,

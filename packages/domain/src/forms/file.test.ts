@@ -287,7 +287,8 @@ describe('projectAnswers on file questions', () => {
         const sees = audiences ?? ['applicant', 'staff', 'reviewer'];
         for (const audience of projectionAudiences) {
           const projected = projectAnswers(form, documentsAnswers, audience);
-          const expected = audience !== 'blind_reviewer' && sees.includes(audience);
+          const who = audience === 'respondent' ? 'applicant' : audience;
+          const expected = who !== 'blind_reviewer' && sees.includes(who);
           expect('f_accounts' in projected, `${String(audiences)} ${identity} ${audience}`).toBe(
             expected,
           );

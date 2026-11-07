@@ -89,3 +89,38 @@ export const auditEventPageSchema = z.object({
 });
 
 export type AuditEventPage = z.infer<typeof auditEventPageSchema>;
+
+/**
+ * The search and export filters, sent in a body so a filter set never
+ * reaches a URL, log or browser history: the list's filters and the party
+ * an event is about (ADR 0027).
+ */
+const searchFilters = {
+  ...auditEventQuerySchema.omit({ cursor: true }).shape,
+  subjectPartyId: idSchema.optional(),
+};
+
+export const auditExportFiltersSchema = z.strictObject(searchFilters);
+
+export type AuditExportFilters = z.infer<typeof auditExportFiltersSchema>;
+
+export const auditSearchSchema = z.strictObject({
+  ...searchFilters,
+  cursor: auditCursorSchema.optional(),
+});
+
+export type AuditSearch = z.infer<typeof auditSearchSchema>;
+
+/** An event with the party it is about, by id only, or null when it is about no one. */
+export const auditSearchEventSchema = auditEventSchema.extend({
+  subjectPartyId: idSchema.nullable(),
+});
+
+export type AuditSearchEvent = z.infer<typeof auditSearchEventSchema>;
+
+/** A page of auditEventPageSchema, each event with its subject party id. */
+export const auditSearchPageSchema = auditEventPageSchema.extend({
+  events: z.array(auditSearchEventSchema),
+});
+
+export type AuditSearchPage = z.infer<typeof auditSearchPageSchema>;

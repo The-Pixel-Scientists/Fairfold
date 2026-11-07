@@ -244,10 +244,12 @@ logged or stored, and only the suppressed table leaves the request.
    or none of its group is suppressed too, because it would tell anyone who
    knows one member's answer that member's outcome.
 3. **Secondary suppression.** Every row and column with a total, the totals
-   included, must have no suppressed cell or at least two. While any line
-   has exactly one, the smallest other non-zero cell in that line is
+   included, must have no suppressed cell or at least two, and where the
+   line's total is shown, its suppressed cells hold 10 or more people between
+   them (a suppressed cell is never zero, so fewer would pin each one). While
+   any line fails, the smallest shown non-zero cell in that line is
    suppressed, or the line's total if there is none, and this repeats until
-   no line has one. A rate is computed only from cells that are shown,
+   no line fails. A rate is computed only from cells that are shown,
    rounded to a whole percentage.
 4. **Minimum group.** A table whose population has fewer than 20 responses
    is withheld whole: the report shows only "Too few responses to show this

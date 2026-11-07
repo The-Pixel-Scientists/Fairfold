@@ -8,5 +8,7 @@
     "allowJs": true,
     "checkJs": true
   },
-  "include": ["*.ts", "*.js", "scripts"]
+  "include": ["*.ts", "*.js", "scripts"],
+  // scripts/dev-env.ts imports isLoopbackHost from packages/db/src/settings.ts.
+  "references": [{ "path": "packages/db" }]
 }

@@ -18,14 +18,15 @@ it('runs zod without eval', { timeout: 30_000 }, async () => {
 });
 
 it(
-  'exports only routes that keep every rule, with no raw route for call() or a reviewer',
+  'exports only routes that keep every rule, idempotent creates, and no raw route for call() or a reviewer',
   {
     timeout: 30_000,
   },
   async () => {
     // From the same module registry as the contracts, which the test above resets.
     const { call, checkRoute, isRawBody } = await import('@pixel-scientists/domain/api');
-    const routes = Object.values<unknown>(await import('./index.ts')).filter(
+    const contracts = await import('./index.ts');
+    const routes = Object.values<unknown>(contracts).filter(
       (value): value is RouteContract =>
         typeof value === 'object' && value !== null && 'audience' in value && 'path' in value,
     );
@@ -33,6 +34,14 @@ it(
     const fetch = vi.fn<Fetch>();
     for (const route of routes) {
       expect(checkRoute(route), route.path).toEqual([]);
+      if (route.method === 'POST' && Object.hasOwn(route.responses, 201)) {
+        expect(route.idempotent, route.path).toBe(true);
+      }
+      // ADR 0028 keeps an unkeyed hash of an idempotent request, so special
+      // category answers, which a withdrawal must delete, never travel in one.
+      if (route.body === contracts.monitoringResponseInputSchema) {
+        expect(route.idempotent, route.path).toBeUndefined();
+      }
       if (!isRawBody(route.body) && !Object.values(route.responses).some(isRawBody)) continue;
       expect(route.scope, route.path).not.toBe('assigned_review');
       await expect(call(route as JsonRouteContract, {}, { fetch }), route.path).rejects.toThrow(

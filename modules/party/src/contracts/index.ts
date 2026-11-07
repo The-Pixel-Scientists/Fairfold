@@ -2,6 +2,8 @@
 //
 // The party module's published contracts (ADR 0016, ADR 0017): checked
 // lists, schemas, routes and audit action codes, safe for the browser.
+// Server contracts are interfaces and schemas only; the party server and
+// each module's server implement them.
 
 import '@pixel-scientists/domain/jitless';
 
@@ -28,6 +30,17 @@ export {
 } from './answers.ts';
 export { partyAuditActions, type PartyAuditAction } from './audit.ts';
 export {
+  mayContactInputSchema,
+  mayContactSchema,
+  messageKindSchema,
+  suppressionInputSchema,
+  type MayContact,
+  type MayContactInput,
+  type MessageKind,
+  type PartyContact,
+  type SuppressionInput,
+} from './contact.ts';
+export {
   identifierInputSchema,
   identifierSchemeIds,
   identifierSchemeSchema,
@@ -49,21 +62,117 @@ export {
   type ProfileInput,
 } from './inputs.ts';
 export {
+  consentChannelLabels,
   consentChannels,
   consentChannelSchema,
+  consentPurposeLabels,
   consentPurposes,
   consentPurposeSchema,
   consentStates,
   consentStateSchema,
+  hardSuppressionReasons,
   legalForms,
   legalFormSchema,
+  partyKinds,
+  partyKindSchema,
   portalConsentChannels,
+  relationshipTypeRules,
   relationshipTypes,
+  relationshipTypeSchema,
+  skipCodes,
+  skipCodeSchema,
+  staffSuppressionReasons,
+  suppressionReasons,
+  suppressionReasonSchema,
+  valueHistoryFields,
+  valueHistoryFieldSchema,
   type ConsentChannel,
+  type ConsentPurpose,
   type LegalForm,
+  type PartyKind,
   type RelationshipType,
+  type SkipCode,
+  type SuppressionReason,
+  type ValueHistoryField,
 } from './lists.ts';
+export {
+  countsByTable,
+  duplicateCandidateSchema,
+  duplicateSignals,
+  duplicateThresholds,
+  mergeConflicts,
+  mergeConflictSchema,
+  mergeCountsSchema,
+  mergeInputSchema,
+  registerRepoints,
+  repointChanges,
+  type DuplicateCandidate,
+  type DuplicateSignal,
+  type MergeConflict,
+  type MergeCounts,
+  type MergeInput,
+  type MergeOutcome,
+  type PartyMerges,
+  type RepointChange,
+  type RepointInput,
+  type RepointParty,
+  type RepointResult,
+  type RepointRow,
+  type ResolvedParty,
+  type RestoreInput,
+} from './merge.ts';
 export { partyMessages, type PartyMessage } from './messages.ts';
+export {
+  changePreference,
+  confirmUnsubscribe,
+  getPreferences,
+  getUnsubscribe,
+  partyPreferenceRoutes,
+  partyPublicRoutes,
+  preferencesSchema,
+  unsubscribeOutcomes,
+  unsubscribeResultSchema,
+  unsubscribeTargetSchema,
+  unsubscribeTokenSchema,
+  type Preferences,
+} from './preferences.ts';
+export {
+  addIdentifier,
+  addRelationship,
+  endRelationship,
+  getOrganisationHistory,
+  getPersonHistory,
+  partyRecordRoutes,
+  removeIdentifier,
+  updateOrganisation,
+  updatePerson,
+  verifyIdentifier,
+} from './record-routes.ts';
+export {
+  consoleIdentifierSchema,
+  managedOrganisationSchema,
+  managedPersonSchema,
+  organisationDetailsInputSchema,
+  valueHistoryEntrySchema,
+  valueHistoryPageSchema,
+  valueHistoryQuerySchema,
+  type ConsoleIdentifier,
+  type ManagedOrganisation,
+  type ManagedPerson,
+  type OrganisationDetailsInput,
+  type ValueHistoryEntry,
+  type ValueHistoryPage,
+} from './records.ts';
+export {
+  consoleRelationshipSchema,
+  endRelationshipSchema,
+  relationshipInputSchema,
+  relationshipProblems,
+  type ConsoleRelationship,
+  type EndRelationship,
+  type RelationshipInput,
+  type RelationshipLink,
+} from './relationships.ts';
 export {
   createOrganisation,
   getMyOrganisation,
@@ -77,3 +186,9 @@ export {
   updateMyOrganisation,
   updateProfile,
 } from './routes.ts';
+export {
+  organisationSnapshotSchema,
+  snapshotIdentifierSchema,
+  type OrganisationSnapshot,
+  type OrganisationSnapshots,
+} from './snapshot.ts';

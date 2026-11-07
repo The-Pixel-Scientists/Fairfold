@@ -9,6 +9,18 @@ export type Generated<T> =
     ? ColumnType<S, I | undefined, U>
     : ColumnType<T, T | undefined, T>;
 
+export type Json = JsonValue;
+
+export type JsonArray = JsonValue[];
+
+export type JsonObject = {
+  [x: string]: JsonValue | undefined;
+};
+
+export type JsonPrimitive = boolean | number | string | null;
+
+export type JsonValue = JsonArray | JsonObject | JsonPrimitive;
+
 export type Timestamp = ColumnType<Date, Date | string, Date | string>;
 
 export interface PartyConsent {
@@ -56,11 +68,29 @@ export interface PartyOrganisationIdentifier {
   verified_by: string | null;
 }
 
+export interface PartyOrganisationSnapshot {
+  address_country_code: string;
+  address_line1: string;
+  address_line2: string | null;
+  address_postcode: string;
+  address_town: string;
+  id: Generated<string>;
+  identifiers: Json;
+  legal_form: string;
+  name: string;
+  organisation_id: string;
+  taken_at: Timestamp;
+  taken_by: string;
+  tenant_id: string;
+  website: string | null;
+}
+
 export interface PartyParty {
   created_at: Generated<Timestamp>;
   created_by: string | null;
   id: Generated<string>;
   kind: string;
+  merged_into: string | null;
   status: Generated<string>;
   tenant_id: string;
   updated_at: Generated<Timestamp>;
@@ -98,11 +128,25 @@ export interface PartyRelationship {
   updated_by: string | null;
 }
 
+export interface PartyValueHistory {
+  changed_at: Generated<Timestamp>;
+  changed_by: string | null;
+  field_id: string;
+  id: Generated<string>;
+  new_value: string | null;
+  old_value: string | null;
+  party_id: string;
+  party_kind: string;
+  tenant_id: string;
+}
+
 export interface DB {
   'party.consent': PartyConsent;
   'party.organisation': PartyOrganisation;
   'party.organisation_identifier': PartyOrganisationIdentifier;
+  'party.organisation_snapshot': PartyOrganisationSnapshot;
   'party.party': PartyParty;
   'party.person': PartyPerson;
   'party.relationship': PartyRelationship;
+  'party.value_history': PartyValueHistory;
 }

@@ -5,7 +5,9 @@
 //     app, a scope rule of that app which the permission uses, and
 //     `stepUp: true` for changes under a step-up permission;
 //   - auth and public routes have neither, and auth routes belong to the
-//     platform module and state the session they need.
+//     platform module and state the session they need; an auth route that
+//     changes MFA, email, password or SSO settings needs step-up, which only
+//     a complete session can give.
 // The fields are read as unknown: a cast or plain JavaScript can get past
 // the types.
 
@@ -65,7 +67,13 @@ export function accessProblems(route: AccessFields): string[] {
   if (permission !== null || scope !== null) {
     problems.push(`A ${audience} route has no permission or scope.`);
   }
-  if (stepUp !== undefined) problems.push('Only console and portal routes can need step-up.');
+  if (stepUp !== undefined && audience !== 'auth') {
+    problems.push('Only console, portal and auth routes can need step-up.');
+  } else if (stepUp !== undefined && (typeof stepUp !== 'boolean' || session !== 'complete')) {
+    problems.push(
+      'An auth route needs step-up only as stepUp: true or false, with a complete session.',
+    );
+  }
   if (audience === 'auth' && module !== 'platform') {
     problems.push('An auth route belongs to the platform module.');
   }

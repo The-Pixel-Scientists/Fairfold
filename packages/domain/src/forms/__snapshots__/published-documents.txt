@@ -1,0 +1,138 @@
+{
+  "definition": {
+    "sections": [
+      {
+        "id": "s_documents",
+        "title": "Documents",
+        "conditions": [],
+        "fields": [
+          {
+            "id": "f_accounts",
+            "label": "Upload your latest accounts",
+            "required": true,
+            "identity": false,
+            "audiences": [
+              "applicant",
+              "staff",
+              "reviewer"
+            ],
+            "conditions": [],
+            "type": "file",
+            "allowedTypes": [
+              "application/pdf",
+              "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            ],
+            "maxBytes": 5242880,
+            "maxFiles": 1
+          },
+          {
+            "id": "f_photos",
+            "label": "Photos of the hall",
+            "required": false,
+            "identity": true,
+            "audiences": [
+              "applicant",
+              "staff",
+              "reviewer"
+            ],
+            "conditions": [],
+            "type": "file",
+            "allowedTypes": [
+              "application/pdf",
+              "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+              "application/vnd.oasis.opendocument.text",
+              "application/vnd.oasis.opendocument.spreadsheet",
+              "image/jpeg",
+              "image/png"
+            ],
+            "maxBytes": 10485760,
+            "maxFiles": 3
+          },
+          {
+            "id": "f_lease",
+            "label": "Do you lease the building?",
+            "required": false,
+            "identity": false,
+            "audiences": [
+              "applicant",
+              "staff",
+              "reviewer"
+            ],
+            "conditions": [],
+            "type": "yes_no"
+          },
+          {
+            "id": "f_leasecopy",
+            "label": "Upload a copy of the lease",
+            "required": true,
+            "identity": false,
+            "audiences": [
+              "applicant",
+              "staff"
+            ],
+            "conditions": [
+              {
+                "field": "f_lease",
+                "equals": true
+              }
+            ],
+            "type": "file",
+            "allowedTypes": [
+              "application/pdf",
+              "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+              "application/vnd.oasis.opendocument.text",
+              "application/vnd.oasis.opendocument.spreadsheet",
+              "image/jpeg",
+              "image/png"
+            ],
+            "maxBytes": 10485760,
+            "maxFiles": 1
+          }
+        ]
+      }
+    ]
+  },
+  "projections": {
+    "applicant": {
+      "f_accounts": [
+        "0f8fad5b-d9cb-469f-a165-70867728950e"
+      ],
+      "f_photos": [
+        "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+        "1b4e28ba-2fa1-41d2-883f-0016d3cca427"
+      ],
+      "f_lease": true,
+      "f_leasecopy": [
+        "6fa459ea-ee8a-4ca4-894e-db77e160355e"
+      ]
+    },
+    "staff": {
+      "f_accounts": [
+        "0f8fad5b-d9cb-469f-a165-70867728950e"
+      ],
+      "f_photos": [
+        "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+        "1b4e28ba-2fa1-41d2-883f-0016d3cca427"
+      ],
+      "f_lease": true,
+      "f_leasecopy": [
+        "6fa459ea-ee8a-4ca4-894e-db77e160355e"
+      ]
+    },
+    "reviewer": {
+      "f_accounts": [
+        "0f8fad5b-d9cb-469f-a165-70867728950e"
+      ],
+      "f_photos": [
+        "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+        "1b4e28ba-2fa1-41d2-883f-0016d3cca427"
+      ],
+      "f_lease": true
+    },
+    "blind_reviewer": {
+      "f_lease": true
+    }
+  }
+}

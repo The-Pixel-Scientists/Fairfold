@@ -40,6 +40,7 @@ it('finds every entry point on disk', () => {
       'files',
       'forms',
       'jitless',
+      'notes',
       'platform',
       'platform/audit-log',
       'platform/settings',

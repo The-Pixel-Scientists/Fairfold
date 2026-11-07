@@ -24,11 +24,17 @@
 //   one tenant table to another matches tenant_id to tenant_id (rule 6).
 // - Every column is in classification.ts, the map names no column that does
 //   not exist, and each retention rule makes sense.
+// - Every table with a personal or special category column has a subject
+//   path (ADR 0027). A path's column exists and is a foreign key in the
+//   catalogue to what its kind names, and a join reaches a party or an
+//   account. An unlinked table keeps every column for a fixed 366 days or
+//   less.
 // - Views use security_invoker. There are no materialized views or foreign
 //   tables.
 //
 // In every schema but PostgreSQL's own, there is no user-defined operator,
-// which could stand in for a built-in one, and no rewrite rule on a table,
+// which could stand in for a built-in one (pg_trgm's in EXTENSION_SCHEMA
+// aside, which privilege-lint.ts checks), and no rewrite rule on a table,
 // since rules run with the table owner's rights. app.current_tenant_id(),
 // which every tenant policy calls, is exactly CURRENT_TENANT_ID_DEFINITION.
 //
@@ -40,13 +46,24 @@
 
 import type pg from 'pg';
 
-import type { ClassificationRegistry, FieldClassification } from '../classification.ts';
+import {
+  subjectPaths,
+  type ClassificationRegistry,
+  type FieldClassification,
+  type SubjectPath,
+  type SubjectPathRegistry,
+} from '../classification.ts';
 import { APP_ROLES } from './connect.ts';
-import { DEFINER_FUNCTIONS, findPrivilegeProblems, NON_SYSTEM_SCHEMA } from './privilege-lint.ts';
+import {
+  DEFINER_FUNCTIONS,
+  EXTENSION_SCHEMA,
+  findPrivilegeProblems,
+  NON_SYSTEM_SCHEMA,
+} from './privilege-lint.ts';
 
 /** Tables in an application schema without tenant_id, each with its reason. */
-export const NON_TENANT_TABLES: ReadonlyMap<string, string> = new Map(
-  (
+export const NON_TENANT_TABLES: ReadonlyMap<string, string> = new Map([
+  ...(
     [
       [
         'auth.user',
@@ -60,11 +77,18 @@ export const NON_TENANT_TABLES: ReadonlyMap<string, string> = new Map(
       ['auth.audit_event', 'Some auth events have no tenant, such as a failed sign-in.'],
       ['auth.audit_copy_pending', 'It holds only an auth event id and a time.'],
     ] as const
-  ).map(([table, reason]) => [
-    table,
-    `${reason} On ADR 0003's allowlist: only app_auth and the function owners have grants.`,
-  ]),
-);
+  ).map(
+    ([table, reason]) =>
+      [
+        table,
+        `${reason} On ADR 0003's allowlist: only app_auth and the function owners have grants.`,
+      ] as const,
+  ),
+  [
+    'app.request_limit',
+    'Hashed client keys and counters for rate limits; holds no tenant data (ADR 0028).',
+  ],
+]);
 
 /** Tenant tables whose own id is the tenant, each with its reason. */
 export const TENANT_KEYED_BY_ID: ReadonlyMap<string, string> = new Map([
@@ -185,6 +209,7 @@ interface TableFacts {
 export async function findSchemaProblems(
   client: pg.ClientBase,
   registry: ClassificationRegistry,
+  paths: SubjectPathRegistry = subjectPaths,
 ): Promise<string[]> {
   const excepted = [...EXCEPTED_SCHEMAS.keys()];
   await client.query('SET search_path = pg_catalog');
@@ -290,6 +315,7 @@ export async function findSchemaProblems(
   }
   problems.push(...foreignKeyProblems(constraints.rows, tenantTables));
   problems.push(...classificationProblems(registry, columns.rows));
+  problems.push(...subjectPathProblems(registry, paths, columns.rows, constraints.rows));
 
   const tenantFunction = await client.query<{ definition: string | null }>(
     `SELECT pg_catalog.pg_get_functiondef(p) AS definition
@@ -305,8 +331,9 @@ export async function findSchemaProblems(
     `SELECT o.oid::pg_catalog.regoperator::text AS operator
        FROM pg_catalog.pg_operator o
        JOIN pg_catalog.pg_namespace n ON n.oid = o.oprnamespace
-      WHERE ${NON_SYSTEM_SCHEMA}
+      WHERE ${NON_SYSTEM_SCHEMA} AND n.nspname <> $1
       ORDER BY 1`,
+    [EXTENSION_SCHEMA],
   );
   for (const { operator } of operators.rows) {
     problems.push(
@@ -531,4 +558,80 @@ function retentionProblems(
     }
   }
   return problems;
+}
+
+/** The tables whose rows share their party's id, and the account table. */
+const TARGETS = {
+  party: ['party.party', 'party.person', 'party.organisation'],
+  account: ['auth.user'],
+} as const;
+/** The longest an unlinked table may keep a value: 12 months. */
+const UNLINKED_MAX_DAYS = 366;
+
+function subjectPathProblems(
+  registry: ClassificationRegistry,
+  paths: SubjectPathRegistry,
+  columns: ColumnRow[],
+  constraints: ConstraintRow[],
+): string[] {
+  const problems: string[] = [];
+  const tables = new Set(columns.map((row) => row.table));
+  const fieldsOf = (table: string) =>
+    Object.hasOwn(registry, table) ? Object.values(registry[table] ?? {}) : [];
+  for (const table of tables) {
+    const personal = fieldsOf(table).some((field) =>
+      ['personal', 'special_category'].includes(field.sensitivity),
+    );
+    if (personal && !Object.hasOwn(paths, table)) {
+      problems.push(`${table} has a personal or special category column and no subject path.`);
+    }
+  }
+  /** Whether `column` of `table` is a foreign key to the id of one of `targets`. */
+  const references = (table: string, column: string, targets: readonly string[]) =>
+    (targets.includes(table) && column === 'id') ||
+    constraints.some(
+      (key) =>
+        key.kind === 'f' &&
+        key.table === table &&
+        targets.includes(key.referenced ?? '') &&
+        key.referenced_columns[key.columns.indexOf(column)] === 'id',
+    );
+  for (const [table, path] of Object.entries(paths)) {
+    if (!tables.has(table)) {
+      problems.push(`classification.ts gives a subject path for ${table}, which does not exist.`);
+    } else if (path.kind === 'unlinked') {
+      const fixed = fieldsOf(table).every(
+        ({ retention }) => retention.kind === 'fixed' && retention.days <= UNLINKED_MAX_DAYS,
+      );
+      if (path.reason.trim() === '' || !fixed) {
+        problems.push(
+          `${table} has an unlinked subject path, so it needs a reason and every column kept for a fixed ${String(UNLINKED_MAX_DAYS)} days or less.`,
+        );
+      }
+    } else if (!columns.some((row) => row.table === table && row.column === path.column)) {
+      problems.push(`${table} has a subject path through ${path.column}, which does not exist.`);
+    } else if (path.kind !== 'join' && !references(table, path.column, TARGETS[path.kind])) {
+      problems.push(
+        `${table} has a subject path through ${path.column}, which is not a foreign key to ${TARGETS[path.kind].join(' or ')}.`,
+      );
+    } else if (path.kind === 'join' && !references(table, path.column, [path.table])) {
+      problems.push(
+        `${table} has a subject path through ${path.column}, which is not a foreign key to ${path.table}.`,
+      );
+    } else if (!reachesSubject(path, paths)) {
+      problems.push(`${table} has a subject path that does not reach a party or an account.`);
+    }
+  }
+  return problems;
+}
+
+/** Whether `path`, following its joins, ends at a party or an account column. */
+function reachesSubject(path: SubjectPath, paths: SubjectPathRegistry): boolean {
+  const seen = new Set<string>();
+  let next: SubjectPath | undefined = path;
+  while (next?.kind === 'join' && !seen.has(next.table)) {
+    seen.add(next.table);
+    next = Object.hasOwn(paths, next.table) ? paths[next.table] : undefined;
+  }
+  return next?.kind === 'party' || next?.kind === 'account';
 }

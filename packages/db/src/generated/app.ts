@@ -29,6 +29,7 @@ export interface AppAuditEvent {
   action: string;
   actor_id: string | null;
   actor_kind: string;
+  actor_member_kind: string | null;
   changes: Json;
   entity_id: string;
   entity_type: string;
@@ -36,6 +37,7 @@ export interface AppAuditEvent {
   occurred_at: Generated<Timestamp>;
   request_id: string;
   retain_until: Timestamp;
+  subject_party_id: string | null;
   tenant_id: string;
 }
 
@@ -64,6 +66,20 @@ export interface AppFile {
   tenant_id: string;
 }
 
+export interface AppIdempotencyKey {
+  created_at: Generated<Timestamp>;
+  created_id: string | null;
+  expires_at: Generated<Timestamp>;
+  id: Generated<string>;
+  key: string;
+  membership_id: string;
+  request_hash: Buffer;
+  route_id: string;
+  state: Generated<string>;
+  status: number | null;
+  tenant_id: string;
+}
+
 export interface AppInvitation {
   accepted_membership_id: string | null;
   created_at: Generated<Timestamp>;
@@ -89,6 +105,14 @@ export interface AppMembership {
   updated_at: Generated<Timestamp>;
   updated_by: string | null;
   user_id: string;
+}
+
+export interface AppRequestLimit {
+  bucket: string;
+  count: number;
+  expires_at: Generated<Timestamp>;
+  key_hash: Buffer;
+  window_start: Timestamp;
 }
 
 export interface AppRetentionPolicy {
@@ -138,8 +162,10 @@ export interface DB {
   'app.audit_event': AppAuditEvent;
   'app.config_version': AppConfigVersion;
   'app.file': AppFile;
+  'app.idempotency_key': AppIdempotencyKey;
   'app.invitation': AppInvitation;
   'app.membership': AppMembership;
+  'app.request_limit': AppRequestLimit;
   'app.retention_policy': AppRetentionPolicy;
   'app.tenant': AppTenant;
   'app.tenant_module': AppTenantModule;

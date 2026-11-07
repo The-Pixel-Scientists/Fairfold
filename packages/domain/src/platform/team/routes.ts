@@ -38,6 +38,7 @@ export const getTeam = defineRoute({
 export const inviteMember = defineRoute({
   ...change,
   method: 'POST',
+  idempotent: true,
   path: '/console/team/invitations',
   summary: 'Invite someone to the team by email, with their roles',
   body: inviteSchema,

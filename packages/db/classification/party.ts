@@ -10,7 +10,11 @@
 // while the tenant is a customer; erasure anonymises a person in place
 // (ADR 0017), and its rule arrives with the erasure ADR.
 
-import type { ClassificationRegistry, FieldClassification } from '../classification.ts';
+import type {
+  ClassificationRegistry,
+  FieldClassification,
+  SubjectPathRegistry,
+} from '../classification.ts';
 
 const internal: FieldClassification = {
   sensitivity: 'internal',
@@ -35,6 +39,7 @@ export const party: ClassificationRegistry = {
     ...keyAndActors,
     kind: internal,
     status: internal,
+    merged_into: internal,
   },
   'party.organisation': {
     ...keyAndActors,
@@ -87,4 +92,53 @@ export const party: ClassificationRegistry = {
     recorded_at: personal,
     recorded_by: personal,
   },
+  // An organisation as submitted (ADR 0017), classified like the columns it
+  // copies. It is kept with the application that references it: today that
+  // is the tenant's lifetime, as for grants.application, until retention
+  // rules arrive (S11-102). Erasure clears its address as the
+  // organisation's (ADR 0027).
+  'party.organisation_snapshot': {
+    tenant_id: internal,
+    id: internal,
+    organisation_id: internal,
+    name: internal,
+    legal_form: internal,
+    address_line1: personal,
+    address_line2: personal,
+    address_town: personal,
+    address_postcode: personal,
+    address_country_code: personal,
+    website: internal,
+    identifiers: internal,
+    taken_by: internal,
+    taken_at: internal,
+  },
+  // One change to a party field (ADR 0025). The values are personal
+  // whatever the field (ADR 0025, rule 5), and are kept as long as their
+  // party; erasure clears them with their source column (ADR 0027).
+  'party.value_history': {
+    tenant_id: internal,
+    id: internal,
+    party_id: internal,
+    party_kind: internal,
+    field_id: internal,
+    old_value: personal,
+    new_value: personal,
+    changed_by: internal,
+    changed_at: internal,
+  },
+};
+
+/**
+ * Each table's path to the party its rows are about (ADR 0027). A person and
+ * an organisation share their party's id.
+ */
+export const partySubjects: SubjectPathRegistry = {
+  'party.party': { kind: 'party', column: 'id' },
+  'party.organisation': { kind: 'party', column: 'id' },
+  'party.organisation_identifier': { kind: 'party', column: 'organisation_id' },
+  'party.organisation_snapshot': { kind: 'party', column: 'organisation_id' },
+  'party.person': { kind: 'party', column: 'id' },
+  'party.consent': { kind: 'party', column: 'person_id' },
+  'party.value_history': { kind: 'party', column: 'party_id' },
 };

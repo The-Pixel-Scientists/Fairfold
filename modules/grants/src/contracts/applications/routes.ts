@@ -75,6 +75,7 @@ export const getOpenRound = defineRoute({
 export const startApplication = defineRoute({
   ...round,
   method: 'POST',
+  idempotent: true,
   path: '/portal/rounds/:roundId/applications',
   summary: "Start an application for one of the caller's organisations, on the published form",
   body: startApplicationInputSchema,

@@ -1,0 +1,136 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+//
+// The assure module's published contracts (ADR 0016, ADR 0031): the
+// registry adapter interface, checked lists, schemas, routes, audit action
+// codes and events, safe for the browser.
+
+import '@pixel-scientists/domain/jitless';
+
+export { assureAuditActions, type AssureAuditAction } from './audit.ts';
+export {
+  answerKinds,
+  applicationChecklistListSchema,
+  checklistInputSchema,
+  checklistListSchema,
+  checklistResponseInputSchema,
+  checklistResponseSchema,
+  checklistRoutes,
+  checklistSchema,
+  checklistVersionSchema,
+  createChecklist,
+  getChecklist,
+  getChecklistResponse,
+  listApplicationChecklists,
+  listChecklists,
+  MAX_CHECKLIST_ITEMS,
+  publishChecklistVersion,
+  saveChecklistResponse,
+  yesNoValues,
+  type ChecklistInput,
+  type ChecklistResponse,
+  type ChecklistResponseInput,
+  type ChecklistVersion,
+} from './checklists.ts';
+export {
+  dismissDuplicateFlag,
+  duplicateFlagListSchema,
+  duplicateFlagSchema,
+  duplicateRoutes,
+  duplicateSignals,
+  flagDismissalInputSchema,
+  flagDismissReasons,
+  listApplicationDuplicateFlags,
+  listPartyDuplicateFlags,
+  type DuplicateFlag,
+} from './duplicates.ts';
+export { screeningMatchFound } from './events.ts';
+export {
+  linkLookupOfficer,
+  listLookupOfficers,
+  listOrganisationLookups,
+  lookupOfficerListSchema,
+  lookupOfficerSchema,
+  lookupRefreshInputSchema,
+  lookupRefreshSchema,
+  lookupRoutes,
+  lookupSnapshotSchema,
+  officerLinkInputSchema,
+  organisationLookupsSchema,
+  refreshOrganisationLookup,
+  type LookupOfficer,
+  type LookupSnapshot,
+  type OrganisationLookups,
+} from './lookups.ts';
+export {
+  decideScreeningMatch,
+  entryKinds,
+  getScreeningMatch,
+  listScreeningMatches,
+  matchDecisionInputSchema,
+  matchDecisionSchema,
+  matchOutcomes,
+  matchPageSchema,
+  matchQuerySchema,
+  matchReasonCodes,
+  matchReasons,
+  matchRoutes,
+  matchSchema,
+  matchStatuses,
+  matchSummarySchema,
+  nameSources,
+  type Match,
+  type MatchDecision,
+  type MatchDecisionInput,
+  type MatchOutcome,
+  type MatchQuery,
+  type MatchReason,
+} from './matches.ts';
+export { assureMessages, type AssureMessage } from './messages.ts';
+export {
+  lookupFailures,
+  MAX_OFFICERS,
+  officerRoles,
+  registries,
+  registryDetailsSchema,
+  registryIds,
+  registryInputSchema,
+  registryResultClassification,
+  registryResultSchema,
+  registrySchema,
+  registryStatuses,
+  type Classification,
+  type LookupFailure,
+  type LookupOutcome,
+  type Registry,
+  type RegistryAdapter,
+  type RegistryResult,
+} from './registry.ts';
+export { assureRoutes } from './routes.ts';
+export {
+  getScreeningRun,
+  listScreeningRuns,
+  listVersionSchema,
+  screeningRoutes,
+  screeningRunListSchema,
+  screeningRunSchema,
+  screeningStatuses,
+  screeningTriggers,
+  startScreeningRun,
+  type ScreeningRun,
+} from './screening.ts';
+export {
+  listVisits,
+  createVisit,
+  getVisit,
+  updateVisit,
+  visitInputSchema,
+  visitPageSchema,
+  visitQuerySchema,
+  visitRoutes,
+  visitSchema,
+  visitTypes,
+  visitUpdateSchema,
+  type Visit,
+  type VisitInput,
+  type VisitUpdate,
+} from './visits.ts';

@@ -21,6 +21,21 @@
     },
     {
       "path": "../../modules/grants/tsconfig.web.json"
+    },
+    {
+      "path": "../../modules/crm/tsconfig.web.json"
+    },
+    {
+      "path": "../../modules/assure/tsconfig.web.json"
+    },
+    {
+      "path": "../../modules/forms/tsconfig.web.json"
+    },
+    {
+      "path": "../../modules/privacy/tsconfig.web.json"
+    },
+    {
+      "path": "../../modules/insight/tsconfig.web.json"
     }
   ]
 }

@@ -10,7 +10,9 @@ import { auditActionPattern } from '../audit.ts';
 /** Words written differently from their code. */
 const words: Readonly<Record<string, string>> = {
   mfa: 'MFA',
+  reencrypted: 're-encrypted',
   'sign in': 'sign-in',
+  sso: 'SSO',
   'step up': 'step-up',
 };
 

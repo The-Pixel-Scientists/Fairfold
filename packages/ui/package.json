@@ -7,9 +7,11 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./form-builder": "./src/form-builder/index.ts",
     "./*.css": "./src/*.css"
   },
   "dependencies": {
+    "@pixel-scientists/domain": "workspace:*",
     "radix-ui": "1.6.7"
   },
   "peerDependencies": {

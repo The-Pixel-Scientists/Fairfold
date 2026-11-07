@@ -8,6 +8,8 @@
 import type { TenantId } from '@pixel-scientists/db';
 import type { App, Permission } from '@pixel-scientists/domain/platform';
 import type { ConfigDiff, ConfigEntityType } from '@pixel-scientists/domain/platform/settings';
+import { grantsSubjectRules } from '@pixel-scientists/grants/server';
+import { partySubjectRules } from '@pixel-scientists/party/server';
 import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
 
 import type { AuditEvent } from './audit/writer.ts';
@@ -43,7 +45,32 @@ export interface RequestAudit {
   /** Record a state change in the request's transaction. */
   record(event: AuditEvent): Promise<void>;
   /** Record a sensitive read. */
-  read(entity: Pick<AuditEvent, 'action' | 'entityId'>): Promise<void>;
+  read(entity: Pick<AuditEvent, 'action' | 'entityId' | 'subjectPartyId'>): Promise<void>;
+}
+
+/** The modules' rules for the party an event is about (ADR 0027), by action. */
+const subjectRules = new Map(Object.entries({ ...partySubjectRules, ...grantsSubjectRules }));
+
+/**
+ * `audit` with each party and grants event given the party it is about,
+ * found in the request's transaction by the action's rule. An action whose
+ * rule says it has a subject is refused without one; platform actions and
+ * actions with no subject pass unchanged.
+ */
+export function withSubjects(tx: TenantTransaction, audit: RequestAudit): RequestAudit {
+  async function subjected<E extends Pick<AuditEvent, 'action' | 'entityId' | 'changes'>>(
+    event: E,
+  ): Promise<E & Pick<AuditEvent, 'subjectPartyId'>> {
+    const rule = subjectRules.get(event.action);
+    if (rule === undefined || 'none' in rule) return event;
+    const subjectPartyId = await rule.subject(tx, event);
+    if (subjectPartyId === null) throw new Error('The audit event has no subject.');
+    return { ...event, subjectPartyId };
+  }
+  return {
+    record: async (event) => audit.record(await subjected(event)),
+    read: async (entity) => audit.read(await subjected(entity)),
+  };
 }
 
 /** The configuration version writer bound to the request's transaction and the acting membership. */

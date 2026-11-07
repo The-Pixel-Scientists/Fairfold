@@ -1,0 +1,19 @@
+{
+  "name": "@pixel-scientists/forms",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Forms and surveys on the shared form engine",
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "exports": {
+    "./contracts": "./src/contracts/index.ts",
+    "./server": "./src/server/index.ts",
+    "./console": "./src/console/index.ts",
+    "./portal": "./src/portal/index.ts"
+  },
+  "dependencies": {
+    "@pixel-scientists/domain": "workspace:*",
+    "@pixel-scientists/grants": "workspace:*",
+    "zod": "4.6.5"
+  }
+}

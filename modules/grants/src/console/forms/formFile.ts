@@ -11,7 +11,7 @@ import {
   formFileSchema,
   formVersionMessages,
 } from '../../contracts/index.ts';
-import { inWords, problemsOf } from './problems.ts';
+import { inWords, problemsOf } from '@pixel-scientists/ui/form-builder';
 
 export type Imported = { definition: FormDefinition } | { messages: string[] };
 

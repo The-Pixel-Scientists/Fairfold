@@ -98,7 +98,8 @@ async function expectDenialAs(role: LoginRole, fixtures: Fixtures): Promise<void
       delete: boolean;
       update: string | null;
     }>(
-      `SELECT pg_catalog.has_table_privilege($1::regclass, 'SELECT') AS select,
+      // A role may read only some columns; the statements below read id.
+      `SELECT pg_catalog.has_column_privilege($1::regclass, 'id', 'SELECT') AS select,
               pg_catalog.has_table_privilege($1::regclass, 'DELETE') AS delete,
               (SELECT a.attname FROM pg_catalog.pg_attribute a
                 WHERE a.attrelid = $1::regclass AND a.attnum > 0 AND NOT a.attisdropped
