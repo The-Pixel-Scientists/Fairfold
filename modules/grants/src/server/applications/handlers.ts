@@ -9,6 +9,7 @@
 
 import {
   checkEligibility,
+  cleanAnswers,
   questionsOf,
   validateAnswers,
   type Answers,
@@ -136,11 +137,12 @@ export function applicationHandlers(deps: ApplicationDependencies) {
     input,
   }: ApplicationArgs<ApplicationParams & { body: SaveAnswersInput }>): Promise<AnswersSaved> {
     const { applicationId } = input.params;
-    const { basedOn, answers } = input.body;
+    const { basedOn } = input.body;
     const application = await lockOwn(tx, deps, context.session.userId, applicationId);
     checkDraft(deps, application, basedOn);
 
     const { definition } = application;
+    const answers = cleanAnswers(definition, input.body.answers);
     const forbidden = fileProblems(definition, answers);
     const problems =
       forbidden.length > 0 ? forbidden : validateAnswers(definition, answers, 'draft');
