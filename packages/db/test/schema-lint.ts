@@ -5,7 +5,8 @@
 // those in privilege-lint.ts.
 //
 // In every application schema (any schema but PostgreSQL's own and
-// EXCEPTED_SCHEMAS):
+// EXCEPTED_SCHEMAS), where every check but the classification one also
+// skips RLS_EXCEPTED_SCHEMAS (the allowlists are in test/catalogue):
 // - Every table has a tenant_id uuid NOT NULL column, unless it is on
 //   NON_TENANT_TABLES. A table on TENANT_KEYED_BY_ID is its own tenant, and
 //   its id takes tenant_id's place in every check below.
@@ -23,7 +24,8 @@
 // - A tenant table has UNIQUE (tenant_id, id), and every foreign key from
 //   one tenant table to another matches tenant_id to tenant_id (rule 6).
 // - Every column is in classification.ts, the map names no column that does
-//   not exist, and each retention rule makes sense.
+//   not exist, and each retention rule makes sense. A partition is covered
+//   by its parent's entry.
 // - Every table with a personal or special category column has a subject
 //   path (ADR 0027). A path's column exists and is a foreign key in the
 //   catalogue to what its kind names, and a join reaches a party or an
@@ -53,78 +55,24 @@ import {
   type SubjectPath,
   type SubjectPathRegistry,
 } from '../classification.ts';
-import { APP_ROLES } from './connect.ts';
 import {
+  CURRENT_TENANT_ID_DEFINITION,
   DEFINER_FUNCTIONS,
+  EXCEPTED_SCHEMAS,
   EXTENSION_SCHEMA,
-  findPrivilegeProblems,
-  NON_SYSTEM_SCHEMA,
-} from './privilege-lint.ts';
+  NON_TENANT_TABLES,
+  RLS_EXCEPTED_SCHEMAS,
+  TENANT_KEYED_BY_ID,
+} from './catalogue/index.ts';
+import { APP_ROLES } from './connect.ts';
+import { findPrivilegeProblems, NON_SYSTEM_SCHEMA } from './privilege-lint.ts';
 
-/** Tables in an application schema without tenant_id, each with its reason. */
-export const NON_TENANT_TABLES: ReadonlyMap<string, string> = new Map([
-  ...(
-    [
-      [
-        'auth.user',
-        'An account belongs to one person and may hold memberships in several tenants.',
-      ],
-      ['auth.session', 'A session belongs to an account; its active tenant grants nothing alone.'],
-      ['auth.account', 'Credential accounts have no tenant; SSO identities add one later.'],
-      ['auth.verification', 'Emailed links come before any tenant is known.'],
-      ['auth.two_factor', 'MFA belongs to the account, whatever the tenant.'],
-      ['auth.rate_limit', 'Sign-in limits count identifiers and addresses, not tenants.'],
-      [
-        'auth.device',
-        'A device cookie belongs to an account, whatever the tenant, and grants no tenant.',
-      ],
-      ['auth.audit_event', 'Some auth events have no tenant, such as a failed sign-in.'],
-      ['auth.audit_copy_pending', 'It holds only an auth event id and a time.'],
-    ] as const
-  ).map(
-    ([table, reason]) =>
-      [
-        table,
-        `${reason} On ADR 0003's allowlist: only app_auth and the function owners have grants.`,
-      ] as const,
-  ),
-  [
-    'app.request_limit',
-    'Hashed client keys and counters for rate limits; holds no tenant data (ADR 0028).',
-  ],
-]);
-
-/** Tenant tables whose own id is the tenant, each with its reason. */
-export const TENANT_KEYED_BY_ID: ReadonlyMap<string, string> = new Map([
-  [
-    'app.tenant',
-    'Each row is a tenant, so its policies use id = app.current_tenant_id() (ADR 0003).',
-  ],
-]);
+export { EXCEPTED_SCHEMAS, NON_TENANT_TABLES, TENANT_KEYED_BY_ID };
 
 /** The column that holds a tenant table's tenant. */
 export function tenantColumn(table: string): string {
   return TENANT_KEYED_BY_ID.has(table) ? 'id' : 'tenant_id';
 }
-
-/**
- * app.current_tenant_id() as pg_get_functiondef prints it with search_path
- * set to pg_catalog alone (ADR 0003, row-level security rule 5).
- */
-export const CURRENT_TENANT_ID_DEFINITION = `CREATE OR REPLACE FUNCTION app.current_tenant_id()
- RETURNS uuid
- LANGUAGE sql
- STABLE PARALLEL SAFE
-RETURN (NULLIF(current_setting('app.tenant_id'::text, true), ''::text))::uuid
-`;
-
-/** Schemas the table, policy and classification checks skip, each with its reason. */
-export const EXCEPTED_SCHEMAS: ReadonlyMap<string, string> = new Map([
-  [
-    'migrations',
-    "Kysely's migration history, which only migrator uses. The lint checks that no app role can use the schema, and checks its grants and functions like any other.",
-  ],
-]);
 
 /** Each approved definer function owner's policies, as "<table> policy <name>", to its owner. */
 const OWNER_POLICIES: ReadonlyMap<string, string> = new Map(
@@ -179,6 +127,8 @@ interface ColumnRow {
   column: string;
   type: string;
   not_null: boolean;
+  /** A partition has exactly its parent's columns, so the parent's classification covers it. */
+  partition: boolean;
 }
 
 interface PolicyRow {
@@ -216,6 +166,9 @@ export async function findSchemaProblems(
   paths: SubjectPathRegistry = subjectPaths,
 ): Promise<string[]> {
   const excepted = [...EXCEPTED_SCHEMAS.keys()];
+  // The table, policy and key checks skip RLS_EXCEPTED_SCHEMAS too; the
+  // classification check does not.
+  const withoutRls = [...excepted, ...RLS_EXCEPTED_SCHEMAS.keys()];
   await client.query('SET search_path = pg_catalog');
 
   const relations = await client.query<RelationRow>(
@@ -226,11 +179,12 @@ export async function findSchemaProblems(
        JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
       WHERE ${APPLICATION_SCHEMA} AND c.relkind IN ('r', 'p', 'v', 'm', 'f')
       ORDER BY 1`,
-    [excepted],
+    [withoutRls],
   );
   const columns = await client.query<ColumnRow>(
     `SELECT n.nspname || '.' || c.relname AS table, a.attname AS column,
-            pg_catalog.format_type(a.atttypid, NULL) AS type, a.attnotnull AS not_null
+            pg_catalog.format_type(a.atttypid, NULL) AS type, a.attnotnull AS not_null,
+            c.relispartition AS partition
        FROM pg_catalog.pg_attribute a
        JOIN pg_catalog.pg_class c ON c.oid = a.attrelid
        JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
@@ -251,7 +205,7 @@ export async function findSchemaProblems(
        JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
       WHERE ${APPLICATION_SCHEMA}
       ORDER BY 1, 2`,
-    [excepted],
+    [withoutRls],
   );
   const constraints = await client.query<ConstraintRow>(
     `SELECT n.nspname || '.' || c.relname AS table, o.conname AS name, o.contype AS kind,
@@ -273,7 +227,7 @@ export async function findSchemaProblems(
        LEFT JOIN pg_catalog.pg_namespace fn ON fn.oid = fc.relnamespace
       WHERE ${APPLICATION_SCHEMA} AND o.contype IN ('p', 'u', 'f')
       ORDER BY 1, 2`,
-    [excepted],
+    [withoutRls],
   );
   // Commands for which no app role holds the right on the table or any column.
   const ungranted = await client.query<{ table: string; command: string }>(
@@ -290,7 +244,7 @@ export async function findSchemaProblems(
                    ELSE pg_catalog.has_any_column_privilege(r.name, c.oid, m.privilege)
                  END)
       ORDER BY 1, 2`,
-    [excepted, APP_ROLES],
+    [withoutRls, APP_ROLES],
   );
 
   const problems: string[] = [];
@@ -510,7 +464,8 @@ function splitTopLevel(text: string, separator: string): string[] {
 
 function classificationProblems(registry: ClassificationRegistry, columns: ColumnRow[]): string[] {
   const problems: string[] = [];
-  for (const { table, column } of columns) {
+  for (const { table, column, partition } of columns) {
+    if (partition) continue;
     // Own properties only, so a column named constructor or __proto__ is
     // never taken as classified.
     const fields = Object.hasOwn(registry, table) ? registry[table] : undefined;
