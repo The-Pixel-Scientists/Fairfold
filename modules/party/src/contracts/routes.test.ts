@@ -72,7 +72,17 @@ describe('party audit actions', () => {
   it('are defined for the audit writer', () => {
     for (const action of partyAuditActions) expect(isAuditAction(action), action).toBe(true);
     expect(new Set(partyAuditActions.map(auditEntityType))).toEqual(
-      new Set(['party.person', 'party.organisation', 'party.relationship', 'party.consent']),
+      new Set([
+        'party.person',
+        'party.organisation',
+        'party.relationship',
+        'party.consent',
+        'party.identifier',
+        'party.party',
+        'party.suppression',
+        'party.organisation_snapshot',
+        'party.value_history',
+      ]),
     );
   });
 });
