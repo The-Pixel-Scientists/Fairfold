@@ -30,6 +30,20 @@ const audit: FieldClassification = {
   retention: { kind: 'tenant_policy', policy: 'audit', minimumDays: 365 },
 };
 
+/**
+ * Columns whose values are structured (json, jsonb, bytea) or free text. An
+ * audit event records a change to one by its field id alone, whatever its
+ * sensitivity (D12). The other schemas' maps have no such marker yet (S11-84).
+ */
+export const notKept: ReadonlySet<string> = new Set([
+  'app.tenant_theme.logo',
+  'app.tenant_theme.tokens',
+  'app.config_version.diff',
+  'app.file.sha256',
+  'app.invitation.token_hash',
+  'app.audit_event.changes',
+]);
+
 export const app: ClassificationRegistry = {
   'app.tenant': {
     id: internal,
@@ -134,6 +148,7 @@ export const app: ClassificationRegistry = {
     request_id: audit,
     actor_kind: audit,
     actor_id: audit,
+    actor_member_kind: audit,
     action: audit,
     entity_type: audit,
     entity_id: audit,

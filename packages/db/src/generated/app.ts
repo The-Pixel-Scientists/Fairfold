@@ -29,6 +29,7 @@ export interface AppAuditEvent {
   action: string;
   actor_id: string | null;
   actor_kind: string;
+  actor_member_kind: string | null;
   changes: Json;
   entity_id: string;
   entity_type: string;
