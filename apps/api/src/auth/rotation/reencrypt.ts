@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
 // Secret re-encryption (ADR 0010, "Secrets at rest"), as app_auth. Each
-// TOTP secret and SSO secret on an older configured key version is opened
-// with that version and sealed again with the newest, one row per short
+// TOTP secret and SSO secret on another configured key version is opened
+// with that version and sealed again with the current one (the version
+// TPS_AUTH_SECRET_CURRENT names), one row per short
 // transaction, under a row lock and only if the row is still on the old
 // version, so a concurrent save or enrolment is never overwritten and a
 // second run changes nothing. Backup codes are HMACs and cannot be re-keyed:
@@ -17,8 +18,8 @@ import type { FastifyBaseLogger } from 'fastify';
 
 import { ssoProvidersByKeyVersion } from '../../../../../packages/db/src/sso-functions.ts';
 
-import type { Secret } from '../../config.ts';
 import type { Sender } from '../../email/sender.ts';
+import type { AuthSecrets } from '../settings.ts';
 import { openSecret, sealSecret, ssoSecretKeys, type SsoSecretKeys } from '../sso/secrets.ts';
 
 type Tables = {
@@ -46,31 +47,26 @@ const FIRST_ID = '00000000-0000-0000-0000-000000000000';
 
 export interface RotationKeys {
   readonly current: number;
-  /** The older versions, oldest first. */
+  /** The other versions, oldest first: everything they sealed moves to `current`. */
   readonly older: readonly number[];
   /** Better Auth's versioned secrets. A value with no version is version 1's. */
   readonly totp: SecretConfig;
   readonly sso: SsoSecretKeys;
 }
 
-/** The keys for the auth secret's versions; the newest seals. */
-export function rotationKeys(secrets: ReadonlyMap<number, Secret>): RotationKeys {
-  const versions = [...secrets.keys()].sort((a, b) => a - b);
-  const current = versions.at(-1) ?? 0;
-  const sso = new Map<number, Buffer>();
-  for (const [version, secret] of secrets) {
-    const key = ssoSecretKeys(secret).keys.get(1);
-    if (key !== undefined) sso.set(version, key);
-  }
+/** The keys for the auth secret's versions, as the API uses them. */
+export function rotationKeys(secrets: AuthSecrets): RotationKeys {
+  const { current, versions } = secrets;
+  const legacy = versions.get(1);
   return {
     current,
-    older: versions.slice(0, -1),
+    older: [...versions.keys()].filter((version) => version !== current).sort((a, b) => a - b),
     totp: {
-      keys: new Map([...secrets].map(([version, secret]) => [version, secret.reveal()])),
+      keys: new Map([...versions].map(([version, secret]) => [version, secret.reveal()])),
       currentVersion: current,
-      ...(secrets.has(1) ? { legacySecret: secrets.get(1)?.reveal() } : {}),
+      ...(legacy === undefined ? {} : { legacySecret: legacy.reveal() }),
     },
-    sso: { current, keys: sso },
+    sso: ssoSecretKeys(secrets),
   };
 }
 
