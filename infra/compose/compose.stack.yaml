@@ -430,6 +430,16 @@ services:
     networks: [database, tunnel]
     ports:
       - 127.0.0.1::5432
+    # The image's own check asks for the API's /health, which the tunnel does not serve.
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - --eval
+        - "require('node:net').connect(5432, '127.0.0.1').on('connect', () => process.exit(0)).on('error', () => process.exit(1))"
+      interval: 2s
+      timeout: 5s
+      retries: 30
     depends_on:
       postgres:
         condition: service_healthy
