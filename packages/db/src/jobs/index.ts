@@ -3,6 +3,7 @@
 // Background jobs (ADR 0009): the `./jobs` entry of the database package and
 // the only code that imports pg-boss.
 
+export { completeDeadLetter, readDeadLetter, type DeadLetter } from './dead-letter.ts';
 export {
   defineEventHandler,
   defineHandler,
@@ -29,3 +30,12 @@ export {
   type SendJobOptions,
   type SendRefusal,
 } from './send.ts';
+export {
+  defineSchedule,
+  scheduleProblems,
+  startWorker,
+  stopWorker,
+  type JobSchedule,
+  type WorkerOptions,
+  type WorkerRunner,
+} from './worker.ts';
