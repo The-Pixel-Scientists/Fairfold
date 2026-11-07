@@ -33,6 +33,11 @@ import { codeAt, stepAt } from '../totp.ts';
 const ORIGINS = { console: 'https://console.example.org', portal: 'https://apply.example.org' };
 const HOSTS = { console: 'console.example.org', portal: 'apply.example.org' } as const;
 type AppName = keyof typeof HOSTS;
+/** Each app's session cookie in a Set-Cookie header. */
+const SESSION_COOKIE: Record<AppName, RegExp> = {
+  console: /__Host-tps_console_session=([^;]*);/,
+  portal: /__Host-tps_portal_session=([^;]*);/,
+};
 const PASSWORD = 'a long synthetic passphrase';
 /** Hex in the stored form's shape, for a secret no test decrypts. */
 const STORED_SECRET = 'ab'.repeat(60);
@@ -94,9 +99,7 @@ const session = (token: string, target: AppName = 'console') =>
   call('GET', '/auth/session', token, undefined, target);
 
 const tokenOf = (response: LightMyRequestResponse, target: AppName = 'console') =>
-  new RegExp(`__Host-tps_${target}_session=([^;]*);`).exec(
-    String(response.headers['set-cookie']),
-  )?.[1];
+  SESSION_COOKIE[target].exec(String(response.headers['set-cookie']))?.[1];
 
 function migrator<T>(query: string, values: unknown[] = []): Promise<T[]> {
   return withClient('migrator', async (client) => (await client.query(query, values)).rows as T[]);
