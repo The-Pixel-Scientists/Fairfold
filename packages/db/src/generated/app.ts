@@ -95,6 +95,12 @@ export interface AppInvitation {
   updated_by: string | null;
 }
 
+export interface AppJobQueue {
+  created_at: Generated<Timestamp>;
+  kind: string;
+  name: string;
+}
+
 export interface AppMembership {
   created_at: Generated<Timestamp>;
   created_by: string | null;
@@ -164,6 +170,7 @@ export interface DB {
   'app.file': AppFile;
   'app.idempotency_key': AppIdempotencyKey;
   'app.invitation': AppInvitation;
+  'app.job_queue': AppJobQueue;
   'app.membership': AppMembership;
   'app.request_limit': AppRequestLimit;
   'app.retention_policy': AppRetentionPolicy;
