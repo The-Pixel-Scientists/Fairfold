@@ -14,7 +14,12 @@ import type { SearchSchema, SessionState } from '@pixel-scientists/ui';
 export type PageKind = 'account' | 'enrol' | 'verify' | 'member';
 
 /** The sentences the sign-in page can open with, by the word in `?notice=`. */
-export const notices = ['timeout', 'account-created', 'password-reset'] as const;
+export const notices = [
+  'timeout',
+  'account-created',
+  'password-reset',
+  'security-changed',
+] as const;
 
 export type Notice = (typeof notices)[number];
 
