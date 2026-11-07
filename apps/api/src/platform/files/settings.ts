@@ -22,8 +22,12 @@ export interface FileSettings {
     readonly bucket: string;
     /** Used only for put. */
     readonly write: StorageKey;
-    /** Used only for get. */
+    /** Used only for get under clean/. */
     readonly read: StorageKey;
+    /** Reads clean/, and reads and writes withheld/ (ADR 0030). */
+    readonly scanner: StorageKey;
+    /** The worker's only: lists and deletes under clean/ and withheld/. The API never has it. */
+    readonly removal?: StorageKey;
   };
   readonly clamd: { readonly host: string; readonly port: number; readonly timeoutMs: number };
   /** Stores at once in this process: fewer than the database pool's 10 connections. */
@@ -39,7 +43,11 @@ const BUCKET = /^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/;
 const ACCESS_KEY_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const HOST = /^[A-Za-z0-9.:_[\]-]{1,255}$/;
 
-export function loadFileSettings(env: Env, readFile?: (path: string) => string): FileSettings {
+export function loadFileSettings(
+  env: Env,
+  readFile?: (path: string) => string,
+  options: { readonly removal?: boolean } = {},
+): FileSettings {
   const problems: string[] = [];
   const read = <T>(name: string, load: () => T, check: (value: T) => boolean, rule: string) => {
     try {
@@ -97,6 +105,10 @@ export function loadFileSettings(env: Env, readFile?: (path: string) => string):
   const bucket = setting('TPS_STORAGE_BUCKET', (v) => BUCKET.test(v), 'is not a bucket name');
   const write = key('TPS_STORAGE_WRITE_ACCESS_KEY_ID', 'TPS_STORAGE_WRITE_SECRET_ACCESS_KEY');
   const readKey = key('TPS_STORAGE_READ_ACCESS_KEY_ID', 'TPS_STORAGE_READ_SECRET_ACCESS_KEY');
+  const scanner = key('TPS_STORAGE_SCANNER_ACCESS_KEY_ID', 'TPS_STORAGE_SCANNER_SECRET_ACCESS_KEY');
+  const removal = options.removal
+    ? key('TPS_STORAGE_REMOVAL_ACCESS_KEY_ID', 'TPS_STORAGE_REMOVAL_SECRET_ACCESS_KEY')
+    : undefined;
   const host = setting('TPS_CLAMD_HOST', (v) => HOST.test(v), 'is not a host name or address');
   const port = integer('TPS_CLAMD_PORT', 1, 65_535);
   const timeoutMs = integer('TPS_CLAMD_TIMEOUT_MS', 1000, MAX_CLAMD_TIMEOUT_MS);
@@ -109,6 +121,8 @@ export function loadFileSettings(env: Env, readFile?: (path: string) => string):
     bucket === undefined ||
     write === undefined ||
     readKey === undefined ||
+    scanner === undefined ||
+    (options.removal === true && removal === undefined) ||
     host === undefined ||
     port === undefined ||
     timeoutMs === undefined ||
@@ -117,7 +131,15 @@ export function loadFileSettings(env: Env, readFile?: (path: string) => string):
     throw new ConfigError(problems);
   }
   return {
-    storage: { endpoint: new URL(endpoint), region, bucket, write, read: readKey },
+    storage: {
+      endpoint: new URL(endpoint),
+      region,
+      bucket,
+      write,
+      read: readKey,
+      scanner,
+      ...(removal === undefined ? {} : { removal }),
+    },
     clamd: { host, port, timeoutMs },
     maxStores,
   };

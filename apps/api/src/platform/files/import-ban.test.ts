@@ -15,7 +15,8 @@ const PRESIGNING =
   /(?:from\s*|import\s*\(?\s*|require\s*\(\s*)['"`]@aws-sdk\/(?:s3-request-presigner|s3-presigned-post)|\.presign(?:WithCredentials)?\s*\(|\bgetSignedUrl\s*\(|\bcreatePresignedPost\s*\(/;
 const SIGNER = /['"`]@smithy\/signature-v4/;
 const SPECIFIER = /(?:\bfrom\s*|\bimport\s*\(?\s*|\brequire\s*\(\s*)(['"`])([^'"`\n]+)\1/g;
-const STORAGE_KEYS = /TPS_STORAGE_(?:WRITE|READ)_(?:ACCESS_KEY_ID|SECRET_ACCESS_KEY)/;
+const STORAGE_KEYS =
+  /TPS_STORAGE_(?:WRITE|READ|SCANNER|REMOVAL)_(?:ACCESS_KEY_ID|SECRET_ACCESS_KEY)/;
 const THIS_FOLDER = 'apps/api/src/platform/files/';
 const FOLDER = 'platform/files/';
 const INDEX = /^index(?:\.[cm]?[jt]s)?$/;

@@ -19,6 +19,8 @@ const settings = {
   bucket: 'tps-files',
   write: { accessKeyId: 'writer', secretAccessKey: new Secret('write-secret-key') },
   read: { accessKeyId: 'reader', secretAccessKey: new Secret('read-secret-key') },
+  scanner: { accessKeyId: 'scanner', secretAccessKey: new Secret('scanner-secret-key') },
+  removal: { accessKeyId: 'remover', secretAccessKey: new Secret('removal-secret-key') },
 };
 
 interface Call {
