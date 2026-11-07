@@ -23,6 +23,7 @@ describe('configuration entity types', () => {
       'platform.theme',
       'platform.module',
       'platform.retention',
+      'platform.embed_origins',
       'crm.segment',
       'assure.checklist',
       'forms.form',
@@ -53,6 +54,7 @@ describe('configuration diffs', () => {
       ],
       'platform.module': [{ field: 'enabled', from: true, to: false }],
       'platform.retention': [{ field: 'days', from: 365, to: 730 }],
+      'platform.embed_origins': [{ field: 'origin', from: null, to: 'https://www.example.org' }],
       'crm.segment': [
         { path: 'name', from: 'Donors', to: 'Regular donors' },
         { path: `filters.${ITEM}.operator`, from: null, to: 'equals' },
@@ -103,6 +105,17 @@ describe('configuration diffs', () => {
         [
           { field: 'days', from: 365, to: 730 },
           { field: 'days', from: 730, to: 1095 },
+        ],
+      ],
+      'platform.embed_origins': [
+        [],
+        [{ field: 'origin', from: null, to: null }],
+        [{ field: 'origin', from: 'https://a.example.org', to: 'https://b.example.org' }],
+        [{ field: 'origin', from: null, to: 'https://*.example.org' }],
+        [{ field: 'origin', from: null, to: 'https://www.example.org', createdBy: ITEM }],
+        [
+          { field: 'origin', from: null, to: 'https://a.example.org' },
+          { field: 'origin', from: null, to: 'https://b.example.org' },
         ],
       ],
       'crm.segment': [
