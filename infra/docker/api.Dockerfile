@@ -9,7 +9,7 @@
 # Build context: the repository root. api.Dockerfile.dockerignore lists the
 # only files sent.
 
-FROM node:24.21.0-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6 AS build
+FROM node:24.22.1-bookworm-slim@sha256:be8204d4bd327363357f532187b752ff62759c31bedf98e9e18fc08c9cbd605c AS build
 
 WORKDIR /app
 # Corepack at an exact version (ADR 0026); it installs pnpm from
@@ -19,7 +19,7 @@ COPY . .
 RUN --mount=type=cache,id=tps-pnpm-store,target=/pnpm-store \
     pnpm install --frozen-lockfile --prod --store-dir /pnpm-store --filter "@pixel-scientists/api..."
 
-FROM node:24.21.0-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6
+FROM node:24.22.1-bookworm-slim@sha256:be8204d4bd327363357f532187b752ff62759c31bedf98e9e18fc08c9cbd605c
 
 ENV NODE_ENV=production
 # Node.js is all the API needs. npm, Corepack and Yarn would only add code to patch.

@@ -11,7 +11,7 @@
 # Build context: the repository root. web.Dockerfile.dockerignore lists the
 # only files sent.
 
-FROM node:24.21.0-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6 AS build
+FROM node:24.22.1-bookworm-slim@sha256:be8204d4bd327363357f532187b752ff62759c31bedf98e9e18fc08c9cbd605c AS build
 
 ARG APP
 WORKDIR /app
@@ -31,7 +31,7 @@ RUN pnpm --filter "@pixel-scientists/${APP}" build \
       exit 1; \
     fi
 
-FROM node:24.21.0-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6
+FROM node:24.22.1-bookworm-slim@sha256:be8204d4bd327363357f532187b752ff62759c31bedf98e9e18fc08c9cbd605c
 
 ARG APP
 # Node.js is all the server needs. npm, Corepack and Yarn would only add code to patch.
