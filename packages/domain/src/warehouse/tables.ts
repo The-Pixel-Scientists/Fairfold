@@ -6,6 +6,7 @@
 import type { ModuleId } from '../platform/modules.ts';
 import { grantsTables } from './grants.ts';
 import type { WarehouseColumn } from './model.ts';
+import type { DataContractVersion } from './registry.ts';
 import { sharedTables } from './shared.ts';
 
 /** Raised with any change to a table or column; the load script's header names it. */
@@ -58,6 +59,8 @@ export interface WarehouseTenant {
  */
 export interface WarehouseContribution<M extends ModuleId, Tx> {
   readonly module: M;
+  /** The data contract version it emits; contributionProblems() checks it against the registry. */
+  readonly contractVersion?: DataContractVersion<M>;
   readonly tables: {
     readonly [T in WarehouseTableOf<M>]: (
       tx: Tx,
