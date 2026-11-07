@@ -5,9 +5,19 @@
 import '../jitless/index.ts';
 
 export {
+  MAX_UPLOAD_BODIES_AT_ONCE,
+  uploadBuckets,
+  uploadCharge,
+  uploadLimitMessage,
+  uploadLimits,
+  type UploadBucket,
+  type UploadLimit,
+} from './limits.ts';
+export {
   fileNameMessages,
   fileRefusalMessages,
   fileRefusals,
+  fileWithheldMessages,
   type FileRefusal,
 } from './messages.ts';
 export {
@@ -18,6 +28,13 @@ export {
   fileNameSchema,
   MAX_FILE_NAME_LENGTH,
 } from './name.ts';
+export {
+  canChangeScanState,
+  needsRescan,
+  scanStateChanges,
+  SIGNATURE_VERSION_TTL_SECONDS,
+  signatureVersionSchema,
+} from './scan.ts';
 export { sniffFileType } from './sniff.ts';
 export {
   fileTypeExtensions,

@@ -16,6 +16,11 @@ platform.warehouse.exported: Warehouse exported
 platform.file.uploaded: File uploaded
 platform.file.refused: File refused
 platform.file.downloaded: File downloaded
+platform.file.withheld: File withheld
+platform.file.restored: File restored
+platform.file.deleted: File deleted
+platform.file_sweep.completed: File sweep completed
+platform.file_recheck.completed: File recheck completed
 platform.retention_policy.changed: Retention policy changed
 platform.retention.applied: Retention applied
 platform.subject_access.requested: Subject access requested
