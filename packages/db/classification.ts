@@ -12,6 +12,7 @@ import { app, appSubjects } from './classification/app.ts';
 import { auth, authSubjects } from './classification/auth.ts';
 import { grants, grantsSubjects } from './classification/grants.ts';
 import { party, partySubjects } from './classification/party.ts';
+import { pgboss } from './classification/pgboss.ts';
 
 /** How sensitive a field's values are, from least to most. */
 export const SENSITIVITIES = ['public', 'internal', 'personal', 'special_category'] as const;
@@ -114,7 +115,13 @@ export function mergeSchemaMaps<T>(
   );
 }
 
-export const classification: ClassificationRegistry = mergeSchemaMaps({ app, auth, party, grants });
+export const classification: ClassificationRegistry = mergeSchemaMaps({
+  app,
+  auth,
+  party,
+  grants,
+  pgboss,
+});
 
 export const subjectPaths: SubjectPathRegistry = mergeSchemaMaps({
   app: appSubjects,
