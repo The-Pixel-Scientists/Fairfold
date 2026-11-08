@@ -35,3 +35,6 @@ rules:
         - /apps/api/src/platform/audit-log/audit-log.integration.test.ts
         # Inserts a duplicate event as app_api to prove the unique key holds.
         - /apps/api/src/auth/auth.integration.test.ts
+        # Seeds events that expired a month ago, which the writer cannot: it
+        # stamps the current time.
+        - /apps/api/src/worker/jobs/retention.integration.test.ts
