@@ -47,16 +47,15 @@ test.describe('the second funder cannot reach the first funder’s file', () => 
       `/console/submissions/${applicationId}/files/${fileId}`,
       `/console/submissions/${applicationId}/files`,
     ];
+    // A reviewer may lack the permission and be refused before the record is looked up.
     const people = {
-      admin: b.admin,
-      manager: b.manager,
-      reviewer: b.reviewer,
+      admin: { api: b.admin, allowed: [404] },
+      manager: { api: b.manager, allowed: [404] },
+      reviewer: { api: b.reviewer, allowed: [403, 404] },
     };
-    for (const [role, api] of Object.entries(people)) {
+    for (const [role, { api, allowed }] of Object.entries(people)) {
       for (const path of staffRoutes) {
         const answer = await api.send('GET', path);
-        // A reviewer may lack the permission and be refused before the record is looked up.
-        const allowed = role === 'reviewer' ? [403, 404] : [404];
         expect(allowed, `${role} ${path}`).toContain(answer.status);
         expect(answer.text, `${role} ${path}`).not.toContain(fileId);
         expect(answer.text, `${role} ${path}`).not.toContain(applicationId);
