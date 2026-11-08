@@ -264,8 +264,8 @@ describe('the export', () => {
       asMigratorIn(t.tenantA.id, async (client) => {
         await client.query(
           `CREATE TEMP TABLE copies AS
-             SELECT gen_random_uuid() AS organisation_id, gen_random_uuid() AS application_id,
-                    gen_random_uuid() AS decision_id, n
+             SELECT gen_random_uuid() AS organisation_id, gen_random_uuid() AS snapshot_id,
+                    gen_random_uuid() AS application_id, gen_random_uuid() AS decision_id, n
                FROM generate_series(1, $1::int) n`,
           [count],
         );
@@ -290,10 +290,18 @@ describe('the export', () => {
           ", 'name', 'Copy ' || c.n",
         );
         await copy(
+          'party.organisation_snapshot',
+          `(SELECT o.* FROM party.organisation_snapshot o
+              JOIN grants.application x ON x.organisation_snapshot_id = o.id
+             WHERE x.id = '${a}')`,
+          'snapshot_id',
+          ", 'organisation_id', c.organisation_id",
+        );
+        await copy(
           'grants.application',
           `(SELECT * FROM grants.application WHERE id = '${a}')`,
           'application_id',
-          ", 'organisation_id', c.organisation_id",
+          ", 'organisation_id', c.organisation_id, 'organisation_snapshot_id', c.snapshot_id",
         );
         await copy(
           'grants.decision',
