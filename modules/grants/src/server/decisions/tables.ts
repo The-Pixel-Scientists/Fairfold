@@ -72,6 +72,7 @@ type DecisionTables = {
     updated_by: string;
   };
   'app.audit_event': { id: string; action: string; entity_id: string };
+  'app.tenant_module': { module: string; enabled: boolean };
 };
 
 /** The transaction typed to the tables the decision routes use. */

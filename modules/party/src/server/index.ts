@@ -16,7 +16,7 @@ export {
   peopleByUserIds,
   personIdForUser,
 } from './people.ts';
-export { organisationSummaries } from './organisations.ts';
+export { organisationName, organisationSummaries } from './organisations.ts';
 export {
   partyHandlers,
   partyResolvers,
