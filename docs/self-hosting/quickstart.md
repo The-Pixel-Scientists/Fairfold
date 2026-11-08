@@ -46,8 +46,8 @@ memory limit first.
 | You need | Version | Why |
 | --- | --- | --- |
 | Git | Any recent version | To clone the code |
-| Node.js | 24.21.0 (named in `.node-version`). Any 24 release from 24.16.0 works | `pnpm stack` is a Node.js script that runs on your machine |
-| pnpm | 12.5.1, which Corepack fetches for you | Runs the commands. It also installs the project's dependencies first, if they are missing |
+| Node.js | 26.12.1 (named in `.node-version`). Any 26 release from 26.12.1 works | `pnpm stack` is a Node.js script that runs on your machine |
+| pnpm | 12.5.1, which Corepack 0.36.0 fetches for you | Runs the commands. It also installs the project's dependencies first, if they are missing |
 | Docker with Compose v2 | We tested Docker 29.8.0 with Compose 5.5.1. On Linux, use Docker Engine 28 or later | Builds and runs the containers |
 | Memory for Docker | Enough for ClamAV, which needs over 1 GB, beside everything else | The virus scanner holds its signatures in memory |
 | Four free ports | On `127.0.0.1`, between 41000 and 48999 | The script picks them for you |
@@ -71,9 +71,11 @@ yet run them on Linux or macOS.
 ```sh
 git clone https://github.com/The-Pixel-Scientists/Fairfold.git
 cd Fairfold
+npm install --global --ignore-scripts corepack@0.36.0
 corepack enable
 ```
 
+Node.js 26 no longer includes Corepack, so the first command installs it.
 `corepack enable` makes the `pnpm` command available at the version the
 project asks for. If it fails with a permissions error, run it in an
 administrator terminal, or install pnpm 12.5.1 another way.
@@ -127,8 +129,8 @@ Your port numbers will differ. The script works them out from the name of the
 folder you cloned into, so two clones on one machine never use the same ports,
 containers or database. `pnpm dev:names` prints them again at any time.
 
-You may also see `This project requires Node.js 24.21.0`. It is a warning, not
-an error: the stack runs on any 24 release from 24.16.0. Install 24.21.0 to
+You may also see `This project requires Node.js 26.12.1`. It is a warning, not
+an error: the stack runs on any 26 release from 26.12.1. Install 26.12.1 to
 clear it.
 
 ## Fill the stack with demo data
