@@ -45,7 +45,7 @@ describe('the worker', () => {
     expect(await t.queued([submission])).toHaveLength(1);
     expect(t.sent).toEqual([]);
 
-    const logger = { error: vi.fn(), warn: vi.fn() };
+    const logger = { error: vi.fn(), warn: vi.fn(), info: vi.fn() };
     const { host, port, database, password } = connectionSettings('app_queue');
     runner = await startWorker({
       queue: {

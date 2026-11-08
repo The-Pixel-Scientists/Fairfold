@@ -47,7 +47,7 @@ describe('shutting down', () => {
 });
 
 describe('the handler registry and schedules', () => {
-  const logger = { error: vi.fn() };
+  const logger = { error: vi.fn(), info: vi.fn() };
 
   it('refuses at start a handler twice, or for a queue not made by defineQueue()', async () => {
     const queue = defineQueue('test_registry_tenant', 'tenant', empty);
@@ -92,7 +92,7 @@ describe('the job audit actor and logger', () => {
 
   it('logs codes, queue names and ids, never the error', () => {
     const error = vi.fn();
-    jobLogger({ error }).error(
+    jobLogger({ error, info: vi.fn() }).error(
       {
         err: new Error('relation "secret" does not exist'),
         queue: 'q',

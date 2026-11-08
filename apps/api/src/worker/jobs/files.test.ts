@@ -32,7 +32,7 @@ describe('the tenant files job', () => {
     expect(daily).toEqual([
       { queue: fileFanOutQueue, cron: '0 2 * * *', data: { target: filesQueue.name } },
     ]);
-    const logger = { error: () => undefined };
+    const logger = { error: () => undefined, info: () => undefined };
     const without = platformHandlers(logger).map(({ queue }) => queue.name);
     const withFiles = platformHandlers(logger, {} as FilesJobDependencies).map(
       ({ queue }) => queue.name,
