@@ -12,6 +12,7 @@ import {
   type PublicTenantRow,
   type TenantId,
 } from '@pixel-scientists/db';
+import { startJobSender, stopJobSender, type JobSender } from '@pixel-scientists/db/jobs';
 import type { LogoType } from '@pixel-scientists/domain/platform';
 import type { FastifyBaseLogger } from 'fastify';
 
@@ -52,6 +53,8 @@ export interface ApiDatabase {
   publicTenants: PublicTenants;
   /** The request limits' counters, in no tenant (S11-36). */
   requestLimits: CounterStore & UploadCounters;
+  /** Starts the sender that routes queue jobs with (ADR 0009); asking again gives the same one. */
+  startJobs(onError: (error: Error) => void): Promise<JobSender>;
   /** Closes the pool. */
   close(): Promise<void>;
 }
@@ -89,6 +92,7 @@ export function openDatabase(settings: Config['database'], log: FastifyBaseLogge
     statementTimeoutMillis: 2000,
     queryTimeoutMillis: 3000,
   });
+  let jobs: Promise<JobSender> | undefined;
   return {
     async check() {
       // No tenant is set: the readiness probe reads no tenant data.
@@ -97,7 +101,9 @@ export function openDatabase(settings: Config['database'], log: FastifyBaseLogge
     inTenant: (tenant, work) => withTenant(db, tenant, work),
     publicTenants: publicTenantsOn(db),
     requestLimits: counterStore(counters),
+    startJobs: (onError) => (jobs ??= startJobSender(db, onError)),
     close: async () => {
+      if (jobs !== undefined) await stopJobSender(await jobs);
       await Promise.all([db.destroy(), counters.destroy()]);
     },
   };

@@ -129,7 +129,9 @@ describe('releasing', () => {
 
     const result = await answer<ReleaseResult>(t.release(roundId));
 
-    expect(result).toEqual({ released: 2, sent: 2, failed: 0, pending: 0 });
+    expect(result).toEqual({ released: 2, sent: 0, failed: 0, pending: 2 });
+    expect(t.sent).toEqual([]);
+    await t.deliver([a, b, c]);
     const text = (to: string) => t.sent.filter((message) => message.to === to);
     expect(t.sent.map((message) => message.to)).toEqual([email, email]);
     expect(
@@ -238,7 +240,7 @@ describe('releasing', () => {
     const result = await answer<ReleaseResult>(
       t.release(roundId, { release: 'chosen', submissionIds: [a] }),
     );
-    expect(result).toEqual({ released: 1, sent: 1, failed: 0, pending: 0 });
+    expect(result).toEqual({ released: 1, sent: 0, failed: 0, pending: 1 });
     expect(await application(a)).toMatchObject({
       status: 'waitlisted',
       outcome: { result: 'waitlisted' },
@@ -258,9 +260,9 @@ describe('releasing', () => {
     );
     expect(await answer<ReleaseResult>(t.release(roundId))).toEqual({
       released: 1,
-      sent: 1,
+      sent: 0,
       failed: 0,
-      pending: 0,
+      pending: 1,
     });
     expect(await answer<ReleaseResult>(t.release(roundId))).toEqual({
       released: 0,
@@ -268,6 +270,7 @@ describe('releasing', () => {
       failed: 0,
       pending: 0,
     });
+    await t.deliver([a, b]);
     expect(t.sent).toHaveLength(1);
   });
 

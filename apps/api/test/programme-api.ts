@@ -174,13 +174,14 @@ export async function startProgrammeApi(port: string, mail?: Mail, files?: FileS
   const logger = createLogger({ level: 'silent' });
   const database = openDatabase(settings, logger);
   const auth = testAuth();
+  const jobs = await database.startJobs(() => undefined);
   const api = await buildApp({
     logger,
     checkDatabase: () => database.check(),
     inTenant: database.inTenant,
     files,
     auth: auth.module,
-    ...composeModules({ publicTenants: database.publicTenants, mail }),
+    ...composeModules({ publicTenants: database.publicTenants, mail, jobs }),
   });
 
   const [tenantA, tenantB] = await Promise.all([createGrantsTenant(), createGrantsTenant()]);
@@ -264,6 +265,7 @@ export async function startProgrammeApi(port: string, mail?: Mail, files?: FileS
     tenantA,
     tenantB,
     ...members,
+    jobs,
     send,
     upload,
     aProgramme,

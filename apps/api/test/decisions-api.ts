@@ -4,9 +4,15 @@
 // sender the tests control, rounds with submissions in their review stage,
 // and the requests the tests share.
 
+import { randomUUID } from 'node:crypto';
+
+import { createDatabase, withTenant } from '@pixel-scientists/db';
 import type { DecisionList, Decision } from '@pixel-scientists/grants/contracts';
 
+import { trustedTenantId } from '../../../packages/db/src/tenant-context.ts';
+import { databaseSettings } from '../../../packages/db/test/connect.ts';
 import { asMigratorIn } from '../../../packages/db/test/tenants.ts';
+import { releaseEmailJob } from '../src/decision-emails.ts';
 import type { Email, SendResult } from '../src/email/sender.ts';
 import type { Mail } from '../src/modules.ts';
 import { startAssessmentApi } from './assessment-api.ts';
@@ -32,6 +38,8 @@ export async function startDecisionsApi(port: string) {
   let behaviour: Send = recording;
   const mail: Mail = { sender: { send: (email) => behaviour(email) }, portalOrigin: PORTAL };
   const t = await startAssessmentApi(port, mail);
+  const worker = createDatabase<unknown>(databaseSettings('app_worker', 4));
+  const { handler } = releaseEmailJob({ sender: mail.sender, portalOrigin: PORTAL });
 
   /** Changes what sending does until `restore()`: a real or failing sender, say. */
   const sendWith = (send: Send) => {
@@ -52,6 +60,70 @@ export async function startDecisionsApi(port: string) {
         ])
         .then(() => undefined),
     );
+
+  /** One release email job, as the worker's wrapper would run it: in `tenantId`, as app_worker. */
+  const runJob = (
+    tenantId: string,
+    job: {
+      id?: string;
+      decisionEmailId: string;
+      requestId?: string;
+      causingUserId?: string | null;
+    },
+    crashAfter = false,
+  ) =>
+    withTenant(worker, trustedTenantId(tenantId), async (trx) => {
+      await handler(trx, {
+        id: job.id ?? randomUUID(),
+        data: { decisionEmailId: job.decisionEmailId },
+        context: {
+          sender: t.jobs,
+          requestId: job.requestId ?? randomUUID(),
+          causingUserId: job.causingUserId ?? null,
+        },
+      });
+      if (crashAfter) throw new Error('The worker stopped before it committed.');
+    });
+
+  /** The jobs queued for the emails of these applications' decisions, oldest first. */
+  const queued = (applicationIds: string[]) =>
+    t.rows<{ id: string; data: Record<string, string | null> }>(
+      `SELECT j.id, j.data FROM pgboss.job j
+        WHERE j.name = 'grants.release_email' AND j.state = 'created'
+          AND j.data->>'decisionEmailId' IN (
+            SELECT e.id::text FROM grants.decision_email e
+              JOIN grants.decision d ON d.id = e.decision_id
+             WHERE d.application_id = ANY($1))
+        ORDER BY j.created_on, j.id`,
+      [applicationIds],
+    );
+
+  /**
+   * Runs the jobs queued for these applications' emails, as the worker does. A job that completes
+   * is taken off the queue; one that fails stays, as pg-boss would keep it for a retry.
+   */
+  const deliver = async (applicationIds: string[], crashAfter = false) => {
+    const result = { ran: 0, failed: 0 };
+    for (const { id, data } of await queued(applicationIds)) {
+      try {
+        await runJob(
+          data['tenantId'] ?? '',
+          {
+            id,
+            decisionEmailId: data['decisionEmailId'] ?? '',
+            requestId: data['requestId'] ?? undefined,
+            causingUserId: data['causingUserId'] ?? null,
+          },
+          crashAfter,
+        );
+        await t.rows('DELETE FROM pgboss.job WHERE id = $1', [id]);
+        result.ran++;
+      } catch {
+        result.failed++;
+      }
+    }
+    return result;
+  };
 
   const decisionPath = (submissionId: string) => `/console/submissions/${submissionId}/decision`;
   const roundPath = (roundId: string, tail = '') => `/console/rounds/${roundId}/decisions${tail}`;
@@ -100,6 +172,8 @@ export async function startDecisionsApi(port: string) {
 
   return {
     ...t,
+    mail,
+    worker,
     sent,
     sendWith,
     restore,
@@ -114,6 +188,13 @@ export async function startDecisionsApi(port: string) {
     decisions,
     emails,
     events,
+    runJob,
+    queued,
+    deliver,
+    async close() {
+      await t.close();
+      await worker.destroy();
+    },
   };
 }
 
