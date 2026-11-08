@@ -1,0 +1,45 @@
+{
+  "tenants": {
+    "a": { "slug": "northfield", "name": "Northfield Community Trust" },
+    "b": {
+      "slug": "eastmoor",
+      "name": "Eastmoor Foundation",
+      "accounts": {
+        "admin": "eastAdmin",
+        "manager": "eastManager",
+        "reviewer": "eastReviewer1",
+        "applicant": "eastApplicant"
+      }
+    }
+  },
+  "modulesOnAtSeed": ["grants"],
+  "portalSections": ["grants"],
+  "pathParams": {
+    "slug": "@slug",
+    "programmeId": "programmeId",
+    "roundId": "roundId",
+    "stageId": "reviewStageId",
+    "formVersionId": "formVersionId",
+    "submissionId": "applicationId",
+    "applicationId": "applicationId",
+    "fieldId": "fieldId",
+    "fileId": "fileId",
+    "organisationId": "organisationId",
+    "personId": "personId",
+    "membershipId": "reviewerMembershipId",
+    "assignmentId": "assignmentId",
+    "invitationId": "invitationId"
+  },
+  "console": {
+    "teamPath": "/team",
+    "paths": {
+      "grants": "/programmes",
+      "crm": "/crm",
+      "assure": "/assure",
+      "forms": "/forms",
+      "privacy": "/privacy",
+      "insight": "/insight"
+    },
+    "extraLinks": { "grants": ["Programmes", "Submissions"] }
+  }
+}
