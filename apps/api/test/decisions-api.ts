@@ -38,7 +38,16 @@ export async function startDecisionsApi(port: string) {
   let behaviour: Send = recording;
   const mail: Mail = { sender: { send: (email) => behaviour(email) }, portalOrigin: PORTAL };
   const t = await startAssessmentApi(port, mail);
-  const worker = createDatabase<unknown>(databaseSettings('app_worker', 4));
+  const settings = databaseSettings('app_worker', 4);
+  const worker = createDatabase<unknown>({
+    host: settings.host,
+    port: settings.port,
+    database: settings.database,
+    password: settings.password,
+    role: 'app_worker',
+    maxConnections: 4,
+    applicationName: 'tps-db-tests',
+  });
   const { handler } = releaseEmailJob({ sender: mail.sender, portalOrigin: PORTAL });
 
   /** Changes what sending does until `restore()`: a real or failing sender, say. */
