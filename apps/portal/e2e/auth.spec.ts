@@ -158,11 +158,7 @@ test.describe('create an account', () => {
 
     await expect(h1(page, 'Apply for a grant')).toBeFocused();
     await expect(page).toHaveURL(/\/northfield\/$/);
-    await expect(
-      page.getByText(
-        'You are signed in. Choose a programme to apply to, or carry on with an application.',
-      ),
-    ).toBeVisible();
+    await expect(page.getByText('You are signed in. Choose where you want to go.')).toBeVisible();
   });
 
   test('says the link does not work when the token is missing, as after a reload', async ({

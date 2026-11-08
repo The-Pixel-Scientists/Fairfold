@@ -57,12 +57,14 @@ export interface SessionOptions {
   /** The funder the session works for; null is a signed-in person with no membership in the address. */
   active?: Membership | null;
   email?: string;
+  /** The tools switched on for the funder. Defaults to grants. */
+  modules?: string[];
   /** When the session ends, as an ISO date. Defaults to eight hours from now. */
   expiresAt?: string;
 }
 
 export function applicantSession(options: SessionOptions = {}) {
-  const { active = northfield, email = 'ada@example.org' } = options;
+  const { active = northfield, email = 'ada@example.org', modules = ['grants'] } = options;
   // Hours ahead, not years: a timer set that far out overflows and fires at once, which starves the router in WebKit.
   const { expiresAt = new Date(Date.now() + 8 * 3_600_000).toISOString() } = options;
   const withRoles = (membership: Membership) => ({ ...membership, roles: ['applicant'] });
@@ -75,6 +77,7 @@ export function applicantSession(options: SessionOptions = {}) {
     activeMembership: active === null ? null : withRoles(active),
     memberships: active === null ? [] : [withRoles(active)],
     permissions: active === null ? [] : applicantPermissions,
+    modules: active === null ? [] : modules,
   };
 }
 
