@@ -8,26 +8,27 @@ build, which can take five minutes or more.
 
 > **Fairfold Grants is pre-release software. Do not put live personal data in
 > this stack.** Use it to try the platform and to check that your hosting
-> set-up works. It has no backups, no encryption in transit and no background
-> worker, and it has not had a penetration test or any security
-> certification. See
+> set-up works. It has no backups and no encryption in transit, and it has
+> not had a penetration test or any security certification. See
 > [What this stack does and does not protect](#what-this-stack-does-and-does-not-protect).
 
 ## What you get
 
 `pnpm stack` builds and runs these containers:
 
-| Container | What it is |
-| --- | --- |
-| `postgres` | PostgreSQL 16, with its data in a Docker volume |
-| `migrate` | A one-off job that creates the database roles and applies every migration, then exits |
-| `api` | The Fairfold Grants API |
-| `console` | The staff console |
-| `portal` | The applicant portal |
-| `mailpit` | Catches every email the API sends, so no email leaves your machine. Read them in a browser |
-| `seaweedfs` | S3-compatible file storage, for the files applicants upload |
-| `storage-bucket` | A one-off job that creates the storage bucket, then exits |
-| `clamav` | The virus scanner. The API checks every upload with it before storing the file |
+| Container                                 | What it is                                                                                   |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `postgres`                                | PostgreSQL 16, with its data in a Docker volume                                              |
+| `migrate`                                 | A one-off job that creates the database roles and applies every migration, then exits        |
+| `api`                                     | The Fairfold Grants API                                                                      |
+| `console`                                 | The staff console                                                                            |
+| `portal`                                  | The applicant portal                                                                         |
+| `worker`                                  | Runs background jobs, such as sending decision emails                                        |
+| `mailpit`                                 | Catches every email the stack sends, so no email leaves your machine. Read them in a browser |
+| `mail-forward-api`, `mail-forward-worker` | Small forwarders that pass the API's and worker's email to Mailpit                           |
+| `seaweedfs`                               | S3-compatible file storage, for the files applicants upload                                  |
+| `storage-bucket`                          | A one-off job that creates the storage bucket, then exits                                    |
+| `clamav`                                  | The virus scanner. The API checks every upload with it before storing the file               |
 
 The stack starts empty. `pnpm stack seed` fills it with two synthetic funders
 and their staff (see [Fill the stack with demo data](#fill-the-stack-with-demo-data)).
@@ -43,16 +44,16 @@ memory limit first.
 
 ## What you need
 
-| You need | Version | Why |
-| --- | --- | --- |
-| Git | Any recent version | To clone the code |
-| Node.js | 26.12.1 (named in `.node-version`). Any 26 release from 26.12.1 works | `pnpm stack` is a Node.js script that runs on your machine |
-| pnpm | 12.5.1, which Corepack 0.36.0 fetches for you | Runs the commands. It also installs the project's dependencies first, if they are missing |
-| Docker with Compose v2 | We tested Docker 29.8.0 with Compose 5.5.1. On Linux, use Docker Engine 28 or later | Builds and runs the containers |
-| Memory for Docker | Enough for ClamAV, which needs over 1 GB, beside everything else | The virus scanner holds its signatures in memory |
-| Four free ports | On `127.0.0.1`, between 41000 and 48999 | The script picks them for you |
-| Disk and network | A few gigabytes of disk, and internet access for the first build | The build downloads base images and packages |
-| An authenticator app | Any app that makes 6-digit codes, on your phone | Staff accounts need a code each time they sign in |
+| You need               | Version                                                                             | Why                                                                                       |
+| ---------------------- | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Git                    | Any recent version                                                                  | To clone the code                                                                         |
+| Node.js                | 26.12.1 (named in `.node-version`). Any 26 release from 26.12.1 works               | `pnpm stack` is a Node.js script that runs on your machine                                |
+| pnpm                   | 12.5.1, which Corepack 0.36.0 fetches for you                                       | Runs the commands. It also installs the project's dependencies first, if they are missing |
+| Docker with Compose v2 | We tested Docker 29.8.0 with Compose 5.5.1. On Linux, use Docker Engine 28 or later | Builds and runs the containers                                                            |
+| Memory for Docker      | Enough for ClamAV, which needs over 1 GB, beside everything else                    | The virus scanner holds its signatures in memory                                          |
+| Four free ports        | On `127.0.0.1`, between 41000 and 48999                                             | The script picks them for you                                                             |
+| Disk and network       | A few gigabytes of disk, and internet access for the first build                    | The build downloads base images and packages                                              |
+| An authenticator app   | Any app that makes 6-digit codes, on your phone                                     | Staff accounts need a code each time they sign in                                         |
 
 Check your tools:
 
@@ -144,11 +145,11 @@ applications into the stack's database. It reaches the database through a
 short-lived container that only your machine can reach, and removes the
 container when it finishes. Name one scenario:
 
-| Scenario | What it adds |
-| --- | --- |
-| `base` | Two funders, **Northfield Community Trust** (`/northfield`) and **Eastmoor Foundation** (`/eastmoor`). Each has an administrator, a programme manager and two reviewers. Nothing else: you set up the programme yourself. Eastmoor has its own brand colour, so the two look different. This is the one the [demo script](../demo/mvp1-demo.md) starts from |
-| `configured` | `base`, plus Northfield's Community Spaces Fund, open, with one round (12 October to 2 November 2026), its three stages, a rubric, a published application form and the outcome emails. This is the default if you name none |
-| `applications` | `configured`, with the round moved to 7 September to 5 October 2026 and five submitted applications and one withdrawn, across its three stages, with reviews partly done and two decisions recorded but not released |
+| Scenario       | What it adds                                                                                                                                                                                                                                                                                                                                                |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `base`         | Two funders, **Northfield Community Trust** (`/northfield`) and **Eastmoor Foundation** (`/eastmoor`). Each has an administrator, a programme manager and two reviewers. Nothing else: you set up the programme yourself. Eastmoor has its own brand colour, so the two look different. This is the one the [demo script](../demo/mvp1-demo.md) starts from |
+| `configured`   | `base`, plus Northfield's Community Spaces Fund, open, with one round (12 October to 2 November 2026), its three stages, a rubric, a published application form and the outcome emails. This is the default if you name none                                                                                                                                |
+| `applications` | `configured`, with the round moved to 7 September to 5 October 2026 and five submitted applications and one withdrawn, across its three stages, with reviews partly done and two decisions recorded but not released                                                                                                                                        |
 
 The seed refuses to run on a database that already has funders. To start
 again, delete the stack's data first (see [Stop the stack](#stop-the-stack)).
@@ -200,8 +201,8 @@ Every address below uses the ports the start-up printed. Replace `46506`,
    pnpm stack ps
    ```
 
-   `postgres`, `api`, `console`, `portal`, `mailpit`, `seaweedfs` and `clamav`
-   should say `(healthy)` or `Up`. The `migrate` and `storage-bucket` jobs
+   `postgres`, `api`, `worker`, `console`, `portal`, `mailpit`, `seaweedfs`,
+   `clamav` and the two `mail-forward` containers should say `(healthy)` or `Up`. The `migrate` and `storage-bucket` jobs
    have finished and exited, so they only show with `pnpm stack ps --all`.
 
 2. Ask the API whether it is running, then whether it can reach the database:
@@ -286,19 +287,19 @@ authenticator app: the new ones have new set-up keys.
 
 ## If something goes wrong
 
-| What you see | What to do |
-| --- | --- |
-| `The stack's database was made with a superuser password that is no longer in ...` | The secrets folder was deleted but the database was not. Run `pnpm stack down --volumes` to delete the database too, then `pnpm stack` |
-| Docker says a port is already allocated | Stop whatever uses it, or clone into a folder with another name, which gives you other ports |
-| `pnpm stack` stops at once and prints nothing | Docker is not installed, or is not on your path. Run `docker compose version` to check |
-| Docker says it cannot connect to its daemon | Start Docker, then run `pnpm stack` again |
-| `pnpm stack` waits a long time at `clamav` | ClamAV is loading its signatures, which takes about a minute and over 1 GB of memory. Give Docker more memory if it never becomes healthy |
-| An upload says "The file could not be checked" | ClamAV is down or still starting, or the file is encrypted or damaged. Run `pnpm stack ps` and `pnpm stack logs clamav` |
-| An upload says "We are checking other files" | The API is scanning as many files as it allows at once. Wait a minute and try again |
-| A container is not healthy | Run `pnpm stack logs <name>`, for example `pnpm stack logs api`, and read the last lines |
-| The build fails while downloading | Check your internet connection and run `pnpm stack` again. Docker keeps the layers it already built |
-| `Refusing to seed ...: it already has tenants` | The seed only fills an empty database. Delete the data with `pnpm stack down --volumes`, then run `pnpm stack` and `pnpm stack seed base` again |
-| The sign-in page does not accept your code | Each code works once, and your phone's clock must be right. Wait for the next code |
+| What you see                                                                       | What to do                                                                                                                                      |
+| ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `The stack's database was made with a superuser password that is no longer in ...` | The secrets folder was deleted but the database was not. Run `pnpm stack down --volumes` to delete the database too, then `pnpm stack`          |
+| Docker says a port is already allocated                                            | Stop whatever uses it, or clone into a folder with another name, which gives you other ports                                                    |
+| `pnpm stack` stops at once and prints nothing                                      | Docker is not installed, or is not on your path. Run `docker compose version` to check                                                          |
+| Docker says it cannot connect to its daemon                                        | Start Docker, then run `pnpm stack` again                                                                                                       |
+| `pnpm stack` waits a long time at `clamav`                                         | ClamAV is loading its signatures, which takes about a minute and over 1 GB of memory. Give Docker more memory if it never becomes healthy       |
+| An upload says "The file could not be checked"                                     | ClamAV is down or still starting, or the file is encrypted or damaged. Run `pnpm stack ps` and `pnpm stack logs clamav`                         |
+| An upload says "We are checking other files"                                       | The API is scanning as many files as it allows at once. Wait a minute and try again                                                             |
+| A container is not healthy                                                         | Run `pnpm stack logs <name>`, for example `pnpm stack logs api`, and read the last lines                                                        |
+| The build fails while downloading                                                  | Check your internet connection and run `pnpm stack` again. Docker keeps the layers it already built                                             |
+| `Refusing to seed ...: it already has tenants`                                     | The seed only fills an empty database. Delete the data with `pnpm stack down --volumes`, then run `pnpm stack` and `pnpm stack seed base` again |
+| The sign-in page does not accept your code                                         | Each code works once, and your phone's clock must be right. Wait for the next code                                                              |
 
 Any other Compose command works the same way: `pnpm stack <command>` passes it
 to Docker Compose for this clone's project.
@@ -330,16 +331,16 @@ other way, these settings are all required, and the API refuses to start
 without them. Each secret setting also has a `_FILE` form that names a file
 holding the value.
 
-| Setting | What it is |
-| --- | --- |
-| `TPS_STORAGE_ENDPOINT` | The storage address, with a host and port only, for example `http://seaweedfs:8333` |
-| `TPS_STORAGE_REGION` | The storage region name, for example `us-east-1` |
-| `TPS_STORAGE_BUCKET` | The bucket that holds the files |
-| `TPS_STORAGE_WRITE_ACCESS_KEY_ID`, `TPS_STORAGE_WRITE_SECRET_ACCESS_KEY` | The key that may only write files under `clean/` |
-| `TPS_STORAGE_READ_ACCESS_KEY_ID`, `TPS_STORAGE_READ_SECRET_ACCESS_KEY` | The key that may only read files under `clean/` |
-| `TPS_CLAMD_HOST`, `TPS_CLAMD_PORT` | Where the ClamAV daemon listens |
-| `TPS_CLAMD_TIMEOUT_MS` | How long the API waits for a scan, from 1000 to 25000. The stack uses 25000, 5 seconds after ClamAV's own 20-second limit |
-| `TPS_FILES_MAX_STORES` | How many uploads the API scans and stores at once, from 1 to 9. The stack uses 4 |
+| Setting                                                                  | What it is                                                                                                                |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| `TPS_STORAGE_ENDPOINT`                                                   | The storage address, with a host and port only, for example `http://seaweedfs:8333`                                       |
+| `TPS_STORAGE_REGION`                                                     | The storage region name, for example `us-east-1`                                                                          |
+| `TPS_STORAGE_BUCKET`                                                     | The bucket that holds the files                                                                                           |
+| `TPS_STORAGE_WRITE_ACCESS_KEY_ID`, `TPS_STORAGE_WRITE_SECRET_ACCESS_KEY` | The key that may only write files under `clean/`                                                                          |
+| `TPS_STORAGE_READ_ACCESS_KEY_ID`, `TPS_STORAGE_READ_SECRET_ACCESS_KEY`   | The key that may only read files under `clean/`                                                                           |
+| `TPS_CLAMD_HOST`, `TPS_CLAMD_PORT`                                       | Where the ClamAV daemon listens                                                                                           |
+| `TPS_CLAMD_TIMEOUT_MS`                                                   | How long the API waits for a scan, from 1000 to 25000. The stack uses 25000, 5 seconds after ClamAV's own 20-second limit |
+| `TPS_FILES_MAX_STORES`                                                   | How many uploads the API scans and stores at once, from 1 to 9. The stack uses 4                                          |
 
 ## What this stack does and does not protect
 
@@ -382,8 +383,8 @@ installation:
   `tps_stack_<folder name>_postgres-data` and
   `tps_stack_<folder name>_seaweedfs-data`. Back up both volumes and the
   secrets folder together; without the passwords the backup cannot be used.
-- **No background worker.** Emails to applicants go out from the API, and
-  reminders do not exist yet.
+- **Few background jobs.** The worker sends decision emails and runs the
+  file and retention jobs. Reminders do not exist yet.
 - **No upload limits at the edge.** There is no reverse proxy, no rate limit
   on uploads and no rescan of stored files yet.
 - **No upgrade path yet.** There are no release versions. Treat each pull of
