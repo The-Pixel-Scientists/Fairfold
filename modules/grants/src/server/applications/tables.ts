@@ -38,6 +38,7 @@ type ApplicationTables = {
     form_version_id: string;
     applicant_person_id: string;
     organisation_id: string;
+    organisation_snapshot_id: Generated<string | null>;
     status: Generated<ApplicationStatus>;
     answers: Json;
     answers_version: Generated<number>;
