@@ -93,7 +93,14 @@ x-mail-forward: &mail-forward
     - "const net = require('node:net'); net.createServer((client) => { const mail = net.connect(1025, 'mailpit'); client.on('error', () => mail.destroy()); mail.on('error', () => client.destroy()); client.pipe(mail).pipe(client); }).listen(1025, '127.0.0.1');"
   # The image's check calls the API, which this container is not.
   healthcheck:
-    disable: true
+    test:
+      - CMD
+      - node
+      - --eval
+      - "require('node:net').connect(1025, '127.0.0.1').on('connect', () => process.exit(0)).on('error', () => process.exit(1))"
+    interval: 5s
+    timeout: 5s
+    retries: 30
 
 # For the node user of the release images.
 x-node-secret: &node-secret
@@ -405,8 +412,13 @@ services:
     <<: *hardening
     command: [node, apps/api/src/worker.ts]
     # The image's check calls the API's port, which the worker does not open.
+    # `up --wait` refuses a container with its check disabled, so this one
+    # passes for as long as the container can run a command.
     healthcheck:
-      disable: true
+      test: [CMD, node, --eval, process.exit(0)]
+      interval: 5s
+      timeout: 5s
+      retries: 30
     environment:
       <<: [*database, *storage, *smtp]
       TPS_PORTAL_ORIGIN: https://portal.localhost:${TPS_STACK_PORTAL_PORT:?Run pnpm stack}
