@@ -21,7 +21,7 @@
     "stack": "node scripts/stack.ts",
     "check": "pnpm run typecheck && pnpm run lint && pnpm run format:check && pnpm run test:unit",
     "typecheck": "tsc -b",
-    "lint": "eslint --max-warnings 0 .",
+    "lint": "node --max-old-space-size=8192 node_modules/eslint/bin/eslint.js --max-warnings 0 .",
     "format": "prettier --write \"**/*.{js,mjs,cjs,ts,tsx,json,yaml,yml,css,html}\" \"!pnpm-lock.yaml\" \"!infra/semgrep/**\"",
     "format:check": "prettier --check \"**/*.{js,mjs,cjs,ts,tsx,json,yaml,yml,css,html}\" \"!pnpm-lock.yaml\" \"!infra/semgrep/**\"",
     "test": "node scripts/test.ts",
