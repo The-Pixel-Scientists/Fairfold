@@ -1,0 +1,60 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Code in apps/api/src/auth sets a tenant that no session chose: the tenant
+# named in a sign-in or callback URL, or one that the secret re-encryption
+# command found (ADR 0003, tenant source 4, in auth/sso and auth/rotation),
+# and the tenant recorded on an auth event whose copy the replay command
+# writes (source 5, in auth/audit-copy). Only the auth module may import
+# those folders or name the replay helpers, so no route or job can reach
+# them.
+#
+# auth.sso_providers_by_key_version() lists every tenant's SSO providers
+# whatever the tenant's status, so only the re-encryption command calls it,
+# through ssoProvidersByKeyVersion() in packages/db (ADRs 0003 and 0010).
+
+rules:
+  - id: tps-tenant-helpers-only-in-auth
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      Only apps/api/src/auth may import its sso, audit-copy and rotation code
+      or the replay helpers, which set a tenant without a session. Take the
+      tenant from the session or a checked job instead (ADR 0003).
+    pattern-either:
+      - patterns:
+          - pattern-either:
+              - pattern: import "$MODULE"
+              - pattern: import $X from "$MODULE"
+              - pattern: import * as $X from "$MODULE"
+              - pattern: import {...} from "$MODULE"
+              - pattern: import type $X from "$MODULE"
+              - pattern: import type {...} from "$MODULE"
+              - pattern: export {...} from "$MODULE"
+              - pattern: export * from "$MODULE"
+              - pattern: import("$MODULE")
+              - pattern: require("$MODULE")
+          - metavariable-regex:
+              metavariable: $MODULE
+              regex: ^['"]?(.*/)?auth/(sso|audit-copy|rotation)/
+      - pattern-regex: \b(copyInRecordedTenant|writeInRecordedTenant|replayAuthCopies)\b
+    paths:
+      exclude:
+        - /apps/api/src/auth/
+
+  - id: tps-key-version-function-only-in-rotation
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      Only the secret re-encryption command in apps/api/src/auth/rotation may
+      call auth.sso_providers_by_key_version() or ssoProvidersByKeyVersion(),
+      which list every tenant's SSO providers. Read a tenant's providers in
+      that tenant's own context instead (ADRs 0003 and 0010).
+    pattern-either:
+      # Any case and any quoting, but not the name of the function's owner role.
+      - pattern-regex: (?i)(?<!\w)sso_providers_by_key_version(?!\w)
+      - pattern-regex: \bssoProvidersByKeyVersion\b|\bsso-functions\b
+    paths:
+      exclude:
+        - /apps/api/src/auth/rotation/
+        - /packages/db/src/sso-functions.ts
+        - /packages/db/test/
