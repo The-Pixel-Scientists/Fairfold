@@ -49,7 +49,7 @@ env:
   # ours added since. Raise these when rules are added; lower them only with a
   # reason in review.
   SEMGREP_MINIMUM_RULES: 300
-  SEMGREP_PROJECT_RULES: 20
+  SEMGREP_PROJECT_RULES: 25
   GITHUB_OIDC_ISSUER: https://token.actions.githubusercontent.com
 
 jobs:
