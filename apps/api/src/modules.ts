@@ -37,6 +37,7 @@ import { queueReleaseEmail } from './decision-emails.ts';
 import { listAuditEventsHandler } from './platform/audit-log/index.ts';
 import { insertConfigVersion, readConfigHistory } from './platform/config-versions.ts';
 import { membersWith } from './platform/members.ts';
+import { retentionRoutes } from './platform/retention/index.ts';
 import { settingsRoutes } from './platform/settings/index.ts';
 import { settingsTables } from './platform/settings/tables.ts';
 import { teamRoutes, type TeamAuth } from './platform/team/index.ts';
@@ -146,6 +147,7 @@ export function composeModules(deps: {
       route(listAuditEvents, listAuditEventsHandler),
       ...teamRoutes(deps.auth ?? noAuth),
       ...settingsRoutes,
+      ...retentionRoutes,
       route(
         getWarehouseSnapshot,
         warehouseSnapshotHandler({ contributions: [partyWarehouse, grantsWarehouse] }),

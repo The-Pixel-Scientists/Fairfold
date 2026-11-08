@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { listAuditEvents } from '@pixel-scientists/domain/platform/audit-log';
+import { retentionRoutes } from '@pixel-scientists/domain/platform/retention';
 import {
   getLogo,
   getPublicTenant,
@@ -62,6 +63,7 @@ describe('composeModules', () => {
       removeLogo,
       listModules,
       switchModule,
+      ...Object.values(retentionRoutes),
       getWarehouseSnapshot,
       getPublicTenant,
       getThemeCss,
