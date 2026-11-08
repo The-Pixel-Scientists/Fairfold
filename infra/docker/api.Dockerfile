@@ -8,8 +8,11 @@
 #
 # Build context: the repository root. api.Dockerfile.dockerignore lists the
 # only files sent.
+#
+# Every stage runs on Node.js 26 on Debian 13 slim, pinned by digest. ADR 0026
+# compares it with distroless and records the scan counts.
 
-FROM node:24.22.1-bookworm-slim@sha256:be8204d4bd327363357f532187b752ff62759c31bedf98e9e18fc08c9cbd605c AS build
+FROM node:26.12.1-trixie-slim@sha256:94816674c62774da0d099a947bf4613b9e1972a2733abd0d0cd80e795f8411d0 AS build
 
 WORKDIR /app
 # Corepack at an exact version (ADR 0026); it installs pnpm from
@@ -19,7 +22,7 @@ COPY . .
 RUN --mount=type=cache,id=tps-pnpm-store,target=/pnpm-store \
     pnpm install --frozen-lockfile --prod --store-dir /pnpm-store --filter "@pixel-scientists/api..."
 
-FROM node:24.22.1-bookworm-slim@sha256:be8204d4bd327363357f532187b752ff62759c31bedf98e9e18fc08c9cbd605c
+FROM node:26.12.1-trixie-slim@sha256:94816674c62774da0d099a947bf4613b9e1972a2733abd0d0cd80e795f8411d0
 
 ENV NODE_ENV=production
 # Node.js is all the API needs. npm, Corepack and Yarn would only add code to patch.
