@@ -39,7 +39,7 @@ type AuditTables = {
 const isRole = (name: string): name is keyof typeof roles => Object.hasOwn(roles, name);
 
 /** Staff hold a console role and no portal role; every other member is an applicant. */
-function isStaff(memberRoles: readonly string[]): boolean {
+export function isStaff(memberRoles: readonly string[]): boolean {
   const apps = memberRoles.filter(isRole).map((name) => roles[name].app);
   return apps.includes('console') && !apps.includes('portal');
 }
