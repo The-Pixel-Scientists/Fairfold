@@ -72,7 +72,7 @@ export function allowedAttributes(attributes: Readonly<Record<string, unknown>>)
   for (const [key, rule] of Object.entries(RULES)) {
     if (!(key in attributes)) continue;
     const value = attributes[key];
-    result[key] = rule.ok(value) ? (value as string | number) : rule.fallback;
+    result[key] = rule.ok(value) ? value : rule.fallback;
   }
   return result;
 }
