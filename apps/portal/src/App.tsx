@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { idSchema } from '@pixel-scientists/domain';
-import { NotFoundPage, Router, SessionProvider } from '@pixel-scientists/ui';
+import { NotFoundPage, Router, SessionProvider, useSession } from '@pixel-scientists/ui';
 import type { PageDefinition, Params, RouteDefinition, SearchSchema } from '@pixel-scientists/ui';
-import { Suspense, lazy } from 'react';
+import { Suspense, lazy, useMemo } from 'react';
 import type { ReactNode } from 'react';
 
 import { endSession, loadSession } from './api.ts';
@@ -47,7 +47,9 @@ import {
   SIGN_IN_PATH,
   SIGN_UP_PATH,
 } from './paths.ts';
-import { PortalShell } from './PortalShell.tsx';
+import { routesFor, toolRoutes } from './shell/gate.tsx';
+import { grantsModule } from './shell/modules.ts';
+import { PortalShell } from './shell/PortalShell.tsx';
 import { productName } from './product.ts';
 import { TenantProvider, tenantSlugOf } from './tenant.ts';
 
@@ -81,7 +83,7 @@ const organisationParams: SearchSchema<Params> = {
  * the main bundle, not loaded on demand, so a weak connection cannot stop an
  * applicant at the door.
  */
-export const tenantRoutes: readonly RouteDefinition[] = [
+const ownRoutes: readonly RouteDefinition[] = [
   { path: HOME_PATH, title: 'Apply for a grant', component: StartPage },
   { path: SIGN_UP_PATH, title: 'Create your account', component: SignUpPage },
   { path: CHECK_EMAIL_PATH, title: 'Check your email', component: CheckEmailPage },
@@ -107,8 +109,10 @@ export const tenantRoutes: readonly RouteDefinition[] = [
     component: OrganisationPage,
   },
   { path: FUTURE_FUNDING_PATH, title: 'Future funding', component: FutureFundingPage },
-  ...applyRoutes,
 ];
+
+/** The tools whose pages come and go with the session. */
+const tools = [toolRoutes(grantsModule, applyRoutes)];
 
 function TenantNotFound() {
   return (
@@ -132,18 +136,23 @@ function TopLayout({ children }: { children: ReactNode }) {
   return <PortalShell>{children}</PortalShell>;
 }
 
-function TenantLayout({ children }: { children: ReactNode }) {
-  return (
-    <SessionProvider load={loadSession} signOut={endSession}>
-      {children}
-    </SessionProvider>
-  );
+/** What every router under a funder's address shares. */
+const sharedProps = (slug: string) => ({
+  errorPage: pageLoadErrorPage,
+  basePath: `/${slug}`,
+  titleSuffix: productName,
+});
+
+/** The funder's pages, less those of any tool the session does not show. */
+function TenantRouter({ slug }: { slug: string }) {
+  const { state } = useSession();
+  const routes = useMemo(() => routesFor(state, ownRoutes, tools), [state]);
+  return <Router routes={routes} notFound={tenantNotFound} {...sharedProps(slug)} />;
 }
 
 /** The funder's pages, or the one page that says the funder cannot be found. */
 function FunderRouter({ slug }: { slug: string }) {
   const funder = useFunder();
-  const shared = { errorPage: pageLoadErrorPage, basePath: `/${slug}`, titleSuffix: productName };
   if (funder?.status === 'missing') {
     return (
       <Router
@@ -151,12 +160,14 @@ function FunderRouter({ slug }: { slug: string }) {
         routes={noRoutes}
         notFound={unknownFunder}
         layout={TopLayout}
-        {...shared}
+        {...sharedProps(slug)}
       />
     );
   }
   return (
-    <Router routes={tenantRoutes} notFound={tenantNotFound} layout={TenantLayout} {...shared} />
+    <SessionProvider load={loadSession} signOut={endSession}>
+      <TenantRouter slug={slug} />
+    </SessionProvider>
   );
 }
 

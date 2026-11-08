@@ -6,6 +6,7 @@
 import { sessionSchema } from '@pixel-scientists/domain/auth';
 import type { Session } from '@pixel-scientists/domain/auth';
 import { permissionsFor } from '@pixel-scientists/domain/platform';
+import type { SwitchableModuleId } from '@pixel-scientists/domain/platform';
 import { vi } from 'vitest';
 
 export const northfield = {
@@ -22,13 +23,20 @@ interface SessionOptions {
   /** The funder the session is working for. Null is a signed-in person with no membership in the address. */
   active?: typeof northfield | typeof eastmere | null;
   email?: string;
+  /** The tools switched on for the funder. Defaults to grants. */
+  modules?: SwitchableModuleId[];
   /** Minutes until the session ends. */
   minutes?: number;
 }
 
 /** An applicant's session, checked against the contract so a fixture cannot drift from it. */
 export function applicantSession(options: SessionOptions = {}): Session {
-  const { active = northfield, email = 'ada@example.org', minutes = 60 } = options;
+  const {
+    active = northfield,
+    email = 'ada@example.org',
+    minutes = 60,
+    modules = ['grants'],
+  } = options;
   const roles = ['applicant'] as const;
   const withRoles = (membership: typeof northfield | typeof eastmere) => ({
     ...membership,
@@ -43,6 +51,7 @@ export function applicantSession(options: SessionOptions = {}): Session {
     activeMembership: active === null ? null : withRoles(active),
     memberships: active === null ? [] : [withRoles(active)],
     permissions: active === null ? [] : permissionsFor(roles, 'portal'),
+    modules: active === null ? [] : modules,
   });
 }
 

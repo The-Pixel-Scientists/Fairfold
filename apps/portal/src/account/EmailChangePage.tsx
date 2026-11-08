@@ -10,7 +10,7 @@ import { LinkNotValid } from '../auth/LinkNotValid.tsx';
 import { useFragmentToken } from '../auth/useFragmentToken.ts';
 import { PageColumn, PageIntro } from '../PageColumn.tsx';
 import { ACCOUNT_PATH, SIGN_IN_PATH } from '../paths.ts';
-import { PortalShell } from '../PortalShell.tsx';
+import { PortalShell } from '../shell/PortalShell.tsx';
 
 /**
  * The page the emailed link opens. Opening it changes nothing: the token is

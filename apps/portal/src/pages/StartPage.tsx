@@ -6,15 +6,8 @@ import { Screen } from '../auth/Screen.tsx';
 import { useFunderName } from '../funder.tsx';
 import { standaloneLink } from '../links.ts';
 import { PageColumn, PageIntro } from '../PageColumn.tsx';
-import { GetReady } from '../party/GetReady.tsx';
-import { SavedNotice } from '../party/Saved.tsx';
-import {
-  APPLICATIONS_PATH,
-  HOW_APPLYING_WORKS_PATH,
-  PROGRAMMES_PATH,
-  SIGN_IN_PATH,
-  SIGN_UP_PATH,
-} from '../paths.ts';
+import { HOW_APPLYING_WORKS_PATH, SIGN_IN_PATH, SIGN_UP_PATH } from '../paths.ts';
+import { FrontDoor } from '../shell/FrontDoor.tsx';
 
 /** What someone who is not signed in sees first: two ways in, and what to expect. */
 function Welcome() {
@@ -46,29 +39,8 @@ function Welcome() {
   );
 }
 
-/** What a signed-in applicant sees: where to find a grant, their applications, and how ready they are. */
-function Applications() {
-  return (
-    <PageColumn>
-      <PageIntro title="Apply for a grant">
-        <SavedNotice />
-        <p>You are signed in. Choose a programme to apply to, or carry on with an application.</p>
-      </PageIntro>
-      <div className="flex flex-col gap-3 sm:flex-row">
-        <Link to={PROGRAMMES_PATH} className={buttonClassName('primary', 'w-full sm:w-auto')}>
-          Programmes you can apply to
-        </Link>
-        <Link to={APPLICATIONS_PATH} className={buttonClassName('secondary', 'w-full sm:w-auto')}>
-          Your applications
-        </Link>
-      </div>
-      <GetReady />
-    </PageColumn>
-  );
-}
-
 /** The funder's front door: the start page for a visitor, and the applicant's own page once signed in. */
 export default function StartPage() {
   const { state } = useSession();
-  return <Screen kind="open">{state.status === 'ready' ? <Applications /> : <Welcome />}</Screen>;
+  return <Screen kind="open">{state.status === 'ready' ? <FrontDoor /> : <Welcome />}</Screen>;
 }
