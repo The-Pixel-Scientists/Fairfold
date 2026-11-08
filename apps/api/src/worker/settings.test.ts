@@ -32,6 +32,11 @@ const env = {
   TPS_CLAMD_PORT: '3310',
   TPS_CLAMD_TIMEOUT_MS: '25000',
   TPS_FILES_MAX_STORES: '4',
+  TPS_SMTP_HOST: 'mail.example.org',
+  TPS_SMTP_PORT: '587',
+  TPS_SMTP_TLS: 'starttls',
+  TPS_SMTP_FROM: 'grants@example.org',
+  TPS_PORTAL_ORIGIN: 'https://portal.example.org',
 };
 
 function problems(values: Record<string, string | undefined>): readonly string[] {
@@ -45,11 +50,34 @@ function problems(values: Record<string, string | undefined>): readonly string[]
 }
 
 describe('the worker settings', () => {
-  it('reads the two passwords and needs no API, mail or auth setting', () => {
+  it('reads the two passwords and needs no API or auth setting', () => {
     const settings = loadWorkerSettings(env);
     expect(settings.workerPassword.reveal()).toBe(env.TPS_DB_APP_WORKER_PASSWORD);
     expect(settings.queuePassword.reveal()).toBe(env.TPS_DB_APP_QUEUE_PASSWORD);
     expect(JSON.stringify(settings)).not.toContain('password-0123456789');
+  });
+
+  it('reads the mail server and the portal origin the release emails need', () => {
+    const settings = loadWorkerSettings(env);
+    expect(settings.smtp).toMatchObject({
+      host: 'mail.example.org',
+      port: 587,
+      tls: 'starttls',
+      from: 'grants@example.org',
+    });
+    expect(settings.portalOrigin).toBe('https://portal.example.org');
+  });
+
+  it('names a missing mail server or portal origin, and refuses a portal origin with a path', () => {
+    const found = problems({ ...env, TPS_SMTP_HOST: undefined, TPS_PORTAL_ORIGIN: undefined });
+    expect(found.join(', ')).toContain('TPS_SMTP_HOST');
+    expect(found.join(', ')).toContain('Set TPS_PORTAL_ORIGIN.');
+    expect(
+      problems({ ...env, TPS_PORTAL_ORIGIN: 'https://portal.example.org/apply' }).join(),
+    ).toContain('TPS_PORTAL_ORIGIN must be an origin');
+    expect(problems({ ...env, TPS_PORTAL_ORIGIN: 'http://portal.example.org' }).join()).toContain(
+      'must use https',
+    );
   });
 
   it('needs the removal key as well as the file settings', () => {

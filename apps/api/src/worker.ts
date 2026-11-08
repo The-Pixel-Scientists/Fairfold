@@ -12,19 +12,19 @@ import { createDatabase } from '@pixel-scientists/db';
 import { startJobSender, startWorker, stopJobSender, stopWorker } from '@pixel-scientists/db/jobs';
 
 import { ConfigError } from './config.ts';
+import { createSender } from './email/sender.ts';
+import { createSmtpTransport } from './email/transport.ts';
 import { createLogger } from './logger.ts';
 import { pinnedFetch } from './outbound/pinned.ts';
 import { proxyProblems } from './outbound/proxy.ts';
 import { createFilesJob } from './platform/files/index.ts';
 import { startTelemetry } from './telemetry/index.ts';
 import { jobLogger } from './worker/job-logger.ts';
-import { handlerRegistry, type ModuleJob } from './worker/registry.ts';
+import { workerModuleJobs } from './worker/module-jobs.ts';
+import { handlerRegistry } from './worker/registry.ts';
 import { schedules } from './worker/schedules.ts';
 import { loadWorkerSettings, type WorkerSettings } from './worker/settings.ts';
 import { shutDown } from './worker/shutdown.ts';
-
-/** Module handlers, filled from each module's `jobs` export by the module composition (S11-69). */
-const moduleJobs: readonly ModuleJob[] = [];
 
 function readSettings(): WorkerSettings | undefined {
   try {
@@ -53,6 +53,10 @@ async function main(): Promise<void> {
     logger.error({ err: error }, 'The job queue reported a problem');
   };
   const { database } = settings;
+  const mail = {
+    sender: createSender(settings.smtp, logger, createSmtpTransport(settings.smtp)),
+    portalOrigin: settings.portalOrigin,
+  };
   const connection = { host: database.host, port: database.port, database: database.database };
   const tls = database.tls === undefined ? {} : { tls: database.tls };
   const db = createDatabase<unknown>({
@@ -82,7 +86,7 @@ async function main(): Promise<void> {
       setup: { db, sender, logger: jobLogger(logger) },
       handlers: handlerRegistry(
         jobLogger(logger),
-        moduleJobs,
+        workerModuleJobs(mail),
         createFilesJob(settings.files, pinnedFetch(settings.files.storage.endpoint)),
       ),
       schedules,

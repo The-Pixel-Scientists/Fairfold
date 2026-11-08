@@ -2,7 +2,8 @@
 //
 // What the worker reads from the environment (ADR 0005): the database
 // settings the API reads (config.ts), the passwords of app_worker and
-// app_queue, and telemetry. It never reads the API's, the migrator's or the
+// app_queue, the mail server and the portal's origin (for the release emails),
+// and telemetry. It never reads the API's, the migrator's or the
 // auth role's password. Every problem is reported at once.
 
 import { isLoopbackHost, readSecret, type Env } from '@pixel-scientists/db';
@@ -22,28 +23,25 @@ export interface WorkerSettings {
   readonly telemetry: TelemetrySettings;
   /** The object store, with the removal key, and clamd, for the files job. */
   readonly files: FileSettings;
+  /** The mail server the release emails go through. */
+  readonly smtp: Config['smtp'];
+  /** The applicant portal's origin, which the release emails link to. */
+  readonly portalOrigin: string;
 }
 
 const MINIMUM_PASSWORD_LENGTH = 16;
 const DEVELOPMENT_PASSWORD = /not-a-secret$/;
 
 /**
- * Settings that only the API's listener, its own role and the mail server
- * use, given fixed values so the shared database rules can be reused. They
- * override the environment, so the API's password is never read.
+ * Settings that only the API's listener and its own role use, given fixed
+ * values so the shared database rules can be reused. They override the
+ * environment, so the API's password is never read.
  */
 const UNUSED = {
   TPS_API_HOST: '127.0.0.1',
   TPS_API_PORT: '1',
   TPS_DB_APP_API_PASSWORD: 'unused-by-the-worker',
   TPS_DB_APP_API_PASSWORD_FILE: '',
-  TPS_SMTP_HOST: '127.0.0.1',
-  TPS_SMTP_PORT: '1',
-  TPS_SMTP_TLS: 'none',
-  TPS_SMTP_FROM: 'unused@example.org',
-  TPS_SMTP_USER: '',
-  TPS_SMTP_PASSWORD: '',
-  TPS_SMTP_PASSWORD_FILE: '',
 } as const;
 
 function password(env: Env, name: string): Secret {
@@ -63,6 +61,32 @@ function password(env: Env, name: string): Secret {
   return new Secret(secret);
 }
 
+/** The portal's origin: https, or http for a name on this machine, with no path. */
+function portalOrigin(env: Env): string {
+  const value = env['TPS_PORTAL_ORIGIN'] ?? '';
+  if (value === '') throw new Error('Set TPS_PORTAL_ORIGIN.');
+  const problem =
+    'TPS_PORTAL_ORIGIN must be an origin such as https://grants.example.org, with no path.';
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error(problem);
+  }
+  const extra = url.username || url.password || url.search || url.hash || url.pathname !== '/';
+  if (url.origin === 'null' || extra || /[?#]/.test(value)) throw new Error(problem);
+  const local =
+    url.hostname === 'localhost' ||
+    url.hostname.endsWith('.localhost') ||
+    isLoopbackHost(url.hostname);
+  if (url.protocol !== 'https:' && !(url.protocol === 'http:' && local)) {
+    throw new Error(
+      'TPS_PORTAL_ORIGIN must use https, except for a localhost name on this machine.',
+    );
+  }
+  return url.origin;
+}
+
 /** Read and check the settings, or throw a ConfigError naming every problem. */
 export function loadWorkerSettings(env: Env): WorkerSettings {
   const problems: string[] = [];
@@ -80,16 +104,27 @@ export function loadWorkerSettings(env: Env): WorkerSettings {
   const queuePassword = attempt(() => password(env, 'TPS_DB_APP_QUEUE_PASSWORD'));
   const telemetry = attempt(() => loadTelemetrySettings(env));
   const files = attempt(() => loadFileSettings(env, undefined, { removal: true }));
+  const origin = attempt(() => portalOrigin(env));
   if (
     config === undefined ||
     workerPassword === undefined ||
     queuePassword === undefined ||
     telemetry === undefined ||
-    files === undefined
+    files === undefined ||
+    origin === undefined
   ) {
     throw new ConfigError(problems);
   }
   const { host, port, database: name, tls } = config.database;
   const database = { host, port, database: name, tls };
-  return { logLevel: config.logLevel, database, workerPassword, queuePassword, telemetry, files };
+  return {
+    logLevel: config.logLevel,
+    database,
+    workerPassword,
+    queuePassword,
+    telemetry,
+    files,
+    smtp: config.smtp,
+    portalOrigin: origin,
+  };
 }
