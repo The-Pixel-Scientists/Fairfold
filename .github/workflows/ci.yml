@@ -44,7 +44,7 @@ env:
   SEMGREP_IMAGE: semgrep/semgrep:1.177.0@sha256:acaac22ffc7b7cc5926de0751b223bce0b2491c33d18422fa72f632c78d81198
   # The browsers for @playwright/test 1.63.0. The e2e job's container names
   # the same image, as a job container cannot read this.
-  PLAYWRIGHT_IMAGE: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
+  PLAYWRIGHT_IMAGE: mcr.microsoft.com/playwright:v1.64.1-noble@sha256:2f05f8a734509a7b3f26a912639488ee08f58a7b292d14d62271bcff9038768f
   # Rules Semgrep loaded on 2026-10-04: 333 in all, 18 of them ours, and 2 of
   # ours added since. Raise these when rules are added; lower them only with a
   # reason in review.
@@ -157,7 +157,7 @@ jobs:
       matrix:
         shard: [1, 2, 3, 4]
     container:
-      image: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
+      image: mcr.microsoft.com/playwright:v1.64.1-noble@sha256:2f05f8a734509a7b3f26a912639488ee08f58a7b292d14d62271bcff9038768f
       options: --ipc=host
     # The job runs as root, but Actions sets HOME to a folder another user
     # owns, and Firefox will not start then (Playwright's documented fix).
