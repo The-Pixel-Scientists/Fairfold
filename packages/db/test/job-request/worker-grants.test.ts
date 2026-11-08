@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// The release email handler's rights (migration 0029) and the subject access
-// export's reads (migration 0044): app_worker holds exactly these on the
-// grants and party schemas and the audit table, and, with one tenant set,
-// reaches none of another tenant's rows.
+// The release email handler's rights (migrations 0029 and 0045) and the
+// subject access export's reads (migration 0044): app_worker holds exactly
+// these on the grants and party schemas, the audit table and the module
+// switches, and, with one tenant set, reaches none of another tenant's rows.
 // The cross-tenant tests of grants.decision, grants.decision_email,
 // grants.email_template_version, party.person and app.audit_event run as
 // every role with a grant, app_worker now included.
@@ -125,6 +125,15 @@ const RELEASE_EMAIL_RIGHTS = [
     (column) => `SELECT on column party.person.${column}`,
   ),
   'SELECT on app.audit_event',
+  // Added by migration 0045: which module is on, and the names in the email.
+  ...['tenant_id', 'id', 'module', 'enabled'].map(
+    (column) => `SELECT on column app.tenant_module.${column}`,
+  ),
+  ...['tenant_id', 'id', 'programme_id', 'title'].map(
+    (column) => `SELECT on column grants.round.${column}`,
+  ),
+  ...['tenant_id', 'id', 'title'].map((column) => `SELECT on column grants.programme.${column}`),
+  ...['tenant_id', 'id', 'name'].map((column) => `SELECT on column party.organisation.${column}`),
   // The subject access export (migration 0044): every classified column of
   // the person's rows, and each pinned form definition. SELECT only.
   ...Object.entries(SUBJECT_ACCESS_READS).flatMap(([table, columns]) =>
@@ -143,7 +152,10 @@ describe("app_worker's release email and subject access rights", { timeout: 60_0
       const held = (await heldRights(client, ['app_worker']))
         .filter(
           ({ schema, object }) =>
-            schema === 'grants' || schema === 'party' || object === 'app.audit_event',
+            schema === 'grants' ||
+            schema === 'party' ||
+            object === 'app.audit_event' ||
+            object.startsWith('column app.tenant_module.'),
         )
         .map(({ privilege, object }) => `${privilege} on ${object}`);
       expect(held.sort()).toEqual([...RELEASE_EMAIL_RIGHTS].sort());
@@ -164,9 +176,13 @@ describe("app_worker's release email and subject access rights", { timeout: 60_0
       expect(await count('grants.application', theirs.application)).toBe(0);
       expect(await count('party.party', theirs.parts.person)).toBe(0);
       expect(await count('app.membership', theirs.manager)).toBe(0);
+      for (const table of ['app.tenant_module', 'party.organisation']) {
+        const seen = await client.query(`SELECT FROM ${table} WHERE tenant_id = $1`, [other.id]);
+        expect(seen.rowCount, table).toBe(0);
+      }
       expect(
-        await outcome(client, 'SELECT name FROM party.organisation'),
-        'a table it does not need',
+        await outcome(client, 'SELECT * FROM party.organisation'),
+        'columns it does not need',
       ).toBe('42501');
       expect(
         await outcome(client, 'UPDATE grants.decision SET outcome = outcome'),
