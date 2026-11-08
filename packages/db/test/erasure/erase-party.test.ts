@@ -241,14 +241,11 @@ describe('party.erase_party on a person', { timeout: 30_000 }, () => {
     'leaves %s nothing personal to read',
     async (role) => {
       await asRoleIn(role, tenant.id, async (client) => {
-        const readable = role === 'app_api' ? '*' : 'tenant_id, id, given_name, email';
-        const { rows } = await client.query(`SELECT ${readable} FROM party.person WHERE id = $1`, [
-          person,
-        ]);
+        const { rows } = await client.query('SELECT * FROM party.person WHERE id = $1', [person]);
         const seen = JSON.stringify(rows);
         for (const value of [...PERSONAL, email]) expect(seen).not.toContain(value);
       });
-      await asRoleIn('app_api', tenant.id, async (client) => {
+      await asRoleIn(role, tenant.id, async (client) => {
         const { rows } = await client.query(
           'SELECT old_value, new_value FROM party.value_history WHERE party_id = $1',
           [person],

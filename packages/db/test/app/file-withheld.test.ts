@@ -171,11 +171,13 @@ describe('app.file after its verdict', { timeout: 30_000 }, () => {
     });
   });
 
+  // The subject access export reads these (migration 0044), but no job changes them.
   it.each(['name', 'created_by', 'updated_by'])(
-    'never shows app_worker a file %s',
+    'never lets app_worker change a file %s',
     async (column) => {
       await asRoleIn('app_worker', tenant.id, async (client) => {
-        expect(await outcome(client, `SELECT ${column} FROM app.file`)).toBe('42501');
+        expect(await outcome(client, `SELECT ${column} FROM app.file`)).toBe('ok');
+        expect(await outcome(client, `UPDATE app.file SET ${column} = ${column}`)).toBe('42501');
       });
     },
   );
