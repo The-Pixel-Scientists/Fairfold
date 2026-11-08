@@ -9,7 +9,7 @@ import type { ReactNode } from 'react';
 
 import { PageColumn, PageIntro } from '../PageColumn.tsx';
 import { SIGNED_OUT_PATH } from '../paths.ts';
-import { PortalShell } from '../PortalShell.tsx';
+import { PortalShell } from '../shell/PortalShell.tsx';
 import { productName } from '../product.ts';
 import { applyRoutes } from './routes.ts';
 import { applicant } from './story.ts';

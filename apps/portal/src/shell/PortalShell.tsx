@@ -3,9 +3,9 @@
 import { AppShell, TenantLogo } from '@pixel-scientists/ui';
 import type { ReactNode } from 'react';
 
-import { useFunder } from './funder.tsx';
-import { HOME_PATH } from './paths.ts';
-import { productName } from './product.ts';
+import { useFunder } from '../funder.tsx';
+import { HOME_PATH } from '../paths.ts';
+import { productName } from '../product.ts';
 
 /**
  * The frame around every portal page: a skip link, a header and the main
