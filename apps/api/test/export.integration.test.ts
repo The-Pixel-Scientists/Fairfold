@@ -274,14 +274,22 @@ describe('the export', () => {
              SELECT $1, organisation_id, 'organisation' FROM copies`,
           [t.tenantA.id],
         );
-        const copy = (table: string, source: string, id: string, extra: string) =>
-          client.query(
-            `INSERT INTO ${table}
-               SELECT (jsonb_populate_record(null::${table}, to_jsonb(s) || jsonb_build_object(
-                        'id', c.${id}${extra})
-                      )).*
-                 FROM ${source} s CROSS JOIN copies c`,
+        const copy = async (table: string, source: string, id: string, extra: string) => {
+          const [schema, name] = table.split('.');
+          const { rows } = await client.query<{ column_name: string }>(
+            `SELECT column_name FROM information_schema.columns
+              WHERE table_schema = $1 AND table_name = $2 AND is_generated = 'NEVER'`,
+            [schema, name],
           );
+          const columns = rows.map((r) => `"${r.column_name}"`).join(', ');
+          await client.query(
+            `INSERT INTO ${table} (${columns})
+               SELECT ${columns} FROM (
+                 SELECT (jsonb_populate_record(null::${table}, to_jsonb(s) || jsonb_build_object(
+                          'id', c.${id}${extra}))).*
+                   FROM ${source} s CROSS JOIN copies c) r`,
+          );
+        };
         await copy(
           'party.organisation',
           `(SELECT o.* FROM party.organisation o JOIN grants.application x ON x.organisation_id = o.id
