@@ -36,6 +36,8 @@ export const app: SchemaCatalogue = {
     ['app.apply_retention(text)', ['app_worker']],
     // The erasure job, once the party is erased (ADR 0027).
     ['app.destroy_subject_key(uuid)', ['app_worker']],
+    // A restore's one-off worker process, in restore mode alone (ADR 0011).
+    ['app.reapply_erasure_ledger()', ['app_worker']],
     // A join table's triggers link and release a file (ADR 0030).
     ['app.link_file(uuid)', ['app_api']],
     ['app.release_file(uuid)', ['app_api']],
@@ -186,10 +188,71 @@ export const app: SchemaCatalogue = {
             'subject_party_id',
             'changes',
           ].map((column) => `INSERT on column app.audit_event.${column}`),
+          // The ledger trigger runs as it (migration 0047); never erased_at.
+          ...['tenant_id', 'subject_party_id', 'kind', 'subject_key_id', 'audit_event_id'].map(
+            (column) => `INSERT on column app.erasure_ledger.${column}`,
+          ),
+          // A ledger row is its authority in restore mode (migration 0049).
+          'SELECT on column app.restore_mode.active',
+          ...['tenant_id', 'subject_party_id', 'kind'].map(
+            (column) => `SELECT on column app.erasure_ledger.${column}`,
+          ),
         ],
         // The tenant policies, TO PUBLIC, admit it; the app roles' UPDATE
         // and DELETE denials do not name it.
-        policies: [],
+        policies: ['app.restore_mode policy restore_mode_select'],
+      },
+    ],
+    [
+      'app.reapply_erasure_ledger()',
+      {
+        owner: 'owner_app_reapply_erasure_ledger',
+        // Never INSERT on occurred_at, retain_until or actor_member_kind,
+        // which the database sets (ADR 0003, "Audit retention").
+        rights: [
+          'USAGE on schema app',
+          'USAGE on schema party',
+          'USAGE on schema grants',
+          'EXECUTE on function app.current_tenant_id()',
+          'EXECUTE on function party.erase_party(uuid,uuid)',
+          'EXECUTE on function app.destroy_subject_key(uuid)',
+          'EXECUTE on function grants.clear_answer_fields(uuid,text[])',
+          ...['active', 'request_id'].map(
+            (column) => `SELECT on column app.restore_mode.${column}`,
+          ),
+          ...['tenant_id', 'id', 'subject_party_id', 'kind', 'erased_at'].map(
+            (column) => `SELECT on column app.erasure_ledger.${column}`,
+          ),
+          ...['tenant_id', 'id', 'status'].map(
+            (column) => `SELECT on column party.party.${column}`,
+          ),
+          ...['tenant_id', 'id', 'user_id'].map(
+            (column) => `SELECT on column party.person.${column}`,
+          ),
+          ...['tenant_id', 'id', 'user_id', 'status', 'roles'].map(
+            (column) => `SELECT on column app.membership.${column}`,
+          ),
+          'UPDATE on column app.membership.status',
+          ...['tenant_id', 'id', 'applicant_person_id', 'form_version_id'].map(
+            (column) => `SELECT on column grants.application.${column}`,
+          ),
+          ...['tenant_id', 'id', 'definition'].map(
+            (column) => `SELECT on column grants.form_version.${column}`,
+          ),
+          ...['tenant_id', 'policy', 'days'].map(
+            (column) => `SELECT on column app.retention_policy.${column}`,
+          ),
+          ...[
+            'tenant_id',
+            'request_id',
+            'actor_kind',
+            'action',
+            'entity_type',
+            'entity_id',
+            'changes',
+          ].map((column) => `INSERT on column app.audit_event.${column}`),
+        ],
+        policies: ['app.restore_mode policy restore_mode_select'],
       },
     ],
     [
@@ -238,6 +301,10 @@ export const app: SchemaCatalogue = {
     [
       'app.job_queue',
       "The queue register, platform configuration that only migrator writes; part of ADR 0009's named exception to rule 2.",
+    ],
+    [
+      'app.restore_mode',
+      "One row for the cell (ADR 0011): whether it is being restored. Only migrator writes it, so no tenant's data is in it.",
     ],
   ],
   tenantKeyedById: [

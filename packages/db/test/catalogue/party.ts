@@ -75,10 +75,21 @@ export const party: SchemaCatalogue = {
             'subject_party_id',
             'changes',
           ]),
+          // The ledger trigger runs as it (migration 0047); never erased_at.
+          ...columns('INSERT', 'app.erasure_ledger', [
+            'tenant_id',
+            'subject_party_id',
+            'kind',
+            'subject_key_id',
+            'audit_event_id',
+          ]),
+          // A ledger row is its authority in restore mode (migration 0049).
+          ...columns('SELECT', 'app.restore_mode', ['active', 'request_id']),
+          ...columns('SELECT', 'app.erasure_ledger', ['tenant_id', 'subject_party_id', 'kind']),
         ],
         // The tenant policies, TO PUBLIC, admit it; the app roles' UPDATE
         // denials on snapshots and value history do not name it.
-        policies: [],
+        policies: ['app.restore_mode policy restore_mode_select'],
       },
     ],
     [

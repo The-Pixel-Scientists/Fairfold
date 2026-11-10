@@ -77,6 +77,8 @@ describe('the app schema', () => {
         // The file sweep and file erasure functions, migration 0042.
         'owner_app_delete_swept_file USAGE',
         'owner_app_erase_file USAGE',
+        // Re-applying the erasure ledger after a restore, migration 0049.
+        'owner_app_reapply_erasure_ledger USAGE',
       ].sort(),
     });
   });
@@ -117,6 +119,8 @@ describe('app.current_tenant_id()', () => {
         // The file sweep and file erasure functions, migration 0042.
         'owner_app_delete_swept_file',
         'owner_app_erase_file',
+        // Re-applying the erasure ledger after a restore, migration 0049.
+        'owner_app_reapply_erasure_ledger',
       ]
         .map((role) => `${role} EXECUTE`)
         .sort(),
