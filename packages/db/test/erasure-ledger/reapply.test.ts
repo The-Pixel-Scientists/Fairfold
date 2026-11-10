@@ -7,10 +7,12 @@
 
 import { randomUUID } from 'node:crypto';
 
+import type pg from 'pg';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { withClient } from '../connect.ts';
 import { addErasureRequest, callAs, DESTROY, ERASE, erase, rowsOf } from '../erasure/fixtures.ts';
+import { addFile, addParts } from '../grants/application-fixtures.ts';
 import { addPerson } from '../party/fixtures.ts';
 import {
   addMember,
@@ -33,6 +35,7 @@ import {
 const REAPPLY = 'SELECT app.reapply_erasure_ledger() AS counts';
 const RESTORE_ROW = `SELECT app.restore_erasure_ledger_row($1, $2, $3, $4, $5, $6) AS restored`;
 const REAPPLIED = 'platform.erasure_ledger.reapplied';
+const ERASE_FILE = 'SELECT app.erase_file($1, $2) AS erased';
 
 let tenant: TestTenant;
 let other: TestTenant;
@@ -77,6 +80,21 @@ describe('outside restore mode', { timeout: 30_000 }, () => {
     expect((await callAs('app_worker', tenant, ERASE, [party, null])).code).toBe('42501');
     expect((await callAs('app_worker', tenant, DESTROY, [party])).code).toBe('55000');
     expect(await statusOf(party)).toBe('active');
+  });
+
+  it('refuses a file erasure on a ledger row alone, for an erased party', async () => {
+    const staff = await asMigratorIn(tenant.id, (client) => addMember(client, tenant));
+    const { person, file } = await asMigratorIn(tenant.id, (client) =>
+      addClassifiedApplication(client, tenant),
+    );
+    const request = await asMigratorIn(tenant.id, (client) =>
+      addErasureRequest(client, tenant, staff, person),
+    );
+    expect((await erase(tenant, person, request)).code).toBeUndefined();
+    expect(await rowsOf(tenant, 'app.erasure_ledger', 'subject_party_id', person)).toHaveLength(1);
+
+    expect((await callAs('app_worker', tenant, ERASE_FILE, [file, null])).code).toBe('42501');
+    expect((await rowsOf(tenant, 'app.file', 'id', file))[0]).toMatchObject({ erased_at: null });
   });
 
   it('refuses a restored ledger row', async () => {
@@ -177,6 +195,74 @@ describe('re-apply in restore mode', { timeout: 30_000 }, () => {
       expect(events.map((event) => event['actor_kind'])).toEqual(['system']);
     });
     expect(await eventsOf(tenant, REAPPLIED)).toHaveLength(2);
+  });
+
+  it('clears a stored answer the pinned version does not ask', async () => {
+    const { application } = await asMigratorIn(tenant.id, async (client) => {
+      const created = await addClassifiedApplication(client, tenant, {
+        f_removed: 'An answer the pinned version no longer asks',
+      });
+      await ledgerRow(client, tenant, created.person);
+      return created;
+    });
+    await inRestoreMode(async () => {
+      expect(await counts(tenant)).toMatchObject({ answers_cleared: 1 });
+    });
+    const [saved] = await rowsOf(tenant, 'grants.application', 'id', application);
+    expect(saved?.['answers']).toEqual({ f_org: CLASSIFIED_ANSWERS.f_org });
+  });
+
+  it('erases each linked file again, once, keeping the link', async () => {
+    const { file } = await asMigratorIn(tenant.id, async (client) => {
+      const created = await addClassifiedApplication(client, tenant);
+      await ledgerRow(client, tenant, created.person);
+      return created;
+    });
+    await inRestoreMode(async () => {
+      expect(await counts(tenant)).toMatchObject({ files_erased: 1 });
+      expect(await counts(tenant)).toMatchObject({ files_erased: 0 });
+    });
+    const [row] = await rowsOf(tenant, 'app.file', 'id', file);
+    expect(row).toMatchObject({ name: 'Erased file', sha256: null, storage_key: null });
+    expect(row?.['erased_at']).toBeInstanceOf(Date);
+    expect(await rowsOf(tenant, 'grants.application_file', 'file_id', file)).toHaveLength(1);
+  });
+
+  it('refuses in restore mode a file with no erased, listed party behind it', async () => {
+    // Erased with no ledger row, as a dump can hold them, so not through the function.
+    const markErased = async (client: pg.ClientBase, party: string) => {
+      await client.query(
+        `UPDATE party.person
+            SET given_name = NULL, family_name = NULL, phone = NULL, user_id = NULL,
+                email = id::text || '@erased.invalid'
+          WHERE id = $1`,
+        [party],
+      );
+      await client.query("UPDATE party.party SET status = 'erased' WHERE id = $1", [party]);
+    };
+    const files = await asMigratorIn(tenant.id, async (client) => {
+      const noRow = await addClassifiedApplication(client, tenant);
+      await markErased(client, noRow.person);
+      const notErased = await addClassifiedApplication(client, tenant);
+      await ledgerRow(client, tenant, notErased.person);
+      const { member } = await addParts(client, tenant);
+      return [noRow.file, notErased.file, await addFile(client, tenant, member)];
+    });
+    const theirs = await asMigratorIn(other.id, async (client) => {
+      const listed = await addClassifiedApplication(client, other);
+      await ledgerRow(client, other, listed.person);
+      await markErased(client, listed.person);
+      return listed.file;
+    });
+    await inRestoreMode(async () => {
+      for (const file of [...files, theirs]) {
+        expect((await callAs('app_worker', tenant, ERASE_FILE, [file, null])).code).toBe('42501');
+      }
+    });
+    for (const file of files) {
+      expect((await rowsOf(tenant, 'app.file', 'id', file))[0]).toMatchObject({ erased_at: null });
+    }
+    expect((await rowsOf(other, 'app.file', 'id', theirs))[0]).toMatchObject({ erased_at: null });
   });
 
   it('never touches another tenant', async () => {
