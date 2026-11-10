@@ -8,7 +8,7 @@ import { randomUUID } from 'node:crypto';
 
 import type pg from 'pg';
 
-import { addParts, applicationRow } from '../grants/application-fixtures.ts';
+import { addFile, addParts, applicationRow } from '../grants/application-fixtures.ts';
 import { withClient } from '../connect.ts';
 import { insertRow, type TestTenant } from '../tenants.ts';
 
@@ -74,12 +74,15 @@ export function ledgerRow(
 
 /**
  * An application by a new applicant on a form version that classifies its
- * answers, as migrator. Returns the application and its applicant.
+ * answers, with one clean linked file, as migrator. `extraAnswers` go in as
+ * stored, so a test can hold a key the version does not ask. Returns the
+ * application, its applicant and the file.
  */
 export async function addClassifiedApplication(
   client: pg.ClientBase,
   tenant: TestTenant,
-): Promise<{ application: string; person: string }> {
+  extraAnswers: Record<string, unknown> = {},
+): Promise<{ application: string; person: string; file: string }> {
   const parts = await addParts(client, tenant);
   const formVersion = await insertRow(client, 'grants.form_version', {
     tenant_id: tenant.id,
@@ -92,7 +95,15 @@ export async function addClassifiedApplication(
   });
   const application = await insertRow(client, 'grants.application', {
     ...applicationRow(tenant, parts, { form_version_id: formVersion }),
-    answers: CLASSIFIED_ANSWERS,
+    answers: { ...CLASSIFIED_ANSWERS, ...extraAnswers },
   });
-  return { application, person: parts.person };
+  const file = await addFile(client, tenant, parts.member);
+  await insertRow(client, 'grants.application_file', {
+    tenant_id: tenant.id,
+    application_id: application,
+    file_id: file,
+    field_id: 'f_accounts',
+    created_by: parts.member,
+  });
+  return { application, person: parts.person, file };
 }

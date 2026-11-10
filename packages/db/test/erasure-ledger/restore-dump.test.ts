@@ -85,6 +85,7 @@ let other: TestTenant;
 let person: string;
 let survivor: string;
 let application: string;
+let file: string;
 let exported: Row[];
 
 describe('restoring a dump older than an erasure', { timeout: 180_000 }, () => {
@@ -98,6 +99,7 @@ describe('restoring a dump older than an erasure', { timeout: 180_000 }, () => {
     );
     person = live.person;
     application = live.application;
+    file = live.file;
     await callAs(
       'app_worker',
       tenant,
@@ -159,6 +161,7 @@ describe('restoring a dump older than an erasure', { timeout: 180_000 }, () => {
       re_erased: 1,
       keys_destroyed: 1,
       answers_cleared: 1,
+      files_erased: 1,
     });
 
     expect(
@@ -183,6 +186,16 @@ describe('restoring a dump older than an erasure', { timeout: 180_000 }, () => {
     expect(
       await firstRow(
         tenant,
+        'SELECT name, sha256, storage_key, erased_at IS NOT NULL AS erased FROM app.file WHERE id = $1',
+        [file],
+      ),
+    ).toEqual({ name: 'Erased file', sha256: null, storage_key: null, erased: true });
+    expect(
+      await firstRow(tenant, 'SELECT count(*)::int AS n FROM grants.application_file', []),
+    ).toEqual({ n: 1 });
+    expect(
+      await firstRow(
+        tenant,
         'SELECT wrapped_key, destroyed_at IS NOT NULL AS destroyed FROM app.subject_key WHERE subject_party_id = $1',
         [person],
       ),
@@ -201,6 +214,7 @@ describe('restoring a dump older than an erasure', { timeout: 180_000 }, () => {
       re_erased: 0,
       keys_destroyed: 0,
       answers_cleared: 0,
+      files_erased: 0,
     });
   });
 });

@@ -1,10 +1,13 @@
 -- SPDX-License-Identifier: AGPL-3.0-or-later
 --
 -- Migration 0049, down: remove the re-apply and put back the erasure
--- functions as migration 0033 wrote them, with no ledger authority.
+-- functions as migrations 0033 and 0042 wrote them, with no ledger authority.
 
 DROP FUNCTION app.reapply_erasure_ledger();
 
+SET LOCAL ROLE owner_app_erase_file;
+REVOKE EXECUTE ON FUNCTION app.erase_file(uuid, uuid) FROM owner_app_reapply_erasure_ledger;
+RESET ROLE;
 SET LOCAL ROLE owner_grants_clear_answer_fields;
 REVOKE EXECUTE ON FUNCTION grants.clear_answer_fields(uuid, text[])
   FROM owner_app_reapply_erasure_ledger;
@@ -17,8 +20,8 @@ REVOKE EXECUTE ON FUNCTION app.destroy_subject_key(uuid) FROM owner_app_reapply_
 RESET ROLE;
 
 REVOKE ALL ON app.restore_mode, app.erasure_ledger, party.party, party.person,
-              app.membership, grants.application, grants.form_version,
-              app.retention_policy, app.audit_event
+              app.membership, grants.application, grants.application_file,
+              grants.form_version, app.retention_policy, app.audit_event
   FROM owner_app_reapply_erasure_ledger;
 REVOKE EXECUTE ON FUNCTION app.current_tenant_id() FROM owner_app_reapply_erasure_ledger;
 REVOKE USAGE ON SCHEMA app, party, grants FROM owner_app_reapply_erasure_ledger;
@@ -167,6 +170,45 @@ $function$;
 RESET ROLE;
 REVOKE CREATE ON SCHEMA app FROM owner_app_destroy_subject_key;
 
-REVOKE ALL ON app.restore_mode FROM owner_party_erase_party, owner_app_destroy_subject_key;
+GRANT CREATE ON SCHEMA app TO owner_app_erase_file;
+SET LOCAL ROLE owner_app_erase_file;
+
+CREATE OR REPLACE FUNCTION app.erase_file(file_id uuid, job_request_id uuid)
+  RETURNS boolean
+  LANGUAGE plpgsql
+  VOLATILE
+  SECURITY DEFINER
+  SET search_path = pg_catalog, pg_temp
+AS $function$
+DECLARE
+  erase_tenant CONSTANT uuid := app.current_tenant_id();
+  erased integer;
+BEGIN
+  IF erase_tenant IS NULL THEN
+    RAISE EXCEPTION 'Erasure needs a tenant.' USING ERRCODE = 'object_not_in_prerequisite_state';
+  END IF;
+  PERFORM FROM app.job_request r
+    JOIN party.party p ON p.tenant_id = r.tenant_id AND p.id::text = r.filters ->> 'partyId'
+   WHERE r.tenant_id = erase_tenant AND r.id = erase_file.job_request_id
+     AND r.kind = 'erasure' AND r.permission = 'platform.erasure.request'
+     AND r.status = 'running' AND p.status = 'erased';
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Erasing a file needs a running erasure request of this tenant whose party is erased.'
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  UPDATE app.file f SET erased_at = pg_catalog.now()
+   WHERE f.tenant_id = erase_tenant AND f.id = erase_file.file_id AND f.erased_at IS NULL;
+  GET DIAGNOSTICS erased = ROW_COUNT;
+  RETURN erased = 1;
+END
+$function$;
+
+RESET ROLE;
+REVOKE CREATE ON SCHEMA app FROM owner_app_erase_file;
+
+REVOKE ALL ON app.restore_mode FROM owner_party_erase_party, owner_app_destroy_subject_key,
+                                    owner_app_erase_file;
 REVOKE SELECT (tenant_id, subject_party_id, kind) ON app.erasure_ledger
-  FROM owner_party_erase_party, owner_app_destroy_subject_key;
+  FROM owner_party_erase_party, owner_app_destroy_subject_key, owner_app_erase_file;
+REVOKE ALL ON grants.application_file, grants.application FROM owner_app_erase_file;
+REVOKE USAGE ON SCHEMA grants FROM owner_app_erase_file;
