@@ -28,6 +28,7 @@ interface Fixture {
   readonly person: string;
   readonly duplicate: string;
   readonly organisation: string;
+  readonly relationship: string;
 }
 
 let db: ReturnType<typeof createDatabase<unknown>>;
@@ -38,7 +39,7 @@ async function addFixture(): Promise<Fixture> {
   const tenant = await createTestTenant();
   return asMigratorIn(tenant.id, async (client) => {
     const person = await addPerson(client, tenant, { given_name: 'Ada', family_name: 'Lovelace' });
-    await addPerson(client, tenant, { given_name: 'Grace' });
+    const other = await addPerson(client, tenant, { given_name: 'Grace' });
     await insertRow(client, 'party.consent', {
       tenant_id: tenant.id,
       person_id: person,
@@ -64,7 +65,19 @@ async function addFixture(): Promise<Fixture> {
       duplicate,
       person,
     ]);
-    return { tenant, person, duplicate, organisation: await addOrganisation(client, tenant) };
+    const organisation = await addOrganisation(client, tenant);
+    const contact = (subject: string, object: string) =>
+      insertRow(client, 'party.relationship', {
+        tenant_id: tenant.id,
+        type: 'contact_for',
+        subject_id: subject,
+        subject_kind: 'person',
+        object_id: object,
+        object_kind: 'organisation',
+      });
+    const relationship = await contact(person, organisation);
+    await contact(other, await addOrganisation(client, tenant));
+    return { tenant, person, duplicate, organisation, relationship };
   });
 }
 
@@ -128,6 +141,19 @@ describe('partySubjectData', { timeout: 30_000 }, () => {
       value: 'future_funding',
       sensitivity: 'personal',
     });
+  });
+
+  it("returns a relationship from either end, and not another person's", async () => {
+    for (const asked of [a.person, a.organisation]) {
+      const rows = (await read(a.tenant, asked))['party.relationship'] ?? [];
+      expect(rows.map((row) => row['party.relationship.id']?.value)).toEqual([a.relationship]);
+    }
+    const row = (await read(a.tenant, a.person))['party.relationship']?.[0];
+    expect(row?.['party.relationship.subject_id']).toEqual({
+      value: a.person,
+      sensitivity: 'internal',
+    });
+    expect(row?.['party.relationship.object_id']?.value).toBe(a.organisation);
   });
 
   it('returns only columns the classification map lists', async () => {

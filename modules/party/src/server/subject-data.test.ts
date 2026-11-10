@@ -21,8 +21,12 @@ describe('party subject tables', () => {
 
   it.each(Object.entries(subjectTables))(
     '%s is read by its party subject path',
-    (table, tables) => {
-      expect(subjectPaths[table]).toEqual({ kind: 'party', column: tables.subjectColumn });
+    (table, { subjectColumn }) => {
+      expect(subjectPaths[table]).toEqual(
+        typeof subjectColumn === 'string'
+          ? { kind: 'party', column: subjectColumn }
+          : { kind: 'parties', columns: subjectColumn },
+      );
     },
   );
 
