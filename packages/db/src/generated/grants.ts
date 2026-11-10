@@ -74,6 +74,22 @@ export interface GrantsApplicationFile {
   tenant_id: string;
 }
 
+export interface GrantsApplicationMessage {
+  application_id: string;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  tenant_id: string;
+  thread_id: string;
+}
+
+export interface GrantsApplicationNote {
+  application_id: string;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  note_id: string;
+  tenant_id: string;
+}
+
 export interface GrantsAssignment {
   application_id: string;
   created_at: Generated<Timestamp>;
@@ -167,6 +183,18 @@ export interface GrantsFormVersion {
   updated_at: Generated<Timestamp>;
   updated_by: string | null;
   version: number;
+}
+
+export interface GrantsMessageNotification {
+  created_at: Generated<Timestamp>;
+  error_code: string | null;
+  id: Generated<string>;
+  message_id: string;
+  recipient_person_id: string | null;
+  sent_at: Timestamp | null;
+  status: Generated<string>;
+  template_version_id: string;
+  tenant_id: string;
 }
 
 export interface GrantsMonitoringResponse {
@@ -291,6 +319,8 @@ export interface DB {
   'grants.adjustment': GrantsAdjustment;
   'grants.application': GrantsApplication;
   'grants.application_file': GrantsApplicationFile;
+  'grants.application_message': GrantsApplicationMessage;
+  'grants.application_note': GrantsApplicationNote;
   'grants.assignment': GrantsAssignment;
   'grants.conflict_declaration': GrantsConflictDeclaration;
   'grants.decision': GrantsDecision;
@@ -298,6 +328,7 @@ export interface DB {
   'grants.eligibility_result': GrantsEligibilityResult;
   'grants.email_template_version': GrantsEmailTemplateVersion;
   'grants.form_version': GrantsFormVersion;
+  'grants.message_notification': GrantsMessageNotification;
   'grants.monitoring_response': GrantsMonitoringResponse;
   'grants.programme': GrantsProgramme;
   'grants.publisher_setting': GrantsPublisherSetting;

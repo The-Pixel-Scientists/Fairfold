@@ -152,6 +152,41 @@ export interface AppMembership {
   user_id: string;
 }
 
+export interface AppMessage {
+  author_membership_id: string | null;
+  author_person_id: string | null;
+  body: string;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  side: string;
+  tenant_id: string;
+  thread_id: string;
+}
+
+export interface AppMessageThread {
+  applicant_read_at: Timestamp | null;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  staff_read_at: Timestamp | null;
+  tenant_id: string;
+}
+
+export interface AppNote {
+  author_id: string;
+  body: string;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  tenant_id: string;
+}
+
+export interface AppNoteMention {
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  membership_id: string;
+  note_id: string;
+  tenant_id: string;
+}
+
 export interface AppRequestLimit {
   bucket: string;
   count: Int8;
@@ -189,6 +224,14 @@ export interface AppSubjectKey {
   subject_party_id: string;
   tenant_id: string;
   wrapped_key: Buffer | null;
+}
+
+export interface AppTag {
+  created_at: Generated<Timestamp>;
+  created_by: string;
+  id: Generated<string>;
+  label: string;
+  tenant_id: string;
 }
 
 export interface AppTenant {
@@ -234,10 +277,15 @@ export interface DB {
   'app.job_queue': AppJobQueue;
   'app.job_request': AppJobRequest;
   'app.membership': AppMembership;
+  'app.message': AppMessage;
+  'app.message_thread': AppMessageThread;
+  'app.note': AppNote;
+  'app.note_mention': AppNoteMention;
   'app.request_limit': AppRequestLimit;
   'app.restore_mode': AppRestoreMode;
   'app.retention_policy': AppRetentionPolicy;
   'app.subject_key': AppSubjectKey;
+  'app.tag': AppTag;
   'app.tenant': AppTenant;
   'app.tenant_module': AppTenantModule;
   'app.tenant_theme': AppTenantTheme;
