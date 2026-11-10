@@ -3,8 +3,11 @@
 // The grants module's contribution to subject access (ADR 0016, ADR 0027):
 // the person's applications and the decision emails sent to them, and every
 // table that joins to an application by its subject path (eligibility
-// results, stage moves, file links, assignments, scores and decisions), each
-// classified column keyed by its field id with its sensitivity. Each answer
+// results, the first stage entry, file links and released decisions), each
+// classified column keyed by its field id with its sensitivity. Scores,
+// assignments (which name reviewers and show review progress), unreleased
+// decisions and how far an application has moved stay out until a check
+// before release exists (rule 8; `withheld` says which and why). Each answer
 // is its own cell keyed by its stable field id (rule 7) with the class its
 // question has in the form version the application pinned; an answer that
 // version does not ask is left out. The column lists below copy the
@@ -27,29 +30,28 @@ type Cell = SubjectDataRow[string];
 type Sensitivity = Cell['sensitivity'];
 type Columns = readonly (readonly [string, Sensitivity])[];
 
+/** Rows are read only where `column` is (or is not) null. */
+type RowFilter = readonly [column: string, 'is' | 'is not'];
+
 const internal = (...names: string[]): Columns => names.map((name) => [name, 'internal']);
 
-const keyAndActors = internal(
-  'tenant_id',
-  'id',
-  'created_at',
-  'created_by',
-  'updated_at',
-  'updated_by',
-);
+const created = internal('tenant_id', 'id', 'created_at', 'created_by');
+
+const keyAndActors = [...created, ...internal('updated_at', 'updated_by')];
 
 /**
- * Each table, its classified columns (but for an application's `answers`,
- * read apart, field by field), and its subject path: the column that holds
- * the person's party id, or, with a `parent`, the column that joins to it.
+ * Each table, its classified columns but for those in `withheld` (and an
+ * application's `answers`, read apart, field by field), its subject path:
+ * the column that holds the person's party id, or, with a `parent`, the
+ * column that joins to it, and a filter on the rows read.
  */
 export const subjectTables: Readonly<
-  Record<string, { column: string; parent?: string; columns: Columns }>
+  Record<string, { column: string; parent?: string; columns: Columns; only?: RowFilter }>
 > = {
   'grants.application': {
     column: 'applicant_person_id',
     columns: [
-      ...keyAndActors,
+      ...created,
       ...internal(
         'round_id',
         'form_version_id',
@@ -57,7 +59,6 @@ export const subjectTables: Readonly<
         'organisation_id',
         'status',
         'answers_version',
-        'stage_id',
         'submitted_at',
         'submitted_late',
         'withdrawn_at',
@@ -98,6 +99,7 @@ export const subjectTables: Readonly<
   'grants.stage_transition': {
     column: 'application_id',
     parent: 'grants.application',
+    only: ['from_stage_id', 'is'],
     columns: internal(
       'tenant_id',
       'id',
@@ -122,33 +124,10 @@ export const subjectTables: Readonly<
       'created_at',
     ),
   },
-  'grants.assignment': {
-    column: 'application_id',
-    parent: 'grants.application',
-    columns: [
-      ...keyAndActors,
-      ...internal(
-        'round_id',
-        'application_id',
-        'reviewer_membership_id',
-        'stage_id',
-        'status',
-        'submitted_at',
-      ),
-    ],
-  },
-  'grants.score': {
-    column: 'assignment_id',
-    parent: 'grants.assignment',
-    columns: [
-      ...keyAndActors,
-      ...internal('assignment_id', 'stage_id', 'criterion_id', 'score'),
-      ['comment', 'personal'],
-    ],
-  },
   'grants.decision': {
     column: 'application_id',
     parent: 'grants.application',
+    only: ['released_at', 'is not'],
     columns: [
       ...keyAndActors,
       ...internal(
@@ -164,6 +143,32 @@ export const subjectTables: Readonly<
     ],
   },
 };
+
+/**
+ * What a subject access export leaves out until a check before release
+ * exists (rule 8: decisions are private until released), in plain words, by
+ * table, column and rows.
+ */
+export const withheld = {
+  tables: {
+    'grants.score': 'Scores and comments stay private until a check before release exists.',
+    'grants.assignment':
+      'Who reviews an application, and how far their reviews have gone, stays private. The row can name the reviewer and show how far the application has moved.',
+  },
+  columns: {
+    'grants.application.stage_id':
+      'It shows how far the application has moved, which applicants are not told.',
+    'grants.application.updated_at':
+      'Once an application is submitted, a later change date shows that staff have moved it on, and when.',
+    'grants.application.updated_by':
+      'Once an application is submitted, it names the staff member who moved it on.',
+  },
+  rows: {
+    'grants.decision': 'A decision is included only once it has been released.',
+    'grants.stage_transition':
+      'Only the move into the first stage is included. Later moves show how far the application has gone.',
+  },
+} as const;
 
 type Tables = Record<string, Record<string, unknown>>;
 type StoredRow = Record<string, unknown>;
@@ -181,16 +186,16 @@ function rowsOf(
   column: string,
   columns: Columns,
   values: readonly string[],
+  only?: RowFilter,
 ): Promise<StoredRow[]> {
   if (values.length === 0) return Promise.resolve([]);
   const read = columns.map(([name]) => name);
-  return tx
+  const query = tx
     .$extendTables<Tables>()
     .selectFrom(table)
     .select(table === 'grants.application' ? [...read, 'answers'] : read)
-    .where(column, 'in', values)
-    .orderBy('id')
-    .execute();
+    .where(column, 'in', values);
+  return (only === undefined ? query : query.where(only[0], only[1], null)).orderBy('id').execute();
 }
 
 const toRow = (table: string, columns: Columns, row: StoredRow): SubjectDataRow =>
@@ -228,13 +233,14 @@ export const grantsSubjectData: SubjectDataContribution<'grants', Tx> = {
   async subjectData(tx, subjectPartyId) {
     const data: SubjectData = {};
     const ids: Record<string, string[]> = {};
-    for (const [table, { column, parent, columns }] of Object.entries(subjectTables)) {
+    for (const [table, { column, parent, columns, only }] of Object.entries(subjectTables)) {
       const rows = await rowsOf(
         tx,
         table,
         column,
         columns,
         parent === undefined ? [subjectPartyId] : (ids[parent] ?? []),
+        only,
       );
       ids[table] = rows.map((row) => String(row['id']));
       data[table] =
