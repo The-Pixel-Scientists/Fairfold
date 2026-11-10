@@ -27,6 +27,8 @@
 import type {
   ClassificationRegistry,
   FieldClassification,
+  ProcessingEntry,
+  ProcessingRegistry,
   Sensitivity,
   SubjectPathRegistry,
 } from '../classification.ts';
@@ -59,7 +61,7 @@ const sso: FieldClassification = {
 const replay = fixed('internal', 1, 'expires_at');
 const devicePersonal = fixed('personal', 366, 'issued_at');
 
-export const auth: ClassificationRegistry = {
+export const auth = {
   'auth.user': {
     id: accountInternal,
     name: accountPersonal,
@@ -236,7 +238,7 @@ export const auth: ClassificationRegistry = {
     created_at: replay,
     updated_at: replay,
   },
-};
+} satisfies ClassificationRegistry;
 
 /**
  * Each table's path to the person its rows are about (ADR 0027): the account,
@@ -259,4 +261,66 @@ export const authSubjects: SubjectPathRegistry = {
   'auth.device': { kind: 'account', column: 'user_id' },
   'auth.passkey': { kind: 'account', column: 'user_id' },
   'auth.audit_event': { kind: 'account', column: 'user_id' },
+};
+
+const stored = ['hosting', 'backup'] as const;
+const accountHolders = ['applicant', 'staff_member', 'reviewer'] as const;
+
+const accountRow = (
+  legalBasis: ProcessingEntry['legalBasis'],
+  dataCategories: ProcessingEntry['dataCategories'],
+  processors: ProcessingEntry['processors'] = stored,
+): ProcessingEntry => ({
+  purpose: 'account_security',
+  legalBasis,
+  processors,
+  dataSubjects: accountHolders,
+  dataCategories,
+});
+const tenantSetUp: ProcessingEntry = {
+  purpose: 'account_security',
+  legalBasis: 'contract',
+  processors: stored,
+  dataSubjects: [],
+  dataCategories: [],
+};
+
+export const authProcessing: ProcessingRegistry<typeof auth> = {
+  'auth.user': accountRow('contract', ['identity', 'contact'], [...stored, 'email']),
+  'auth.session': accountRow('legitimate_interests', ['online_identifiers']),
+  'auth.account': accountRow('contract', ['identity', 'other']),
+  'auth.verification': {
+    purpose: 'account_security',
+    legalBasis: 'contract',
+    processors: [...stored, 'email'],
+    dataSubjects: [...accountHolders, 'visitor'],
+    dataCategories: ['contact'],
+  },
+  'auth.two_factor': accountRow('contract', ['identity']),
+  'auth.rate_limit': {
+    purpose: 'account_security',
+    legalBasis: 'legitimate_interests',
+    processors: stored,
+    dataSubjects: [...accountHolders, 'visitor'],
+    dataCategories: ['contact', 'online_identifiers'],
+  },
+  'auth.device': accountRow('legitimate_interests', ['identity', 'online_identifiers']),
+  'auth.passkey': accountRow('contract', ['identity', 'online_identifiers'], [...stored, 'email']),
+  'auth.audit_event': {
+    purpose: 'audit',
+    legalBasis: 'legitimate_interests',
+    processors: stored,
+    dataSubjects: [...accountHolders, 'visitor'],
+    dataCategories: ['identity', 'contact', 'online_identifiers'],
+  },
+  'auth.audit_copy_pending': {
+    purpose: 'audit',
+    legalBasis: 'legitimate_interests',
+    processors: stored,
+    dataSubjects: [],
+    dataCategories: [],
+  },
+  'auth.sso_provider': tenantSetUp,
+  'auth.sso_domain': tenantSetUp,
+  'auth.saml_replay': { ...tenantSetUp, legalBasis: 'legitimate_interests' },
 };

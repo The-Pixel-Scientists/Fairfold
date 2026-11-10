@@ -4,7 +4,7 @@
 // apps/api/src/modules.ts alone, which registers the routes.
 // `grantsSubjectRules` is for the platform's audit writer alone. `grantsWarehouse`
 // feeds the warehouse snapshot. `grantsSubjectData` serves subject access.
-// `sendReleaseEmail` is for the worker's release email job alone.
+// `grantsErasure` serves erasure. `sendReleaseEmail` is for the worker's release email job alone.
 
 export {
   grantsHandlers,
@@ -24,4 +24,5 @@ export {
 } from './decisions/job.ts';
 export { grantsSubjectRules } from './audit.ts';
 export { grantsWarehouse } from './warehouse.ts';
+export { grantsErasure } from './erasure.ts';
 export { grantsSubjectData } from './subject-data.ts';

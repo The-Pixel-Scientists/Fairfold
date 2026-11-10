@@ -567,6 +567,16 @@ function subjectPathProblems(
           `${table} has an unlinked subject path, so it needs a reason and every column kept for a fixed ${String(UNLINKED_MAX_DAYS)} days or less.`,
         );
       }
+    } else if (path.kind === 'parties') {
+      for (const column of path.columns) {
+        if (!columns.some((row) => row.table === table && row.column === column)) {
+          problems.push(`${table} has a subject path through ${column}, which does not exist.`);
+        } else if (!references(table, column, TARGETS.party)) {
+          problems.push(
+            `${table} has a subject path through ${column}, which is not a foreign key to ${TARGETS.party.join(' or ')}.`,
+          );
+        }
+      }
     } else if (!columns.some((row) => row.table === table && row.column === path.column)) {
       problems.push(`${table} has a subject path through ${path.column}, which does not exist.`);
     } else if (path.kind !== 'join' && !references(table, path.column, TARGETS[path.kind])) {
@@ -592,5 +602,5 @@ function reachesSubject(path: SubjectPath, paths: SubjectPathRegistry): boolean 
     seen.add(next.table);
     next = Object.hasOwn(paths, next.table) ? paths[next.table] : undefined;
   }
-  return next?.kind === 'party' || next?.kind === 'account';
+  return next?.kind === 'party' || next?.kind === 'parties' || next?.kind === 'account';
 }

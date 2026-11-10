@@ -32,9 +32,19 @@ const keyAndActors = columns(
   'updated_by',
 );
 
-/** Each table, the column that holds the subject's party id, and its classified columns. */
+/**
+ * Each table, the column that holds the subject's party id (a relationship
+ * holds it in either of two, and is read in both directions), and its
+ * classified columns.
+ */
 export const subjectTables: Readonly<
-  Record<string, { subjectColumn: string; columns: readonly (readonly [string, Sensitivity])[] }>
+  Record<
+    string,
+    {
+      subjectColumn: string | readonly [string, string];
+      columns: readonly (readonly [string, Sensitivity])[];
+    }
+  >
 > = {
   'party.party': {
     subjectColumn: 'id',
@@ -49,6 +59,22 @@ export const subjectTables: Readonly<
       ...keyAndActors,
       ...columns('internal', 'kind'),
       ...columns('personal', 'given_name', 'family_name', 'email', 'phone', 'user_id'),
+    ],
+  },
+  'party.relationship': {
+    subjectColumn: ['subject_id', 'object_id'],
+    columns: [
+      ...keyAndActors,
+      ...columns(
+        'internal',
+        'type',
+        'subject_id',
+        'subject_kind',
+        'object_id',
+        'object_kind',
+        'starts_on',
+        'ends_on',
+      ),
     ],
   },
   'party.consent': {
@@ -128,7 +154,9 @@ export const partySubjectData: SubjectDataContribution<'party', Tx> = {
       const rows = await db
         .selectFrom(table)
         .select(fields.map(([column]) => column))
-        .where(subjectColumn, '=', subjectPartyId)
+        .where((eb) =>
+          eb.or([subjectColumn].flat().map((column) => eb(column, '=', subjectPartyId))),
+        )
         .orderBy('id')
         .execute();
       data[table] = rows.map((row) =>

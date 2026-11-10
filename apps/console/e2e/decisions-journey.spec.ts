@@ -114,7 +114,9 @@ test.describe('the decisions journey against the real API', () => {
     await confirmItsYou(page, PASSWORD ?? '', await nextCode(TOTP_KEY ?? '', spent));
     await expectReleased(page);
 
-    await expect.poll(decisionEmails, { message: 'The emails have not arrived.' }).toBe(before + 5);
+    await expect
+      .poll(decisionEmails, { message: 'The emails have not arrived.', timeout: 60_000 })
+      .toBe(before + 5);
     await page.getByRole('link', { name: 'Back to decisions' }).click();
     await expect(decisionRows(page).filter({ hasText: 'Email: sent' })).toHaveCount(5);
   });

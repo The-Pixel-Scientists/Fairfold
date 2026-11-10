@@ -241,7 +241,10 @@ describe('party.erase_party on a person', { timeout: 30_000 }, () => {
     'leaves %s nothing personal to read',
     async (role) => {
       await asRoleIn(role, tenant.id, async (client) => {
-        const { rows } = await client.query('SELECT * FROM party.person WHERE id = $1', [person]);
+        const { rows } = await client.query(
+          'SELECT given_name, family_name, email, phone, user_id FROM party.person WHERE id = $1',
+          [person],
+        );
         const seen = JSON.stringify(rows);
         for (const value of [...PERSONAL, email]) expect(seen).not.toContain(value);
       });

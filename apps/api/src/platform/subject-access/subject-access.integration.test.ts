@@ -237,6 +237,80 @@ describe('collectSubjectAccess', { timeout: 60_000 }, () => {
     );
   });
 
+  it("leaves out the party a request was made for, which a filter can name (someone else's id)", async () => {
+    const { platform } = (await collect(a.tenant, a.person)).modules;
+    expect(platform?.['app.job_request']?.[0]).not.toHaveProperty(['app.job_request.filters']);
+    expect(JSON.stringify(platform)).not.toContain(a.bystander);
+  });
+
+  it('leaves out audit events and fields that show an unreleased outcome or how far an application has moved', async () => {
+    const tenant = await createTestTenant();
+    const stage = randomUUID();
+    const person = await asMigratorIn(tenant.id, async (client) => {
+      const subject = await addPerson(client, tenant);
+      const userId = await createTestUser();
+      const membership = await insertRow(client, 'app.membership', {
+        tenant_id: tenant.id,
+        user_id: userId,
+        roles: ['programme_manager'],
+      });
+      await client.query('UPDATE party.person SET user_id = $2 WHERE id = $1', [subject, userId]);
+      const audit = (action: string, changes: Record<string, unknown>, byMember = false) =>
+        insertRow(client, 'app.audit_event', {
+          tenant_id: tenant.id,
+          request_id: randomUUID(),
+          actor_kind: byMember ? 'user' : 'system',
+          actor_id: byMember ? membership : null,
+          action,
+          entity_type: action.split('.').slice(0, 2).join('.'),
+          entity_id: randomUUID(),
+          changes,
+          subject_party_id: byMember ? null : subject,
+        });
+      await audit('grants.review.submitted', {
+        'grants.assignment.status': { before: 'assigned', after: 'submitted' },
+      });
+      await audit('grants.assignment.conflict_declared', {
+        'grants.assignment.status': { before: 'assigned', after: 'conflicted' },
+      });
+      await audit(
+        'grants.reviewer.added',
+        { 'grants.reviewer.membership_id': { before: null, after: stage } },
+        true,
+      );
+      await audit(
+        'grants.reviewer.removed',
+        { 'grants.reviewer.membership_id': { before: stage, after: null } },
+        true,
+      );
+      await audit('grants.decision.recorded', {
+        'grants.decision.outcome': { before: null, after: 'declined' },
+      });
+      await audit('grants.decision.changed', {
+        'grants.decision.outcome': { before: 'declined', after: 'accepted' },
+      });
+      await audit('grants.assignment.created', {
+        'grants.assignment.reviewer_membership_id': { before: null, after: stage },
+      });
+      await audit('grants.application.stage_changed', {
+        'grants.application.stage_id': { before: null, after: stage },
+      });
+      await audit('grants.application.submitted', {
+        'grants.application.status': { before: 'draft', after: 'submitted' },
+        'grants.application.stage_id': { before: null, after: stage },
+        'grants.assignment.reviewer_membership_id': { before: stage, after: stage },
+        'grants.reviewer.membership_id': { before: null, after: stage },
+      });
+      return subject;
+    });
+    const { auditEvents } = await collect(tenant, person);
+    expect(auditEvents.map((event) => event.action)).toEqual(['grants.application.submitted']);
+    expect(Object.keys(auditEvents[0]?.changes ?? {})).toEqual(['grants.application.status']);
+    expect(JSON.stringify(auditEvents)).not.toContain(stage);
+    expect(JSON.stringify(auditEvents)).not.toContain('declined');
+    expect(JSON.stringify(auditEvents)).not.toContain('conflicted');
+  });
+
   it('adds the audit events about the person or their merged duplicate, or done by their memberships, by kind', async () => {
     const data = await collect(a.tenant, a.person);
     expect(data.auditEvents.map((event) => event.actor.kind).sort()).toEqual([

@@ -11,6 +11,8 @@
 import type {
   ClassificationRegistry,
   FieldClassification,
+  ProcessingEntry,
+  ProcessingRegistry,
   SubjectPathRegistry,
 } from '../classification.ts';
 
@@ -46,6 +48,11 @@ const audit: FieldClassification = {
   sensitivity: 'internal',
   retention: { kind: 'tenant_policy', policy: 'audit', minimumDays: 365 },
 };
+/** 7 years, the longest off-site tier (ADR 0011), never under a tenant's policy. */
+const erasureLedger: FieldClassification = {
+  sensitivity: 'internal',
+  retention: { kind: 'fixed', days: 2557, from: 'erased_at' },
+};
 
 /**
  * Columns whose values are structured (json, jsonb, bytea) or free text. An
@@ -63,9 +70,12 @@ export const notKept: ReadonlySet<string> = new Set([
   'app.audit_event.changes',
   'app.job_request.filters',
   'app.subject_key.wrapped_key',
+  'app.note.body',
+  'app.message.body',
+  'app.tag.label',
 ]);
 
-export const app: ClassificationRegistry = {
+export const app = {
   'app.tenant': {
     id: internal,
     slug: publicField,
@@ -250,7 +260,74 @@ export const app: ClassificationRegistry = {
     created_at: internal,
     destroyed_at: internal,
   },
-};
+  // Who was erased, as ids and times, so a restore can erase them again
+  // (ADR 0027). Plain ids: no foreign key, so no subject path.
+  'app.erasure_ledger': {
+    tenant_id: erasureLedger,
+    id: erasureLedger,
+    subject_party_id: erasureLedger,
+    kind: erasureLedger,
+    subject_key_id: erasureLedger,
+    audit_event_id: erasureLedger,
+    erased_at: erasureLedger,
+    retain_until: erasureLedger,
+  },
+  // Whether this cell is being restored (ADR 0011): one row, no tenant's.
+  'app.restore_mode': {
+    id: internal,
+    active: internal,
+    request_id: internal,
+    created_at: internal,
+    created_by: internal,
+    updated_at: internal,
+    updated_by: internal,
+  },
+  // Notes and messages are personal in their bodies and internal in everything
+  // else: their ids, sides, read times and the author, mention and creator
+  // ids. They follow the application they are joined to, as
+  // grants.application does: S11-102's retention functions enforce that, and
+  // S11-106's erasure functions clear the bodies. A tag label is tenant
+  // configuration, kept with the tenant; its check keeps it to a short word,
+  // and a label must not name a person.
+  'app.note': {
+    tenant_id: internal,
+    id: internal,
+    body: personal,
+    author_id: internal,
+    created_at: internal,
+  },
+  'app.note_mention': {
+    tenant_id: internal,
+    id: internal,
+    note_id: internal,
+    membership_id: internal,
+    created_at: internal,
+  },
+  'app.message_thread': {
+    tenant_id: internal,
+    id: internal,
+    applicant_read_at: internal,
+    staff_read_at: internal,
+    created_at: internal,
+  },
+  'app.message': {
+    tenant_id: internal,
+    id: internal,
+    thread_id: internal,
+    side: internal,
+    body: personal,
+    author_membership_id: internal,
+    author_person_id: internal,
+    created_at: internal,
+  },
+  'app.tag': {
+    tenant_id: internal,
+    id: internal,
+    label: internal,
+    created_by: internal,
+    created_at: internal,
+  },
+} satisfies ClassificationRegistry;
 
 /**
  * Each table's path to the party its rows are about (ADR 0027). A file is
@@ -272,4 +349,118 @@ export const appSubjects: SubjectPathRegistry = {
   'app.audit_event': { kind: 'party', column: 'subject_party_id' },
   'app.job_request': { kind: 'join', column: 'requested_by', table: 'app.membership' },
   'app.subject_key': { kind: 'party', column: 'subject_party_id' },
+  // A note is about its author, as a file is about its uploader; the applicant
+  // it concerns is reached through grants.application_note. An applicant's
+  // message names them directly.
+  'app.note': { kind: 'join', column: 'author_id', table: 'app.membership' },
+  'app.message': { kind: 'party', column: 'author_person_id' },
+};
+
+const stored = ['hosting', 'backup'] as const;
+const tenantPeople = ['applicant', 'applicant_contact', 'staff_member', 'reviewer'] as const;
+const members = ['applicant', 'staff_member', 'reviewer'] as const;
+
+/** A table of the tenant's own set-up, holding no person's data. */
+const setUp: ProcessingEntry = {
+  purpose: 'tenant_administration',
+  legalBasis: 'contract',
+  processors: stored,
+  dataSubjects: [],
+  dataCategories: [],
+};
+/** A note, message or thread's working data, under the application it joins. */
+const noteRecord: ProcessingEntry = {
+  purpose: 'grant_applications',
+  legalBasis: 'contract',
+  processors: stored,
+  dataSubjects: [],
+  dataCategories: [],
+};
+const auditRow: ProcessingEntry = {
+  purpose: 'audit',
+  legalBasis: 'legitimate_interests',
+  processors: stored,
+  dataSubjects: tenantPeople,
+  dataCategories: ['other'],
+};
+
+export const appProcessing: ProcessingRegistry<typeof app> = {
+  'app.tenant': setUp,
+  'app.membership': {
+    purpose: 'tenant_administration',
+    legalBasis: 'legitimate_interests',
+    processors: stored,
+    dataSubjects: members,
+    dataCategories: ['identity'],
+  },
+  'app.tenant_module': setUp,
+  'app.tenant_theme': setUp,
+  'app.config_version': setUp,
+  'app.retention_policy': setUp,
+  'app.file': {
+    purpose: 'file_storage',
+    legalBasis: 'contract',
+    processors: [...stored, 'malware_scanning'],
+    dataSubjects: members,
+    dataCategories: ['identity', 'other'],
+  },
+  'app.invitation': {
+    purpose: 'tenant_administration',
+    legalBasis: 'legitimate_interests',
+    processors: [...stored, 'email'],
+    dataSubjects: ['staff_member', 'reviewer'],
+    dataCategories: ['contact'],
+  },
+  'app.idempotency_key': {
+    purpose: 'service_reliability',
+    legalBasis: 'legitimate_interests',
+    processors: stored,
+    dataSubjects: members,
+    dataCategories: ['other'],
+  },
+  'app.request_limit': {
+    purpose: 'service_reliability',
+    legalBasis: 'legitimate_interests',
+    processors: stored,
+    dataSubjects: ['visitor'],
+    dataCategories: ['online_identifiers'],
+  },
+  'app.audit_event': auditRow,
+  'app.job_queue': {
+    purpose: 'background_jobs',
+    legalBasis: 'legitimate_interests',
+    processors: stored,
+    dataSubjects: [],
+    dataCategories: [],
+  },
+  'app.job_request': {
+    purpose: 'background_jobs',
+    legalBasis: 'legitimate_interests',
+    processors: stored,
+    dataSubjects: tenantPeople,
+    dataCategories: ['identity'],
+  },
+  'app.subject_key': auditRow,
+  // Its party ids have no foreign key, so no subject path: it states none.
+  'app.erasure_ledger': { ...auditRow, dataSubjects: [], dataCategories: [] },
+  'app.restore_mode': {
+    purpose: 'service_reliability',
+    legalBasis: 'legitimate_interests',
+    processors: stored,
+    dataSubjects: [],
+    dataCategories: [],
+  },
+  'app.note': {
+    ...noteRecord,
+    dataSubjects: ['applicant', 'staff_member'],
+    dataCategories: ['other'],
+  },
+  'app.note_mention': noteRecord,
+  'app.message_thread': noteRecord,
+  'app.message': {
+    ...noteRecord,
+    dataSubjects: ['applicant', 'staff_member'],
+    dataCategories: ['other'],
+  },
+  'app.tag': setUp,
 };

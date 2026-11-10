@@ -240,6 +240,7 @@ describe('subject paths (ADR 0027)', () => {
       'app.lint_columns': { kind: 'party', column: 'missing' },
       'app.lint_party': { kind: 'party', column: 'party_id' },
       'app.lint_account': { kind: 'account', column: 'user_id' },
+      'app.lint_parties': { kind: 'parties', columns: ['party_id', 'missing'] },
       'app.lint_join': { kind: 'join', column: 'party_id', table: 'grants.application' },
       'app.lint_dead_end': { kind: 'join', column: 'id', table: 'app.lint_unlinked' },
       'app.lint_gone': { kind: 'party', column: 'id' },
@@ -250,7 +251,7 @@ describe('subject paths (ADR 0027)', () => {
         await client.query(`CREATE TABLE app.${table} (id uuid PRIMARY KEY, tenant_id uuid)`);
       }
       // Plain uuid columns, with no foreign key to what each path names.
-      for (const table of ['lint_party', 'lint_account', 'lint_join']) {
+      for (const table of ['lint_party', 'lint_account', 'lint_parties', 'lint_join']) {
         await client.query(
           `CREATE TABLE app.${table} (id uuid PRIMARY KEY, party_id uuid, user_id uuid)`,
         );
@@ -267,6 +268,8 @@ describe('subject paths (ADR 0027)', () => {
         'app.lint_columns has a subject path through missing, which does not exist.',
         'app.lint_party has a subject path through party_id, which is not a foreign key to party.party or party.person or party.organisation.',
         'app.lint_account has a subject path through user_id, which is not a foreign key to auth.user.',
+        'app.lint_parties has a subject path through party_id, which is not a foreign key to party.party or party.person or party.organisation.',
+        'app.lint_parties has a subject path through missing, which does not exist.',
         'app.lint_join has a subject path through party_id, which is not a foreign key to grants.application.',
         'app.lint_dead_end has a subject path that does not reach a party or an account.',
         'classification.ts gives a subject path for app.lint_gone, which does not exist.',

@@ -32,12 +32,9 @@ export async function openFirstSubmission(
     .getByRole('navigation', { name: 'Main' })
     .getByRole('link', { name: 'Submissions' })
     .click();
-  const skipped = new RegExp(['Withdrawn', ...decided].join('|'));
-  const first = submissionRows(page)
-    .filter({ hasNotText: skipped })
-    .first()
-    .getByRole('rowheader')
-    .getByRole('link');
+  let rows = submissionRows(page);
+  for (const text of ['Withdrawn', ...decided]) rows = rows.filter({ hasNotText: text });
+  const first = rows.first().getByRole('rowheader').getByRole('link');
   const name = (await first.textContent()) ?? '';
   await first.click();
   await expect(h1(page, name)).toBeFocused();

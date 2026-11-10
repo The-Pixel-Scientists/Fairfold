@@ -12,17 +12,23 @@ describe('party subject tables', () => {
   it.each(Object.entries(subjectTables))(
     '%s lists every classified column with its sensitivity',
     (table, { columns }) => {
-      const mapped = Object.entries(classification[table] ?? {}).map(
-        ([column, { sensitivity }]) => [column, sensitivity],
-      );
+      // Every value in search_vector comes from a column that is exported, and
+      // app_worker is deliberately unable to read it.
+      const mapped = Object.entries(classification[table] ?? {})
+        .filter(([column]) => !(table === 'party.person' && column === 'search_vector'))
+        .map(([column, { sensitivity }]) => [column, sensitivity]);
       expect([...columns].sort()).toEqual(mapped.sort());
     },
   );
 
   it.each(Object.entries(subjectTables))(
     '%s is read by its party subject path',
-    (table, tables) => {
-      expect(subjectPaths[table]).toEqual({ kind: 'party', column: tables.subjectColumn });
+    (table, { subjectColumn }) => {
+      expect(subjectPaths[table]).toEqual(
+        typeof subjectColumn === 'string'
+          ? { kind: 'party', column: subjectColumn }
+          : { kind: 'parties', columns: subjectColumn },
+      );
     },
   );
 

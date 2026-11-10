@@ -227,7 +227,7 @@ describe('the configured scenario', { timeout: 60_000 }, () => {
         ),
         theme: await query('SELECT brand_colour FROM app.tenant_theme'),
         forms: await query(
-          'SELECT version, status, published_at, definition FROM grants.form_version',
+          'SELECT version, status, published_at < now() AS published, definition FROM grants.form_version',
         ),
       };
     });
@@ -261,7 +261,7 @@ describe('the configured scenario', { timeout: 60_000 }, () => {
           version: 1,
           status: 'published',
           // The day before the round opens.
-          published_at: expect.any(Date),
+          published: true,
           // As parsed, with every default written out.
           definition: expect.objectContaining({
             sections: communitySpacesForm.sections.map(({ id }): unknown =>

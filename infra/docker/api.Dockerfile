@@ -24,6 +24,8 @@ RUN --mount=type=cache,id=tps-pnpm-store,target=/pnpm-store \
 
 FROM node:26.12.1-trixie-slim@sha256:94816674c62774da0d099a947bf4613b9e1972a2733abd0d0cd80e795f8411d0
 
+# The base image can trail Debian's security fixes, which the release scan fails on.
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
 ENV NODE_ENV=production
 # Node.js is all the API needs. npm, Corepack and Yarn would only add code to patch.
 RUN rm -rf /usr/local/lib/node_modules /opt/yarn-* /usr/local/bin/npm /usr/local/bin/npx \
