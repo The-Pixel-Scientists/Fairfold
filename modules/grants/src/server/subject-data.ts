@@ -63,6 +63,7 @@ export const subjectTables: Readonly<
         'submitted_late',
         'withdrawn_at',
         'organisation_snapshot_id',
+        'submission_route',
       ),
     ],
   },
@@ -154,8 +155,20 @@ export const withheld = {
     'grants.score': 'Scores and comments stay private until a check before release exists.',
     'grants.assignment':
       'Who reviews an application, and how far their reviews have gone, stays private. The row can name the reviewer and show how far the application has moved.',
+    'grants.adjustment':
+      'Its reason codes are not shown to applicants, and it is about the organisation, not the person.',
+    'grants.monitoring_response':
+      'Monitoring responses are a separate output (ADR 0032), not part of this export.',
+    'grants.application_note':
+      'Staff notes about an application are not yet read for export; the grants module adds them.',
+    'grants.application_message':
+      'Messages about an application are not yet read for export; the grants module adds them.',
+    'grants.message_notification':
+      'Notifications of messages are not yet read for export; the grants module adds them.',
   },
   columns: {
+    'grants.application.submitted_by':
+      'It names the staff member who submitted the application for the applicant.',
     'grants.application.stage_id':
       'It shows how far the application has moved, which applicants are not told.',
     'grants.application.updated_at':
