@@ -1,0 +1,11 @@
+// The off-site backup job, which runs on Node.js with built-in type stripping.
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "../../node_modules/.cache/tsc/infra-backup",
+    "tsBuildInfoFile": "../../node_modules/.cache/tsc/infra-backup/tsconfig.tsbuildinfo",
+    "types": ["node"]
+  },
+  "include": ["src"],
+  "references": [{ "path": "../../packages/db" }]
+}
