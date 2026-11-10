@@ -11,6 +11,8 @@
 import type {
   ClassificationRegistry,
   FieldClassification,
+  ProcessingEntry,
+  ProcessingRegistry,
   SubjectPathRegistry,
 } from '../classification.ts';
 
@@ -65,7 +67,7 @@ export const notKept: ReadonlySet<string> = new Set([
   'app.subject_key.wrapped_key',
 ]);
 
-export const app: ClassificationRegistry = {
+export const app = {
   'app.tenant': {
     id: internal,
     slug: publicField,
@@ -250,7 +252,7 @@ export const app: ClassificationRegistry = {
     created_at: internal,
     destroyed_at: internal,
   },
-};
+} satisfies ClassificationRegistry;
 
 /**
  * Each table's path to the party its rows are about (ADR 0027). A file is
@@ -272,4 +274,83 @@ export const appSubjects: SubjectPathRegistry = {
   'app.audit_event': { kind: 'party', column: 'subject_party_id' },
   'app.job_request': { kind: 'join', column: 'requested_by', table: 'app.membership' },
   'app.subject_key': { kind: 'party', column: 'subject_party_id' },
+};
+
+const stored = ['hosting', 'backup'] as const;
+const tenantPeople = ['applicant', 'applicant_contact', 'staff_member', 'reviewer'] as const;
+const members = ['applicant', 'staff_member', 'reviewer'] as const;
+
+/** A table of the tenant's own set-up, holding no person's data. */
+const setUp: ProcessingEntry = {
+  purpose: 'tenant_administration',
+  legalBasis: 'contract',
+  processors: stored,
+  dataSubjects: [],
+  dataCategories: [],
+};
+const auditRow: ProcessingEntry = {
+  purpose: 'audit',
+  legalBasis: 'legitimate_interests',
+  processors: stored,
+  dataSubjects: tenantPeople,
+  dataCategories: ['other'],
+};
+
+export const appProcessing: ProcessingRegistry<typeof app> = {
+  'app.tenant': setUp,
+  'app.membership': {
+    purpose: 'tenant_administration',
+    legalBasis: 'legitimate_interests',
+    processors: stored,
+    dataSubjects: members,
+    dataCategories: ['identity'],
+  },
+  'app.tenant_module': setUp,
+  'app.tenant_theme': setUp,
+  'app.config_version': setUp,
+  'app.retention_policy': setUp,
+  'app.file': {
+    purpose: 'file_storage',
+    legalBasis: 'contract',
+    processors: [...stored, 'malware_scanning'],
+    dataSubjects: members,
+    dataCategories: ['identity', 'other'],
+  },
+  'app.invitation': {
+    purpose: 'tenant_administration',
+    legalBasis: 'legitimate_interests',
+    processors: [...stored, 'email'],
+    dataSubjects: ['staff_member', 'reviewer'],
+    dataCategories: ['contact'],
+  },
+  'app.idempotency_key': {
+    purpose: 'service_reliability',
+    legalBasis: 'legitimate_interests',
+    processors: stored,
+    dataSubjects: members,
+    dataCategories: ['other'],
+  },
+  'app.request_limit': {
+    purpose: 'service_reliability',
+    legalBasis: 'legitimate_interests',
+    processors: stored,
+    dataSubjects: ['visitor'],
+    dataCategories: ['online_identifiers'],
+  },
+  'app.audit_event': auditRow,
+  'app.job_queue': {
+    purpose: 'background_jobs',
+    legalBasis: 'legitimate_interests',
+    processors: stored,
+    dataSubjects: [],
+    dataCategories: [],
+  },
+  'app.job_request': {
+    purpose: 'background_jobs',
+    legalBasis: 'legitimate_interests',
+    processors: stored,
+    dataSubjects: tenantPeople,
+    dataCategories: ['identity'],
+  },
+  'app.subject_key': auditRow,
 };
