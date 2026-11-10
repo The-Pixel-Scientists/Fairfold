@@ -1135,6 +1135,271 @@ exports[`the shipped map > matches the committed register 1`] = `
     "article9Condition": null,
     "columns": [
       {
+        "column": "author_membership_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "author_person_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "body",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "personal",
+      },
+      {
+        "column": "created_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "side",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "tenant_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "thread_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+    ],
+    "dataCategories": [
+      "other",
+    ],
+    "dataSubjects": [
+      "applicant",
+      "staff_member",
+    ],
+    "highestSensitivity": "personal",
+    "legalBasis": "contract",
+    "processors": [
+      "hosting",
+      "backup",
+    ],
+    "purpose": "grant_applications",
+    "subjectPath": {
+      "column": "author_person_id",
+      "kind": "party",
+    },
+    "table": "app.message",
+  },
+  {
+    "article9Condition": null,
+    "columns": [
+      {
+        "column": "applicant_read_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "created_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "staff_read_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "tenant_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+    ],
+    "dataCategories": [],
+    "dataSubjects": [],
+    "highestSensitivity": "internal",
+    "legalBasis": "contract",
+    "processors": [
+      "hosting",
+      "backup",
+    ],
+    "purpose": "grant_applications",
+    "subjectPath": null,
+    "table": "app.message_thread",
+  },
+  {
+    "article9Condition": null,
+    "columns": [
+      {
+        "column": "author_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "body",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "personal",
+      },
+      {
+        "column": "created_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "tenant_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+    ],
+    "dataCategories": [
+      "other",
+    ],
+    "dataSubjects": [
+      "applicant",
+      "staff_member",
+    ],
+    "highestSensitivity": "personal",
+    "legalBasis": "contract",
+    "processors": [
+      "hosting",
+      "backup",
+    ],
+    "purpose": "grant_applications",
+    "subjectPath": {
+      "column": "author_id",
+      "kind": "join",
+      "table": "app.membership",
+    },
+    "table": "app.note",
+  },
+  {
+    "article9Condition": null,
+    "columns": [
+      {
+        "column": "created_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "membership_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "note_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "tenant_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+    ],
+    "dataCategories": [],
+    "dataSubjects": [],
+    "highestSensitivity": "internal",
+    "legalBasis": "contract",
+    "processors": [
+      "hosting",
+      "backup",
+    ],
+    "purpose": "grant_applications",
+    "subjectPath": null,
+    "table": "app.note_mention",
+  },
+  {
+    "article9Condition": null,
+    "columns": [
+      {
         "column": "bucket",
         "perField": false,
         "retention": {
@@ -1437,6 +1702,62 @@ exports[`the shipped map > matches the committed register 1`] = `
       "kind": "party",
     },
     "table": "app.subject_key",
+  },
+  {
+    "article9Condition": null,
+    "columns": [
+      {
+        "column": "created_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "created_by",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "label",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "tenant_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+    ],
+    "dataCategories": [],
+    "dataSubjects": [],
+    "highestSensitivity": "internal",
+    "legalBasis": "contract",
+    "processors": [
+      "hosting",
+      "backup",
+    ],
+    "purpose": "tenant_administration",
+    "subjectPath": null,
+    "table": "app.tag",
   },
   {
     "article9Condition": null,
@@ -3668,6 +3989,134 @@ exports[`the shipped map > matches the committed register 1`] = `
         "sensitivity": "internal",
       },
       {
+        "column": "id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "tenant_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "thread_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+    ],
+    "dataCategories": [
+      "other",
+    ],
+    "dataSubjects": [
+      "applicant",
+    ],
+    "highestSensitivity": "internal",
+    "legalBasis": "contract",
+    "processors": [
+      "hosting",
+      "backup",
+    ],
+    "purpose": "grant_applications",
+    "subjectPath": {
+      "column": "application_id",
+      "kind": "join",
+      "table": "grants.application",
+    },
+    "table": "grants.application_message",
+  },
+  {
+    "article9Condition": null,
+    "columns": [
+      {
+        "column": "application_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "created_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "note_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "tenant_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+    ],
+    "dataCategories": [
+      "other",
+    ],
+    "dataSubjects": [
+      "applicant",
+    ],
+    "highestSensitivity": "internal",
+    "legalBasis": "contract",
+    "processors": [
+      "hosting",
+      "backup",
+    ],
+    "purpose": "grant_applications",
+    "subjectPath": {
+      "column": "application_id",
+      "kind": "join",
+      "table": "grants.application",
+    },
+    "table": "grants.application_note",
+  },
+  {
+    "article9Condition": null,
+    "columns": [
+      {
+        "column": "application_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "created_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
         "column": "created_by",
         "perField": false,
         "retention": {
@@ -4385,6 +4834,102 @@ exports[`the shipped map > matches the committed register 1`] = `
     "purpose": "programme_administration",
     "subjectPath": null,
     "table": "grants.form_version",
+  },
+  {
+    "article9Condition": null,
+    "columns": [
+      {
+        "column": "created_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "error_code",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "message_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "recipient_person_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "personal",
+      },
+      {
+        "column": "sent_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "status",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "template_version_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "tenant_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+    ],
+    "dataCategories": [
+      "other",
+    ],
+    "dataSubjects": [
+      "applicant",
+    ],
+    "highestSensitivity": "personal",
+    "legalBasis": "contract",
+    "processors": [
+      "hosting",
+      "backup",
+      "email",
+    ],
+    "purpose": "grant_applications",
+    "subjectPath": {
+      "column": "recipient_person_id",
+      "kind": "party",
+    },
+    "table": "grants.message_notification",
   },
   {
     "article9Condition": "explicit_consent",

@@ -258,6 +258,35 @@ export const grants = {
     funder_name: shown,
     identifier_prefix: shown,
   },
+  // Join tables between an application and its platform notes and thread
+  // (ADR 0030): ids and times, kept with the application.
+  'grants.application_note': {
+    tenant_id: internal,
+    id: internal,
+    note_id: internal,
+    application_id: internal,
+    created_at: internal,
+  },
+  'grants.application_message': {
+    tenant_id: internal,
+    id: internal,
+    application_id: internal,
+    thread_id: internal,
+    created_at: internal,
+  },
+  // An outbox row for telling an applicant about a message, kept as long as a
+  // decision email. The recipient is cleared on erasure (ADR 0027).
+  'grants.message_notification': {
+    tenant_id: internal,
+    id: internal,
+    message_id: internal,
+    recipient_person_id: personal,
+    template_version_id: internal,
+    status: internal,
+    error_code: internal,
+    sent_at: internal,
+    created_at: internal,
+  },
 } satisfies ClassificationRegistry;
 
 const throughApplication = {
@@ -282,6 +311,9 @@ export const grantsSubjects: SubjectPathRegistry = {
   'grants.score': { kind: 'join', column: 'assignment_id', table: 'grants.assignment' },
   'grants.decision': throughApplication,
   'grants.decision_email': { kind: 'party', column: 'recipient_person_id' },
+  'grants.application_note': throughApplication,
+  'grants.application_message': throughApplication,
+  'grants.message_notification': { kind: 'party', column: 'recipient_person_id' },
 };
 
 const stored = ['hosting', 'backup'] as const;
@@ -351,4 +383,11 @@ export const grantsProcessing: ProcessingRegistry<typeof grants> = {
   'grants.decision': emailedDecision,
   'grants.decision_email': emailedDecision,
   'grants.publisher_setting': setUp,
+  'grants.application_note': application('grant_applications', 'contract', ['applicant']),
+  'grants.application_message': application('grant_applications', 'contract'),
+  // The notification names the message's thread to the mail provider.
+  'grants.message_notification': {
+    ...application('grant_applications', 'contract'),
+    processors: [...stored, 'email'],
+  },
 };

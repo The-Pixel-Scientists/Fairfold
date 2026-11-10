@@ -70,6 +70,9 @@ export const notKept: ReadonlySet<string> = new Set([
   'app.audit_event.changes',
   'app.job_request.filters',
   'app.subject_key.wrapped_key',
+  'app.note.body',
+  'app.message.body',
+  'app.tag.label',
 ]);
 
 export const app = {
@@ -279,6 +282,51 @@ export const app = {
     updated_at: internal,
     updated_by: internal,
   },
+  // Notes and messages are personal in their bodies and internal in everything
+  // else: their ids, sides, read times and the author, mention and creator
+  // ids. They follow the application they are joined to, as
+  // grants.application does: S11-102's retention functions enforce that, and
+  // S11-106's erasure functions clear the bodies. A tag label is tenant
+  // configuration, kept with the tenant; its check keeps it to a short word,
+  // and a label must not name a person.
+  'app.note': {
+    tenant_id: internal,
+    id: internal,
+    body: personal,
+    author_id: internal,
+    created_at: internal,
+  },
+  'app.note_mention': {
+    tenant_id: internal,
+    id: internal,
+    note_id: internal,
+    membership_id: internal,
+    created_at: internal,
+  },
+  'app.message_thread': {
+    tenant_id: internal,
+    id: internal,
+    applicant_read_at: internal,
+    staff_read_at: internal,
+    created_at: internal,
+  },
+  'app.message': {
+    tenant_id: internal,
+    id: internal,
+    thread_id: internal,
+    side: internal,
+    body: personal,
+    author_membership_id: internal,
+    author_person_id: internal,
+    created_at: internal,
+  },
+  'app.tag': {
+    tenant_id: internal,
+    id: internal,
+    label: internal,
+    created_by: internal,
+    created_at: internal,
+  },
 } satisfies ClassificationRegistry;
 
 /**
@@ -301,6 +349,11 @@ export const appSubjects: SubjectPathRegistry = {
   'app.audit_event': { kind: 'party', column: 'subject_party_id' },
   'app.job_request': { kind: 'join', column: 'requested_by', table: 'app.membership' },
   'app.subject_key': { kind: 'party', column: 'subject_party_id' },
+  // A note is about its author, as a file is about its uploader; the applicant
+  // it concerns is reached through grants.application_note. An applicant's
+  // message names them directly.
+  'app.note': { kind: 'join', column: 'author_id', table: 'app.membership' },
+  'app.message': { kind: 'party', column: 'author_person_id' },
 };
 
 const stored = ['hosting', 'backup'] as const;
@@ -310,6 +363,14 @@ const members = ['applicant', 'staff_member', 'reviewer'] as const;
 /** A table of the tenant's own set-up, holding no person's data. */
 const setUp: ProcessingEntry = {
   purpose: 'tenant_administration',
+  legalBasis: 'contract',
+  processors: stored,
+  dataSubjects: [],
+  dataCategories: [],
+};
+/** A note, message or thread's working data, under the application it joins. */
+const noteRecord: ProcessingEntry = {
+  purpose: 'grant_applications',
   legalBasis: 'contract',
   processors: stored,
   dataSubjects: [],
@@ -389,4 +450,17 @@ export const appProcessing: ProcessingRegistry<typeof app> = {
     dataSubjects: [],
     dataCategories: [],
   },
+  'app.note': {
+    ...noteRecord,
+    dataSubjects: ['applicant', 'staff_member'],
+    dataCategories: ['other'],
+  },
+  'app.note_mention': noteRecord,
+  'app.message_thread': noteRecord,
+  'app.message': {
+    ...noteRecord,
+    dataSubjects: ['applicant', 'staff_member'],
+    dataCategories: ['other'],
+  },
+  'app.tag': setUp,
 };
