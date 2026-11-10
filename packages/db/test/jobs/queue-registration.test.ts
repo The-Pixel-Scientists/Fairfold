@@ -26,6 +26,7 @@ const TENANT = [
   'platform.audit_log_export',
   'platform.board_pack',
   'grants.release_email',
+  'grants.message_notification',
 ];
 const EVENTS = ['crm', 'assure'] as const;
 

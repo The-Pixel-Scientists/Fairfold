@@ -79,6 +79,8 @@ describe('the app schema', () => {
         'owner_app_erase_file USAGE',
         // Re-applying the erasure ledger after a restore, migration 0049.
         'owner_app_reapply_erasure_ledger USAGE',
+        // Erasing a subject's notes and messages, migration 0052.
+        'owner_app_erase_notes USAGE',
       ].sort(),
     });
   });
@@ -121,6 +123,8 @@ describe('app.current_tenant_id()', () => {
         'owner_app_erase_file',
         // Re-applying the erasure ledger after a restore, migration 0049.
         'owner_app_reapply_erasure_ledger',
+        // Erasing a subject's notes and messages, migration 0052.
+        'owner_app_erase_notes',
       ]
         .map((role) => `${role} EXECUTE`)
         .sort(),

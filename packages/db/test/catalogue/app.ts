@@ -44,6 +44,8 @@ export const app: SchemaCatalogue = {
     // The file sweep and file erasure (ADR 0030).
     ['app.delete_swept_file(uuid)', ['app_worker']],
     ['app.erase_file(uuid, uuid)', ['app_worker']],
+    // The erasure job clears a subject's notes and messages (ADR 0027).
+    ['app.erase_subject_notes(uuid)', ['app_worker']],
   ],
   definerFunctions: [
     [
@@ -287,6 +289,45 @@ export const app: SchemaCatalogue = {
           ),
           ...['tenant_id', 'id', 'status'].map(
             (column) => `SELECT on column party.party.${column}`,
+          ),
+        ],
+        policies: [],
+      },
+    ],
+    [
+      'app.erase_subject_notes(uuid)',
+      {
+        owner: 'owner_app_erase_notes',
+        // Never DELETE, nor the columns that say who a row is about but the
+        // notification's recipient, which it clears.
+        rights: [
+          'USAGE on schema app',
+          'USAGE on schema party',
+          'USAGE on schema grants',
+          'EXECUTE on function app.current_tenant_id()',
+          ...['tenant_id', 'id', 'status'].map(
+            (column) => `SELECT on column party.party.${column}`,
+          ),
+          ...['tenant_id', 'id', 'applicant_person_id'].map(
+            (column) => `SELECT on column grants.application.${column}`,
+          ),
+          ...['tenant_id', 'note_id', 'application_id'].map(
+            (column) => `SELECT on column grants.application_note.${column}`,
+          ),
+          ...['tenant_id', 'thread_id', 'application_id'].map(
+            (column) => `SELECT on column grants.application_message.${column}`,
+          ),
+          ...['tenant_id', 'id', 'body'].map((column) => `SELECT on column app.note.${column}`),
+          'UPDATE on column app.note.body',
+          ...['tenant_id', 'thread_id', 'body'].map(
+            (column) => `SELECT on column app.message.${column}`,
+          ),
+          'UPDATE on column app.message.body',
+          ...['tenant_id', 'recipient_person_id', 'status', 'error_code'].map(
+            (column) => `SELECT on column grants.message_notification.${column}`,
+          ),
+          ...['recipient_person_id', 'status', 'error_code'].map(
+            (column) => `UPDATE on column grants.message_notification.${column}`,
           ),
         ],
         policies: [],

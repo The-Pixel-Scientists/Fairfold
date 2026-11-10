@@ -157,6 +157,12 @@ const RELEASE_EMAIL_RIGHTS = [
   'EXECUTE on function party.erase_party(uuid,uuid)',
   // The erased-party guards call it on the worker's writes (migration 0033).
   'EXECUTE on function party.is_erased(uuid,uuid)',
+  // The message notification job (migration 0052).
+  'SELECT on grants.application_message',
+  'SELECT on grants.message_notification',
+  ...['status', 'error_code', 'sent_at'].map(
+    (column) => `UPDATE on column grants.message_notification.${column}`,
+  ),
 ];
 
 /** A released decision, with its applicant as a contact for its organisation. */
