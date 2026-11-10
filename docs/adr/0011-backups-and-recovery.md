@@ -309,6 +309,30 @@ In every outcome these stay ruled out: `pg_dump --enable-row-security`,
 exempting `migrator` or a table owner, removing forced row-level security from
 any database or copy, and any policy that grants the backup role every row.
 
+### The restore role
+
+`restore_operator` is the restore runbook's role, wherever this ADR and
+[ADR 0027](0027-erasure-across-modules-and-audit.md) name that role. The roles
+script creates it as `NOSUPERUSER`, `NOBYPASSRLS`, `NOCREATEROLE`, `NOCREATEDB`
+and `NOREPLICATION`. It belongs to no role and no role is a member of it, so
+`backup_reader` stays the only role with `BYPASSRLS`.
+
+- Only the restore command connects as it, with a password mounted as a file
+  on the restore host.
+- It holds `CONNECT`, `USAGE` on schema `app`, and `EXECUTE` on the definer
+  functions below. It has no right on any tenant table.
+- It holds `SELECT` and `UPDATE` on `app.restore_mode`, and its `UPDATE` policy
+  has `WITH CHECK (active)`. So it can set restore mode but not clear it, and
+  only `app.finish_restore(...)` clears it, after its checks.
+- Its functions are `app.restore_tenant_ids()`,
+  `app.restore_erasure_ledger_row(...)`, `app.advance_event_sequences()`,
+  `app.assign_restore_admin(...)`, `app.reapply_erasure_ledger_without_admin(...)`
+  and `app.finish_restore(...)`. Each refuses outside restore mode.
+- Migration 0048 leaves this work with `migrator` for now, which also has no
+  `BYPASSRLS`. It moves to `restore_operator` with the restore tooling, and
+  `app.restore_erasure_ledger_row(...)` then becomes the definer function ADR
+  0027 describes.
+
 ### Erasure and restores
 
 This section records what
@@ -339,7 +363,7 @@ write it to. Until step 4 the gate is that nothing is running.
 Steps that work through tenants cover every tenant whatever its status, because
 a suspended tenant's restored data is live again the moment it is reactivated.
 They take their list from `app.restore_tenant_ids()`, an approved definer
-function executable only by the restore runbook's role and `app_worker`, which
+function executable only by `restore_operator` and `app_worker`, which
 returns ids alone and refuses outside restore mode. They never use
 `app.tenant_ids()`, which lists active tenants only.
 
@@ -404,25 +428,57 @@ Every restore, of any layer and to any point, follows these steps:
     list from the restored table. Where
     [ADR 0027](0027-erasure-across-modules-and-audit.md#backups-and-restores)
     stops it for a tenant that would be left with no admin, that tenant holds
-    the whole restore. On the tenant's written instruction, the operator makes
-    another of its members an admin, through an approved definer function that
-    only the restore runbook's role can execute and that refuses outside restore
-    mode, and runs this step again for that tenant.
+    the whole restore until the operator takes one of two routes. Each is an
+    approved definer function that only `restore_operator` can execute and that
+    refuses outside restore mode, run with that tenant set. `app_worker` can
+    execute neither, and `app.reapply_erasure_ledger()` takes no argument that
+    lifts its stop.
+    - **Promote a member.** On the tenant's written instruction,
+      `app.assign_restore_admin(...)` makes another of its active members an
+      admin, and refuses a member the tenant's ledger names. In the same
+      transaction, in that tenant, it writes `platform.restore.admin_assigned`
+      with actor kind `operator`, the restore's request id, the membership id,
+      the role, the id of the operator's own credential, and the reference of
+      the written instruction, an opaque id with no personal data. The operator
+      then runs this step again for that tenant.
+    - **Leave the tenant with no admin.** If the tenant has no other member to
+      promote, or none answers within four hours of the operator's written
+      request to its contact on record,
+      `app.reapply_erasure_ledger_without_admin(...)` completes re-apply through
+      the same engine, so the person is still erased and the membership removed
+      with the standard event, and the tenant gets its
+      `platform.erasure_ledger.reapplied` event. It refuses if the tenant has
+      another active admin. It sets the tenant to `suspended`, and revokes every
+      session whose active tenant it is, because a session checks its membership
+      and not its tenant's status. In the same transaction it writes
+      `platform.restore.tenant_left_without_admin` with actor kind `operator`,
+      the restore's request id, the removed membership id, the id of the
+      operator's own credential and a reason code, `no_member` or `no_answer`.
+      Nobody can use the tenant until an operator reinstates it, a later action
+      that the restore tooling adds. It runs only on the tenant's written
+      instruction and only for a tenant holding that event, establishes a new
+      admin and writes `platform.restore.admin_assigned`.
 11. The file sweep runs for every tenant on that list
     ([ADR 0030](0030-files-and-reverse-proxy.md)), so objects brought back for
     erased or released files are gone.
-12. The restore command refuses to clear restore mode until re-apply and the
-    sweep have completed for every tenant on that list. In one transaction it
-    checks that each of those tenants has its
-    `platform.erasure_ledger.reapplied` event and its sweep audit event for this
+12. The restore command calls `app.finish_restore(...)`, an approved definer
+    function that only `restore_operator` can execute and that refuses outside
+    restore mode. It is the only thing that clears restore mode, and it refuses
+    until re-apply and the sweep have completed for every tenant on that list.
+    In one transaction it refuses if a tenant is already set, then takes each
+    tenant from `app.restore_tenant_ids()` in turn, setting `app.tenant_id` with
+    `set_config(..., true)` inside its own body. Its reads and writes stay under
+    the ordinary tenant policies, so no policy crosses tenants and ADR 0003's
+    helper does not change. For each tenant it checks for the
+    `platform.erasure_ledger.reapplied` event and the sweep audit event of this
     restore, tied to it by the restore's request id. A tenant where re-apply
-    stopped has no such event. If any is missing it names those tenants and goes
-    no further, and steps 10 and 11 can safely run again for them. No option
-    skips a tenant or clears restore mode without this check. Otherwise, in that
-    transaction, it clears restore mode and writes the restore's audit events
-    (see "Restore records"). It then writes the end of the restore record and
-    lets the services start. The API takes traffic, and the worker takes up its
-    queues and relay again.
+    stopped has no such event. If any is missing it names those tenants, nothing
+    commits, and steps 10 and 11 can safely run again for them. No option skips
+    a tenant or clears restore mode without this check. Otherwise, in that
+    transaction, it writes the restore's audit events (see "Restore records"),
+    empties the setting and clears restore mode. The restore command then writes
+    the end of the restore record and lets the services start. The API takes
+    traffic, and the worker takes up its queues and relay again.
 
 While restore mode is set, the API takes no traffic and a worker that starts
 does no queue, sender, relay, outbox, retention or purge work. Each reads the
@@ -443,7 +499,7 @@ its record through the same command.
   list, replace or delete them, as with the ledger's copies. No rollback can
   reach them, including at the start of a restore, when the database may not
   exist.
-- **In the restored database.** In step 12 the restore command writes each
+- **In the restored database.** In step 12 `app.finish_restore(...)` writes each
   record, and any earlier restore's record the restored data lacks, as
   `platform.restore.*` audit events in every tenant from
   `app.restore_tenant_ids()`, whatever its status, with actor kind `operator`
@@ -501,10 +557,11 @@ not working systems:
   to be read or anything else. If they cannot, the completeness check and the
   manifest write move to an identity in the backup project, and production's
   identity keeps only create and lengthen. Reading content is not granted;
-- the restore tooling: the restore-mode row, the hold on the API and worker, the
-  restore-only tenant list, the one-off re-apply process and its completion
-  check, the route for a tenant left with no admin, cancelling restored jobs,
-  the counter function, the restore records and the run record;
+- the restore tooling: the `restore_operator` role, the restore-mode row, the
+  hold on the API and worker, the restore-only tenant list, the one-off re-apply
+  process, `app.finish_restore(...)`, the two routes for a tenant left with no
+  admin and the later reinstatement of a suspended one, cancelling restored
+  jobs, the counter function, the restore records and the run record;
 - PeaSoup's confirmation that compliance-mode dates can be set per object
   through its S3 API, for 7 years, and extended later. Until it confirms, no
   7-year lock is set there;
@@ -523,12 +580,24 @@ not working systems:
   thing, both of which concern roles that run migrations and application code.
   Aaron decides whether this is enough or ADR 0003 needs its own amending ADR.
   Status lines change in a later housekeeping change.
+- This ADR adds a new entry to ADR 0003's list of tenant sources: the entries
+  of `app.restore_tenant_ids()`, in the restore command and the one-off worker
+  process only. ADR 0003's limit of the fan-out to the scheduler's platform job
+  widens to those two places and no others. The Semgrep rule that enforces this
+  admits only those files, and its test holds a use in another file that must
+  fail. ADR 0003's helper is unchanged and still sets one tenant per
+  transaction. `app.finish_restore(...)` alone moves between tenants within a
+  transaction, inside its own body.
+- `restore_operator` and this ADR's definer functions join ADR 0003's role table,
+  its list of approved definer functions and the catalogue test.
 - `docs/ARCHITECTURE.md` lists two named exceptions to its rules. On acceptance
   it gains two more: the backup role under rule 2, and the backup job's read
   under rule 4.
 - Rule 4: the nightly read leaves a run record outside the database and no
   `audit_event`. Restores, restore-mode changes and escrow recoveries leave a
   record that no rollback can remove, and audit events after the restore.
+  Promoting a member, leaving a tenant with no admin and reinstating that tenant
+  each write their own audit event in that tenant, in the same transaction.
 - A restore cancels restored jobs and leaves pending emails for staff to resend
   by name, so work in flight at the snapshot can need replaying or sending
   again. A pending email that had already gone out goes twice if staff resend it.
@@ -541,8 +610,11 @@ not working systems:
 - A restore needs an operator's attention, for every ledger row found only in
   a copy.
 - One tenant stopped by the no-admin rule holds the restore for every tenant
-  until the operator resolves it, so a restore can run past its target while
-  waiting for that tenant's answer.
+  until the operator promotes a member or, with no member to promote or no
+  answer within four hours, leaves it suspended with no admin. A restore can run
+  past its target by those four hours. A tenant left this way stays unusable,
+  with no admin, until it instructs an operator in writing, and the person is
+  erased either way.
 - No table is added, so this ADR adds no row-level security policy or
   classification entry.
 
