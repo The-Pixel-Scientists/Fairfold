@@ -4,9 +4,11 @@
 // as app_worker (the role the export job runs as) in a tenant's transaction:
 // a person's applications with each answer under its stable field id and the
 // class the pinned form version gives it, their decision emails, and the
-// eligibility results, stage moves, file links, assignments, scores and
+// eligibility results, first stage entry, file links and released
 // decisions that join to their applications, nothing of anyone else, and
-// nothing of another tenant. It reads the same with the module switched off.
+// nothing of another tenant. It carries no score, no reviewer, no unreleased
+// decision and no later stage move (rule 8). It reads the same with the module
+// switched off.
 
 import { randomUUID } from 'node:crypto';
 
@@ -18,13 +20,18 @@ import { databaseSettings } from '../../../../packages/db/test/connect.ts';
 import {
   addFile,
   applicationRow,
+  submit,
 } from '../../../../packages/db/test/grants/application-fixtures.ts';
 import {
   assignmentRow,
   reviewerRow,
   scoreRow,
 } from '../../../../packages/db/test/grants/assessment-fixtures.ts';
-import { addReleased, emailRow } from '../../../../packages/db/test/grants/decision-fixtures.ts';
+import {
+  addReleased,
+  decisionRow,
+  emailRow,
+} from '../../../../packages/db/test/grants/decision-fixtures.ts';
 import { addCriterion } from '../../../../packages/db/test/grants/fixtures.ts';
 import { addOrganisation, addPerson } from '../../../../packages/db/test/party/fixtures.ts';
 import {
@@ -63,6 +70,12 @@ interface Fixture {
   readonly bystander: string;
   readonly member: string;
   readonly applications: readonly string[];
+  /** A submitted application with an unreleased decision, a score and a stage move (transition row and update). */
+  readonly pending: {
+    readonly decision: string;
+    readonly reviewer: string;
+    readonly mover: string;
+  };
   /** Ids of the rows that join to the person's applications, by table. */
   readonly joined: Readonly<Record<string, string>>;
 }
@@ -127,9 +140,48 @@ async function addFixture(): Promise<Fixture> {
       criteria: [criterion, criterion, criterion],
     } as const;
     const assignment = await insertRow(client, 'grants.assignment', assignmentRow(tenant, review));
+    await insertRow(client, 'grants.score', scoreRow(tenant, review, assignment));
+    const pendingId = await apply(parts.person, {});
+    await submit(client, pendingId, parts.stages[1]);
+    const unreleased = await insertRow(
+      client,
+      'grants.decision',
+      decisionRow(
+        tenant,
+        { ...released, application: pendingId },
+        { outcome: 'declined', amount_minor: null, currency: null },
+      ),
+    );
+    const pendingReview = { ...review, application: pendingId };
+    const pendingAssignment = await insertRow(
+      client,
+      'grants.assignment',
+      assignmentRow(tenant, pendingReview, {
+        created_by: reviewer,
+        updated_by: reviewer,
+      }),
+    );
+    await insertRow(
+      client,
+      'grants.score',
+      scoreRow(tenant, pendingReview, pendingAssignment, {
+        comment: 'Weak case for a second hall.',
+      }),
+    );
+    const mover = await addMember(client, tenant, ['reviewer']);
+    await insertRow(client, 'grants.stage_transition', {
+      tenant_id: tenant.id,
+      round_id: parts.round,
+      application_id: pendingId,
+      from_stage_id: parts.stages[0],
+      to_stage_id: parts.stages[1],
+      moved_by: mover,
+    });
+    await client.query(
+      'UPDATE grants.application SET stage_id = $2, updated_by = $3 WHERE id = $1',
+      [pendingId, parts.stages[0], mover],
+    );
     const joined = {
-      'grants.assignment': assignment,
-      'grants.score': await insertRow(client, 'grants.score', scoreRow(tenant, review, assignment)),
       'grants.decision': released.decision,
       'grants.eligibility_result': await insertRow(client, 'grants.eligibility_result', {
         tenant_id: tenant.id,
@@ -158,7 +210,8 @@ async function addFixture(): Promise<Fixture> {
       person: parts.person,
       bystander,
       member: parts.member,
-      applications,
+      applications: [...applications, pendingId],
+      pending: { decision: unreleased, reviewer, mover },
       joined,
     };
   });
@@ -226,13 +279,34 @@ describe('grantsSubjectData', { timeout: 30_000 }, () => {
       expect(
         data[table]?.map((row) => row[`${table}.id`]?.value),
         table,
-      ).toEqual([id]);
+      ).toContain(id);
     }
-    expect(data['grants.score']?.[0]?.['grants.score.comment']).toEqual({
-      value: 'Clear evidence that the hall is used every day.',
-      sensitivity: 'personal',
-    });
     expect(data['grants.decision']?.[0]?.['grants.decision.outcome']?.value).toBe('accepted');
+  });
+
+  it('carries no score, reviewer, unreleased decision or later stage move', async () => {
+    const data = await read(a.tenant, a.person);
+    expect(data['grants.score']).toBeUndefined();
+    const text = JSON.stringify(data);
+    for (const hidden of [
+      a.pending.reviewer,
+      a.pending.decision,
+      a.pending.mover,
+      'Weak case',
+      'Clear evidence',
+    ]) {
+      expect(text).not.toContain(hidden);
+    }
+    expect(text).not.toContain('declined');
+    expect(data['grants.decision']).toHaveLength(1);
+    expect(data['grants.stage_transition']).toHaveLength(1);
+    expect(data['grants.assignment']).toBeUndefined();
+    expect(text).not.toContain('grants.assignment');
+    for (const row of data['grants.application'] ?? []) {
+      expect(row).not.toHaveProperty(['grants.application.stage_id']);
+      expect(row).not.toHaveProperty(['grants.application.updated_at']);
+      expect(row).not.toHaveProperty(['grants.application.updated_by']);
+    }
   });
 
   it('returns none of those tables for a person with other applications only', async () => {
@@ -250,8 +324,8 @@ describe('grantsSubjectData', { timeout: 30_000 }, () => {
       }),
     );
     const data = await read(b.tenant, b.person);
-    expect(data['grants.application']).toHaveLength(3);
-    expect(data['grants.score']).toHaveLength(1);
+    expect(data['grants.application']).toHaveLength(4);
+    expect(data['grants.assignment']).toBeUndefined();
   });
 
   it("returns nothing of another tenant's person, in either direction", async () => {
