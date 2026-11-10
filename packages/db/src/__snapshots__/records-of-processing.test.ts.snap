@@ -3255,6 +3255,134 @@ exports[`the shipped map > matches the committed register 1`] = `
     "table": "auth.verification",
   },
   {
+    "article9Condition": "substantial_public_interest",
+    "columns": [
+      {
+        "column": "application_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "closes_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "granted_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "granted_by",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "kind",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "organisation_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "reason_code",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "special_category",
+      },
+      {
+        "column": "revoke_reason_code",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "special_category",
+      },
+      {
+        "column": "revoked_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "revoked_by",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "round_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "tenant_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+    ],
+    "dataCategories": [
+      "other",
+    ],
+    "dataSubjects": [
+      "applicant",
+      "applicant_contact",
+    ],
+    "highestSensitivity": "special_category",
+    "legalBasis": "legal_obligation",
+    "processors": [
+      "hosting",
+      "backup",
+    ],
+    "purpose": "grant_applications",
+    "subjectPath": {
+      "column": "organisation_id",
+      "kind": "party",
+    },
+    "table": "grants.adjustment",
+  },
+  {
     "article9Condition": "explicit_consent",
     "columns": [
       {
@@ -3354,7 +3482,23 @@ exports[`the shipped map > matches the committed register 1`] = `
         "sensitivity": "internal",
       },
       {
+        "column": "submission_route",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
         "column": "submitted_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "submitted_by",
         "perField": false,
         "retention": {
           "kind": "tenant_lifetime",
@@ -4241,6 +4385,102 @@ exports[`the shipped map > matches the committed register 1`] = `
     "purpose": "programme_administration",
     "subjectPath": null,
     "table": "grants.form_version",
+  },
+  {
+    "article9Condition": "explicit_consent",
+    "columns": [
+      {
+        "column": "answers",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "special_category",
+      },
+      {
+        "column": "application_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "consent_given_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "special_category",
+      },
+      {
+        "column": "created_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "form_version_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "privacy_notice_version",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "special_category",
+      },
+      {
+        "column": "round_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "tenant_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+    ],
+    "dataCategories": [
+      "other",
+    ],
+    "dataSubjects": [
+      "applicant",
+    ],
+    "highestSensitivity": "special_category",
+    "legalBasis": "consent",
+    "processors": [
+      "hosting",
+      "backup",
+    ],
+    "purpose": "grant_applications",
+    "subjectPath": {
+      "column": "application_id",
+      "kind": "join",
+      "table": "grants.application",
+    },
+    "table": "grants.monitoring_response",
   },
   {
     "article9Condition": null,
