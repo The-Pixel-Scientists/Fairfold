@@ -60,7 +60,7 @@ const keyOf = (party: string) =>
 
 describe('app.subject_key', { timeout: 30_000 }, () => {
   it('keeps each tenant’s keys from every other', async () => {
-    await expectCrossTenantDenial(KEYS, async (client, inTenant) => ({
+    await expectCrossTenantDenial('app.subject_key', async (client, inTenant) => ({
       tenant_id: inTenant.id,
       subject_party_id: await addParty(client, inTenant, 'person'),
       wrapped_key: randomBytes(60),
