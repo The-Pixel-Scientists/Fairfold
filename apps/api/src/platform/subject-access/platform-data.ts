@@ -4,8 +4,9 @@
 // subject path in the classification map: the memberships of the person's
 // account, the files, invitations and job requests those memberships made or
 // accepted, and the audit events about the person or by their memberships.
-// Every classified column is returned with its sensitivity. Audit events
-// hold ids, codes and field ids only, and name their actor by kind alone.
+// Every classified column is returned with its sensitivity, but for the
+// columns, audit events and audit fields withheld below. Audit events hold
+// ids, codes and field ids only, and name their actor by kind alone.
 
 import type { Transaction } from '@pixel-scientists/db';
 import { classification, subjectPaths } from '@pixel-scientists/db/classification';
@@ -42,8 +43,41 @@ export const excludedTables: Readonly<Record<string, string>> = {
   'app.subject_key': 'Wrapped key material: a secret, not data about the person.',
 };
 
-/** Columns that hold a credential digest, which no export carries. */
-export const withheldColumns: ReadonlySet<string> = new Set(['app.invitation.token_hash']);
+/** Columns no export carries, each with why. */
+export const withheldColumns: Readonly<Record<string, string>> = {
+  'app.invitation.token_hash': 'A credential digest, not data about the person.',
+  'app.job_request.filters':
+    'It can name another person: the party a subject access request was made for.',
+};
+
+/**
+ * Audit events left out until a check before release exists (rule 8:
+ * decisions are private until released), each with why. Their changes hold an
+ * unreleased outcome, a reviewer's id or the stage an application has reached.
+ */
+export const withheldAuditActions: Readonly<Record<string, string>> = {
+  'grants.decision.recorded': 'It holds an outcome and amount that have not been released.',
+  'grants.decision.changed': 'It holds an outcome and amount that have not been released.',
+  'grants.assignment.created': 'It names the reviewer.',
+  'grants.assignment.removed': 'It names the reviewer.',
+  'grants.assignment.conflict_declared': 'It shows how a review has gone.',
+  'grants.review.submitted': 'It shows how a review has gone.',
+  'grants.reviewer.added': 'It names the reviewer.',
+  'grants.reviewer.removed': 'It names the reviewer.',
+  'grants.application.stage_changed': 'It shows how far the application has moved.',
+};
+
+/** Fields dropped from the changes of the audit events that are kept, each with why. */
+export const withheldAuditFields: Readonly<Record<string, string>> = {
+  'grants.application.stage_id': 'It shows how far the application has moved.',
+};
+
+function withoutWithheldFields(changes: unknown): unknown {
+  if (typeof changes !== 'object' || changes === null) return changes;
+  return Object.fromEntries(
+    Object.entries(changes).filter(([field]) => !Object.hasOwn(withheldAuditFields, field)),
+  );
+}
 
 /** The cell for a stored value: a timestamp is its ISO text and a byte string its hex. */
 function cellValue(value: unknown): unknown {
@@ -60,7 +94,7 @@ async function readRows(
 ): Promise<SubjectDataRow[]> {
   if (values.length === 0) return [];
   const fields = Object.entries(classification[table] ?? {}).filter(
-    ([name]) => !withheldColumns.has(`${table}.${name}`),
+    ([name]) => !Object.hasOwn(withheldColumns, `${table}.${name}`),
   );
   const rows = await tx
     .$extendTables<Tables>()
@@ -141,6 +175,7 @@ export async function subjectAuditEvents(
         ...(membershipIds.length === 0 ? [] : [eb('actor_id', 'in', membershipIds)]),
       ]),
     )
+    .where('action', 'not in', Object.keys(withheldAuditActions))
     .orderBy('occurred_at')
     .orderBy('id')
     .execute();
@@ -171,7 +206,7 @@ export async function subjectAuditEvents(
               : 'applicant'
             : event.actor_kind,
       },
-      changes: event.changes,
+      changes: withoutWithheldFields(event.changes),
     }),
   );
 }

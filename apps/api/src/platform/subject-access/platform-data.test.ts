@@ -11,6 +11,8 @@ import {
   ACCOUNT_COLUMN,
   excludedTables,
   membershipTables,
+  withheldAuditActions,
+  withheldAuditFields,
   withheldColumns,
 } from './platform-data.ts';
 
@@ -45,9 +47,30 @@ describe('platform subject tables', () => {
         expect(excludedTables).toHaveProperty(table);
     }
     for (const table of Object.keys(excludedTables)) expect(subjectPaths).toHaveProperty(table);
-    for (const id of withheldColumns) {
+    for (const id of Object.keys(withheldColumns)) {
       const [, table = '', column = ''] = /^(.+\..+)\.([^.]+)$/.exec(id) ?? [];
       expect(classification[table]).toHaveProperty(column);
     }
+  });
+
+  it('gives a plain reason for everything it withholds', () => {
+    for (const manifest of [withheldColumns, withheldAuditActions, withheldAuditFields]) {
+      expect(Object.values(manifest).every((reason) => reason !== '')).toBe(true);
+    }
+    expect(withheldColumns).toHaveProperty(['app.job_request.filters']);
+  });
+
+  it('withholds every audit event that names a reviewer, shows review progress or holds an unreleased outcome', () => {
+    expect(Object.keys(withheldAuditActions).sort()).toEqual([
+      'grants.application.stage_changed',
+      'grants.assignment.conflict_declared',
+      'grants.assignment.created',
+      'grants.assignment.removed',
+      'grants.decision.changed',
+      'grants.decision.recorded',
+      'grants.review.submitted',
+      'grants.reviewer.added',
+      'grants.reviewer.removed',
+    ]);
   });
 });
