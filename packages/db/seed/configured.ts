@@ -1,14 +1,19 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
 // Scenario `configured`, the default for `pnpm dev`: `base`, plus
-// Northfield's Community Spaces Fund, open, with one round from 12 October to
-// 2 November 2026 in Europe/London, its three stages, a rubric of three
+// Northfield's Community Spaces Fund, open, with one round that opened ten
+// days before seeding and closes three weeks after it, in Europe/London, its
+// three stages, a rubric of three
 // weighted criteria on Review, version 1 of its application form, published,
 // and version 1 of each outcome's email, which is the text every new
 // programme starts with.
 
 import { base } from './base.ts';
 import type { Programme, Scenario } from './scenario.ts';
+
+/** A local time `days` from seeding, so the round is open whenever the seed runs. */
+const fromSeeding = (days: number, time: string) =>
+  `${new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10)}T${time}`;
 
 /** Version 1 of the round's application form, as the form editor saves it. */
 export const communitySpacesForm = {
@@ -108,8 +113,8 @@ export const communitySpacesFund: Programme = {
   rounds: [
     {
       title: 'Autumn 2026',
-      opensAt: '2026-10-12T09:00',
-      closesAt: '2026-11-02T17:00',
+      opensAt: fromSeeding(-10, '09:00'),
+      closesAt: fromSeeding(21, '17:00'),
       timezone: 'Europe/London',
       budgetMinor: 150_000_00,
       awardMinMinor: 5_000_00,

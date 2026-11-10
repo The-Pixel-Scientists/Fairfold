@@ -5,8 +5,7 @@
 // £5,000 to £25,000), the stages Intake, Review and Decision, a rubric of three
 // weighted criteria scored 1 to 5, and the outcome emails. Each change shows in
 // the configuration history. The dates are worked out from today, so the round
-// is open whenever the journey runs; the demo's own were 12 October to
-// 2 November.
+// is open whenever the journey runs.
 
 import {
   addRubric,

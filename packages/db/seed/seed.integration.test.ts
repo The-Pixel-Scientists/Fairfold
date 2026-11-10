@@ -208,7 +208,11 @@ describe('the configured scenario', { timeout: 60_000 }, () => {
         (await client.query<Record<string, unknown>>(text)).rows;
       return {
         rounds: await query(
-          `SELECT p.title AS programme, p.status, r.title, r.opens_at, r.closes_at, r.timezone,
+          `SELECT p.title AS programme, p.status, r.title,
+                  r.opens_at < now() AND now() < r.closes_at AS open_now,
+                  to_char(r.opens_at AT TIME ZONE r.timezone, 'HH24:MI') AS opens_local,
+                  to_char(r.closes_at AT TIME ZONE r.timezone, 'HH24:MI') AS closes_local,
+                  r.timezone,
                   r.budget_minor, r.award_min_minor, r.award_max_minor, r.currency, r.late_policy
              FROM grants.programme p JOIN grants.round r ON r.programme_id = p.id`,
         ),
@@ -233,9 +237,9 @@ describe('the configured scenario', { timeout: 60_000 }, () => {
           programme: 'Community Spaces Fund',
           status: 'open',
           title: 'Autumn 2026',
-          // 9am BST and 5pm GMT: the clocks go back on 25 October.
-          opens_at: new Date('2026-10-12T08:00:00Z'),
-          closes_at: new Date('2026-11-02T17:00:00Z'),
+          open_now: true,
+          opens_local: '09:00',
+          closes_local: '17:00',
           timezone: 'Europe/London',
           budget_minor: '15000000',
           award_min_minor: '500000',
@@ -257,7 +261,7 @@ describe('the configured scenario', { timeout: 60_000 }, () => {
           version: 1,
           status: 'published',
           // The day before the round opens.
-          published_at: new Date('2026-10-11T08:00:00Z'),
+          published_at: expect.any(Date),
           // As parsed, with every default written out.
           definition: expect.objectContaining({
             sections: communitySpacesForm.sections.map(({ id }): unknown =>
