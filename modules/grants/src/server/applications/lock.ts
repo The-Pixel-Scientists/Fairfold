@@ -32,6 +32,7 @@ export interface LockedApplication {
   readonly answersVersion: number;
   readonly formVersionId: string;
   readonly roundId: string;
+  readonly organisationId: string;
   readonly definition: FormDefinition;
 }
 
@@ -49,7 +50,15 @@ export async function lockOwn(
       ? undefined
       : await applicationsDb(tx)
           .selectFrom('grants.application')
-          .select(['id', 'status', 'answers', 'answers_version', 'form_version_id', 'round_id'])
+          .select([
+            'id',
+            'status',
+            'answers',
+            'answers_version',
+            'form_version_id',
+            'round_id',
+            'organisation_id',
+          ])
           .where('id', '=', applicationId)
           .where('applicant_person_id', '=', personId)
           .$if(lock, (query) => query.forUpdate())
@@ -64,6 +73,7 @@ export async function lockOwn(
     answersVersion: row.answers_version,
     formVersionId: row.form_version_id,
     roundId: row.round_id,
+    organisationId: row.organisation_id,
     definition,
   };
 }

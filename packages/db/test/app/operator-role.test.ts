@@ -121,10 +121,14 @@ describe('app_operator', { timeout: 30_000 }, () => {
     );
   });
 
-  it('leaves app_worker on its own unable to read or add switches and versions', async () => {
+  // 0040 moved the switch rights to app_operator so that a job could never change
+  // a switch. The release email job must still skip a module that is off (ADR 0024),
+  // so 0045 lets app_worker read which module is on, and nothing more.
+  it('leaves app_worker on its own able to read only which module is on', async () => {
     await asRoleIn('app_worker', tenant.id, async (client) => {
+      expect(await outcome(client, 'SELECT module, enabled FROM app.tenant_module')).toBe('ok');
       for (const statement of [
-        'SELECT 1 FROM app.tenant_module',
+        'SELECT updated_by, updated_by_kind FROM app.tenant_module',
         'SELECT 1 FROM app.config_version',
         `INSERT INTO app.tenant_module (tenant_id, module, enabled, updated_by_kind)
          VALUES (app.current_tenant_id(), 'grants', true, 'operator')`,

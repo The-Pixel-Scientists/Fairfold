@@ -205,6 +205,16 @@ export async function organisationSummaries(
   return [...new Set(ids)].flatMap((id) => byId.get(id) ?? []);
 }
 
+/** An organisation's name alone, for callers that fill a message with it; null if there is no such organisation. */
+export async function organisationName(tx: Tx, id: string): Promise<string | null> {
+  const row = await partyDb(tx)
+    .selectFrom('party.organisation')
+    .select('name')
+    .where('id', '=', id)
+    .executeTakeFirst();
+  return row?.name ?? null;
+}
+
 const address = (row: {
   address_line1: string;
   address_line2: string | null;

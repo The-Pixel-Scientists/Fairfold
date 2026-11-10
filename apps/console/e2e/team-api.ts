@@ -150,6 +150,7 @@ export async function stubTeam(
           activeMembership: { ...northfield, roles: ['tenant_admin'] },
           memberships: [{ ...northfield, roles: ['tenant_admin'] }],
           permissions: ['platform.members.manage', 'platform.settings.manage'],
+          modules: ['grants'],
         });
       },
       ...more,

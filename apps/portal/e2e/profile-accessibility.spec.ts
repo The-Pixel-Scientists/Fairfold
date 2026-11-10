@@ -131,7 +131,7 @@ const states: State[] = [
       await page.goto('/northfield/profile');
       await page.getByRole('textbox', { name: 'First name' }).fill('Augusta');
       await page.getByRole('link', { name: 'Apply for a grant' }).click();
-      await page.getByRole('link', { name: 'Your details' }).click();
+      await page.getByRole('link', { name: 'Your details', exact: true }).click();
       await expect(page.getByText('We kept what you typed last time.')).toBeVisible();
     },
   },

@@ -69,11 +69,7 @@ describe('the sign-in page', () => {
       password: 'correct horse battery',
     });
     expect(window.location.pathname).toBe('/northfield/');
-    expect(
-      screen.getByText(
-        'You are signed in. Choose a programme to apply to, or carry on with an application.',
-      ),
-    ).toBeTruthy();
+    expect(screen.getByText('You are signed in. Choose where you want to go.')).toBeTruthy();
   });
 
   it('says it is signing in while the request is on its way, and keeps focus on the button', async () => {

@@ -45,7 +45,7 @@ describe('app.idempotency_key', { timeout: 30_000 }, () => {
     // Expired, so that app_worker, which deletes only expired keys, may
     // delete its own tenant's.
     await withExpiryTriggerOff(() =>
-      expectCrossTenantDenial(KEYS, async (client, owner) => ({
+      expectCrossTenantDenial('app.idempotency_key', async (client, owner) => ({
         ...keyRow(owner, await addMember(client, owner)),
         ...expiredTimes(),
       })),

@@ -22,8 +22,8 @@
 //
 // The S3 key pairs come from the seaweedfs-s3 config in the same file:
 // dev-scanner writes, dev-rescan reads clean/ and reads and writes withheld/,
-// and dev-downloads reads clean/ (ADR 0030, 0047). dev-removal is the
-// worker's and reaches no command here. dev-admin only
+// and dev-downloads reads clean/ (ADR 0030, 0047). dev-removal lists and
+// deletes for the worker alone. dev-admin only
 // creates this worktree's bucket (ensureDevBucket) and reaches no command.
 //
 // This is for development only. It sets TPS_DEV=1, and so refuses to
@@ -130,6 +130,19 @@ export const PROFILES = {
     'TPS_PORTAL_ORIGIN',
     ...SMTP,
     ...FILES,
+  ],
+  // The worker in `pnpm dev`: app_worker and pg-boss's role, Mailpit, and the
+  // file service with the removal key.
+  worker: [
+    ...CONNECTION,
+    'TPS_DB_NAME',
+    'TPS_DB_APP_WORKER_PASSWORD',
+    'TPS_DB_APP_QUEUE_PASSWORD',
+    'TPS_PORTAL_ORIGIN',
+    ...SMTP,
+    ...FILES,
+    'TPS_STORAGE_REMOVAL_ACCESS_KEY_ID',
+    'TPS_STORAGE_REMOVAL_SECRET_ACCESS_KEY',
   ],
   // pnpm db:seed: this worktree's database as migrator. The seed checks the
   // database against the own-database list.
@@ -240,6 +253,7 @@ export function developmentValues(
   const writeKey = storageKey(config, 'dev-scanner');
   const readKey = storageKey(config, 'dev-downloads');
   const scannerKey = storageKey(config, 'dev-rescan');
+  const removalKey = storageKey(config, 'dev-removal');
   const values: Record<string, string> = {
     TPS_DEV: '1',
     TPS_API_PORT: String(names.ports.api),
@@ -265,6 +279,8 @@ export function developmentValues(
     TPS_STORAGE_READ_SECRET_ACCESS_KEY: readKey.secretKey,
     TPS_STORAGE_SCANNER_ACCESS_KEY_ID: scannerKey.accessKey,
     TPS_STORAGE_SCANNER_SECRET_ACCESS_KEY: scannerKey.secretKey,
+    TPS_STORAGE_REMOVAL_ACCESS_KEY_ID: removalKey.accessKey,
+    TPS_STORAGE_REMOVAL_SECRET_ACCESS_KEY: removalKey.secretKey,
     TPS_CLAMD_HOST: clamdPort.host_ip ?? '127.0.0.1',
     TPS_CLAMD_PORT: clamdPort.published ?? '',
     // ADR 0047: the API gives up 5 seconds after clamd's MaxScanTime.

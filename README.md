@@ -106,9 +106,11 @@ cloud.
 
 ## Working on it
 
-You need Node.js 24 (see `.node-version`), pnpm through Corepack, and Docker.
+You need Node.js 26 (see `.node-version`), pnpm through Corepack, and Docker.
+Node.js 26 no longer bundles Corepack, so install it first.
 
 ```bash
+npm install --global --ignore-scripts corepack@0.36.0
 corepack enable
 pnpm install
 docker compose -f infra/compose/compose.dev.yaml up -d --wait

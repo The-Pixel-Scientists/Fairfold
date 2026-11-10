@@ -89,7 +89,7 @@ describe('app.job_request', { timeout: 30_000 }, () => {
     // Expired, so that app_worker, which deletes only expired requests, may
     // delete its own tenant's.
     await withRequestTriggerOff(() =>
-      expectCrossTenantDenial(REQUESTS, async (client, owner) => ({
+      expectCrossTenantDenial('app.job_request', async (client, owner) => ({
         ...requestRow(owner, await addMember(client, owner)),
         ...expiredFailure(),
       })),

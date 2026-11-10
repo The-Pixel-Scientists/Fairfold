@@ -7,7 +7,6 @@
 import {
   defineHandler,
   type JobHandler,
-  type JobLogger,
   type Queue,
   type RunningJob,
 } from '@pixel-scientists/db/jobs';
@@ -15,6 +14,7 @@ import type { Transaction } from '@pixel-scientists/db';
 import type { z } from 'zod';
 
 import type { FilesJobDependencies } from '../platform/files/index.ts';
+import type { RunLogger } from './job-logger.ts';
 import { platformHandlers } from './jobs/index.ts';
 
 /** A module's tenant handler, which checks its module is on inside the transaction. */
@@ -24,7 +24,7 @@ export interface ModuleJob<S extends z.ZodObject = z.ZodObject> {
 }
 
 export function handlerRegistry(
-  logger: JobLogger,
+  logger: RunLogger,
   modules: readonly ModuleJob[],
   files?: FilesJobDependencies,
 ): readonly JobHandler<unknown>[] {

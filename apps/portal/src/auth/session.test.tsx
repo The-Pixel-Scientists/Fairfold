@@ -94,11 +94,7 @@ describe('checking the session', () => {
     expect(within(screen.getByRole('main')).getByRole('status').textContent).toBe('Loading…');
     finish();
     expect(await heading('Apply for a grant')).toBeTruthy();
-    expect(
-      screen.getByText(
-        'You are signed in. Choose a programme to apply to, or carry on with an application.',
-      ),
-    ).toBeTruthy();
+    expect(screen.getByText('You are signed in. Choose where you want to go.')).toBeTruthy();
   });
 
   it('says so, and offers to try again, when the session cannot be read', async () => {
@@ -131,7 +127,7 @@ describe('a signed-in applicant', () => {
     const banner = screen.getByRole('banner');
     expect(within(banner).getByText('ada@example.org')).toBeTruthy();
     expect(within(banner).getByRole('button', { name: 'Sign out' })).toBeTruthy();
-    expect(screen.getByRole('link', { name: 'Programmes you can apply to' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Grants' })).toBeTruthy();
     expect(screen.queryByRole('link', { name: 'Create an account' })).toBeNull();
     expect(screen.queryByRole('navigation')).toBeNull();
   });
@@ -163,7 +159,7 @@ describe('a signed-in person with no applicant membership here', () => {
     await heading('This account cannot apply to this funder');
 
     expect(screen.getByRole('main').textContent).toContain('ada@example.org');
-    expect(screen.queryByRole('link', { name: 'Programmes you can apply to' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Grants' })).toBeNull();
     expect(screen.queryByRole('link', { name: 'Create an account' })).toBeNull();
     await user.click(screen.getByRole('button', { name: 'Sign out' }));
     await heading('You have signed out');

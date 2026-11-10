@@ -7,6 +7,7 @@
 // `partyHandlers` and `partyResolvers` are for apps/api/src/modules.ts alone, which registers the
 // routes and the scope rules. `partySubjectRules` is for the platform's audit
 // writer alone. `partyWarehouse` feeds the warehouse snapshot.
+// `partySubjectData` and `partyMergeSet` serve subject access.
 
 export {
   contactDetails,
@@ -15,7 +16,7 @@ export {
   peopleByUserIds,
   personIdForUser,
 } from './people.ts';
-export { organisationSummaries } from './organisations.ts';
+export { organisationName, organisationSummaries } from './organisations.ts';
 export {
   partyHandlers,
   partyResolvers,
@@ -24,3 +25,9 @@ export {
 } from './handlers.ts';
 export { partySubjectRules, type SubjectRule } from './audit.ts';
 export { partyWarehouse } from './warehouse.ts';
+export { partyMergeSet, partySubjectData } from './subject-data.ts';
+export {
+  readOrganisationSnapshot,
+  takeOrganisationSnapshot,
+  type SnapshotContext,
+} from './snapshot.ts';

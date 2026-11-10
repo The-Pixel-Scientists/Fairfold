@@ -76,7 +76,6 @@ describe('programmes you can apply to', () => {
   });
 
   it('is reached from the start page', async () => {
-    const user = userEvent.setup();
     stubApi({
       ...signedIn,
       'GET /portal/profile': ok({
@@ -91,9 +90,9 @@ describe('programmes you can apply to', () => {
     });
     openPortal('/northfield/');
 
-    await user.click(await screen.findByRole('link', { name: 'Programmes you can apply to' }));
+    const link = await screen.findByRole('link', { name: 'Grants' });
 
-    expect(await heading('Programmes you can apply to')).toBeTruthy();
+    expect(link.getAttribute('href')).toBe('/northfield/applications');
   });
 });
 

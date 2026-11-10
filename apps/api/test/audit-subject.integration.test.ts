@@ -69,6 +69,7 @@ describe('the subject of an event', () => {
     const submission = await t.submission(round);
     await t.recorded(submission, accepted());
     await answer(t.release(roundId));
+    await t.deliver([submission]);
     const applicant = await applicantOf(submission);
     const [decision] = await t.decisions<{ id: string }>('d.application_id = $1', [submission]);
     const [email] = await t.rows<{ id: string }>(

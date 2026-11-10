@@ -1,0 +1,75 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# The database cannot tell a scheduled send from any other send by app_queue,
+# so pg-boss's send methods are allowed only in the send helper, which sends
+# through the caller's transaction, and the worker's own pg-boss instance
+# creates nothing but its schedules (ADR 0009, "Tenant checks"). send,
+# insert, publish, schedule and the other short names are common method
+# names, so they count only in a file that imports pg-boss or the worker's
+# bossOf(); the longer names count everywhere. Tests of the pgboss schema
+# itself drive pg-boss directly. Migrations are SQL, which these rules do not
+# read.
+
+rules:
+  - id: tps-jobs-sent-only-by-jobs-helpers
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      Only the send helper in @pixel-scientists/db/jobs may call pg-boss's
+      send methods or insert into the pgboss schema. Send a job with sendJob()
+      or publish() from @pixel-scientists/db/jobs, which take the tenant from
+      your transaction (ADR 0009).
+    pattern-either:
+      - patterns:
+          - pattern: $BOSS.$METHOD(...)
+          - metavariable-regex:
+              metavariable: $METHOD
+              regex: ^(sendAfter|sendThrottled|sendDebounced)$
+      - patterns:
+          - pattern-either: &pg-boss-imported
+              - pattern-inside: |
+                  import $X from "pg-boss";
+                  ...
+              - pattern-inside: |
+                  import * as $X from "pg-boss";
+                  ...
+              - pattern-inside: |
+                  import {...} from "pg-boss";
+                  ...
+              - pattern-inside: |
+                  import type {...} from "pg-boss";
+                  ...
+              - pattern-inside: |
+                  $X = require("pg-boss");
+                  ...
+              - pattern-inside: |
+                  $X = await import("pg-boss");
+                  ...
+              - pattern-inside: |
+                  import { bossOf } from "$W";
+                  ...
+          - pattern: $BOSS.$METHOD(...)
+          - metavariable-regex:
+              metavariable: $METHOD
+              regex: ^(send|insert|publish|flow|upsert|redrive)$
+      - pattern-regex: (?i)\b(?:insert|merge)\s+into[\s\x22]+pgboss[\s\x22]*\.
+    paths:
+      exclude:
+        - /packages/db/src/jobs/send.ts
+        - /packages/db/test/
+
+  - id: tps-job-schedules-only-in-worker
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      Only the worker in @pixel-scientists/db/jobs may register pg-boss
+      schedules, since the database cannot tell a scheduled job from any
+      other send by app_queue. Add the schedule to apps/api/src/worker/schedules.ts,
+      which the worker registers at start-up (ADR 0009).
+    patterns:
+      - pattern-either: *pg-boss-imported
+      - pattern: $BOSS.schedule(...)
+    paths:
+      exclude:
+        - /packages/db/src/jobs/worker.ts
+        - /packages/db/test/

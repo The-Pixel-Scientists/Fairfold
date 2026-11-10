@@ -1,16 +1,17 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// Releasing decisions and sending their emails (ADR 0004, ADR 0010, ADR 0020,
+// Releasing decisions and queuing their emails (ADR 0004, ADR 0010, ADR 0020,
 // architecture rules 8 and 9). The routes need a sign-in in the last five
 // minutes, which the platform has checked. In one transaction, each chosen
 // recorded decision is released, gets one email waiting to send with the
-// programme's latest template for its outcome, and records its release. The
-// emails go after that commits (send.ts), so a slow or failing mail server
-// never undoes a release. Only a named person's request releases anything.
+// programme's latest template for its outcome, records its release, and has
+// a job queued to send the email (send.ts). The worker sends it, so a slow
+// or failing mail server never delays or undoes a release. Only a named
+// person's request releases anything.
 
 import type { ReleaseInput, ReleaseResult, EmailDelivery } from '../../contracts/index.ts';
 import type { DecisionArgs, DecisionDependencies } from './context.ts';
-import { emailSender } from './send.ts';
+import { queueEmails } from './send.ts';
 import { decisionsDb } from './tables.ts';
 
 const refusals = {
@@ -20,8 +21,6 @@ const refusals = {
 } as const;
 
 export function releaseHandlers(deps: DecisionDependencies) {
-  const { deliver } = emailSender(deps);
-
   async function releaseDecisions({
     tx,
     context,
@@ -59,7 +58,6 @@ export function releaseHandlers(deps: DecisionDependencies) {
       if (problems.length > 0) throw deps.refuse(409, refusals.none, problems);
     }
 
-    const result = { released: decisions.length, sent: 0, failed: 0, pending: 0 };
     if (decisions.length > 0) {
       const templates = new Map(
         (
@@ -93,7 +91,7 @@ export function releaseHandlers(deps: DecisionDependencies) {
           },
         });
       }
-      await db
+      const emails = await db
         .insertInto('grants.decision_email')
         .values((eb) =>
           decisions.map((decision) => ({
@@ -109,20 +107,16 @@ export function releaseHandlers(deps: DecisionDependencies) {
             updated_by: actor,
           })),
         )
+        .returning('id')
         .execute();
-    }
-
-    context.afterCommit(async (own) => {
-      Object.assign(
-        result,
-        await deliver(own, 'release', {
-          roundId,
-          memberId: context.membership.id,
-          requestId: context.requestId,
-        }),
+      await queueEmails(
+        tx,
+        deps,
+        context,
+        emails.map(({ id }) => id),
       );
-    });
-    return result;
+    }
+    return { released: decisions.length, sent: 0, failed: 0, pending: decisions.length };
   }
 
   async function sendDecisionEmails({
@@ -131,25 +125,34 @@ export function releaseHandlers(deps: DecisionDependencies) {
     input,
   }: DecisionArgs<{ params: { roundId: string } }>): Promise<EmailDelivery> {
     const { roundId } = input.params;
-    const round = await decisionsDb(tx)
+    const db = decisionsDb(tx);
+    const round = await db
       .selectFrom('grants.round')
       .select('id')
       .where('id', '=', roundId)
       .executeTakeFirst();
     if (round === undefined) throw deps.notFound();
 
-    const result = { sent: 0, failed: 0, pending: 0 };
-    context.afterCommit(async (own) => {
-      Object.assign(
-        result,
-        await deliver(own, 'resend', {
-          roundId,
-          memberId: context.membership.id,
-          requestId: context.requestId,
-        }),
-      );
-    });
-    return result;
+    // The round's unsent emails: waiting to send, or failed. Each is queued, and recorded as resent if its job was added.
+    const unsent = await db
+      .selectFrom('grants.decision_email as e')
+      .innerJoin('grants.decision as d', 'd.id', 'e.decision_id')
+      .innerJoin('grants.application as a', 'a.id', 'd.application_id')
+      .select('e.id')
+      .where('a.round_id', '=', roundId)
+      .where('e.status', 'in', ['pending', 'failed'])
+      .orderBy('e.id')
+      .execute();
+    const queued = await queueEmails(
+      tx,
+      deps,
+      context,
+      unsent.map(({ id }) => id),
+    );
+    for (const id of queued) {
+      await context.audit.record({ action: 'grants.decision_email.resent', entityId: id });
+    }
+    return { sent: 0, failed: 0, pending: unsent.length };
   }
 
   return { releaseDecisions, sendDecisionEmails };

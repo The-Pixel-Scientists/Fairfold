@@ -5,6 +5,7 @@
 // declares. A module never imports from this app; the platform reaches it
 // only through its server entry point.
 
+import type { JobSender } from '@pixel-scientists/db/jobs';
 import type { FieldProblem } from '@pixel-scientists/domain/platform';
 import { listAuditEvents } from '@pixel-scientists/domain/platform/audit-log';
 import { getWarehouseSnapshot } from '@pixel-scientists/domain/warehouse';
@@ -32,9 +33,11 @@ import { partyRoutes } from '@pixel-scientists/party/contracts';
 import { partyHandlers, partyResolvers, partyWarehouse } from '@pixel-scientists/party/server';
 
 import type { PublicTenants, TenantTransaction } from './database.ts';
+import { queueReleaseEmail } from './decision-emails.ts';
 import { listAuditEventsHandler } from './platform/audit-log/index.ts';
 import { insertConfigVersion, readConfigHistory } from './platform/config-versions.ts';
 import { membersWith } from './platform/members.ts';
+import { retentionRoutes } from './platform/retention/index.ts';
 import { settingsRoutes } from './platform/settings/index.ts';
 import { settingsTables } from './platform/settings/tables.ts';
 import { teamRoutes, type TeamAuth } from './platform/team/index.ts';
@@ -108,6 +111,9 @@ const noMail: Mail = {
   portalOrigin: 'https://portal.invalid',
 };
 
+/** For callers that send no jobs: sending one fails, and nothing is queued. */
+const noJobs = {} as JobSender;
+
 /** For callers with no auth module: the team routes fail, and nothing is invited or signed out. */
 const missingAuth = (): Promise<never> =>
   Promise.reject(new Error('The API was built without the auth module.'));
@@ -121,6 +127,8 @@ export function composeModules(deps: {
   /** The auth module, for the team routes. */
   auth?: TeamAuth;
   mail?: Mail;
+  /** The job sender, for the jobs a request queues (ADR 0009). */
+  jobs?: JobSender;
   log?: PublicLog;
 }): ComposedModules {
   const party = partyHandlers({ notFound });
@@ -131,6 +139,7 @@ export function composeModules(deps: {
     recordConfig: insertConfigVersion,
     configHistory: readConfigHistory,
     membersWith,
+    queueEmail: queueReleaseEmail(deps.jobs ?? noJobs),
     ...(deps.mail ?? noMail),
   });
   return {
@@ -138,6 +147,7 @@ export function composeModules(deps: {
       route(listAuditEvents, listAuditEventsHandler),
       ...teamRoutes(deps.auth ?? noAuth),
       ...settingsRoutes,
+      ...retentionRoutes,
       route(
         getWarehouseSnapshot,
         warehouseSnapshotHandler({ contributions: [partyWarehouse, grantsWarehouse] }),

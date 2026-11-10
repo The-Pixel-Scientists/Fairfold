@@ -22,6 +22,10 @@ updates:
     ignore:
       - dependency-name: '*'
         update-types: ['version-update:semver-major']
+      # A pg-boss release can move its schema version, which needs a pasted
+      # upgrade migration with line-by-line review (ADR 0009), so it is
+      # upgraded by hand.
+      - dependency-name: pg-boss
     groups:
       npm:
         patterns: ['*']

@@ -111,7 +111,8 @@ describe('app.invitation', { timeout: 30_000 }, () => {
       const signed = insertStatement(client, 'app.invitation', invitation());
       expect(await outcome(client, signed.text, signed.values), 'an inviter').toBe('42501');
       for (const statement of [
-        'SELECT 1 FROM app.invitation',
+        // The subject access export reads the rest (migration 0044), never the digest.
+        'SELECT token_hash FROM app.invitation',
         "UPDATE app.invitation SET status = 'revoked'",
         'DELETE FROM app.invitation',
       ]) {

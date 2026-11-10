@@ -1,0 +1,40 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Tenant audit events go through the writer in apps/api/src/audit, which
+# checks the action code and the event's subject and takes the actor from
+# the request or job context (architecture rule 4). insertAuditEvent() in
+# packages/db/src/audit.ts is the writer's database call and the one insert
+# into app.audit_event, where it drops the values of fields classified above
+# internal. The name is matched anywhere, so an alias, a re-export or a
+# namespace import is caught too, and so is a Kysely or SQL insert into the
+# table that would bypass it.
+
+rules:
+  - id: tps-audit-insert-only-in-writer
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      Only the audit writer in apps/api/src/audit may use insertAuditEvent(),
+      and only insertAuditEvent() may insert into app.audit_event. Record the
+      event with the writer's recordAudit() or recordRead(), or a module's
+      context.audit, which check its action and subject, take the actor from
+      the request context and keep personal values out of the log (ADR 0003).
+    pattern-either:
+      - pattern-regex: \binsertAuditEvent\b
+      - pattern-regex: (?i)\binsert\s+into[\s\x22]+(?:app[\s\x22]*\.[\s\x22]*)?audit_event\b
+      - pattern-regex: \binsertInto\(\s*['"`](?:app\.)?audit_event\b
+    paths:
+      exclude:
+        - /apps/api/src/audit/
+        - /packages/db/src/audit.ts
+        - /packages/db/src/audit.test.ts
+        # Re-exports insertAuditEvent for the writer.
+        - /packages/db/src/index.ts
+        - /packages/db/test/
+        # Seeds the audit log that its search and export tests read.
+        - /apps/api/src/platform/audit-log/audit-log.integration.test.ts
+        # Inserts a duplicate event as app_api to prove the unique key holds.
+        - /apps/api/src/auth/auth.integration.test.ts
+        # Seeds events that expired a month ago, which the writer cannot: it
+        # stamps the current time.
+        - /apps/api/src/worker/jobs/retention.integration.test.ts

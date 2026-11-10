@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { listAuditEvents } from '@pixel-scientists/domain/platform/audit-log';
+import { retentionRoutes } from '@pixel-scientists/domain/platform/retention';
 import {
   getLogo,
   getPublicTenant,
@@ -36,6 +37,7 @@ import { defineQueue } from '@pixel-scientists/db/jobs';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
+import { releaseEmailJob } from './decision-emails.ts';
 import { collectModuleJobs, composeModules } from './modules.ts';
 import type { ModuleJob } from './worker/registry.ts';
 
@@ -61,6 +63,7 @@ describe('composeModules', () => {
       removeLogo,
       listModules,
       switchModule,
+      ...Object.values(retentionRoutes),
       getWarehouseSnapshot,
       getPublicTenant,
       getThemeCss,
@@ -116,6 +119,23 @@ describe('collectModuleJobs', () => {
     const second = job('fake_module.second');
 
     expect(collectModuleJobs([{ jobs: [first] }, {}, { jobs: [second] }])).toEqual([first, second]);
+  });
+
+  it('takes the grants release email job for the worker', () => {
+    const jobs = collectModuleJobs([
+      {
+        jobs: [
+          releaseEmailJob({
+            sender: { send: () => Promise.resolve({ sent: true }) },
+            portalOrigin: 'https://portal.example.org',
+          }),
+        ],
+      },
+    ]);
+
+    expect(jobs.map(({ queue }) => [queue.name, queue.kind])).toEqual([
+      ['grants.release_email', 'tenant'],
+    ]);
   });
 
   it('stops start-up on a queue name defined twice', () => {

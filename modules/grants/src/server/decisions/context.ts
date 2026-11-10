@@ -23,7 +23,16 @@ export interface MailSender {
 }
 
 export interface DecisionDependencies extends Pick<GrantsDependencies, 'notFound' | 'refuse'> {
-  readonly sender: MailSender;
+  /**
+   * Queues the job that sends one outbox row's email, in the request's transaction (ADR 0009).
+   * The platform supplies it; the job commits or rolls back with the release. It answers whether
+   * a job was queued: false when one for the same row is already waiting.
+   */
+  queueEmail(
+    tx: Tx,
+    decisionEmailId: string,
+    by: { readonly requestId: string; readonly membershipId: string },
+  ): Promise<boolean>;
   /** The applicant portal's origin, which the emails link to. */
   readonly portalOrigin: string;
 }
@@ -36,15 +45,10 @@ export interface DecisionAudit {
   }): Promise<void>;
 }
 
-/** Runs `work` in a transaction of its own, as the acting member. */
-export type OwnTransaction = <T>(work: (tx: Tx, audit: DecisionAudit) => Promise<T>) => Promise<T>;
-
 export interface DecisionContext {
   readonly requestId: string;
   readonly audit: DecisionAudit;
   readonly membership: { readonly id: string };
-  /** Queues work for after the request's transaction commits (the platform runs it, then encodes the answer). */
-  afterCommit(work: (own: OwnTransaction) => Promise<void>): void;
 }
 
 export interface DecisionArgs<I> {

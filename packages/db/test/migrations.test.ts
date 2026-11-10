@@ -133,6 +133,9 @@ describe('migrations', { timeout: 30_000 }, () => {
       // And 0041's down refuses while a file is withheld or erased. Empty
       // app.file and every table that refers to it.
       await sql`TRUNCATE app.file CASCADE`.execute(trx);
+      // And 0045's down refuses while a release email job waits, which the
+      // decision tests leave behind with no worker to run them.
+      await sql`DELETE FROM pgboss.job WHERE name LIKE 'grants.release_email%'`.execute(trx);
       // After the loop, before[i] is the schema with the first i migrations applied.
       const before = [await stableSnapshot(trx)];
       for (const { name, down } of [...migrations].reverse()) {

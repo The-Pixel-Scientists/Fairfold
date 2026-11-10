@@ -19,14 +19,22 @@ export const decisionsTable = (page: Page) =>
 /** The rows of the table, the heading row left out. */
 export const decisionRows = (page: Page) => decisionsTable(page).locator('tbody > tr');
 
-/** Opens the first submission from the list that has not been withdrawn, and gives its name. */
-export async function openFirstSubmission(page: Page): Promise<string> {
+/**
+ * Opens the first submission from the list that has not been withdrawn, and
+ * gives its name. `decided` names organisations to pass over, such as those
+ * the seed has recorded a decision for.
+ */
+export async function openFirstSubmission(
+  page: Page,
+  decided: readonly string[] = [],
+): Promise<string> {
   await page
     .getByRole('navigation', { name: 'Main' })
     .getByRole('link', { name: 'Submissions' })
     .click();
+  const skipped = new RegExp(['Withdrawn', ...decided].join('|'));
   const first = submissionRows(page)
-    .filter({ hasNotText: 'Withdrawn' })
+    .filter({ hasNotText: skipped })
     .first()
     .getByRole('rowheader')
     .getByRole('link');

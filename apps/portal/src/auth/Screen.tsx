@@ -6,7 +6,7 @@ import type { ReactNode } from 'react';
 
 import { useFunder } from '../funder.tsx';
 import { PageColumn, PageIntro } from '../PageColumn.tsx';
-import { PortalShell } from '../PortalShell.tsx';
+import { PortalShell } from '../shell/PortalShell.tsx';
 import { useTenantSlug } from '../tenant.ts';
 import { AccountControls } from './AccountControls.tsx';
 import { CannotApply } from './CannotApply.tsx';

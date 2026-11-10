@@ -10,6 +10,18 @@ import { Migrator } from 'kysely/migration';
 // ruleid: tps-database-imports-only-in-db
 import type { PgBoss } from 'pg-boss';
 // ruleid: tps-database-imports-only-in-db
+import { PgBoss as Boss, type Db } from 'pg-boss';
+// ruleid: tps-database-imports-only-in-db
+import * as pgBoss from 'pg-boss';
+// ruleid: tps-database-imports-only-in-db
+export * from 'pg-boss';
+// ruleid: tps-database-imports-only-in-db
+export { getConstructionPlans } from 'pg-boss';
+// ruleid: tps-database-imports-only-in-db
+const { PgBoss: Loaded } = await import('pg-boss');
+// ruleid: tps-database-imports-only-in-db
+const plans = require('pg-boss/dist/plans.js');
+// ruleid: tps-database-imports-only-in-db
 const pool = await import('pg-pool');
 // ok: tps-database-imports-only-in-db
 import { withTenant } from '@pixel-scientists/db';
@@ -59,7 +71,8 @@ const url = await new SignatureV4(options).presign(request);
 // ok: tps-no-presigned-urls
 const signed = await new SignatureV4(options).sign(request);
 
-export { pg, Kysely, Migrator, pool, withTenant, betterAuth, sso, z, nodemailer, smtp, sendEmail };
+export { pg, Kysely, Migrator, Boss, pgBoss, Loaded, plans, pool, withTenant };
+export { betterAuth, sso, z, nodemailer, smtp, sendEmail };
 export { Dialog, Button, writeKey, readKeyId, writeKeyFile, readKey, bucket };
 export { getSignedUrl, post, url, signed };
-export type { PgBoss, Transporter };
+export type { PgBoss, Db, Transporter };

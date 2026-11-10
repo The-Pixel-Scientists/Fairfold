@@ -38,6 +38,8 @@ export interface SessionOptions {
   active?: Membership | null;
   memberships?: Membership[];
   permissions?: string[];
+  /** The tools switched on for the funder. Grants only, by default. */
+  modules?: string[];
   mfa?: 'enrol' | 'verify' | 'complete';
   /** When the session ends, as an ISO date. Defaults to well in the future. */
   expiresAt?: string;
@@ -48,6 +50,7 @@ export function consoleSession(options: SessionOptions = {}) {
     active = northfield,
     memberships = [northfield],
     permissions = programmeManager,
+    modules = ['grants'],
   } = options;
   const { mfa = 'complete', expiresAt = '2099-01-01T00:00:00.000Z' } = options;
   const user = { id: '9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d', email: 'ada@example.org' };
@@ -61,6 +64,7 @@ export function consoleSession(options: SessionOptions = {}) {
       activeMembership: null,
       memberships: [],
       permissions: [],
+      modules: [],
     };
   }
   const withRoles = (membership: Membership) => ({ ...membership, roles: ['programme_manager'] });
@@ -73,6 +77,7 @@ export function consoleSession(options: SessionOptions = {}) {
     activeMembership: active === null ? null : withRoles(active),
     memberships: memberships.map(withRoles),
     permissions: active === null ? [] : permissions,
+    modules: active === null ? [] : modules,
   };
 }
 

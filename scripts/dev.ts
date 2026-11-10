@@ -2,9 +2,10 @@
 //
 // `pnpm dev` (ADR 0005): start the development services in Compose if they
 // are not running, create this worktree's bucket if it is missing, prepare
-// and migrate this worktree's database, then run the API, console and
-// portal on this machine with reload, on this worktree's ports
-// (dev-names.ts). The API gets the `api` profile of dev-env.ts. The console
+// and migrate this worktree's database, then run the API, worker, console
+// and portal on this machine with reload, on this worktree's ports
+// (dev-names.ts). The API and worker get their own profiles of dev-env.ts,
+// so neither holds the other's password. The console
 // and portal get no TPS_ variable but the API's address, so their Vite
 // servers proxy `/api` to it on their own origin. Ctrl+C stops the apps and
 // leaves the services running.
@@ -115,6 +116,12 @@ const apps: App[] = [
     folder: 'apps/api',
     args: [commandScript('apps/api', 'tsx'), 'watch', '--clear-screen=false', 'src/main.ts'],
     env: developmentEnvironment('api'),
+  },
+  {
+    name: 'worker',
+    folder: 'apps/api',
+    args: [commandScript('apps/api', 'tsx'), 'watch', '--clear-screen=false', 'src/worker.ts'],
+    env: developmentEnvironment('worker'),
   },
   vite('console', ports.console),
   vite('portal', ports.portal),

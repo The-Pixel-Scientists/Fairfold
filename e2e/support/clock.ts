@@ -3,8 +3,8 @@
 // Dates and times in the funder's time zone, worked out from now so that a
 // round is open whenever the journey runs: the way the round form takes them,
 // the way the round contract takes them (`2026-11-13T17:00`, no offset) and the
-// way the pages word them. The demo's own round ran from 12 October to
-// 2 November; the journey's opens ten days ago and closes in three weeks.
+// way the pages word them. The journey's round opens ten days ago and closes in
+// three weeks.
 
 const ZONE = 'Europe/London';
 

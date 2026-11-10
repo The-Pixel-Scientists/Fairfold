@@ -174,6 +174,9 @@ test.describe('a programme manager recording and releasing decisions', () => {
       'Record or change the decision',
     );
     await page.keyboard.press('Escape');
+    // Focus goes back to the row once the dialog has closed; a key before that has no row to act on.
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(decisionRows(page).nth(1)).toBeFocused();
     await page.keyboard.press('Space');
     await expect(page.getByRole('group', { name: 'Bulk actions' })).toContainText(
       '1 submission selected',

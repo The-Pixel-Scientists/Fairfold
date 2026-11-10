@@ -38,7 +38,7 @@ describe('leaving a form without saving', () => {
     await user.type(box, ' Augusta');
     await user.click(screen.getByRole('link', { name: 'Apply for a grant' }));
     await heading('Apply for a grant');
-    await user.click(await screen.findByRole('link', { name: /^Your details/ }));
+    await user.click(await screen.findByRole('link', { name: 'Your details' }));
 
     expect((await firstName()).value).toBe('Ada Augusta');
     expect(screen.getByText(restored)).toBeTruthy();
@@ -115,7 +115,7 @@ describe('signing out', () => {
     await user.type(screen.getByLabelText('Password'), 'correct horse battery');
     await user.click(screen.getByRole('button', { name: 'Sign in' }));
     await heading('Apply for a grant');
-    await user.click(await screen.findByRole('link', { name: /^Your details/ }));
+    await user.click(await screen.findByRole('link', { name: 'Your details' }));
 
     expect((await firstName()).value).toBe('Ada');
     expect(screen.queryByText(restored)).toBeNull();

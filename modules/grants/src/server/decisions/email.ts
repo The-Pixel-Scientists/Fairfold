@@ -5,7 +5,7 @@
 // portal link, and the award for an accepted decision. Nothing else about
 // the application reaches a template.
 
-import { contactDetails, organisationSummaries } from '@pixel-scientists/party/server';
+import { contactDetails, organisationName } from '@pixel-scientists/party/server';
 
 import type { MergeValues, Outcome } from '../../contracts/index.ts';
 import type { Tx } from '../programme/tables.ts';
@@ -27,12 +27,12 @@ export async function mergeValuesFor(
   facts: DecisionFacts,
 ): Promise<{ values: MergeValues; address: string | null }> {
   const contact = await contactDetails(tx, facts.recipient_person_id);
-  const [organisation] = await organisationSummaries(tx, [facts.organisation_id]);
+  const organisation = await organisationName(tx, facts.organisation_id);
   return {
     address: contact?.email === undefined || contact.email === '' ? null : contact.email,
     values: {
       givenName: contact?.givenName ?? 'applicant',
-      organisationName: organisation?.name ?? '',
+      organisationName: organisation ?? '',
       programmeTitle: facts.programme_title,
       roundTitle: facts.round_title,
       portalLink: portalOrigin,

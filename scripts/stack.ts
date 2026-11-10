@@ -385,9 +385,12 @@ function reachesApi(host: string, port: string): Promise<boolean> {
 
 async function up(): Promise<number> {
   createWebNetwork();
-  const { status } = compose(['up', '--build', '--detach', '--wait', 'proxy', 'mailpit'], {
-    secrets: loadSecrets(),
-  });
+  const { status } = compose(
+    ['up', '--build', '--detach', '--wait', 'proxy', 'mail-forward-api', 'mail-forward-worker'],
+    {
+      secrets: loadSecrets(),
+    },
+  );
   if (status !== 0) return status ?? 1;
 
   const [consoleHost, portalHost] = STACK_HOSTS;

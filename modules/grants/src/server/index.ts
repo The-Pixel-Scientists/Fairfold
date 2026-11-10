@@ -3,7 +3,8 @@
 // The grants module's server entry point (ADR 0016). `grantsHandlers` is for
 // apps/api/src/modules.ts alone, which registers the routes.
 // `grantsSubjectRules` is for the platform's audit writer alone. `grantsWarehouse`
-// feeds the warehouse snapshot.
+// feeds the warehouse snapshot. `grantsSubjectData` serves subject access.
+// `sendReleaseEmail` is for the worker's release email job alone.
 
 export {
   grantsHandlers,
@@ -15,5 +16,12 @@ export {
   type GrantsDependencies,
   type MailSender,
 } from './routes.ts';
+export {
+  sendReleaseEmail,
+  type ReleaseEmailDependencies,
+  type ReleaseEmailJob,
+  type ReleaseEmailOutcome,
+} from './decisions/job.ts';
 export { grantsSubjectRules } from './audit.ts';
 export { grantsWarehouse } from './warehouse.ts';
+export { grantsSubjectData } from './subject-data.ts';

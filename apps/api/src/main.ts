@@ -113,6 +113,9 @@ async function main(): Promise<void> {
   }
   let app;
   try {
+    const jobs = await database.startJobs((error) => {
+      logger.error({ err: error }, 'The job queue reported a problem');
+    });
     app = await buildApp({
       logger,
       checkDatabase: () => database.check(),
@@ -129,6 +132,7 @@ async function main(): Promise<void> {
         auth,
         log: logger,
         mail: { sender, portalOrigin: authSettings.origins.portal },
+        jobs,
       }),
       trustProxy: config.trustProxy,
       limits: { store: database.requestLimits, key: limitSettings.key },

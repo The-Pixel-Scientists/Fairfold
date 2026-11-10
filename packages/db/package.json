@@ -15,7 +15,7 @@
     "@pixel-scientists/domain": "workspace:*",
     "kysely": "0.29.7",
     "pg": "8.23.1",
-    "pg-boss": "12.38.0",
+    "pg-boss": "12.35.0",
     "zod": "4.6.7"
   },
   "devDependencies": {

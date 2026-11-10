@@ -2,7 +2,8 @@
 //
 // party.value_history (migration 0020, ADR 0025): isolation, append-only
 // for every app role, the time from the database, and the checks on field
-// ids, kinds, values and actors. Only app_api has any right on it.
+// ids, kinds, values and actors. Only app_api may add a row; app_worker may
+// only read, for the subject access export (migration 0044).
 
 import { beforeAll, describe, expect, it } from 'vitest';
 
@@ -67,17 +68,25 @@ describe('party.value_history', { timeout: 30_000 }, () => {
     }));
   });
 
-  it('grants app_api alone, and no app role may change or remove a row', async () => {
-    const { rows } = await withClient('app_api', (client) =>
-      client.query<{ role: string }>(
-        `SELECT r.role FROM pg_catalog.unnest($1::text[]) AS r(role)
-          WHERE pg_catalog.has_any_column_privilege(r.role, 'party.value_history',
-                                                    'SELECT, INSERT, UPDATE')
-             OR pg_catalog.has_table_privilege(r.role, 'party.value_history', 'DELETE')`,
-        [APP_ROLES],
-      ),
-    );
-    expect(rows).toEqual([{ role: 'app_api' }]);
+  it('lets app_api alone add, app_worker only read, and no app role change or remove a row', async () => {
+    const holders = (privilege: string) =>
+      withClient('app_api', async (client) =>
+        (
+          await client.query<{ role: string }>(
+            `SELECT r.role FROM pg_catalog.unnest($1::text[]) AS r(role)
+              WHERE CASE WHEN $2 = 'DELETE'
+                    THEN pg_catalog.has_table_privilege(r.role, 'party.value_history', $2)
+                    ELSE pg_catalog.has_any_column_privilege(r.role, 'party.value_history', $2)
+                    END
+              ORDER BY 1`,
+            [APP_ROLES, privilege],
+          )
+        ).rows.map(({ role }) => role),
+      );
+    expect(await holders('SELECT')).toEqual(['app_api', 'app_worker']);
+    expect(await holders('INSERT')).toEqual(['app_api']);
+    expect(await holders('UPDATE')).toEqual([]);
+    expect(await holders('DELETE')).toEqual([]);
     for (const role of APP_ROLES) {
       await asRoleIn(role, tenant.id, async (client) => {
         for (const statement of [

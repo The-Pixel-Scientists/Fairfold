@@ -82,10 +82,11 @@ export async function stubSettings(
     page,
     {},
     {
-      // With Grants off the session drops its permissions.
+      // With Grants off the session drops its permissions and no longer lists the tool.
       'GET /auth/session': () =>
         ok(
           consoleSession({
+            modules: funder.grants ? ['grants'] : [],
             permissions: permissions.filter(
               (permission) => funder.grants || !permission.startsWith('grants.'),
             ),

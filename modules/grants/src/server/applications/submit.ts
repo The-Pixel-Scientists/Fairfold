@@ -6,10 +6,12 @@
 // version and its eligibility questions. The round must be taking applications
 // (its programme open and its opening time passed), and its closing time is
 // read by the database's clock: a late submission is refused or marked late, as
-// the round's late policy says. The first stage is set by the server.
+// the round's late policy says. The first stage is set by the server. The
+// organisation's details are snapshotted in the same transaction (ADR 0017).
 
 import { checkEligibility, validateAnswers } from '@pixel-scientists/domain/forms';
 import { messages } from '@pixel-scientists/domain/platform';
+import { takeOrganisationSnapshot } from '@pixel-scientists/party/server';
 
 import type { Application, SubmitApplicationInput } from '../../contracts/index.ts';
 import type { Tx } from '../programme/tables.ts';
@@ -93,10 +95,16 @@ export function submitHandlers(deps: ApplicationDependencies) {
     if (first === undefined) throw deps.notFound();
 
     const actor = context.membership.id;
+    // The organisation as it stands now; the update below fixes it to this application.
+    const snapshotId = await takeOrganisationSnapshot(
+      { tx, membership: context.membership, audit: context.audit },
+      application.organisationId,
+    );
     await db
       .updateTable('grants.application')
       .set({
         status: 'submitted',
+        organisation_snapshot_id: snapshotId,
         stage_id: first.id,
         submitted_late: late,
         updated_by: actor,

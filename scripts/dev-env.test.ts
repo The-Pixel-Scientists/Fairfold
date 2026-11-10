@@ -175,6 +175,17 @@ describe('profileEnvironment', () => {
     ]);
   });
 
+  it('gives the worker its own roles, Mailpit and the removal key, and not the API password', () => {
+    const env = ours(profileEnvironment('worker', values, [], {}, own));
+    expect(env['TPS_DB_APP_WORKER_PASSWORD']).toBeDefined();
+    expect(env['TPS_DB_APP_QUEUE_PASSWORD']).toBeDefined();
+    expect(env['TPS_PORTAL_ORIGIN']).toBeDefined();
+    expect(env['TPS_SMTP_HOST']).toBeDefined();
+    expect(env['TPS_STORAGE_REMOVAL_ACCESS_KEY_ID']).toBe('dev-removal');
+    expect(env['TPS_DB_APP_API_PASSWORD']).toBeUndefined();
+    expect(env['TPS_AUTH_SECRET_FILE']).toBeUndefined();
+  });
+
   it('refuses a Mailpit login that is not user:password', () => {
     const broken: ComposeConfig = {
       services: {

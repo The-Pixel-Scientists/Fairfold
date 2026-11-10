@@ -29,8 +29,11 @@
 #   way out. `files`: SeaweedFS, the bucket job, the API and the worker.
 #   `scan`: ClamAV, the API and the worker. Neither has a way out, and
 #   ClamAV, which parses hostile files, cannot reach SeaweedFS.
-# - `api`: the API alone, with a way out, for the breached-password check
-#   and Mailpit's inbox port (Mailpit shares the API's network namespace).
+# - `api`: the API alone, with a way out, for the breached-password check.
+# - `mail`: Mailpit, the API and the worker, with no way out. Mail without
+#   TLS is accepted only for a loopback address, so a small forwarder shares
+#   the API's namespace and another the worker's, each passing 127.0.0.1:1025
+#   to Mailpit. `mail-inbox` holds Mailpit alone, to publish its inbox.
 #
 # Outbound requests (ADR 0010): the worker has no way out at all. The API's
 # way out is not yet limited to public addresses on 443: that needs a guard
@@ -72,6 +75,32 @@ x-storage: &storage
   TPS_STORAGE_BUCKET: tps-files
 
 x-seaweedfs-image: &seaweedfs-image chrislusf/seaweedfs:4.47@sha256:ce9e796f1fe6f06968f4c04bdaf8f678dad9c8acdfef3d244133d71bfa6bf882
+
+# Mailpit through this container's forwarder, so mail never leaves the stack.
+x-smtp: &smtp
+  TPS_SMTP_HOST: 127.0.0.1
+  TPS_SMTP_PORT: '1025'
+  TPS_SMTP_TLS: none
+  TPS_SMTP_FROM: no-reply@example.org
+
+# Passes 127.0.0.1:1025, in the namespace of the service it joins, to Mailpit.
+x-mail-forward: &mail-forward
+  build: *api-build
+  <<: [*hardening, *read-only]
+  command:
+    - node
+    - --eval
+    - "const net = require('node:net'); net.createServer((client) => { const mail = net.connect(1025, 'mailpit'); client.on('error', () => mail.destroy()); mail.on('error', () => client.destroy()); client.pipe(mail).pipe(client); }).listen(1025, '127.0.0.1');"
+  # The image's check calls the API, which this container is not.
+  healthcheck:
+    test:
+      - CMD
+      - node
+      - --eval
+      - "require('node:net').connect(1025, '127.0.0.1').on('connect', () => process.exit(0)).on('error', () => process.exit(1))"
+    interval: 5s
+    timeout: 5s
+    retries: 30
 
 # For the node user of the release images.
 x-node-secret: &node-secret
@@ -153,7 +182,7 @@ services:
     build: *api-build
     <<: *hardening
     environment:
-      <<: [*database, *storage]
+      <<: [*database, *storage, *smtp]
       TPS_API_HOST: 0.0.0.0
       TPS_API_PORT: '3000'
       # The proxy, the only other container on `web` (see Networks). Empty,
@@ -171,11 +200,6 @@ services:
       # Wraps each subject's data key (ADR 0027), for the erasure work.
       TPS_SUBJECT_KEK_FILE: /run/secrets/subject_kek
       TPS_SUBJECT_KEK_VERSION: '1'
-      # Mailpit shares this container's network, so mail never leaves it.
-      TPS_SMTP_HOST: 127.0.0.1
-      TPS_SMTP_PORT: '1025'
-      TPS_SMTP_TLS: none
-      TPS_SMTP_FROM: no-reply@example.org
       # Write and read under clean/ only; never the admin key.
       TPS_STORAGE_WRITE_ACCESS_KEY_ID: tps-write
       TPS_STORAGE_WRITE_SECRET_ACCESS_KEY_FILE: /run/secrets/storage_write_secret_key
@@ -198,10 +222,7 @@ services:
       - { source: storage_write_secret_key, <<: *node-secret }
       - { source: storage_read_secret_key, <<: *node-secret }
       - { source: storage_scanner_secret_key, <<: *node-secret }
-    networks: [database, web, api, files, scan]
-    ports:
-      # Mailpit's inbox, published here because Mailpit uses this network.
-      - 127.0.0.1:${TPS_STACK_MAIL_PORT:?Run pnpm stack}:8025
+    networks: [database, web, api, files, scan, mail]
     healthcheck:
       test:
         - CMD
@@ -296,15 +317,35 @@ services:
       start_period: 5m
       retries: 3
 
-  # Catches every email the API sends. SMTP listens on the API's loopback
-  # address only; the inbox is at http://127.0.0.1:<stackMail port>.
+  # Catches every email the API and worker send. SMTP is reachable on `mail`
+  # only; the inbox is at http://127.0.0.1:<stackMail port>.
   mailpit:
     image: axllent/mailpit:v1.33.0@sha256:9b3a463be15354c0f0eba91697d80e3e0d8a5623ef0e627cacc836bc17fd5231
     <<: [*hardening, *read-only]
-    network_mode: service:api
+    networks: [mail, mail-inbox]
+    ports:
+      - 127.0.0.1:${TPS_STACK_MAIL_PORT:?Run pnpm stack}:8025
     environment:
-      MP_SMTP_BIND_ADDR: 127.0.0.1:1025
+      MP_SMTP_BIND_ADDR: 0.0.0.0:1025
       MP_UI_BIND_ADDR: 0.0.0.0:8025
+
+  mail-forward-api:
+    <<: *mail-forward
+    network_mode: service:api
+    depends_on:
+      api:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+
+  mail-forward-worker:
+    <<: *mail-forward
+    network_mode: service:worker
+    depends_on:
+      worker:
+        condition: service_started
+      mailpit:
+        condition: service_started
 
   console:
     <<: *web
@@ -364,16 +405,23 @@ services:
 
   # Background jobs (ADR 0009), from the API's image as app_worker, with
   # pg-boss's own role. No published port, no route to `web`, and no way
-  # out. It sits behind the `worker` profile until the worker entry point
-  # lands, so `pnpm stack` does not start it. Its storage keys come with the
-  # jobs that use them (ADR 0030: the scanner and removal keys).
+  # out. Its storage keys come with the jobs that use them (ADR 0030: the
+  # scanner and removal keys).
   worker:
     build: *api-build
     <<: *hardening
-    profiles: [worker]
     command: [node, apps/api/src/worker.ts]
+    # The image's check calls the API's port, which the worker does not open.
+    # `up --wait` refuses a container with its check disabled, so this one
+    # passes for as long as the container can run a command.
+    healthcheck:
+      test: [CMD, node, --eval, process.exit(0)]
+      interval: 5s
+      timeout: 5s
+      retries: 30
     environment:
-      <<: [*database, *storage]
+      <<: [*database, *storage, *smtp]
+      TPS_PORTAL_ORIGIN: https://portal.localhost:${TPS_STACK_PORTAL_PORT:?Run pnpm stack}
       # Compose's internal network, which no other machine can reach.
       TPS_DB_TLS: disable
       TPS_DB_APP_WORKER_PASSWORD_FILE: /run/secrets/app_worker_password
@@ -401,7 +449,7 @@ services:
       - { source: storage_read_secret_key, <<: *node-secret }
       - { source: storage_scanner_secret_key, <<: *node-secret }
       - { source: storage_removal_secret_key, <<: *node-secret }
-    networks: [database, files, scan]
+    networks: [database, files, scan, mail]
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -502,7 +550,10 @@ networks:
   web:
     external: true
     name: ${TPS_STACK_WEB_NETWORK:?Run pnpm stack}
-  # Published ports: the proxy's, Mailpit's inbox on the API's, and the tunnel's.
+  mail:
+    internal: true
+  # Published ports: the proxy's, Mailpit's inbox, and the tunnel's.
   apps:
+  mail-inbox:
   api:
   tunnel:
