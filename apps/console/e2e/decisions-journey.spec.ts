@@ -98,12 +98,14 @@ test.describe('the decisions journey against the real API', () => {
     const before = await decisionEmails();
 
     // Step 12: one award from the submission's page, the rest in bulk. Nothing goes to applicants.
-    await openFirstSubmission(page);
+    // The seed has already recorded two decisions, so the list's first submission, Brook Street Youth Club, is passed over.
+    await openFirstSubmission(page, ['Brook Street Youth Club']);
     await recordAwardFromTheDetail(page, '12,500');
     await openDecisions(page);
-    await expectBudgetWords(page, /^£12,500 of £[\d,]+, £[\d,]+ left$/);
-    await recordSeveral(page, 2, 'Waitlisted');
-    await recordSeveral(page, 2, 'Declined');
+    // The seed's award of £18,000 to Friends of Elm Park counts too.
+    await expectBudgetWords(page, /^£30,500 of £[\d,]+, £[\d,]+ left$/);
+    await recordSeveral(page, 1, 'Waitlisted');
+    await recordSeveral(page, 1, 'Declined');
     await expect(decisionsTable(page).getByText('Released', { exact: true })).toHaveCount(0);
     expect(await decisionEmails()).toBe(before);
 
