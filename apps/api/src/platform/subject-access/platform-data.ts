@@ -28,20 +28,26 @@ const MEMBERSHIP = 'app.membership';
 /** The membership column that holds the account's id (the table's `account` subject path). */
 export const ACCOUNT_COLUMN = 'user_id';
 
-/** The platform tables read through a membership, each with its column, from the subject paths. */
-export const membershipTables: Readonly<Record<string, string>> = Object.fromEntries(
-  Object.entries(subjectPaths).flatMap(([table, path]) =>
-    path.kind === 'join' && path.table === MEMBERSHIP ? [[table, path.column]] : [],
-  ),
-);
-
 /** Subject-path tables the platform leaves out of its tables, and why. */
 export const excludedTables: Readonly<Record<string, string>> = {
   'app.audit_event': 'Read as the export audit events, which name each actor by kind only.',
   'app.idempotency_key': 'A one-way digest of a request, which names no one.',
+  'app.message':
+    'A message belongs to an application, so the grants module reads it through the application.',
+  'app.note':
+    'A note is about an applicant, not its author, so a staff member does not receive it. The grants module reads it through the application.',
   'app.request_limit': 'A hashed client key with no account or tenant.',
   'app.subject_key': 'Wrapped key material: a secret, not data about the person.',
 };
+
+/** The platform tables read through a membership, each with its column, from the subject paths. */
+export const membershipTables: Readonly<Record<string, string>> = Object.fromEntries(
+  Object.entries(subjectPaths).flatMap(([table, path]) =>
+    path.kind === 'join' && path.table === MEMBERSHIP && !Object.hasOwn(excludedTables, table)
+      ? [[table, path.column]]
+      : [],
+  ),
+);
 
 /** Columns no export carries, each with why. */
 export const withheldColumns: Readonly<Record<string, string>> = {
@@ -70,6 +76,8 @@ export const withheldAuditActions: Readonly<Record<string, string>> = {
 /** Fields dropped from the changes of the audit events that are kept, each with why. */
 export const withheldAuditFields: Readonly<Record<string, string>> = {
   'grants.application.stage_id': 'It shows how far the application has moved.',
+  'grants.assignment.reviewer_membership_id': 'It names the reviewer.',
+  'grants.reviewer.membership_id': 'It names the reviewer.',
 };
 
 function withoutWithheldFields(changes: unknown): unknown {

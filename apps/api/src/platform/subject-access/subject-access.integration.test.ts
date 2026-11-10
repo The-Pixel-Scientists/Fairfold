@@ -298,6 +298,8 @@ describe('collectSubjectAccess', { timeout: 60_000 }, () => {
       await audit('grants.application.submitted', {
         'grants.application.status': { before: 'draft', after: 'submitted' },
         'grants.application.stage_id': { before: null, after: stage },
+        'grants.assignment.reviewer_membership_id': { before: stage, after: stage },
+        'grants.reviewer.membership_id': { before: null, after: stage },
       });
       return subject;
     });
