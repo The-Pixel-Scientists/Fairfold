@@ -13,6 +13,8 @@
 import type {
   ClassificationRegistry,
   FieldClassification,
+  ProcessingEntry,
+  ProcessingRegistry,
   SubjectPathRegistry,
 } from '../classification.ts';
 
@@ -34,7 +36,7 @@ const keyAndActors = {
   updated_by: internal,
 } as const;
 
-export const party: ClassificationRegistry = {
+export const party = {
   'party.party': {
     ...keyAndActors,
     kind: internal,
@@ -129,7 +131,7 @@ export const party: ClassificationRegistry = {
     changed_by: internal,
     changed_at: internal,
   },
-};
+} satisfies ClassificationRegistry;
 
 /**
  * Each table's path to the party its rows are about (ADR 0027). A person and
@@ -143,4 +145,40 @@ export const partySubjects: SubjectPathRegistry = {
   'party.person': { kind: 'party', column: 'id' },
   'party.consent': { kind: 'party', column: 'person_id' },
   'party.value_history': { kind: 'party', column: 'party_id' },
+};
+
+const stored = ['hosting', 'backup'] as const;
+const people = ['applicant', 'applicant_contact', 'staff_member', 'reviewer'] as const;
+
+const record = (
+  dataSubjects: ProcessingEntry['dataSubjects'],
+  dataCategories: ProcessingEntry['dataCategories'],
+): ProcessingEntry => ({
+  purpose: 'party_records',
+  legalBasis: 'legitimate_interests',
+  processors: stored,
+  dataSubjects,
+  dataCategories,
+});
+
+export const partyProcessing: ProcessingRegistry<typeof party> = {
+  'party.party': record(people, ['other']),
+  // Its name is merged into the decision email.
+  'party.organisation': {
+    ...record(['applicant_contact'], ['contact']),
+    processors: [...stored, 'email'],
+  },
+  'party.organisation_identifier': record([], []),
+  'party.person': {
+    ...record(people, ['identity', 'contact']),
+    processors: [...stored, 'email'],
+  },
+  'party.relationship': record(people, ['other']),
+  'party.consent': { ...record(people, ['other']), legalBasis: 'legal_obligation' },
+  'party.organisation_snapshot': {
+    ...record(['applicant_contact'], ['contact']),
+    purpose: 'grant_applications',
+    legalBasis: 'contract',
+  },
+  'party.value_history': record(people, ['identity', 'contact']),
 };

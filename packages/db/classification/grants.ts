@@ -24,6 +24,8 @@
 import type {
   ClassificationRegistry,
   FieldClassification,
+  ProcessingEntry,
+  ProcessingRegistry,
   SubjectPathRegistry,
 } from '../classification.ts';
 
@@ -49,7 +51,7 @@ const keyAndActors = {
   updated_by: internal,
 } as const;
 
-export const grants: ClassificationRegistry = {
+export const grants = {
   'grants.programme': {
     ...keyAndActors,
     title: shown,
@@ -217,7 +219,7 @@ export const grants: ClassificationRegistry = {
     funder_name: shown,
     identifier_prefix: shown,
   },
-};
+} satisfies ClassificationRegistry;
 
 const throughApplication = {
   kind: 'join',
@@ -239,4 +241,62 @@ export const grantsSubjects: SubjectPathRegistry = {
   'grants.score': { kind: 'join', column: 'assignment_id', table: 'grants.assignment' },
   'grants.decision': throughApplication,
   'grants.decision_email': { kind: 'party', column: 'recipient_person_id' },
+};
+
+const stored = ['hosting', 'backup'] as const;
+
+/** A programme's set-up, holding no person's data. */
+const setUp: ProcessingEntry = {
+  purpose: 'programme_administration',
+  legalBasis: 'contract',
+  processors: stored,
+  dataSubjects: [],
+  dataCategories: [],
+};
+const application = (
+  purpose: ProcessingEntry['purpose'],
+  legalBasis: ProcessingEntry['legalBasis'],
+  dataSubjects: ProcessingEntry['dataSubjects'] = ['applicant'],
+): ProcessingEntry => ({
+  purpose,
+  legalBasis,
+  processors: stored,
+  dataSubjects,
+  dataCategories: ['other'],
+});
+const reviewerSetUp: ProcessingEntry = { ...setUp, purpose: 'assessment' };
+/** The release email carries the outcome and any award to the mail provider. */
+const emailedDecision: ProcessingEntry = {
+  ...application('decisions', 'contract'),
+  processors: [...stored, 'email'],
+};
+
+export const grantsProcessing: ProcessingRegistry<typeof grants> = {
+  'grants.programme': setUp,
+  'grants.round': setUp,
+  'grants.stage': setUp,
+  'grants.rubric_criterion': setUp,
+  'grants.email_template_version': setUp,
+  'grants.form_version': setUp,
+  // Answers are classified per field with a special category ceiling. Special
+  // category answers are given under explicit consent, as for monitoring
+  // (ADR 0032).
+  'grants.application': {
+    purpose: 'grant_applications',
+    legalBasis: 'contract',
+    article9Condition: 'explicit_consent',
+    processors: stored,
+    dataSubjects: ['applicant', 'applicant_contact'],
+    dataCategories: ['identity', 'contact', 'other'],
+  },
+  'grants.eligibility_result': application('assessment', 'contract'),
+  'grants.stage_transition': application('assessment', 'contract'),
+  'grants.application_file': application('grant_applications', 'contract'),
+  'grants.reviewer': reviewerSetUp,
+  'grants.assignment': application('assessment', 'legitimate_interests', ['applicant', 'reviewer']),
+  'grants.conflict_declaration': reviewerSetUp,
+  'grants.score': application('assessment', 'legitimate_interests', ['applicant', 'reviewer']),
+  'grants.decision': emailedDecision,
+  'grants.decision_email': emailedDecision,
+  'grants.publisher_setting': setUp,
 };
