@@ -24,6 +24,9 @@ import type { Answer, Api, Call } from '../../support/api.ts';
 import type { Slug } from '../../support/env.ts';
 import { keyOf, memberRoutes, type MemberRoute } from '../../support/contracts.ts';
 
+/** A well-formed id no record has, for a route whose record the seed does not make; the answer must still be a refusal. */
+export const ABSENT_ID = '00000000-0000-4000-8000-000000000000';
+
 const AUDIENCES = ['console', 'portal', 'public'] as const;
 
 export type RouteAudience = (typeof AUDIENCES)[number];
@@ -167,7 +170,7 @@ export function pathFor(
     if (source === undefined) {
       throw new Error(`${route.key} has no fixture value for the path parameter ${name}.`);
     }
-    const value = source === '@slug' ? slug : ids[source];
+    const value = source === '@slug' ? slug : source === '@absent' ? ABSENT_ID : ids[source];
     if (value === undefined) {
       throw new Error(`${route.key}: the fixture has no ${source} for the path parameter ${name}.`);
     }

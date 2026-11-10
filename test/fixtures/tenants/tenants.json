@@ -28,7 +28,14 @@
     "personId": "personId",
     "membershipId": "reviewerMembershipId",
     "assignmentId": "assignmentId",
-    "invitationId": "invitationId"
+    "invitationId": "invitationId",
+    "labelId": "@absent",
+    "viewId": "@absent",
+    "requestId": "@absent",
+    "adjustmentId": "@absent",
+    "relationshipId": "@absent",
+    "identifierId": "@absent",
+    "originId": "@absent"
   },
   "console": {
     "teamPath": "/team",
