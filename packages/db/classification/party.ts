@@ -143,6 +143,7 @@ export const partySubjects: SubjectPathRegistry = {
   'party.organisation_identifier': { kind: 'party', column: 'organisation_id' },
   'party.organisation_snapshot': { kind: 'party', column: 'organisation_id' },
   'party.person': { kind: 'party', column: 'id' },
+  'party.relationship': { kind: 'parties', columns: ['subject_id', 'object_id'] },
   'party.consent': { kind: 'party', column: 'person_id' },
   'party.value_history': { kind: 'party', column: 'party_id' },
 };

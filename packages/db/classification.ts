@@ -88,6 +88,8 @@ export type ClassificationRegistry = Readonly<
  * null on a row with no known subject.
  * - `party`: the column holds a party id: it is a party key itself, or
  *   references `party.party`, `party.person` or `party.organisation`.
+ * - `parties`: the row is about two parties, each column holding a party id
+ *   as for `party`. A reader follows both.
  * - `join`: the column is a foreign key to `table`, whose path continues.
  * - `account`: the column holds an `auth.user` id, which reaches a person in
  *   a tenant through `party.person.user_id`.
@@ -96,6 +98,7 @@ export type ClassificationRegistry = Readonly<
  */
 export type SubjectPath =
   | { readonly kind: 'party' | 'account'; readonly column: string }
+  | { readonly kind: 'parties'; readonly columns: readonly [string, string] }
   | { readonly kind: 'join'; readonly column: string; readonly table: string }
   | { readonly kind: 'unlinked'; readonly reason: string };
 
