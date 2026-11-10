@@ -24,18 +24,25 @@ import {
   submissionRoutes,
 } from '@pixel-scientists/grants/contracts';
 import {
+  grantsErasure,
   grantsHandlers,
   grantsResolvers,
   grantsWarehouse,
   type MailSender,
 } from '@pixel-scientists/grants/server';
 import { partyRoutes } from '@pixel-scientists/party/contracts';
-import { partyHandlers, partyResolvers, partyWarehouse } from '@pixel-scientists/party/server';
+import {
+  partyErasure,
+  partyHandlers,
+  partyResolvers,
+  partyWarehouse,
+} from '@pixel-scientists/party/server';
 
 import type { PublicTenants, TenantTransaction } from './database.ts';
 import { queueReleaseEmail } from './decision-emails.ts';
 import { listAuditEventsHandler } from './platform/audit-log/index.ts';
 import { insertConfigVersion, readConfigHistory } from './platform/config-versions.ts';
+import { erasureRoutes, type Contribution } from './platform/erasure/index.ts';
 import { membersWith } from './platform/members.ts';
 import { retentionRoutes } from './platform/retention/index.ts';
 import { settingsRoutes } from './platform/settings/index.ts';
@@ -48,6 +55,9 @@ import { publicRoutes } from './public/index.ts';
 import type { PublicLog } from './public/tenants.ts';
 import { route, type Route } from './routes/register.ts';
 import type { ModuleJob } from './worker/registry.ts';
+
+/** Every module's erasure contribution, one line each; the erasure job calls them all, whether or not a tenant has the module on. */
+export const erasureContributions: readonly Contribution[] = [partyErasure, grantsErasure];
 
 /** What the platform reads from a module's server entry point besides its routes. */
 export interface ModuleServer {
@@ -148,6 +158,7 @@ export function composeModules(deps: {
       ...teamRoutes(deps.auth ?? noAuth),
       ...settingsRoutes,
       ...retentionRoutes,
+      ...erasureRoutes(deps.jobs ?? noJobs),
       route(
         getWarehouseSnapshot,
         warehouseSnapshotHandler({ contributions: [partyWarehouse, grantsWarehouse] }),

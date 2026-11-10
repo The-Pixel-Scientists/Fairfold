@@ -3,6 +3,10 @@
 import { listAuditEvents } from '@pixel-scientists/domain/platform/audit-log';
 import { retentionRoutes } from '@pixel-scientists/domain/platform/retention';
 import {
+  readErasureRequest,
+  requestErasure,
+} from '@pixel-scientists/domain/platform/subject-access';
+import {
   getLogo,
   getPublicTenant,
   getSettings,
@@ -64,6 +68,8 @@ describe('composeModules', () => {
       listModules,
       switchModule,
       ...Object.values(retentionRoutes),
+      requestErasure,
+      readErasureRequest,
       getWarehouseSnapshot,
       getPublicTenant,
       getThemeCss,
