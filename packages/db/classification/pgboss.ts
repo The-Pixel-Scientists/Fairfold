@@ -11,7 +11,12 @@
 // days after their own time. Queue, schedule, subscription and version rows
 // are configuration, kept while the platform runs.
 
-import type { ClassificationRegistry, FieldClassification } from '../classification.ts';
+import type {
+  ClassificationRegistry,
+  FieldClassification,
+  ProcessingEntry,
+  ProcessingRegistry,
+} from '../classification.ts';
 
 const configuration: FieldClassification = {
   sensitivity: 'internal',
@@ -30,7 +35,7 @@ function all(
   return Object.fromEntries(columns.map((column) => [column, field]));
 }
 
-export const pgboss: ClassificationRegistry = {
+export const pgboss = {
   'pgboss.version': all(
     ['version', 'cron_on', 'bam_on', 'flow_on', 'reindex_on', 'monitor_backoff_on'],
     configuration,
@@ -180,4 +185,25 @@ export const pgboss: ClassificationRegistry = {
     ['child_name', 'child_id', 'parent_name', 'parent_id'],
     configuration,
   ),
+} satisfies ClassificationRegistry;
+
+/** Queue tables hold ids and codes only (ADR 0009), so state no person's data. */
+const queueTable: ProcessingEntry = {
+  purpose: 'background_jobs',
+  legalBasis: 'legitimate_interests',
+  processors: ['hosting', 'backup'],
+  dataSubjects: [],
+  dataCategories: [],
+};
+
+export const pgbossProcessing: ProcessingRegistry<typeof pgboss> = {
+  'pgboss.version': queueTable,
+  'pgboss.queue': queueTable,
+  'pgboss.schedule': queueTable,
+  'pgboss.subscription': queueTable,
+  'pgboss.bam': queueTable,
+  'pgboss.job': queueTable,
+  'pgboss.warning': queueTable,
+  'pgboss.queue_stats': queueTable,
+  'pgboss.job_dependency': queueTable,
 };
