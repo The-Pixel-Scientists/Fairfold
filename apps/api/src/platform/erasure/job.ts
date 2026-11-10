@@ -19,7 +19,7 @@
 // `running` once the erasure is done: the status route reads the completed
 // event, since a finished request needs an output file (migration 0029).
 
-import type { Transaction } from '@pixel-scientists/db';
+import { attempt, type Transaction } from '@pixel-scientists/db';
 import { defineQueue, JobError, type JobErrorCode } from '@pixel-scientists/db/jobs';
 import { idSchema } from '@pixel-scientists/domain';
 import { permissionsFor } from '@pixel-scientists/domain/platform';
@@ -31,7 +31,6 @@ import { recordAudit } from '../../audit/writer.ts';
 import { jobActor } from '../../worker/job-actor.ts';
 import type { ModuleJob } from '../../worker/registry.ts';
 import { runErasure, type Contribution } from './registry.ts';
-import { attempt } from './savepoint.ts';
 import { countsAsChanges } from './status.ts';
 
 /** Migration 0029's tenant queue; its payload is the request's id and nothing else. */
