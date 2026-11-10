@@ -1,24 +1,45 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
 // The release email handler's rights (migrations 0029 and 0045) and the
-// subject access export's reads (migration 0044): app_worker holds exactly
-// these on the grants and party schemas, the audit table and the module
-// switches, and, with one tenant set, reaches none of another tenant's rows.
+// subject access export's reads (migrations 0044 and 0046): app_worker holds
+// exactly these on the grants and party schemas, the audit table and the
+// module switches, and, with one tenant set, reaches none of another
+// tenant's rows. The score table and an assignment's reviewer columns are
+// not among them (rule 8); audit event changes are the export's to filter.
 // The cross-tenant tests of grants.decision, grants.decision_email,
-// grants.email_template_version, party.person and app.audit_event run as
-// every role with a grant, app_worker now included.
+// grants.email_template_version, party.person, party.relationship and
+// app.audit_event run as every role with a grant, app_worker now included.
 
 import { describe, expect, it } from 'vitest';
 
 import { withClient } from '../connect.ts';
-import { addReleased } from '../grants/decision-fixtures.ts';
+import { addReleased, type Released } from '../grants/decision-fixtures.ts';
 import { heldRights } from '../privilege-lint.ts';
-import { asMigratorIn, asRoleIn, createTestTenant, outcome } from '../tenants.ts';
+import {
+  asMigratorIn,
+  asRoleIn,
+  createTestTenant,
+  insertRow,
+  outcome,
+  type TestTenant,
+} from '../tenants.ts';
 
 const ACTORS = ['created_at', 'created_by', 'updated_at', 'updated_by'];
 
 const SUBJECT_ACCESS_READS: Readonly<Record<string, readonly string[]>> = {
   'party.party': ['tenant_id', 'id', 'kind', 'status', 'merged_into', 'erased_at', ...ACTORS],
+  'party.relationship': [
+    'tenant_id',
+    'id',
+    ...ACTORS,
+    'type',
+    'subject_id',
+    'subject_kind',
+    'object_id',
+    'object_kind',
+    'starts_on',
+    'ends_on',
+  ],
   'party.person': ['kind', 'family_name', 'phone', 'user_id', ...ACTORS],
   'party.consent': [
     'tenant_id',
@@ -93,23 +114,14 @@ const SUBJECT_ACCESS_READS: Readonly<Record<string, readonly string[]>> = {
   'grants.assignment': [
     'tenant_id',
     'id',
-    ...ACTORS,
+    'created_at',
+    'created_by',
+    'updated_at',
     'round_id',
     'application_id',
-    'reviewer_membership_id',
     'stage_id',
     'status',
     'submitted_at',
-  ],
-  'grants.score': [
-    'tenant_id',
-    'id',
-    ...ACTORS,
-    'assignment_id',
-    'stage_id',
-    'criterion_id',
-    'score',
-    'comment',
   ],
 };
 
@@ -146,6 +158,22 @@ const RELEASE_EMAIL_RIGHTS = [
   'EXECUTE on function party.is_erased(uuid,uuid)',
 ];
 
+/** A released decision, with its applicant as a contact for its organisation. */
+async function addLinkedRelease(tenant: TestTenant): Promise<Released & { link: string }> {
+  return asMigratorIn(tenant.id, async (client) => {
+    const released = await addReleased(client, tenant);
+    const link = await insertRow(client, 'party.relationship', {
+      tenant_id: tenant.id,
+      type: 'contact_for',
+      subject_id: released.parts.person,
+      subject_kind: 'person',
+      object_id: released.parts.organisation,
+      object_kind: 'organisation',
+    });
+    return { ...released, link };
+  });
+}
+
 describe("app_worker's release email and subject access rights", { timeout: 60_000 }, () => {
   it('are exactly those the jobs need in grants, party and the audit table', () =>
     withClient('migrator', async (client) => {
@@ -163,8 +191,8 @@ describe("app_worker's release email and subject access rights", { timeout: 60_0
 
   it("reach one tenant's release and none of another's", async () => {
     const [tenant, other] = [await createTestTenant(), await createTestTenant()];
-    const mine = await asMigratorIn(tenant.id, (client) => addReleased(client, tenant));
-    const theirs = await asMigratorIn(other.id, (client) => addReleased(client, other));
+    const mine = await addLinkedRelease(tenant);
+    const theirs = await addLinkedRelease(other);
     await asRoleIn('app_worker', tenant.id, async (client) => {
       const count = async (table: string, id: string) =>
         (await client.query(`SELECT FROM ${table} WHERE id = $1`, [id])).rowCount;
@@ -176,6 +204,14 @@ describe("app_worker's release email and subject access rights", { timeout: 60_0
       expect(await count('grants.application', theirs.application)).toBe(0);
       expect(await count('party.party', theirs.parts.person)).toBe(0);
       expect(await count('app.membership', theirs.manager)).toBe(0);
+      expect(await count('party.relationship', mine.link)).toBe(1);
+      expect(await count('party.relationship', theirs.link)).toBe(0);
+      const linksOf = async (column: string, id: string) =>
+        (await client.query(`SELECT FROM party.relationship WHERE ${column} = $1`, [id])).rowCount;
+      expect(await linksOf('subject_id', mine.parts.person)).toBe(1);
+      expect(await linksOf('object_id', mine.parts.organisation)).toBe(1);
+      expect(await linksOf('subject_id', theirs.parts.person)).toBe(0);
+      expect(await linksOf('object_id', theirs.parts.organisation)).toBe(0);
       for (const table of ['app.tenant_module', 'party.organisation']) {
         const seen = await client.query(`SELECT FROM ${table} WHERE tenant_id = $1`, [other.id]);
         expect(seen.rowCount, table).toBe(0);
@@ -196,6 +232,22 @@ describe("app_worker's release email and subject access rights", { timeout: 60_0
       ]) {
         expect(await outcome(client, statement), statement).toBe('42501');
       }
+    });
+  });
+
+  it('leave out the score table and reviewer columns, and keep the rest of an assignment', async () => {
+    const tenant = await createTestTenant();
+    await asRoleIn('app_worker', tenant.id, async (client) => {
+      for (const statement of [
+        'SELECT score FROM grants.score',
+        'SELECT comment FROM grants.score',
+        'SELECT id FROM grants.score',
+        'SELECT reviewer_membership_id FROM grants.assignment',
+        'SELECT updated_by FROM grants.assignment',
+      ]) {
+        expect(await outcome(client, statement), statement).toBe('42501');
+      }
+      expect(await outcome(client, 'SELECT id, status FROM grants.assignment')).toBe('ok');
     });
   });
 });
