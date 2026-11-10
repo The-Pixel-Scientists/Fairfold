@@ -24,7 +24,7 @@ const TOTP_KEY = process.env['TPS_E2E_MANAGER_TOTP_KEY'];
 
 export const managerIsSet = EMAIL !== undefined && PASSWORD !== undefined && TOTP_KEY !== undefined;
 
-const CONSOLE = `http://console.localhost:${String(currentDevNames().ports.stackConsole)}`;
+const CONSOLE = `https://console.localhost:${String(currentDevNames().ports.stackConsole)}`;
 
 /** The six-digit code an authenticator app shows now for its base32 key (RFC 6238). */
 function totp(key: string): string {
