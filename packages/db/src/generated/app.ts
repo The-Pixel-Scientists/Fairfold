@@ -55,6 +55,17 @@ export interface AppConfigVersion {
   version: number;
 }
 
+export interface AppErasureLedger {
+  audit_event_id: string;
+  erased_at: Generated<Timestamp>;
+  id: Generated<string>;
+  kind: string;
+  retain_until: Generated<Timestamp>;
+  subject_key_id: string | null;
+  subject_party_id: string;
+  tenant_id: string;
+}
+
 export interface AppFile {
   content_type: string;
   created_at: Generated<Timestamp>;
@@ -149,6 +160,16 @@ export interface AppRequestLimit {
   window_start: Timestamp;
 }
 
+export interface AppRestoreMode {
+  active: Generated<boolean>;
+  created_at: Generated<Timestamp>;
+  created_by: string | null;
+  id: Generated<boolean>;
+  request_id: string | null;
+  updated_at: Generated<Timestamp>;
+  updated_by: string | null;
+}
+
 export interface AppRetentionPolicy {
   created_at: Generated<Timestamp>;
   created_by: string;
@@ -206,6 +227,7 @@ export interface AppTenantTheme {
 export interface DB {
   'app.audit_event': AppAuditEvent;
   'app.config_version': AppConfigVersion;
+  'app.erasure_ledger': AppErasureLedger;
   'app.file': AppFile;
   'app.idempotency_key': AppIdempotencyKey;
   'app.invitation': AppInvitation;
@@ -213,6 +235,7 @@ export interface DB {
   'app.job_request': AppJobRequest;
   'app.membership': AppMembership;
   'app.request_limit': AppRequestLimit;
+  'app.restore_mode': AppRestoreMode;
   'app.retention_policy': AppRetentionPolicy;
   'app.subject_key': AppSubjectKey;
   'app.tenant': AppTenant;

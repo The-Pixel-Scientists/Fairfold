@@ -270,6 +270,102 @@ exports[`the shipped map > matches the committed register 1`] = `
     "article9Condition": null,
     "columns": [
       {
+        "column": "audit_event_id",
+        "perField": false,
+        "retention": {
+          "days": 2557,
+          "from": "erased_at",
+          "kind": "fixed",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "erased_at",
+        "perField": false,
+        "retention": {
+          "days": 2557,
+          "from": "erased_at",
+          "kind": "fixed",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "id",
+        "perField": false,
+        "retention": {
+          "days": 2557,
+          "from": "erased_at",
+          "kind": "fixed",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "kind",
+        "perField": false,
+        "retention": {
+          "days": 2557,
+          "from": "erased_at",
+          "kind": "fixed",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "retain_until",
+        "perField": false,
+        "retention": {
+          "days": 2557,
+          "from": "erased_at",
+          "kind": "fixed",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "subject_key_id",
+        "perField": false,
+        "retention": {
+          "days": 2557,
+          "from": "erased_at",
+          "kind": "fixed",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "subject_party_id",
+        "perField": false,
+        "retention": {
+          "days": 2557,
+          "from": "erased_at",
+          "kind": "fixed",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "tenant_id",
+        "perField": false,
+        "retention": {
+          "days": 2557,
+          "from": "erased_at",
+          "kind": "fixed",
+        },
+        "sensitivity": "internal",
+      },
+    ],
+    "dataCategories": [],
+    "dataSubjects": [],
+    "highestSensitivity": "internal",
+    "legalBasis": "legitimate_interests",
+    "processors": [
+      "hosting",
+      "backup",
+    ],
+    "purpose": "audit",
+    "subjectPath": null,
+    "table": "app.erasure_ledger",
+  },
+  {
+    "article9Condition": null,
+    "columns": [
+      {
         "column": "content_type",
         "perField": false,
         "retention": {
@@ -1107,6 +1203,78 @@ exports[`the shipped map > matches the committed register 1`] = `
       "reason": "A hashed client key for rate limits, with no account or tenant.",
     },
     "table": "app.request_limit",
+  },
+  {
+    "article9Condition": null,
+    "columns": [
+      {
+        "column": "active",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "created_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "created_by",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "request_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "updated_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "updated_by",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+    ],
+    "dataCategories": [],
+    "dataSubjects": [],
+    "highestSensitivity": "internal",
+    "legalBasis": "legitimate_interests",
+    "processors": [
+      "hosting",
+      "backup",
+    ],
+    "purpose": "service_reliability",
+    "subjectPath": null,
+    "table": "app.restore_mode",
   },
   {
     "article9Condition": null,

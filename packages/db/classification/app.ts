@@ -48,6 +48,11 @@ const audit: FieldClassification = {
   sensitivity: 'internal',
   retention: { kind: 'tenant_policy', policy: 'audit', minimumDays: 365 },
 };
+/** 7 years, the longest off-site tier (ADR 0011), never under a tenant's policy. */
+const erasureLedger: FieldClassification = {
+  sensitivity: 'internal',
+  retention: { kind: 'fixed', days: 2557, from: 'erased_at' },
+};
 
 /**
  * Columns whose values are structured (json, jsonb, bytea) or free text. An
@@ -252,6 +257,28 @@ export const app = {
     created_at: internal,
     destroyed_at: internal,
   },
+  // Who was erased, as ids and times, so a restore can erase them again
+  // (ADR 0027). Plain ids: no foreign key, so no subject path.
+  'app.erasure_ledger': {
+    tenant_id: erasureLedger,
+    id: erasureLedger,
+    subject_party_id: erasureLedger,
+    kind: erasureLedger,
+    subject_key_id: erasureLedger,
+    audit_event_id: erasureLedger,
+    erased_at: erasureLedger,
+    retain_until: erasureLedger,
+  },
+  // Whether this cell is being restored (ADR 0011): one row, no tenant's.
+  'app.restore_mode': {
+    id: internal,
+    active: internal,
+    request_id: internal,
+    created_at: internal,
+    created_by: internal,
+    updated_at: internal,
+    updated_by: internal,
+  },
 } satisfies ClassificationRegistry;
 
 /**
@@ -353,4 +380,13 @@ export const appProcessing: ProcessingRegistry<typeof app> = {
     dataCategories: ['identity'],
   },
   'app.subject_key': auditRow,
+  // Its party ids have no foreign key, so no subject path: it states none.
+  'app.erasure_ledger': { ...auditRow, dataSubjects: [], dataCategories: [] },
+  'app.restore_mode': {
+    purpose: 'service_reliability',
+    legalBasis: 'legitimate_interests',
+    processors: stored,
+    dataSubjects: [],
+    dataCategories: [],
+  },
 };
