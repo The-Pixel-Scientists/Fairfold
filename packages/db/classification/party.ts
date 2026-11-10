@@ -56,6 +56,8 @@ export const party = {
     address_postcode: personal,
     address_country_code: personal,
     website: internal,
+    // Generated from name, so classified and retained as it is (ADR 0025).
+    search_vector: internal,
   },
   'party.organisation_identifier': {
     ...keyAndActors,
@@ -73,6 +75,9 @@ export const party = {
     email: personal,
     phone: personal,
     user_id: personal,
+    // Generated from the names and email, so classified and retained as they
+    // are, and emptied with them by erasure (ADR 0025).
+    search_vector: personal,
   },
   'party.relationship': {
     ...keyAndActors,

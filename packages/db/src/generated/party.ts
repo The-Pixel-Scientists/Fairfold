@@ -48,6 +48,7 @@ export interface PartyOrganisation {
   kind: Generated<string>;
   legal_form: string;
   name: string;
+  search_vector: Generated<string | null>;
   tenant_id: string;
   updated_at: Generated<Timestamp>;
   updated_by: string | null;
@@ -107,6 +108,7 @@ export interface PartyPerson {
   id: string;
   kind: Generated<string>;
   phone: string | null;
+  search_vector: Generated<string | null>;
   tenant_id: string;
   updated_at: Generated<Timestamp>;
   updated_by: string | null;

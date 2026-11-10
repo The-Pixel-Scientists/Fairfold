@@ -5241,6 +5241,14 @@ exports[`the shipped map > matches the committed register 1`] = `
         "sensitivity": "internal",
       },
       {
+        "column": "search_vector",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
         "column": "tenant_id",
         "perField": false,
         "retention": {
@@ -5702,6 +5710,14 @@ exports[`the shipped map > matches the committed register 1`] = `
       },
       {
         "column": "phone",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "personal",
+      },
+      {
+        "column": "search_vector",
         "perField": false,
         "retention": {
           "kind": "tenant_lifetime",
