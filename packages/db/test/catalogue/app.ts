@@ -219,6 +219,7 @@ export const app: SchemaCatalogue = {
           'EXECUTE on function party.erase_party(uuid,uuid)',
           'EXECUTE on function app.destroy_subject_key(uuid)',
           'EXECUTE on function grants.clear_answer_fields(uuid,text[])',
+          'EXECUTE on function app.erase_file(uuid,uuid)',
           ...['active', 'request_id'].map(
             (column) => `SELECT on column app.restore_mode.${column}`,
           ),
@@ -235,8 +236,11 @@ export const app: SchemaCatalogue = {
             (column) => `SELECT on column app.membership.${column}`,
           ),
           'UPDATE on column app.membership.status',
-          ...['tenant_id', 'id', 'applicant_person_id', 'form_version_id'].map(
+          ...['tenant_id', 'id', 'applicant_person_id', 'form_version_id', 'answers'].map(
             (column) => `SELECT on column grants.application.${column}`,
+          ),
+          ...['tenant_id', 'application_id', 'file_id'].map(
+            (column) => `SELECT on column grants.application_file.${column}`,
           ),
           ...['tenant_id', 'id', 'definition'].map(
             (column) => `SELECT on column grants.form_version.${column}`,
@@ -279,6 +283,7 @@ export const app: SchemaCatalogue = {
         rights: [
           'USAGE on schema app',
           'USAGE on schema party',
+          'USAGE on schema grants',
           'EXECUTE on function app.current_tenant_id()',
           ...['tenant_id', 'id', 'erased_at'].map(
             (column) => `SELECT on column app.file.${column}`,
@@ -290,8 +295,19 @@ export const app: SchemaCatalogue = {
           ...['tenant_id', 'id', 'status'].map(
             (column) => `SELECT on column party.party.${column}`,
           ),
+          // A ledger row is its authority in restore mode (migration 0049).
+          'SELECT on column app.restore_mode.active',
+          ...['tenant_id', 'subject_party_id', 'kind'].map(
+            (column) => `SELECT on column app.erasure_ledger.${column}`,
+          ),
+          ...['tenant_id', 'application_id', 'file_id'].map(
+            (column) => `SELECT on column grants.application_file.${column}`,
+          ),
+          ...['tenant_id', 'id', 'applicant_person_id'].map(
+            (column) => `SELECT on column grants.application.${column}`,
+          ),
         ],
-        policies: [],
+        policies: ['app.restore_mode policy restore_mode_select'],
       },
     ],
     [

@@ -3,20 +3,24 @@
 -- Migration 0049, up: re-applying the erasure ledger after a restore (ADR
 -- 0027 and ADR 0011, "Erasure and restores"; S11-109).
 --
--- party.erase_party and app.destroy_subject_key take one more authority:
--- while the cell is in restore mode, a ledger row of this tenant naming the
--- party (and, for an erasure, no job request). Outside restore mode they are
--- unchanged, so a ledger row never authorises an erasure. A re-erasure is
--- written with the system actor and the restore's request id.
+-- party.erase_party, app.destroy_subject_key and app.erase_file take one more
+-- authority: while the cell is in restore mode, a ledger row of this tenant
+-- naming the party (and, for an erasure of a party or file, no job request).
+-- Outside restore mode they are unchanged, so a ledger row never authorises an
+-- erasure. A re-erasure is written with the system actor and the restore's
+-- request id.
 --
 -- app.reapply_erasure_ledger(), run once per tenant by the restore's one-off
 -- worker process (ADR 0011, step 10), repeats each row of the restored
 -- table, in the tenant set in the transaction, through those functions and
 -- grants.clear_answer_fields: for a party present and not erased, it removes
 -- any membership the restored data still gives them, with the standard
--- event, erases them, and clears the personal answers of their applications
--- by the classes their pinned form version gives. A row whose party is
--- absent is counted and kept. Only the restored table is read: a row found
+-- event, and erases them. It then clears every stored answer of their
+-- applications that the pinned form version does not class as public or
+-- internal, an unasked key included, as the module's erasure does, and erases
+-- every file linked to those applications whatever its question's class. A
+-- row whose party is absent is counted and kept. Only the restored table is
+-- read: a row found
 -- only in an off-site copy erases no one until an operator confirms it
 -- through app.restore_erasure_ledger_row (migration 0048). A party erased
 -- again and a second call both change nothing further, and each call writes
@@ -186,6 +190,62 @@ $function$;
 RESET ROLE;
 REVOKE CREATE ON SCHEMA app FROM owner_app_destroy_subject_key;
 
+-- In restore mode a null job request erases only a file linked to an
+-- application of an erased party with a ledger row in this tenant.
+GRANT USAGE ON SCHEMA grants TO owner_app_erase_file;
+GRANT SELECT (active) ON app.restore_mode TO owner_app_erase_file;
+GRANT SELECT (tenant_id, subject_party_id, kind) ON app.erasure_ledger TO owner_app_erase_file;
+GRANT SELECT (tenant_id, application_id, file_id) ON grants.application_file
+  TO owner_app_erase_file;
+GRANT SELECT (tenant_id, id, applicant_person_id) ON grants.application TO owner_app_erase_file;
+
+GRANT CREATE ON SCHEMA app TO owner_app_erase_file;
+SET LOCAL ROLE owner_app_erase_file;
+
+CREATE OR REPLACE FUNCTION app.erase_file(file_id uuid, job_request_id uuid)
+  RETURNS boolean
+  LANGUAGE plpgsql
+  VOLATILE
+  SECURITY DEFINER
+  SET search_path = pg_catalog, pg_temp
+AS $function$
+DECLARE
+  erase_tenant CONSTANT uuid := app.current_tenant_id();
+  erased integer;
+BEGIN
+  IF erase_tenant IS NULL THEN
+    RAISE EXCEPTION 'Erasure needs a tenant.' USING ERRCODE = 'object_not_in_prerequisite_state';
+  END IF;
+  PERFORM FROM app.job_request r
+    JOIN party.party p ON p.tenant_id = r.tenant_id AND p.id::text = r.filters ->> 'partyId'
+   WHERE r.tenant_id = erase_tenant AND r.id = erase_file.job_request_id
+     AND r.kind = 'erasure' AND r.permission = 'platform.erasure.request'
+     AND r.status = 'running' AND p.status = 'erased';
+  IF NOT FOUND
+     AND NOT (erase_file.job_request_id IS NULL
+              AND EXISTS (SELECT FROM app.restore_mode m WHERE m.active)
+              AND EXISTS (SELECT FROM grants.application_file l
+                            JOIN grants.application a
+                              ON a.tenant_id = l.tenant_id AND a.id = l.application_id
+                            JOIN party.party p
+                              ON p.tenant_id = a.tenant_id AND p.id = a.applicant_person_id
+                            JOIN app.erasure_ledger e
+                              ON e.tenant_id = p.tenant_id AND e.subject_party_id = p.id
+                           WHERE l.tenant_id = erase_tenant AND l.file_id = erase_file.file_id
+                             AND p.status = 'erased' AND e.kind = 'party_erased')) THEN
+    RAISE EXCEPTION 'Erasing a file needs a running erasure request of this tenant whose party is erased, or in restore mode its ledger row.'
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  UPDATE app.file f SET erased_at = pg_catalog.now()
+   WHERE f.tenant_id = erase_tenant AND f.id = erase_file.file_id AND f.erased_at IS NULL;
+  GET DIAGNOSTICS erased = ROW_COUNT;
+  RETURN erased = 1;
+END
+$function$;
+
+RESET ROLE;
+REVOKE CREATE ON SCHEMA app FROM owner_app_erase_file;
+
 -- Re-apply the restored ledger of the tenant set in the transaction, only in
 -- restore mode. Returns its counts. It raises ER001, for the restore to
 -- report, when a removal would leave the tenant with no admin (ADR 0027),
@@ -204,6 +264,7 @@ DECLARE
   party_status text;
   member record;
   application record;
+  linked_file uuid;
   field_count integer;
   entries integer := 0;
   re_erased integer := 0;
@@ -211,6 +272,7 @@ DECLARE
   absent integer := 0;
   memberships_removed integer := 0;
   answers_cleared integer := 0;
+  files_erased integer := 0;
   counts jsonb;
 BEGIN
   IF reapply_tenant IS NULL THEN
@@ -274,12 +336,13 @@ BEGIN
 
     FOR application IN
       SELECT a.id,
-             ARRAY(SELECT field ->> 'id'
-                     FROM pg_catalog.jsonb_array_elements(v.definition -> 'sections') AS s(section),
-                          pg_catalog.jsonb_array_elements(section -> 'fields') AS f(field)
-                    WHERE field ->> 'type' <> 'content'
-                      AND COALESCE(field ->> 'classification', 'personal')
-                          NOT IN ('public', 'internal')) AS field_ids
+             ARRAY(SELECT stored.key
+                     FROM pg_catalog.jsonb_object_keys(a.answers) AS stored(key)
+                    WHERE NOT EXISTS (
+                      SELECT FROM pg_catalog.jsonb_array_elements(v.definition -> 'sections') AS s(section),
+                                  pg_catalog.jsonb_array_elements(section -> 'fields') AS f(field)
+                       WHERE field ->> 'id' = stored.key AND field ->> 'type' <> 'content'
+                         AND field ->> 'classification' IN ('public', 'internal'))) AS field_ids
         FROM grants.application a
         JOIN grants.form_version v ON v.tenant_id = a.tenant_id AND v.id = a.form_version_id
        WHERE a.tenant_id = reapply_tenant AND a.applicant_person_id = entry.subject_party_id
@@ -292,13 +355,23 @@ BEGIN
                 application.field_ids[batch * 500 + 1 : (batch + 1) * 500]);
         END LOOP;
       END IF;
+      FOR linked_file IN
+        SELECT l.file_id
+          FROM grants.application_file l
+         WHERE l.tenant_id = reapply_tenant AND l.application_id = application.id
+         ORDER BY l.file_id
+      LOOP
+        IF app.erase_file(linked_file, NULL) THEN
+          files_erased := files_erased + 1;
+        END IF;
+      END LOOP;
     END LOOP;
   END LOOP;
 
   counts := pg_catalog.jsonb_build_object(
     'entries', entries, 're_erased', re_erased, 'keys_destroyed', keys_destroyed,
     'absent', absent, 'memberships_removed', memberships_removed,
-    'answers_cleared', answers_cleared);
+    'answers_cleared', answers_cleared, 'files_erased', files_erased);
   INSERT INTO app.audit_event (tenant_id, request_id, actor_kind, action, entity_type, entity_id,
                                changes)
   VALUES (reapply_tenant, restore_request, 'system', 'platform.erasure_ledger.reapplied',
@@ -316,9 +389,11 @@ GRANT SELECT (tenant_id, id, status) ON party.party TO owner_app_reapply_erasure
 GRANT SELECT (tenant_id, id, user_id) ON party.person TO owner_app_reapply_erasure_ledger;
 GRANT SELECT (tenant_id, id, user_id, status, roles), UPDATE (status)
    ON app.membership TO owner_app_reapply_erasure_ledger;
-GRANT SELECT (tenant_id, id, applicant_person_id, form_version_id)
+GRANT SELECT (tenant_id, id, applicant_person_id, form_version_id, answers)
    ON grants.application TO owner_app_reapply_erasure_ledger;
 GRANT SELECT (tenant_id, id, definition) ON grants.form_version
+   TO owner_app_reapply_erasure_ledger;
+GRANT SELECT (tenant_id, application_id, file_id) ON grants.application_file
    TO owner_app_reapply_erasure_ledger;
 GRANT SELECT (tenant_id, policy, days) ON app.retention_policy
    TO owner_app_reapply_erasure_ledger;
@@ -335,6 +410,9 @@ RESET ROLE;
 SET LOCAL ROLE owner_grants_clear_answer_fields;
 GRANT EXECUTE ON FUNCTION grants.clear_answer_fields(uuid, text[])
   TO owner_app_reapply_erasure_ledger;
+RESET ROLE;
+SET LOCAL ROLE owner_app_erase_file;
+GRANT EXECUTE ON FUNCTION app.erase_file(uuid, uuid) TO owner_app_reapply_erasure_ledger;
 RESET ROLE;
 
 REVOKE ALL ON FUNCTION app.reapply_erasure_ledger() FROM PUBLIC;

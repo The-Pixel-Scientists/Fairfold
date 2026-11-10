@@ -33,7 +33,7 @@ ALTER TABLE app.restore_mode ENABLE ROW LEVEL SECURITY;
 ALTER TABLE app.restore_mode FORCE ROW LEVEL SECURITY;
 CREATE POLICY restore_mode_select ON app.restore_mode FOR SELECT
   TO app_api, app_worker, migrator, owner_party_erase_party, owner_app_destroy_subject_key,
-     owner_app_reapply_erasure_ledger
+     owner_app_erase_file, owner_app_reapply_erasure_ledger
   USING (true);
 CREATE POLICY migrator_insert ON app.restore_mode FOR INSERT TO migrator WITH CHECK (true);
 CREATE POLICY migrator_update ON app.restore_mode FOR UPDATE TO migrator
