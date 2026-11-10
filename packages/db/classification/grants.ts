@@ -19,7 +19,14 @@
 // tenant is a customer: applications, scores and sent emails refer to the
 // set-up, an email row as long as its decision, since it records who was
 // told what and when (ADR 0020), and erasure anonymises a person in place
-// (ADR 0017).
+// (ADR 0017). A reasonable adjustment is kept with the round it concerns;
+// its reason codes are special category, since a code such as access_needs
+// can reveal health. An equality monitoring response's answers and consent
+// (ADR 0032) are special category, and the row is deleted when consent is
+// withdrawn. For now it is otherwise kept as long as its application:
+// S11-102's retention functions will enforce the tenant policy
+// grants.monitoring (24 months from the round's close for monitoring) once
+// that policy has a target.
 
 import type {
   ClassificationRegistry,
@@ -39,6 +46,10 @@ const shown: FieldClassification = {
 };
 const personal: FieldClassification = {
   sensitivity: 'personal',
+  retention: { kind: 'tenant_lifetime' },
+};
+const special: FieldClassification = {
+  sensitivity: 'special_category',
   retention: { kind: 'tenant_lifetime' },
 };
 
@@ -129,6 +140,34 @@ export const grants = {
     submitted_late: internal,
     withdrawn_at: internal,
     organisation_snapshot_id: internal,
+    submission_route: internal,
+    submitted_by: internal,
+  },
+  'grants.adjustment': {
+    tenant_id: internal,
+    id: internal,
+    round_id: internal,
+    organisation_id: internal,
+    application_id: internal,
+    kind: internal,
+    closes_at: internal,
+    reason_code: special,
+    granted_by: internal,
+    granted_at: internal,
+    revoked_by: internal,
+    revoked_at: internal,
+    revoke_reason_code: special,
+  },
+  'grants.monitoring_response': {
+    tenant_id: internal,
+    id: internal,
+    round_id: internal,
+    application_id: internal,
+    form_version_id: internal,
+    answers: special,
+    consent_given_at: special,
+    privacy_notice_version: special,
+    created_at: internal,
   },
   'grants.eligibility_result': {
     tenant_id: internal,
@@ -234,6 +273,8 @@ const throughApplication = {
  */
 export const grantsSubjects: SubjectPathRegistry = {
   'grants.application': { kind: 'party', column: 'applicant_person_id' },
+  'grants.adjustment': { kind: 'party', column: 'organisation_id' },
+  'grants.monitoring_response': throughApplication,
   'grants.eligibility_result': throughApplication,
   'grants.stage_transition': throughApplication,
   'grants.application_file': throughApplication,
@@ -288,6 +329,17 @@ export const grantsProcessing: ProcessingRegistry<typeof grants> = {
     processors: stored,
     dataSubjects: ['applicant', 'applicant_contact'],
     dataCategories: ['identity', 'contact', 'other'],
+  },
+  // A reasonable adjustment is a duty under the Equality Act 2010, not
+  // something a person consents to.
+  'grants.adjustment': {
+    ...application('grant_applications', 'legal_obligation', ['applicant', 'applicant_contact']),
+    article9Condition: 'substantial_public_interest',
+  },
+  // Explicit consent, as ADR 0032 decides.
+  'grants.monitoring_response': {
+    ...application('grant_applications', 'consent'),
+    article9Condition: 'explicit_consent',
   },
   'grants.eligibility_result': application('assessment', 'contract'),
   'grants.stage_transition': application('assessment', 'contract'),

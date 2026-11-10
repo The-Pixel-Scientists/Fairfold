@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
 // The release email handler's rights (migrations 0029 and 0045) and the
-// subject access export's reads (migrations 0044 and 0046): app_worker holds
+// subject access export's reads (migrations 0044, 0046 and 0051): app_worker holds
 // exactly these on the grants and party schemas, the audit table and the
 // module switches, and, with one tenant set, reaches none of another
 // tenant's rows. The score table and an assignment's reviewer columns are
@@ -80,6 +80,7 @@ const SUBJECT_ACCESS_READS: Readonly<Record<string, readonly string[]>> = {
     'submitted_late',
     'withdrawn_at',
     'organisation_snapshot_id',
+    'submission_route',
   ],
   'grants.form_version': ['tenant_id', 'id', 'definition'],
   'grants.eligibility_result': [

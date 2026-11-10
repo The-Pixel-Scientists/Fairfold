@@ -25,6 +25,22 @@ export type JsonValue = JsonArray | JsonObject | JsonPrimitive;
 
 export type Timestamp = ColumnType<Date, Date | string, Date | string>;
 
+export interface GrantsAdjustment {
+  application_id: string | null;
+  closes_at: Timestamp | null;
+  granted_at: Generated<Timestamp>;
+  granted_by: string;
+  id: Generated<string>;
+  kind: string;
+  organisation_id: string;
+  reason_code: string;
+  revoke_reason_code: string | null;
+  revoked_at: Timestamp | null;
+  revoked_by: string | null;
+  round_id: string;
+  tenant_id: string;
+}
+
 export interface GrantsApplication {
   answers: Generated<Json>;
   answers_version: Generated<number>;
@@ -38,7 +54,9 @@ export interface GrantsApplication {
   round_id: string;
   stage_id: string | null;
   status: Generated<string>;
+  submission_route: Generated<string>;
   submitted_at: Timestamp | null;
+  submitted_by: string | null;
   submitted_late: Generated<boolean>;
   tenant_id: string;
   updated_at: Generated<Timestamp>;
@@ -151,6 +169,18 @@ export interface GrantsFormVersion {
   version: number;
 }
 
+export interface GrantsMonitoringResponse {
+  answers: Json;
+  application_id: string;
+  consent_given_at: Generated<Timestamp>;
+  created_at: Generated<Timestamp>;
+  form_version_id: string;
+  id: Generated<string>;
+  privacy_notice_version: string;
+  round_id: string;
+  tenant_id: string;
+}
+
 export interface GrantsProgramme {
   created_at: Generated<Timestamp>;
   created_by: string | null;
@@ -258,6 +288,7 @@ export interface GrantsStageTransition {
 }
 
 export interface DB {
+  'grants.adjustment': GrantsAdjustment;
   'grants.application': GrantsApplication;
   'grants.application_file': GrantsApplicationFile;
   'grants.assignment': GrantsAssignment;
@@ -267,6 +298,7 @@ export interface DB {
   'grants.eligibility_result': GrantsEligibilityResult;
   'grants.email_template_version': GrantsEmailTemplateVersion;
   'grants.form_version': GrantsFormVersion;
+  'grants.monitoring_response': GrantsMonitoringResponse;
   'grants.programme': GrantsProgramme;
   'grants.publisher_setting': GrantsPublisherSetting;
   'grants.reviewer': GrantsReviewer;
