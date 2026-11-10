@@ -11,28 +11,23 @@
 -- LEAKPROOF. As app_api, a ranked trigram search limited to 20 rows had a p95
 -- of 131 ms on email at 10,000 people in the tenant and 525 ms at 50,000, over
 -- the 500 ms target; the other trigram columns stayed at or under 80 ms at
--- 50,000 people or 15,000 organisations. The indexes are built because S12-04
--- specifies them. Today they add write cost and further copies of the indexed
--- values, and give searches no speed.
+-- 50,000 people or 15,000 organisations.
 --
--- For a self-hoster with a large table: this migration builds the indexes
--- inside its transaction, and each stored generated column rewrites its table
--- under an exclusive lock. To shorten that lock, not to speed up searches,
--- build the five trigram indexes below with CREATE INDEX CONCURRENTLY under
--- exactly these names before upgrading; IF NOT EXISTS then skips them here.
--- The two tsvector indexes need their column first, so they are built here,
--- after the rewrite.
-
-CREATE INDEX IF NOT EXISTS organisation_name_trgm
-  ON party.organisation USING gin (name ext.gin_trgm_ops);
-CREATE INDEX IF NOT EXISTS organisation_identifier_identifier_trgm
-  ON party.organisation_identifier USING gin (identifier ext.gin_trgm_ops);
-CREATE INDEX IF NOT EXISTS person_given_name_trgm
-  ON party.person USING gin (given_name ext.gin_trgm_ops);
-CREATE INDEX IF NOT EXISTS person_family_name_trgm
-  ON party.person USING gin (family_name ext.gin_trgm_ops);
-CREATE INDEX IF NOT EXISTS person_email_trgm
-  ON party.person USING gin (email ext.gin_trgm_ops);
+-- Decided: the seven indexes stay because S12-04's acceptance criteria require
+-- them, and for no other reason. They add write cost and further copies of the
+-- indexed values, and give searches no speed. The trigram indexes are on the
+-- source columns, since no migration adds ADR 0025's match_name. A later
+-- migration can drop them and lose nothing, as every indexed value is derived.
+--
+-- For a self-hoster with a large table: this migration runs in one
+-- transaction, and each stored generated column rewrites party.organisation
+-- or party.person under an exclusive lock held until commit. The rewrite
+-- rebuilds every index already on the table under that lock, so building an
+-- index on those two tables beforehand shortens nothing; they are built here,
+-- once, after the rewrite. Only organisation_identifier_identifier_trgm, on a
+-- table that is not rewritten, gains from being built first: use CREATE INDEX
+-- CONCURRENTLY under exactly that name before upgrading, and IF NOT EXISTS
+-- then skips it here.
 
 -- The simple configuration, named so the expression is immutable: stemming
 -- harms names and Welsh (ADR 0025), and no unaccent is used.
@@ -47,6 +42,17 @@ ALTER TABLE party.person
     GENERATED ALWAYS AS (pg_catalog.to_tsvector('pg_catalog.simple'::regconfig,
       COALESCE(given_name, '') || ' ' || COALESCE(family_name, '') || ' '
         || CASE WHEN email LIKE '%@erased.invalid' THEN '' ELSE email END)) STORED;
+
+CREATE INDEX organisation_name_trgm
+  ON party.organisation USING gin (name ext.gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS organisation_identifier_identifier_trgm
+  ON party.organisation_identifier USING gin (identifier ext.gin_trgm_ops);
+CREATE INDEX person_given_name_trgm
+  ON party.person USING gin (given_name ext.gin_trgm_ops);
+CREATE INDEX person_family_name_trgm
+  ON party.person USING gin (family_name ext.gin_trgm_ops);
+CREATE INDEX person_email_trgm
+  ON party.person USING gin (email ext.gin_trgm_ops);
 
 CREATE INDEX organisation_search_vector
   ON party.organisation USING gin (search_vector);
