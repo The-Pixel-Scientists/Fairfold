@@ -19,7 +19,8 @@ function fakeTransaction(counts: number[]) {
       },
     }),
     selectFrom: () => {
-      throw new Error('No policy other than audit exists.');
+      calls++;
+      return { selectAll: () => ({ execute: () => Promise.resolve([]) }) };
     },
   };
   return { trx, calls: () => calls };
@@ -27,7 +28,11 @@ function fakeTransaction(counts: number[]) {
 
 describe('the policies', () => {
   it('come from the classification map, with the audit minimum', () => {
-    expect([...retentionPolicies]).toEqual([['audit', 365]]);
+    expect([...retentionPolicies]).toEqual([
+      ['audit', 365],
+      ['crm_import_jobs', 90],
+      ['crm_import_rows', 30],
+    ]);
   });
 });
 
@@ -54,14 +59,14 @@ describe('the audit purge', () => {
     expect(calls()).toBe(4);
   });
 
-  it('makes one call when nothing has expired', async () => {
+  it('makes one call for each policy when nothing has expired', async () => {
     const { trx, calls } = fakeTransaction([0]);
     expect(await sweepTenant(trx as never, 20)).toEqual({
       applied: [],
       audit: 0,
       remaining: false,
     });
-    expect(calls()).toBe(1);
+    expect(calls()).toBe(retentionPolicies.size);
   });
 });
 
