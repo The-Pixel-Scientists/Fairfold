@@ -17,6 +17,7 @@ import {
   type ApplicationSummary,
 } from '../../contracts/index.ts';
 import { definitionOf } from '../forms/read.ts';
+import { closingTime, withClosing, type Closing } from './closing.ts';
 import type { ApplicationDependencies } from './context.ts';
 import type { Tx } from '../programme/tables.ts';
 import { localAt } from '../programme/time.ts';
@@ -39,7 +40,10 @@ const summaryRows = (db: ApplicationsDb) =>
       'r.timezone',
       'p.title as programme_title',
       'a.organisation_id',
-    ]);
+      'a.submission_route',
+    ])
+    // An assisted draft is not there for its applicant until staff have submitted it.
+    .where((eb) => eb.or([eb('a.submission_route', '=', 'portal'), eb('a.status', '<>', 'draft')]));
 
 type SummaryRow = Awaited<ReturnType<ReturnType<typeof summaryRows>['execute']>>[number];
 
@@ -105,6 +109,7 @@ function toSummary(
   first: ReadonlyMap<string, string>,
   names: ReadonlyMap<string, string>,
   decision: ApplicantDecision | undefined,
+  closing: Closing,
 ): ApplicationSummary {
   return {
     id: row.id,
@@ -119,6 +124,8 @@ function toSummary(
       id: row.organisation_id,
       name: names.get(row.organisation_id) ?? '',
     },
+    closesAt: localAt(row.timezone, closing.closesAt),
+    submissionRoute: row.submission_route,
     status: applicantStatus({
       status: row.status,
       inFirstStage: row.stage_id !== null && row.stage_id === first.get(row.round_id),
@@ -145,7 +152,14 @@ export async function readApplications(tx: Tx, userId: string): Promise<Applicat
     tx,
     rows.map((row) => row.id),
   );
-  return rows.map((row) => toSummary(row, first, names, decisions.get(row.id)));
+  const closings = await withClosing(tx, rows, (row) => ({
+    roundId: row.round_id,
+    organisationId: row.organisation_id,
+    applicationId: row.id,
+  }));
+  return closings.map(({ item, closing }) =>
+    toSummary(item, first, names, decisions.get(item.id), closing),
+  );
 }
 
 /**
@@ -193,8 +207,13 @@ export async function readApplication(
   const names = await organisationNames(tx, [row.organisation_id]);
   const answers = await answersWithFiles(tx, row.id, row.answers);
   const decision = (await releasedDecisions(tx, [row.id])).get(row.id);
+  const closing = await closingTime(tx, {
+    roundId: row.round_id,
+    organisationId: row.organisation_id,
+    applicationId: row.id,
+  });
   return {
-    ...toSummary(row, first, names, decision),
+    ...toSummary(row, first, names, decision, closing),
     form: { id: row.form_id, definition },
     answers: projectedAnswers(definition, answers, 'applicant'),
     answersVersion: row.answers_version,
