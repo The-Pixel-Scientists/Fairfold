@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
 // The jobs the worker takes from the modules (ADR 0009, ADR 0016). The grants
-// release email job sends through the mail server the worker is given.
+// release email and message notification jobs send through the mail server the worker is given.
 
 import { partyErasureTarget } from '@pixel-scientists/party/server';
 
 import { releaseEmailJob } from '../decision-emails.ts';
+import { messageNotificationJob } from '../message-notifications.ts';
 import { erasureJob } from '../platform/erasure/index.ts';
 import { collectModuleJobs, erasureContributions, type Mail } from '../modules.ts';
 import type { ModuleJob } from './registry.ts';
@@ -15,6 +16,7 @@ export function workerModuleJobs(mail: Mail): readonly ModuleJob[] {
     {
       jobs: [
         releaseEmailJob(mail),
+        messageNotificationJob(mail),
         erasureJob({ contributions: erasureContributions, target: partyErasureTarget }),
       ],
     },

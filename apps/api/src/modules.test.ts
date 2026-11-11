@@ -24,13 +24,18 @@ import {
 import { teamRoutes } from '@pixel-scientists/domain/platform/team';
 import { getWarehouseSnapshot } from '@pixel-scientists/domain/warehouse';
 import {
+  adjustmentRoutes,
   applicationRoutes,
   assessmentRoutes,
+  assistedRoutes,
   assignReviewersAutomatically,
   attachmentRoutes,
   decisionRoutes,
   exportRoutes,
   formRoutes,
+  messageRoutes,
+  monitoringRoutes,
+  noteRoutes,
   programmeRoutes,
   reviewRoutes,
   spreadRoutes,
@@ -80,6 +85,10 @@ describe('composeModules', () => {
       ...Object.values(applicationRoutes),
       ...Object.values(attachmentRoutes),
       ...Object.values(submissionRoutes),
+      ...Object.values(adjustmentRoutes),
+      ...Object.values(assistedRoutes),
+      ...Object.values(noteRoutes),
+      ...Object.values(messageRoutes),
       ...Object.values(assessmentRoutes),
       assignReviewersAutomatically,
       ...Object.values(spreadRoutes),
@@ -87,6 +96,13 @@ describe('composeModules', () => {
       ...Object.values(decisionRoutes),
       ...Object.values(exportRoutes),
     ]);
+  });
+
+  it('leaves the monitoring routes off until the audit log hides their events (ADR 0032)', () => {
+    const { routes } = composeModules({ publicTenants });
+    for (const contract of Object.values(monitoringRoutes)) {
+      expect(routes.map(({ contract: registered }) => registered)).not.toContain(contract);
+    }
   });
 
   it('resolves every scope rule the module routes use, and none that is the platform’s', () => {
@@ -99,6 +115,10 @@ describe('composeModules', () => {
         ...Object.values(applicationRoutes),
         ...Object.values(attachmentRoutes),
         ...Object.values(submissionRoutes),
+        ...Object.values(adjustmentRoutes),
+        ...Object.values(assistedRoutes),
+        ...Object.values(noteRoutes),
+        ...Object.values(messageRoutes),
         ...Object.values(assessmentRoutes),
         assignReviewersAutomatically,
         ...Object.values(spreadRoutes),
