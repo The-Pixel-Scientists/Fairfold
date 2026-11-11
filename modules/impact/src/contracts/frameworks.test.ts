@@ -62,7 +62,7 @@ describe('a framework', () => {
     const indicator = framework.indicators[INDICATOR];
     const cases: [object, string][] = [
       [{ ...framework, name: ' ' }, impactMessages.frameworkName],
-      [{ ...framework, name: 'Out‮comes' }, impactMessages.hiddenCharacters],
+      [{ ...framework, name: 'Out\u202ecomes' }, impactMessages.hiddenCharacters],
       [{ ...framework, outcomes: {} }, impactMessages.outcomes],
       [
         { ...framework, outcomes: { [OUTCOME]: { name: '', description: '' } } },
