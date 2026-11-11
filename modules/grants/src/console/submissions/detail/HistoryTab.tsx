@@ -4,10 +4,10 @@ import type { Submission, SubmissionEvent } from '../../../contracts/index.ts';
 import { formatMoment } from '../../programme/format.ts';
 
 /** What happened, in a sentence. */
-export function eventText(event: SubmissionEvent): string {
+export function eventText(event: SubmissionEvent, assisted = false): string {
   switch (event.event) {
     case 'submitted':
-      return 'Submitted';
+      return assisted ? 'Submitted by staff for the applicant' : 'Submitted';
     case 'withdrawn':
       return 'Withdrawn by the applicant';
     case 'stage_changed':
@@ -18,7 +18,13 @@ export function eventText(event: SubmissionEvent): string {
 }
 
 /** Everything that has happened to the submission, newest first. */
-export function HistoryTab({ history }: { history: Submission['history'] }) {
+export function HistoryTab({
+  history,
+  assisted = false,
+}: {
+  history: Submission['history'];
+  assisted?: boolean;
+}) {
   const newestFirst = [...history].reverse();
   return (
     <div className="flex max-w-prose flex-col gap-4">
@@ -42,7 +48,7 @@ export function HistoryTab({ history }: { history: Submission['history'] }) {
               className="relative mt-1.5 size-2.5 shrink-0 rounded-full border-2 border-edge bg-surface"
             />
             <div className="flex min-w-0 flex-col">
-              <p className="text-body text-ink">{eventText(event)}</p>
+              <p className="text-body text-ink">{eventText(event, assisted)}</p>
               <p className="text-sm text-muted">
                 {event.by ?? 'Name not on record'}, {formatMoment(event.at)}
               </p>

@@ -101,6 +101,12 @@ export const grantsRoutes: readonly RouteDefinition[] = [
     load: () => import('./submissions/SubmissionsPage.tsx'),
   },
   {
+    path: '/assisted-applications/:applicationId',
+    title: 'Application for an applicant',
+    params: ids,
+    load: () => import('./submissions/assisted/AssistedPage.tsx'),
+  },
+  {
     path: '/submissions/:submissionId',
     title: 'Submission',
     params: ids,
