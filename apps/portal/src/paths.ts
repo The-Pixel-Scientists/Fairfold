@@ -36,6 +36,8 @@ export const SECTION_PATH = '/applications/:applicationId/sections/:sectionId';
 export const CHECK_PATH = '/applications/:applicationId/check';
 export const SUBMITTED_PATH = '/applications/:applicationId/submitted';
 export const OUTCOME_PATH = '/applications/:applicationId/outcome';
+export const SENT_PATH = '/applications/:applicationId/sent';
+export const MONITORING_PATH = '/applications/:applicationId/monitoring';
 
 /** The path of one organisation's page, from its id. */
 export function organisationPath(organisationId: string): string {
@@ -77,4 +79,14 @@ export function submittedPath(applicationId: string): string {
 /** The page that tells the applicant a released decision. */
 export function outcomePath(applicationId: string): string {
   return `${applicationPath(applicationId)}/outcome`;
+}
+
+/** The page that reads back what was sent, as it was sent. */
+export function sentPath(applicationId: string): string {
+  return `${applicationPath(applicationId)}/sent`;
+}
+
+/** The optional equality monitoring step, after an application is sent. */
+export function monitoringPath(applicationId: string): string {
+  return `${applicationPath(applicationId)}/monitoring`;
 }

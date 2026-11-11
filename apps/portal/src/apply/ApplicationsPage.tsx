@@ -22,7 +22,7 @@ import { callApi } from '../api.ts';
 import { ReadPage, homeCrumb } from '../party/parts.tsx';
 import { useRead } from '../party/useRead.ts';
 import { PROGRAMMES_PATH, applicationPath, outcomePath, submittedPath } from '../paths.ts';
-import { closingTime, dateOf } from './format.ts';
+import { dateOf, deadlineOf, hasMoreTime } from './format.ts';
 import { ApplyScreen, Block } from './parts.tsx';
 import { StatusTag } from './status.tsx';
 
@@ -152,12 +152,12 @@ type Fact = readonly [term: string, value: string];
 
 /** What to show about an application, by where it stands. An award shows its amount. */
 function factsOf(application: ApplicationSummary, status: ApplicantStatus): Fact[] {
-  const { round, organisation, submittedAt, outcome } = application;
+  const { organisation, submittedAt, outcome } = application;
   if (status === 'in_progress') {
     return [
       ['Organisation', organisation.name],
       ['Last saved', dateOf(application.updatedAt)],
-      ['Closes', closingTime(round.closesAt, round.timeZone)],
+      [hasMoreTime(application) ? 'Your deadline' : 'Closes', deadlineOf(application)],
     ];
   }
   return [

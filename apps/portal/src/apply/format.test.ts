@@ -1,8 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { awardRange, closingTime, dateAndTimeOf, dateOf } from './format.ts';
+import {
+  awardRange,
+  closingTime,
+  dateAndTimeOf,
+  dateOf,
+  deadlineOf,
+  hasMoreTime,
+  ukTimeOf,
+} from './format.ts';
 
 describe('closingTime', () => {
   it('writes the time of day and the date, with the time zone', () => {
@@ -11,12 +19,30 @@ describe('closingTime', () => {
     );
   });
 
-  it('shows minutes only when there are some, and 12 for midday and midnight', () => {
+  it('shows minutes only when there are some, and words midday and midnight', () => {
     expect(closingTime('2027-03-03T17:30', 'Europe/London')).toBe(
       '5:30pm on 3 March 2027, UK time',
     );
-    expect(closingTime('2027-03-03T12:00', 'Europe/London')).toBe('12pm on 3 March 2027, UK time');
-    expect(closingTime('2027-03-04T00:00', 'Europe/London')).toBe('12am on 4 March 2027, UK time');
+    expect(closingTime('2027-03-03T12:00', 'Europe/London')).toBe(
+      'midday on 3 March 2027, UK time',
+    );
+    expect(closingTime('2027-03-01T00:00', 'Europe/London')).toBe(
+      'midnight at the end of 28 February 2027, UK time',
+    );
+    expect(closingTime('2027-04-01T00:00', 'Europe/London')).toBe(
+      'midnight at the end of 31 March 2027, UK time',
+    );
+  });
+
+  it('writes winter, summer and clock-change days as the wall clock says', () => {
+    expect(closingTime('2027-01-14T17:00', 'Europe/London')).toBe(
+      '5pm on 14 January 2027, UK time',
+    );
+    expect(closingTime('2027-07-01T17:00', 'Europe/London')).toBe('5pm on 1 July 2027, UK time');
+    expect(closingTime('2027-03-28T17:00', 'Europe/London')).toBe('5pm on 28 March 2027, UK time');
+    expect(closingTime('2027-10-31T17:00', 'Europe/London')).toBe(
+      '5pm on 31 October 2027, UK time',
+    );
   });
 
   it('names a time zone other than the UK’s', () => {
@@ -51,5 +77,40 @@ describe('dates the API sends', () => {
     const noon = '2027-03-01T12:14:00';
     expect(dateOf(noon)).toBe('1 March 2027');
     expect(dateAndTimeOf(noon)).toBe('1 March 2027 at 12:14pm');
+  });
+});
+
+describe('deadlineOf and hasMoreTime', () => {
+  const round = { closesAt: '2027-03-01T17:00', timeZone: 'Europe/London' };
+
+  it('use the application’s closing time when the server sends one', () => {
+    const extended = { round, closesAt: '2027-03-15T17:00' };
+    expect(deadlineOf(extended)).toBe('5pm on 15 March 2027, UK time');
+    expect(hasMoreTime(extended)).toBe(true);
+  });
+
+  it('use the round’s when there is no other, or the same, time', () => {
+    expect(deadlineOf({ round })).toBe('5pm on 1 March 2027, UK time');
+    expect(hasMoreTime({ round })).toBe(false);
+    expect(hasMoreTime({ round, closesAt: round.closesAt })).toBe(false);
+  });
+});
+
+describe('ukTimeOf', () => {
+  it('writes UK time in winter and summer', () => {
+    expect(ukTimeOf('2027-01-14T14:14:00Z')).toBe('14 January 2027 at 2:14pm, UK time');
+    expect(ukTimeOf('2027-07-01T14:14:00Z')).toBe('1 July 2027 at 3:14pm, UK time');
+  });
+
+  it('is the same on a device set to another time zone', () => {
+    vi.stubEnv('TZ', 'Pacific/Auckland');
+    try {
+      expect(ukTimeOf('2027-01-14T14:14:00Z')).toBe('14 January 2027 at 2:14pm, UK time');
+      expect(closingTime('2027-01-14T17:00', 'Europe/London')).toBe(
+        '5pm on 14 January 2027, UK time',
+      );
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });
