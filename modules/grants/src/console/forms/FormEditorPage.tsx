@@ -19,6 +19,7 @@ import {
   useLeaveGuard,
   useLoad,
   useNavigate,
+  useSearch,
   WhenLoaded,
 } from '@pixel-scientists/ui';
 import {
@@ -43,6 +44,8 @@ import { formCrumbs } from './breadcrumbs.ts';
 import { checkDefinition } from './check.ts';
 import { readFormFile } from './formFile.ts';
 import { loadVersion } from './loaders.ts';
+import { MonitoringEditor, checkboxId, listId } from './MonitoringEditor.tsx';
+import { monitoringIssues, monitoringStart } from './monitoring.ts';
 import { formPath } from './paths.ts';
 import { useHeadingFocus } from './useHeadingFocus.ts';
 
@@ -68,16 +71,27 @@ function PreviewBlocked({ problems }: { problems: readonly Problem[] }) {
   );
 }
 
+/** Whether the address asks for the equality monitoring starting template. */
+const templateSchema = {
+  safeParse: (input: unknown) => ({
+    success: true as const,
+    data: (input as { template?: unknown }).template === 'monitoring',
+  }),
+};
+
 function DraftEditor({
   version,
   round,
   programme,
   earlier,
+  monitoring,
   onPublished,
-}: Page & { onPublished: (version: FormVersion) => void }) {
+}: Page & { monitoring: boolean; onPublished: (version: FormVersion) => void }) {
   const navigate = useNavigate();
   useHeadingFocus();
-  const start: FormDefinition = version.definition ?? { sections: [] };
+  const start: FormDefinition = monitoring
+    ? monitoringStart(version.definition)
+    : (version.definition ?? { sections: [] });
   const [definition, setDefinition] = useState(start);
   const [saved, setSaved] = useState(() => JSON.stringify(start));
   const [savedAt, setSavedAt] = useState(version.updatedAt);
@@ -101,6 +115,11 @@ function DraftEditor({
     [checked.definition, earlier],
   );
   const problems = [...checked.problems, ...lowered, ...refused];
+  const issues = useMemo(
+    () => (monitoring ? monitoringIssues(definition) : []),
+    [monitoring, definition],
+  );
+  const title = monitoring ? 'Equality monitoring form' : 'Application form';
   const dirty = JSON.stringify(definition) !== saved;
   useLeaveGuard(dirty && !leaving);
 
@@ -159,6 +178,10 @@ function DraftEditor({
   }
 
   async function startPublish() {
+    if (issues.length > 0) {
+      setAttempt((count) => count + 1);
+      return;
+    }
     if (!(await save())) return;
     if (lowered.length > 0) {
       showProblems(lowered);
@@ -214,7 +237,7 @@ function DraftEditor({
     <>
       <PageHeader
         breadcrumbs={formCrumbs(programme, round, `Version ${String(version.version)}`)}
-        title="Application form"
+        title={title}
         eyebrow={<Tag tone="neutral">Draft</Tag>}
         description={
           <>
@@ -255,7 +278,21 @@ function DraftEditor({
       </p>
       <ErrorSummary
         key={`problems-${String(attempt)}`}
-        errors={summaryOf(attempt > 0 ? problems : [], definition, selection)}
+        errors={
+          monitoring
+            ? [
+                ...summaryOf(
+                  attempt > 0 ? [...checked.problems, ...refused] : [],
+                  definition,
+                  selection,
+                ),
+                ...(attempt > 0 ? issues : []).map(({ fieldId, message }) => ({
+                  fieldId: fieldId === null ? listId : checkboxId(fieldId),
+                  message,
+                })),
+              ]
+            : summaryOf(attempt > 0 ? problems : [], definition, selection)
+        }
       />
       <ErrorSummary
         key={`import-${String(imported.attempt)}`}
@@ -268,7 +305,9 @@ function DraftEditor({
           {
             id: 'edit',
             label: 'Edit form',
-            content: (
+            content: monitoring ? (
+              <MonitoringEditor definition={definition} onChange={edit} issues={issues} />
+            ) : (
               <FormEditor
                 definition={definition}
                 onChange={edit}
@@ -353,6 +392,8 @@ function PublishedView({ version, round, programme }: Page) {
 
 function VersionPage({ version: loaded, round, programme, earlier }: Page) {
   const [version, setVersion] = useState(loaded);
+  const asked = useSearch(templateSchema);
+  const monitoring = asked.success && asked.data;
   const [announcement, setAnnouncement] = useState('');
   return (
     <>
@@ -365,6 +406,7 @@ function VersionPage({ version: loaded, round, programme, earlier }: Page) {
           round={round}
           programme={programme}
           earlier={earlier}
+          monitoring={monitoring}
           onPublished={(published) => {
             setAnnouncement(`Version ${String(published.version)} is published.`);
             setVersion(published);

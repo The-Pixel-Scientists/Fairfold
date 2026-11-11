@@ -80,7 +80,7 @@ function columns(round: Round): readonly Column<FormVersionSummary>[] {
 }
 
 /** Starts a draft from the latest published version, or empty, and opens it. */
-function useCreateDraft(roundId: string) {
+function useCreateDraft(roundId: string, search = '') {
   const navigate = useNavigate();
   const [pending, setPending] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -93,7 +93,7 @@ function useCreateDraft(roundId: string) {
     setPending(true);
     try {
       const draft = await call(createFormDraft, { params: { roundId } });
-      navigate(formVersionPath(roundId, draft.id));
+      navigate(`${formVersionPath(roundId, draft.id)}${search}`);
     } catch (error) {
       setProblem(asProblem(error)?.detail ?? 'Something went wrong. Try again.');
       setAttempt((count) => count + 1);
@@ -107,8 +107,18 @@ function useCreateDraft(roundId: string) {
 function Versions({ roundId }: { roundId: string }) {
   const { state, retry } = useLoad(loadVersions, roundId);
   const draft = useCreateDraft(roundId);
+  const monitoringDraft = useCreateDraft(roundId, '?template=monitoring');
   const loaded = state.status === 'ready' ? state.value : null;
   const open = loaded?.versions.find((version) => version.status === 'draft');
+  const createMonitoring = (
+    <Button
+      id="create-monitoring-draft"
+      aria-disabled={monitoringDraft.pending || undefined}
+      onClick={() => void monitoringDraft.create()}
+    >
+      Create equality monitoring draft
+    </Button>
+  );
   const create = (
     <Button
       id="create-draft"
@@ -132,13 +142,24 @@ function Versions({ roundId }: { roundId: string }) {
               Edit draft
             </LinkButton>
           ) : loaded !== null && loaded.versions.length > 0 ? (
-            create
+            <>
+              {createMonitoring}
+              {create}
+            </>
           ) : undefined
         }
       />
       <ErrorSummary
         key={draft.attempt}
         errors={draft.problem === null ? [] : [{ fieldId: 'create-draft', message: draft.problem }]}
+      />
+      <ErrorSummary
+        key={`monitoring-${String(monitoringDraft.attempt)}`}
+        errors={
+          monitoringDraft.problem === null
+            ? []
+            : [{ fieldId: 'create-monitoring-draft', message: monitoringDraft.problem }]
+        }
       />
       <WhenLoaded state={state} label="Loading the form" retry={retry}>
         {({ round, versions }) => (
@@ -149,7 +170,15 @@ function Versions({ roundId }: { roundId: string }) {
             rows={versions}
             rowKey={(version) => version.id}
             empty={
-              <EmptyState title="No form yet" action={create}>
+              <EmptyState
+                title="No form yet"
+                action={
+                  <>
+                    {create}
+                    {createMonitoring}
+                  </>
+                }
+              >
                 <p>
                   Create a draft to build the form applicants fill in for {round.title}. You can add
                   sections and questions, or import a form from a file, then preview it and publish
