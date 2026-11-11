@@ -81,6 +81,12 @@ describe('the app schema', () => {
         'owner_app_reapply_erasure_ledger USAGE',
         // Erasing a subject's notes and messages, migration 0052.
         'owner_app_erase_notes USAGE',
+        // Erasing a subject's assure data, migration 0058.
+        'owner_assure_erase_subject USAGE',
+        // Erasing a reminder's recipient, migration 0062.
+        'owner_grants_erase_reminders USAGE',
+        // Erasing a subject's crm data, migration 0063.
+        'owner_crm_erase_subject USAGE',
       ].sort(),
     });
   });
@@ -125,6 +131,12 @@ describe('app.current_tenant_id()', () => {
         'owner_app_reapply_erasure_ledger',
         // Erasing a subject's notes and messages, migration 0052.
         'owner_app_erase_notes',
+        // Erasing a subject's assure data, migration 0058.
+        'owner_assure_erase_subject',
+        // Erasing a reminder's recipient, migration 0062.
+        'owner_grants_erase_reminders',
+        // Erasing a subject's crm data, migration 0063.
+        'owner_crm_erase_subject',
       ]
         .map((role) => `${role} EXECUTE`)
         .sort(),
