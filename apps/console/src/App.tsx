@@ -24,7 +24,9 @@ import { SsoFailedPage, SsoSigningInPage } from './auth/sign-in/SsoLandingPages.
 import SignUpPage from './auth/SignUpPage.tsx';
 import { AUDIT_LOG_PATH } from './platform/audit-log/paths.ts';
 import { DATA_PATH } from './platform/data/paths.ts';
+import { RETENTION_PATH } from './platform/retention/paths.ts';
 import { SSO_PATH } from './platform/sso/paths.ts';
+import { SUBJECT_ACCESS_PATH } from './platform/subject-access/paths.ts';
 import { TenantLook } from './platform/settings/look.tsx';
 import { INVITATION_PATH, TEAM_PATH } from './platform/team/paths.ts';
 import { productName, titleSuffix } from './product.ts';
@@ -69,6 +71,36 @@ export const tenantRoutes: readonly RouteDefinition[] = [
       path: SSO_PATH,
       title: 'Single sign-on',
       load: () => import('./platform/sso/SsoPage.tsx'),
+    },
+    {
+      path: RETENTION_PATH,
+      title: 'Data retention',
+      load: () => import('./platform/retention/RetentionPage.tsx'),
+    },
+    {
+      path: SUBJECT_ACCESS_PATH,
+      title: 'Subject access and erasure',
+      load: () => import('./platform/subject-access/FindPage.tsx'),
+    },
+    {
+      path: `${SUBJECT_ACCESS_PATH}/people/:partyId`,
+      title: 'Subject access and erasure',
+      load: () => import('./platform/subject-access/PersonPage.tsx'),
+    },
+    {
+      path: `${SUBJECT_ACCESS_PATH}/people/:partyId/erasure`,
+      title: 'Erase personal data',
+      load: () => import('./platform/subject-access/ErasurePage.tsx'),
+    },
+    {
+      path: `${SUBJECT_ACCESS_PATH}/exports/:requestId`,
+      title: 'Subject access export',
+      load: () => import('./platform/subject-access/ExportPage.tsx'),
+    },
+    {
+      path: `${SUBJECT_ACCESS_PATH}/erasures/:requestId`,
+      title: 'Erasure',
+      load: () => import('./platform/subject-access/ErasureStatusPage.tsx'),
     },
     { path: DATA_PATH, title: 'Data', load: () => import('./platform/data/DataPage.tsx') },
     { path: TEAM_PATH, title: 'Team', load: () => import('./platform/team/TeamPage.tsx') },
