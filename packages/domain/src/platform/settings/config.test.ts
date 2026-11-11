@@ -17,7 +17,7 @@ describe('configuration entity types', () => {
     expect(Object.keys(configDiffSchemas)).toEqual([...configEntityTypes]);
   });
 
-  it('are exactly the platform settings and the wave 1 tools, so an unknown type has no diff', () => {
+  it('are exactly the platform settings and the tools, so an unknown type has no diff', () => {
     expect(configEntityTypes).toEqual([
       'platform.tenant',
       'platform.theme',
@@ -29,6 +29,7 @@ describe('configuration entity types', () => {
       'forms.form',
       'insight.report_definition',
       'insight.disclosure_rule',
+      'impact.framework',
     ]);
     for (const type of ['crm.list', 'grants.programme', '__proto__', 'toString']) {
       expect(Object.hasOwn(configDiffSchemas, type), type).toBe(false);
@@ -73,6 +74,11 @@ describe('configuration diffs', () => {
         { path: `groupBy.${ITEM}`, from: null, to: 'region' },
       ],
       'insight.disclosure_rule': [{ field: 'threshold', from: 10, to: 15 }],
+      'impact.framework': [
+        { path: 'name', from: null, to: 'Community outcomes' },
+        { path: `outcomes.${ITEM}.name`, from: 'Less isolation', to: 'Fewer people isolated' },
+        { path: `indicators.${ITEM}.unit`, from: null, to: 'people' },
+      ],
     } as const;
     for (const type of configEntityTypes) {
       expect(configDiffSchemas[type].parse(cases[type])).toEqual(cases[type]);
@@ -146,6 +152,12 @@ describe('configuration diffs', () => {
         [{ field: 'threshold', from: 10, to: 0 }],
         [{ field: 'floor', from: 10, to: 5 }],
         [{ field: 'threshold', from: 10, to: 15, reason: 'x' }],
+      ],
+      'impact.framework': [
+        [],
+        [{ path: `indicators.${ITEM}.value`, from: null, to: 12 }],
+        [{ path: 'outcomes.f_policy.name', from: null, to: 'x' }],
+        [{ path: `results.${ITEM}`, from: null, to: 3 }],
       ],
     };
     for (const type of configEntityTypes) {
