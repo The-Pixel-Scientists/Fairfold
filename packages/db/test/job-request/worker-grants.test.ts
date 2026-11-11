@@ -4,8 +4,10 @@
 // subject access export's reads (migrations 0044, 0046 and 0051): app_worker holds
 // exactly these on the grants and party schemas, the audit table and the
 // module switches, and, with one tenant set, reaches none of another
-// tenant's rows. The score table and an assignment's reviewer columns are
-// not among them (rule 8); audit event changes are the export's to filter.
+// tenant's rows. The score table and an assignment's updated_by are not
+// among them (rule 8); the reviewer is readable only for the reminder jobs
+// (migration 0061), and the export leaves it out. Audit event changes are
+// the export's to filter.
 // The cross-tenant tests of grants.decision, grants.decision_email,
 // grants.email_template_version, party.person, party.relationship and
 // app.audit_event run as every role with a grant, app_worker now included.
@@ -163,6 +165,39 @@ const RELEASE_EMAIL_RIGHTS = [
   ...['status', 'error_code', 'sent_at'].map(
     (column) => `UPDATE on column grants.message_notification.${column}`,
   ),
+  // The saved view CSV export (migration 0059). SELECT only.
+  'SELECT on grants.saved_view',
+  'SELECT on grants.application_owner',
+  'SELECT on grants.label',
+  'SELECT on grants.application_label',
+  // The reminder jobs (migrations 0060 to 0062): the setting, the outbox
+  // they write and deal with, each draft's closing time, each assignment's
+  // reviewer, and erasing a reminder's recipient.
+  'SELECT on grants.reminder_setting',
+  'SELECT on grants.reminder_email',
+  ...[
+    'tenant_id',
+    'kind',
+    'application_id',
+    'assignment_id',
+    'recipient_person_id',
+    'template_version_id',
+    'occurrence',
+  ].map((column) => `INSERT on column grants.reminder_email.${column}`),
+  ...['status', 'outcome_code'].map((column) => `UPDATE on column grants.reminder_email.${column}`),
+  'SELECT on column grants.round.closes_at',
+  ...[
+    'tenant_id',
+    'id',
+    'round_id',
+    'organisation_id',
+    'application_id',
+    'kind',
+    'closes_at',
+    'revoked_at',
+  ].map((column) => `SELECT on column grants.adjustment.${column}`),
+  'SELECT on column grants.assignment.reviewer_membership_id',
+  'EXECUTE on function grants.erase_reminders(uuid)',
 ];
 
 /** A released decision, with its applicant as a contact for its organisation. */
@@ -242,14 +277,13 @@ describe("app_worker's release email and subject access rights", { timeout: 60_0
     });
   });
 
-  it('leave out the score table and reviewer columns, and keep the rest of an assignment', async () => {
+  it('leave out the score table and who last changed an assignment, and keep the rest', async () => {
     const tenant = await createTestTenant();
     await asRoleIn('app_worker', tenant.id, async (client) => {
       for (const statement of [
         'SELECT score FROM grants.score',
         'SELECT comment FROM grants.score',
         'SELECT id FROM grants.score',
-        'SELECT reviewer_membership_id FROM grants.assignment',
         'SELECT updated_by FROM grants.assignment',
       ]) {
         expect(await outcome(client, statement), statement).toBe('42501');
