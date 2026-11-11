@@ -10,6 +10,7 @@
 // person's request releases anything.
 
 import type { ReleaseInput, ReleaseResult, EmailDelivery } from '../../contracts/index.ts';
+import { publishDecisionReleased } from '../events/index.ts';
 import type { DecisionArgs, DecisionDependencies } from './context.ts';
 import { queueEmails } from './send.ts';
 import { decisionsDb } from './tables.ts';
@@ -39,7 +40,13 @@ export function releaseHandlers(deps: DecisionDependencies) {
     let query = db
       .selectFrom('grants.decision as d')
       .innerJoin('grants.application as a', 'a.id', 'd.application_id')
-      .select(['d.id', 'd.outcome', 'a.id as application_id', 'a.applicant_person_id'])
+      .select([
+        'd.id',
+        'd.outcome',
+        'a.id as application_id',
+        'a.organisation_id',
+        'a.applicant_person_id',
+      ])
       .where('a.round_id', '=', roundId)
       .where('a.status', '=', 'submitted')
       .where('d.released_at', 'is', null);
@@ -90,6 +97,20 @@ export function releaseHandlers(deps: DecisionDependencies) {
             },
           },
         });
+        if (released.released_at === null) throw new Error('The release time was not set.');
+        await publishDecisionReleased(
+          tx,
+          deps,
+          { requestId: context.requestId, membershipId: actor },
+          {
+            id: decision.id,
+            applicationId: decision.application_id,
+            roundId,
+            organisationId: decision.organisation_id,
+            recipientPersonId: decision.applicant_person_id,
+            releasedAt: released.released_at,
+          },
+        );
       }
       const emails = await db
         .insertInto('grants.decision_email')

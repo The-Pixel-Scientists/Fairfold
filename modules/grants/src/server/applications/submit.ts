@@ -6,17 +6,29 @@
 // version and its eligibility questions. The round must be taking applications
 // (its programme open and its opening time passed), and its closing time is
 // read by the database's clock: a late submission is refused or marked late, as
-// the round's late policy says. The first stage is set by the server. The
-// organisation's details are snapshotted in the same transaction (ADR 0017).
+// the round's late policy says, and an organisation's deadline extension moves
+// its closing time. The first stage is set by the server. The organisation's
+// details are snapshotted in the same transaction (ADR 0017).
 
 import { checkEligibility, validateAnswers } from '@pixel-scientists/domain/forms';
 import { messages } from '@pixel-scientists/domain/platform';
 import { takeOrganisationSnapshot } from '@pixel-scientists/party/server';
 
-import type { Application, SubmitApplicationInput } from '../../contracts/index.ts';
+import type {
+  Application,
+  SubmissionRoute,
+  SubmitApplicationInput,
+} from '../../contracts/index.ts';
 import type { Tx } from '../programme/tables.ts';
-import type { ApplicationArgs, ApplicationDependencies, ApplicationParams } from './context.ts';
-import { checkDraft, lockOwn, refusals } from './lock.ts';
+import { publishApplicationSubmitted } from '../events/index.ts';
+import { closingTime } from './closing.ts';
+import type {
+  ApplicationArgs,
+  ActingContext,
+  ApplicationDependencies,
+  ApplicationParams,
+} from './context.ts';
+import { checkDraft, lockOwn, refusals, type LockedApplication } from './lock.ts';
 import { answersWithFiles, ownApplication } from './read.ts';
 import { applicationsDb } from './tables.ts';
 
@@ -32,24 +44,151 @@ function closingWords(closesAt: Date, zone: string): string {
 
 /**
  * Whether the round is taking applications (its programme is open and its
- * opening time has passed), its closing time, whether the database's clock is
- * past it, and its late policy.
+ * opening time has passed), when the application closes and whether the
+ * database's clock is past it (closing.ts), and the round's late policy.
  */
-export async function closing(tx: Tx, roundId: string) {
-  return applicationsDb(tx)
+export async function closing(
+  tx: Tx,
+  application: Pick<LockedApplication, 'id' | 'roundId' | 'organisationId'>,
+) {
+  const round = await applicationsDb(tx)
     .selectFrom('grants.round as r')
     .innerJoin('grants.programme as p', 'p.id', 'r.programme_id')
     .select((eb) => [
-      'r.closes_at',
+      'r.programme_id',
       'r.timezone',
       'r.late_policy',
       eb
         .and([eb('p.status', '=', 'open'), eb('r.opens_at', '<=', eb.fn<Date>('now', []))])
         .as('taking'),
-      eb('r.closes_at', '<=', eb.fn<Date>('now', [])).as('closed'),
     ])
-    .where('r.id', '=', roundId)
+    .where('r.id', '=', application.roundId)
     .executeTakeFirstOrThrow();
+  const { closesAt, closed } = await closingTime(tx, {
+    roundId: application.roundId,
+    organisationId: application.organisationId,
+    applicationId: application.id,
+  });
+  return { ...round, closes_at: closesAt, closed };
+}
+
+/**
+ * Submits a draft, for the applicant (`portal`) or for them on the
+ * alternative route (`assisted`): one function, so both routes refuse the
+ * same answers, ineligibility and lateness. The acting member is the
+ * session's; on the assisted route they are recorded as the submitter, never
+ * as the applicant. Everything is in the caller's transaction, so a failure
+ * anywhere, the audit events included, leaves the draft as it was.
+ */
+export async function submitDraft(
+  tx: Tx,
+  deps: ApplicationDependencies,
+  context: ActingContext,
+  application: LockedApplication,
+  basedOn: number,
+  route: SubmissionRoute,
+): Promise<void> {
+  checkDraft(deps, application, basedOn);
+  const applicationId = application.id;
+
+  const round = await closing(tx, application);
+  if (!round.taking) throw deps.notFound();
+  const late = round.closed;
+  if (late && round.late_policy === 'refuse') {
+    throw deps.refuse(
+      400,
+      `This round closed on ${closingWords(round.closes_at, round.timezone)}.`,
+    );
+  }
+
+  const { definition } = application;
+  const answers = await answersWithFiles(tx, applicationId, application.answers);
+  const problems = validateAnswers(definition, answers, 'submit');
+  if (problems.length > 0) throw deps.refuse(400, messages.fixFields, problems);
+  const eligibility = checkEligibility(definition, answers);
+  if (eligibility.status === 'stopped') {
+    const { fieldId, explanation } = eligibility;
+    throw deps.refuse(400, explanation, [{ field: fieldId, message: explanation }]);
+  }
+  if (eligibility.status === 'incomplete') throw deps.refuse(400, refusals.notEligible);
+
+  const db = applicationsDb(tx);
+  const first = await db
+    .selectFrom('grants.stage')
+    .select('id')
+    .where('round_id', '=', application.roundId)
+    .orderBy('position')
+    .limit(1)
+    .executeTakeFirst();
+  if (first === undefined) throw deps.notFound();
+
+  const actor = context.membership.id;
+  const submittedBy = route === 'assisted' ? actor : null;
+  // The organisation as it stands now; the update below fixes it to this application.
+  const snapshotId = await takeOrganisationSnapshot(
+    { tx, membership: context.membership, audit: context.audit },
+    application.organisationId,
+  );
+  const submitted = await db
+    .updateTable('grants.application')
+    .set({
+      status: 'submitted',
+      submission_route: route,
+      submitted_by: submittedBy,
+      organisation_snapshot_id: snapshotId,
+      stage_id: first.id,
+      submitted_late: late,
+      updated_by: actor,
+    })
+    .where('id', '=', applicationId)
+    .returning(['applicant_person_id', 'submitted_at'])
+    .executeTakeFirstOrThrow();
+  await db
+    .insertInto('grants.stage_transition')
+    .values((eb) => ({
+      tenant_id: eb.fn<string>('app.current_tenant_id', []),
+      round_id: application.roundId,
+      application_id: applicationId,
+      from_stage_id: null,
+      to_stage_id: first.id,
+      moved_by: actor,
+    }))
+    .execute();
+  await context.audit.record({
+    action: 'grants.application.submitted',
+    entityId: applicationId,
+    changes: {
+      [column('status')]: { before: 'draft', after: 'submitted' },
+      [column('stage_id')]: { before: null, after: first.id },
+      [column('submitted_late')]: { before: false, after: late },
+    },
+  });
+  if (submitted.submitted_at === null) throw new Error('The submission time was not set.');
+  await publishApplicationSubmitted(
+    tx,
+    deps,
+    { requestId: context.requestId, membershipId: actor },
+    {
+      id: applicationId,
+      roundId: application.roundId,
+      programmeId: round.programme_id,
+      organisationId: application.organisationId,
+      applicantPersonId: submitted.applicant_person_id,
+      route,
+      late,
+      submittedAt: submitted.submitted_at,
+    },
+  );
+  if (submittedBy !== null) {
+    await context.audit.record({
+      action: 'grants.application.submitted_on_behalf',
+      entityId: applicationId,
+      changes: {
+        [column('organisation_id')]: { before: null, after: application.organisationId },
+        [column('submitted_by')]: { before: null, after: submittedBy },
+      },
+    });
+  }
 }
 
 export function submitHandlers(deps: ApplicationDependencies) {
@@ -61,77 +200,7 @@ export function submitHandlers(deps: ApplicationDependencies) {
     const { userId } = context.session;
     const { applicationId } = input.params;
     const application = await lockOwn(tx, deps, userId, applicationId);
-    checkDraft(deps, application, input.body.basedOn);
-
-    const round = await closing(tx, application.roundId);
-    if (!round.taking) throw deps.notFound();
-    const late = Boolean(round.closed);
-    if (late && round.late_policy === 'refuse') {
-      throw deps.refuse(
-        400,
-        `This round closed on ${closingWords(round.closes_at, round.timezone)}.`,
-      );
-    }
-
-    const { definition } = application;
-    const answers = await answersWithFiles(tx, applicationId, application.answers);
-    const problems = validateAnswers(definition, answers, 'submit');
-    if (problems.length > 0) throw deps.refuse(400, messages.fixFields, problems);
-    const eligibility = checkEligibility(definition, answers);
-    if (eligibility.status === 'stopped') {
-      const { fieldId, explanation } = eligibility;
-      throw deps.refuse(400, explanation, [{ field: fieldId, message: explanation }]);
-    }
-    if (eligibility.status === 'incomplete') throw deps.refuse(400, refusals.notEligible);
-
-    const db = applicationsDb(tx);
-    const first = await db
-      .selectFrom('grants.stage')
-      .select('id')
-      .where('round_id', '=', application.roundId)
-      .orderBy('position')
-      .limit(1)
-      .executeTakeFirst();
-    if (first === undefined) throw deps.notFound();
-
-    const actor = context.membership.id;
-    // The organisation as it stands now; the update below fixes it to this application.
-    const snapshotId = await takeOrganisationSnapshot(
-      { tx, membership: context.membership, audit: context.audit },
-      application.organisationId,
-    );
-    await db
-      .updateTable('grants.application')
-      .set({
-        status: 'submitted',
-        organisation_snapshot_id: snapshotId,
-        stage_id: first.id,
-        submitted_late: late,
-        updated_by: actor,
-      })
-      .where('id', '=', applicationId)
-      .returning('id')
-      .executeTakeFirstOrThrow();
-    await db
-      .insertInto('grants.stage_transition')
-      .values((eb) => ({
-        tenant_id: eb.fn<string>('app.current_tenant_id', []),
-        round_id: application.roundId,
-        application_id: applicationId,
-        from_stage_id: null,
-        to_stage_id: first.id,
-        moved_by: actor,
-      }))
-      .execute();
-    await context.audit.record({
-      action: 'grants.application.submitted',
-      entityId: applicationId,
-      changes: {
-        [column('status')]: { before: 'draft', after: 'submitted' },
-        [column('stage_id')]: { before: null, after: first.id },
-        [column('submitted_late')]: { before: false, after: late },
-      },
-    });
+    await submitDraft(tx, deps, context, application, input.body.basedOn, 'portal');
     return ownApplication(tx, deps, userId, applicationId);
   }
 
