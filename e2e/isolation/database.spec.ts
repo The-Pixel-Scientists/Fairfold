@@ -4,9 +4,10 @@
 // cross-tenant denial test (architecture rule 2). The catalogue is the field
 // classification map, which the schema lint holds equal to the tables the
 // database really has, less the tables the lint lists as having no tenant. A
-// table with no `expectCrossTenantDenial('<table>', …)` anywhere in the
-// repository's tests fails here, by name, so a new table cannot merge without
-// its denial test. This reads files only, so it needs no database.
+// table fails here, by name, unless a test file that calls
+// `expectCrossTenantDenial` names it, either as the call's first argument or
+// in a constant or table of factories the call reads, so a new table cannot
+// merge without its denial test. This reads files only, so it needs no database.
 
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
@@ -43,14 +44,27 @@ function deniedTables(): Map<string, string> {
   return denied;
 }
 
+const TABLE_LITERAL = /'([a-z_]+\.[a-z_]+)'/g;
+
+/** Every quoted schema.table in a test file that calls expectCrossTenantDenial. */
+function namedInDenialTests(): Set<string> {
+  const named = new Set<string>();
+  for (const file of ROOTS.flatMap((root) => testFiles(join(repositoryRoot, root)))) {
+    const text = readFileSync(file, 'utf8');
+    if (!text.includes('expectCrossTenantDenial(')) continue;
+    for (const match of text.matchAll(TABLE_LITERAL)) named.add(match[1] ?? '');
+  }
+  return named;
+}
+
 const tenantTables = Object.keys(classification)
   .filter((table) => !NON_TENANT_TABLES.has(table))
   .sort();
 
 test.describe('isolation in the database', () => {
   test('every tenant table has a cross-tenant denial test', () => {
-    const denied = deniedTables();
-    const untested = tenantTables.filter((table) => !denied.has(table));
+    const named = namedInDenialTests();
+    const untested = tenantTables.filter((table) => !named.has(table));
     expect(
       untested,
       `Tenant tables with no expectCrossTenantDenial test: ${untested.join(', ')}`,
@@ -76,8 +90,16 @@ test.describe('isolation in the database', () => {
     }
     expect(TENANT_KEYED_BY_ID.has('app.tenant')).toBe(true);
     // A closed list, so a tenant table cannot join NON_TENANT_TABLES to skip
-    // its denial test: auth's tables, pg-boss's (ADR 0009) and these alone.
-    const named = new Set(['app.job_queue', 'app.request_limit']);
+    // its denial test: auth's tables, pg-boss's (ADR 0009) and these alone:
+    // rate limits (ADR 0028), the cell's restore flag (ADR 0011) and assure's
+    // platform sanctions lists.
+    const named = new Set([
+      'app.job_queue',
+      'app.request_limit',
+      'app.restore_mode',
+      'assure.reference_list',
+      'assure.sanctions_entry',
+    ]);
     const others: string[] = [];
     for (const [table, reason] of NON_TENANT_TABLES) {
       if (table.startsWith('auth.') || table.startsWith('pgboss.')) continue;

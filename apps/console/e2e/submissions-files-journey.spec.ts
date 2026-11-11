@@ -60,11 +60,17 @@ async function applyWithFile(browser: Browser): Promise<string> {
 
   await page.getByRole('link', { name: /^Continue with / }).click();
   for (;;) {
-    await expect(page.getByText(/^Section \d+ of \d+/)).toBeVisible();
+    const progress = page.getByText(/^Section \d+ of \d+/);
+    await expect(progress).toBeVisible();
     if ((await h1(page, 'Documents').count()) > 0) break;
+    const [, current, total] =
+      /Section (\d+) of (\d+)/.exec((await progress.textContent()) ?? '') ?? [];
     await answerQuestions(page);
     await expect(page.getByText(/^Saved at \d/)).toBeVisible();
     await page.getByRole('button', { name: 'Save and continue' }).click();
+    await expect(
+      page.getByText(`Section ${String(Number(current) + 1)} of ${String(total)}`),
+    ).toBeVisible();
   }
   await page
     .locator('input[type="file"]')
