@@ -136,6 +136,15 @@ describe('migrations', { timeout: 30_000 }, () => {
       // And 0045's down refuses while a release email job waits, which the
       // decision tests leave behind with no worker to run them.
       await sql`DELETE FROM pgboss.job WHERE name LIKE 'grants.release_email%'`.execute(trx);
+      // And 0064's down refuses while a tenant has set an import period,
+      // which the crm retention tests leave behind; row-level security hides
+      // the settings from migrator.
+      await sql`TRUNCATE app.retention_policy`.execute(trx);
+      // And 0063's down refuses while any crm table holds a row, which the
+      // crm tests leave behind.
+      await sql`TRUNCATE crm.list, crm.list_member, crm.segment, crm.interaction,
+                         crm.merge_record, crm.import_job, crm.import_row,
+                         crm.external_reference`.execute(trx);
       // After the loop, before[i] is the schema with the first i migrations applied.
       const before = [await stableSnapshot(trx)];
       for (const { name, down } of [...migrations].reverse()) {

@@ -9,11 +9,10 @@
 // its owner may write only its targets' columns and never a decision,
 // status or stage (rule 9).
 //
-// No column has such a rule yet, so TARGETS is empty and the function
-// refuses every policy. A migration that adds one adds its targets to the
-// function and TARGETS, with tests that it acts only past the tenant's
-// setting (or the minimum), in its batch size, in the tenant set, and
-// writes its audit event.
+// Migration 0064 adds the first targets, the crm import tables; a later
+// one adds its targets to the function and TARGETS, with tests that it acts
+// only past the tenant's setting (or the minimum), in its batch size, in the
+// tenant set, and writes its audit event (test/crm/retention.test.ts).
 
 import { readFile } from 'node:fs/promises';
 
@@ -32,7 +31,37 @@ interface Target {
   readonly columns: readonly string[];
 }
 
-const TARGETS: readonly Target[] = [];
+/** A table wholly under one policy, whose rows the function deletes. */
+const wholeTable = (policy: string, table: string): Target => ({
+  policy,
+  table,
+  action: 'delete',
+  columns: Object.keys(classification[table] ?? {}),
+});
+
+const TARGETS: readonly Target[] = [
+  wholeTable('crm_import_jobs', 'crm.import_job'),
+  wholeTable('crm_import_rows', 'crm.import_row'),
+];
+
+/**
+ * What the owner may touch besides its targets: the tenant's settings, read;
+ * its own audit event; and the file a deleted import job releases (ADR 0030).
+ */
+const READS = ['app.retention_policy'];
+const AUDIT_INSERT = [
+  'tenant_id',
+  'request_id',
+  'actor_kind',
+  'action',
+  'entity_type',
+  'entity_id',
+  'changes',
+];
+const SIDE_WRITES = [
+  ...AUDIT_INSERT.map((column) => `INSERT on column app.audit_event.${column}`),
+  'UPDATE on column app.file.released_at',
+];
 
 const FUNCTION = 'app.apply_retention(text)';
 const OWNER = 'owner_app_apply_retention';
@@ -111,7 +140,7 @@ describe('app.apply_retention', { timeout: 30_000 }, () => {
     const named = [...(rows[0]?.source ?? '').matchAll(/\b([a-z_]+)\.([a-z_]+)\b(?!\s*\()/g)]
       .filter(([, schema]) => schemas.has(schema ?? ''))
       .map(([table]) => table);
-    const allowed = new Set(TARGETS.map(({ table }) => table));
+    const allowed = new Set([...TARGETS.map(({ table }) => table), ...READS, 'app.audit_event']);
     expect(named.filter((table) => !allowed.has(table))).toEqual([]);
   });
 
@@ -120,11 +149,14 @@ describe('app.apply_retention', { timeout: 30_000 }, () => {
     const writes = rights
       .filter(({ privilege }) => ['INSERT', 'UPDATE', 'DELETE', 'TRUNCATE'].includes(privilege))
       .map(({ privilege, object }) => `${privilege} on ${object}`);
-    const allowed = TARGETS.flatMap(({ table, action, columns }) =>
-      action === 'delete'
-        ? [`DELETE on ${table}`]
-        : columns.map((column) => `UPDATE on column ${table}.${column}`),
-    );
+    const allowed = [
+      ...TARGETS.flatMap(({ table, action, columns }) =>
+        action === 'delete'
+          ? [`DELETE on ${table}`]
+          : columns.map((column) => `UPDATE on column ${table}.${column}`),
+      ),
+      ...SIDE_WRITES,
+    ];
     expect(writes.filter((right) => !allowed.includes(right))).toEqual([]);
     expect(writes.filter((right) => /\.(status|decision|stage|outcome)\w*$/.test(right))).toEqual(
       [],
