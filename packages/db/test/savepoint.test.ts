@@ -78,6 +78,44 @@ describe('attempt()', { timeout: 30_000 }, () => {
     expect(await written(db, tenant, [before, undone, after])).toEqual([before, after].sort());
   });
 
+  it('undoes an inner attempt that finished when the outer work fails', async () => {
+    const [outer, inner, after] = [randomUUID(), randomUUID(), randomUUID()];
+
+    const results = await withTenant(db, tenant, async (trx) => {
+      let innerResult: boolean | undefined;
+      const outerResult = await attempt(trx, async () => {
+        await write(trx, outer);
+        innerResult = await attempt(trx, () => write(trx, inner));
+        throw new Error('A later step failed.');
+      });
+      await write(trx, after);
+      return { innerResult, outerResult };
+    });
+
+    expect(results).toEqual({ innerResult: true, outerResult: false });
+    expect(await written(db, tenant, [outer, inner, after])).toEqual([after]);
+  });
+
+  it('keeps the outer work when an inner attempt fails', async () => {
+    const [before, inner, after] = [randomUUID(), randomUUID(), randomUUID()];
+
+    const results = await withTenant(db, tenant, async (trx) => {
+      let innerResult: boolean | undefined;
+      const outerResult = await attempt(trx, async () => {
+        await write(trx, before);
+        innerResult = await attempt(trx, async () => {
+          await write(trx, inner);
+          await sql`SELECT 1 / 0`.execute(trx);
+        });
+        await write(trx, after);
+      });
+      return { innerResult, outerResult };
+    });
+
+    expect(results).toEqual({ innerResult: false, outerResult: true });
+    expect(await written(db, tenant, [before, inner, after])).toEqual([before, after].sort());
+  });
+
   it('throws when the connection breaks during the work', async () => {
     const own = createDatabase(databaseSettings('app_worker', 1));
     try {
