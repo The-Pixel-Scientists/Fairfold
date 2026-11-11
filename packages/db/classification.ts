@@ -118,6 +118,9 @@ export const PROCESSING_PURPOSES = [
   'audit',
   'background_jobs',
   'service_reliability',
+  'due_diligence',
+  'sanctions_screening',
+  'grant_monitoring',
 ] as const;
 export type ProcessingPurpose = (typeof PROCESSING_PURPOSES)[number];
 
@@ -154,13 +157,20 @@ export type Article9Condition = (typeof ARTICLE_9_CONDITIONS)[number];
 export const PROCESSOR_ROLES = ['hosting', 'backup', 'email', 'malware_scanning'] as const;
 export type ProcessorRole = (typeof PROCESSOR_ROLES)[number];
 
-/** `visitor` is anyone whose request or sign-in attempt reaches the service, known or not. */
+/**
+ * `visitor` is anyone whose request or sign-in attempt reaches the service,
+ * known or not. `organisation_officer` is a trustee, director or other
+ * officer a public register names; `listed_person` is someone a published
+ * sanctions list names.
+ */
 export const DATA_SUBJECTS = [
   'applicant',
   'applicant_contact',
   'staff_member',
   'reviewer',
   'visitor',
+  'organisation_officer',
+  'listed_person',
 ] as const;
 export type DataSubject = (typeof DATA_SUBJECTS)[number];
 
@@ -238,6 +248,8 @@ export const subjectPaths: SubjectPathRegistry = mergeSchemaMaps({
   auth: authFile.authSubjects,
   party: partyFile.partySubjects,
   grants: grantsFile.grantsSubjects,
+  assure: assureFile.assureSubjects,
+  crm: crmFile.crmSubjects,
 });
 
 /** A schema file's `<schema>Processing` export, which a file with no tables yet does not have. */
