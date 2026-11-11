@@ -90,6 +90,22 @@ describe('reading the policies', () => {
         defaultDays: 365,
         changed: false,
       },
+      {
+        policyId: 'crm_import_jobs',
+        labelKey: 'crm_import_jobs',
+        days: 90,
+        minimumDays: 90,
+        defaultDays: 90,
+        changed: false,
+      },
+      {
+        policyId: 'crm_import_rows',
+        labelKey: 'crm_import_rows',
+        days: 30,
+        minimumDays: 30,
+        defaultDays: 30,
+        changed: false,
+      },
     ]);
   });
 });
