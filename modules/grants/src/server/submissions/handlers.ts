@@ -13,6 +13,8 @@ import type {
   SubmissionPage,
   SubmissionQuery,
 } from '../../contracts/index.ts';
+import { adjustmentHandlers } from './adjustments.ts';
+import { assistedHandlers } from './assisted.ts';
 import type { SubmissionArgs, SubmissionDependencies } from './context.ts';
 import { readSubmission, readSubmissions } from './read.ts';
 import { submissionsDb } from './tables.ts';
@@ -125,5 +127,11 @@ export function submissionHandlers(deps: SubmissionDependencies) {
     return { moved: moving.length };
   }
 
-  return { listSubmissions, getSubmission, moveSubmissionsToStage };
+  return {
+    listSubmissions,
+    getSubmission,
+    moveSubmissionsToStage,
+    ...adjustmentHandlers(deps),
+    ...assistedHandlers(deps),
+  };
 }

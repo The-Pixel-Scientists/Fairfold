@@ -104,6 +104,7 @@ describe('listing submissions', () => {
       submittedAt: expect.stringMatching(/Z$/) as string,
       late: false,
       eligibility: null,
+      submissionRoute: 'portal',
     });
 
     for (const status of ['draft', 'incomplete']) {

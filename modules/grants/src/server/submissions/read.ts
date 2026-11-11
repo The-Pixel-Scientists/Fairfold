@@ -24,6 +24,7 @@ import {
   type SubmissionEvent,
   type SubmissionPage,
   type SubmissionQuery,
+  type SubmissionRoute,
   type SubmissionSummary,
 } from '../../contracts/index.ts';
 import { answersWithFiles } from '../applications/read.ts';
@@ -80,6 +81,7 @@ const summaryColumns = [
   'a.submitted_at',
   'a.submitted_late',
   'a.organisation_id',
+  'a.submission_route',
   'r.id as round_id',
   'r.title as round_title',
   'p.id as programme_id',
@@ -94,6 +96,7 @@ interface SummaryRow {
   readonly submitted_at: Date;
   readonly submitted_late: boolean;
   readonly organisation_id: string;
+  readonly submission_route: SubmissionRoute;
   readonly round_id: string;
   readonly round_title: string;
   readonly programme_id: string;
@@ -115,6 +118,7 @@ function toSummary(row: SummaryRow, organisationName: string): SubmissionSummary
     submittedAt: row.submitted_at.toISOString(),
     late: row.submitted_late,
     eligibility: row.eligibility,
+    submissionRoute: row.submission_route,
   };
 }
 
@@ -214,6 +218,7 @@ export async function readSubmission(tx: Tx, id: string): Promise<Submission | u
       'a.applicant_person_id',
       'a.created_by',
       'a.updated_by',
+      'a.submitted_by',
       'a.withdrawn_at',
       'f.id as form_id',
       'f.version as form_version',
@@ -256,6 +261,7 @@ export async function readSubmission(tx: Tx, id: string): Promise<Submission | u
   const people = await peopleByMembership(tx, [
     ...(row.created_by === null ? [] : [row.created_by]),
     ...(row.updated_by === null ? [] : [row.updated_by]),
+    ...(row.submitted_by === null ? [] : [row.submitted_by]),
     ...moves.map((move) => move.moved_by),
   ]);
   const nameOf = (membershipId: string | null) =>
@@ -298,6 +304,10 @@ export async function readSubmission(tx: Tx, id: string): Promise<Submission | u
         applicant?.personId === row.applicant_person_id ? (applicant.familyName ?? null) : null,
       email: details.email,
     },
+    submittedBy:
+      row.submitted_by === null
+        ? null
+        : { membershipId: row.submitted_by, name: nameOf(row.submitted_by) },
     withdrawnAt: row.withdrawn_at?.toISOString() ?? null,
     eligibilityChecks: checks.map((check) => ({
       outcome: check.outcome,
