@@ -7,7 +7,12 @@
 
 import type { Transaction } from '@pixel-scientists/db';
 
-import type { ConsentChannel, IdentifierScheme, LegalForm } from '../contracts/index.ts';
+import type {
+  ConsentChannel,
+  IdentifierScheme,
+  LegalForm,
+  ValueHistoryField,
+} from '../contracts/index.ts';
 
 /** The caller's request transaction, which already has its tenant set. */
 export type Tx = Transaction<unknown>;
@@ -24,6 +29,8 @@ type PartyTables = {
     id: Generated<string>;
     tenant_id: string;
     kind: 'organisation' | 'person';
+    status: Generated<'active' | 'archived' | 'merged' | 'erased'>;
+    merged_into: Generated<string | null>;
     created_by: string | null;
     updated_by: string | null;
   };
@@ -48,6 +55,7 @@ type PartyTables = {
     scheme: IdentifierScheme;
     identifier: string;
     verified_at: Date | null;
+    verified_by: string | null;
     created_by: string | null;
     updated_by: string | null;
   };
@@ -70,9 +78,28 @@ type PartyTables = {
     subject_kind: 'person';
     object_id: string;
     object_kind: 'organisation';
-    ends_on: Date | null;
+    starts_on: string | null;
+    ends_on: string | null;
+    created_at: Generated<Date>;
     created_by: string | null;
     updated_by: string | null;
+  };
+  'app.membership': {
+    id: string;
+    user_id: string;
+    roles: string[];
+    status: string;
+  };
+  'party.value_history': {
+    id: Generated<string>;
+    tenant_id: string;
+    party_id: string;
+    party_kind: 'organisation' | 'person';
+    field_id: ValueHistoryField;
+    old_value: string | null;
+    new_value: string | null;
+    changed_by: string | null;
+    changed_at: Generated<Date>;
   };
   'party.consent': {
     id: Generated<string>;
