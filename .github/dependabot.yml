@@ -26,6 +26,10 @@ updates:
       # upgrade migration with line-by-line review (ADR 0009), so it is
       # upgraded by hand.
       - dependency-name: pg-boss
+      # Held at 1.63.0: WebKit in 1.64 reports style-src-attr violations
+      # on pages with a native select, which fails the accessibility specs.
+      # Lift this, with the e2e image in ci.yml, once a release fixes it.
+      - dependency-name: '@playwright/test'
     groups:
       npm:
         patterns: ['*']
