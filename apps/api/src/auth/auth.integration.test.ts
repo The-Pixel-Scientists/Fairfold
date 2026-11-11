@@ -33,8 +33,8 @@ import { createAuth, loadAuthSettings, type Auth } from './index.ts';
 import { onModulePermissions, onModules } from './routes.ts';
 import { issueSession } from './sessions.ts';
 
-/** The wave 1 tools, off for a tenant without their row (ADR 0024). */
-const WAVE_1 = /^(crm|assure|forms|privacy|insight)\./;
+/** The tools after grants, off for a tenant without their row (ADR 0024). */
+const WAVE_1 = /^(crm|assure|forms|privacy|insight|impact)\./;
 
 const CONSOLE = 'https://console.example.org';
 const PORTAL = 'https://apply.example.org';

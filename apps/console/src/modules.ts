@@ -31,4 +31,5 @@ export const consoleModules: readonly ConsoleModule[] = [
   { id: 'forms', path: '/forms', load: () => import('@pixel-scientists/forms/console') },
   { id: 'privacy', path: '/privacy', load: () => import('@pixel-scientists/privacy/console') },
   { id: 'insight', path: '/insight', load: () => import('@pixel-scientists/insight/console') },
+  { id: 'impact', path: '/impact', load: () => import('@pixel-scientists/impact/console') },
 ];

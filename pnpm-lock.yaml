@@ -303,6 +303,9 @@ importers:
       '@pixel-scientists/grants':
         specifier: workspace:*
         version: link:../../modules/grants
+      '@pixel-scientists/impact':
+        specifier: workspace:*
+        version: link:../../modules/impact
       '@pixel-scientists/insight':
         specifier: workspace:*
         version: link:../../modules/insight
@@ -477,6 +480,15 @@ importers:
       react:
         specifier: 19.3.1
         version: 19.3.1
+
+  modules/impact:
+    dependencies:
+      '@pixel-scientists/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
 
   modules/insight:
     dependencies:

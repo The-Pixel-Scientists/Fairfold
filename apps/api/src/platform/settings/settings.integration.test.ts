@@ -54,8 +54,8 @@ afterAll(async () => {
 
 const call = (...args: Parameters<SettingsApi['call']>) => app.call(...args);
 const grants = (member: Member) => app.grants(member);
-const wave1 = ['crm', 'assure', 'forms', 'privacy', 'insight'];
-const off = ['grants', ...wave1].map((module) => ({ module, enabled: false }));
+const others = ['crm', 'assure', 'forms', 'privacy', 'insight', 'impact'];
+const off = ['grants', ...others].map((module) => ({ module, enabled: false }));
 const grantsOn = [{ module: 'grants', enabled: true }, ...off.slice(1)];
 
 describe('who may use the settings routes', () => {

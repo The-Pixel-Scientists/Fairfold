@@ -89,6 +89,7 @@ export const dataContracts = {
   forms: null,
   privacy: null,
   insight: null,
+  impact: null,
 } as const satisfies Partial<Record<ModuleId, DataContract | null>>;
 
 export type DataContractModule = keyof typeof dataContracts;

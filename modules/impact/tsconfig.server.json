@@ -1,0 +1,18 @@
+// Contracts and server code, which runs on Node.js with its built-in type stripping.
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "node_modules/.cache/tsc/server",
+    "tsBuildInfoFile": "node_modules/.cache/tsc/server/tsconfig.tsbuildinfo",
+    "types": ["node"]
+  },
+  "include": ["src/contracts", "src/server"],
+  "references": [
+    {
+      "path": "../../packages/domain"
+    },
+    {
+      "path": "../../packages/db"
+    }
+  ]
+}

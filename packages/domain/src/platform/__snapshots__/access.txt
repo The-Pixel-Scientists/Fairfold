@@ -62,6 +62,9 @@ insight.reports.manage (console; tenant)
 insight.publications.manage (console; tenant)
 insight.monitoring.report (console; tenant)
 insight.disclosure_rules.manage (console; tenant)
+impact.frameworks.read (console; tenant)
+impact.frameworks.manage (console; tenant)
+impact.results.manage (console; tenant)
 
 tenant_admin (console, "Administrator"):
   platform.settings.manage
@@ -115,6 +118,9 @@ programme_manager (console, "Programme manager"):
   forms.responses.read
   forms.responses.manage
   insight.reports.read
+  impact.frameworks.read
+  impact.frameworks.manage
+  impact.results.manage
 
 reviewer (console, "Reviewer"):
   grants.reviews.score
@@ -143,6 +149,7 @@ analyst (console, "Analyst"):
   insight.reports.manage
   insight.publications.manage
   insight.monitoring.report
+  impact.frameworks.read
 
 applicant (portal, "Applicant"):
   party.profile.manage

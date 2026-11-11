@@ -16,6 +16,7 @@
     "@pixel-scientists/domain": "workspace:*",
     "@pixel-scientists/forms": "workspace:*",
     "@pixel-scientists/grants": "workspace:*",
+    "@pixel-scientists/impact": "workspace:*",
     "@pixel-scientists/insight": "workspace:*",
     "@pixel-scientists/privacy": "workspace:*",
     "@pixel-scientists/ui": "workspace:*",

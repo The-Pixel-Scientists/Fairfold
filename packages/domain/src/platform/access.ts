@@ -327,6 +327,21 @@ export const permissions = {
     label: 'Raise the thresholds that hide small numbers in reports',
     scopes: ['tenant'],
   },
+  'impact.frameworks.read': {
+    app: 'console',
+    label: 'View outcomes, indicators and results',
+    scopes: ['tenant'],
+  },
+  'impact.frameworks.manage': {
+    app: 'console',
+    label: 'Set up outcomes, indicators and targets',
+    scopes: ['tenant'],
+  },
+  'impact.results.manage': {
+    app: 'console',
+    label: 'Record results, evidence and learning notes',
+    scopes: ['tenant'],
+  },
 } as const satisfies Record<
   `${ModuleId}.${string}.${string}`,
   { app: App; label: string; scopes: readonly ScopeRule[]; stepUp?: true }

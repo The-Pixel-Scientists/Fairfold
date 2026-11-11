@@ -20,4 +20,5 @@ export const toolNames = {
   forms: 'Forms',
   privacy: 'Data Protection',
   insight: 'Reporting',
+  impact: 'Impact',
 } as const;

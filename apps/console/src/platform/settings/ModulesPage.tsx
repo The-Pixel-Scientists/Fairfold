@@ -22,6 +22,7 @@ const about: Record<SwitchableModuleId, string> = {
   forms: 'Forms you build once and use across your tools.',
   privacy: 'Requests for personal data, erasure and retention.',
   insight: 'Reports on your programmes and what they achieve.',
+  impact: 'Outcomes, indicators and evidence of what your funding changes.',
 };
 
 function ModuleList({ initial }: { initial: readonly ModuleState[] }) {

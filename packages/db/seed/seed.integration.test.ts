@@ -106,7 +106,7 @@ describe('the configured scenario', { timeout: 60_000 }, () => {
       'auth.user': 4,
       'auth.account': 4,
       'app.membership': 4,
-      'app.tenant_module': 6,
+      'app.tenant_module': 7,
     };
     const persons = { 'party.party': 4, 'party.person': 4 };
     expect(counts(northfield)).toEqual({
@@ -192,7 +192,7 @@ describe('the configured scenario', { timeout: 60_000 }, () => {
         return rows;
       });
       expect(switches, tenant.slug).toEqual(
-        ['assure', 'crm', 'forms', 'grants', 'insight', 'privacy'].map((module) => ({
+        ['assure', 'crm', 'forms', 'grants', 'impact', 'insight', 'privacy'].map((module) => ({
           module,
           enabled: module === 'grants',
           updated_by_kind: 'user',

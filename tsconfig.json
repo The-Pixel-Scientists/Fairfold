@@ -39,6 +39,9 @@
       "path": "modules/insight"
     },
     {
+      "path": "modules/impact"
+    },
+    {
       "path": "apps/api"
     },
     {

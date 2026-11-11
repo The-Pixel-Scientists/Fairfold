@@ -36,6 +36,9 @@
     },
     {
       "path": "../../modules/insight/tsconfig.web.json"
+    },
+    {
+      "path": "../../modules/impact/tsconfig.web.json"
     }
   ]
 }

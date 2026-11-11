@@ -26,6 +26,7 @@ const permissions = {
   forms: 'forms.forms.manage',
   privacy: 'privacy.requests.manage',
   insight: 'insight.reports.read',
+  impact: 'impact.frameworks.read',
 } as const;
 
 const contracts = switchableModuleIds.map((module) =>

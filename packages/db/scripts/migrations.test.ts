@@ -74,12 +74,12 @@ describe('SqlFolderMigrationProvider', () => {
   it('refuses a schema it does not know, naming the folder', async () => {
     await addMigration('0003_billing_invoices', { 'up.sql': 'SELECT 1;', 'down.sql': 'SELECT 2;' });
     await expect(new SqlFolderMigrationProvider(root).getMigrations()).rejects.toThrow(
-      'Migration folder 0003_billing_invoices names the unknown schema billing. Use one of app, auth, party, grants, crm, assure, forms, privacy, insight.',
+      'Migration folder 0003_billing_invoices names the unknown schema billing. Use one of app, auth, party, grants, crm, assure, forms, privacy, insight, impact.',
     );
   });
 
-  it("accepts a folder for each wave 1 module's schema", async () => {
-    const names = ['crm', 'assure', 'forms', 'privacy', 'insight'].map(
+  it("accepts a folder for each later module's schema", async () => {
+    const names = ['crm', 'assure', 'forms', 'privacy', 'insight', 'impact'].map(
       (schema, index) => `000${String(index + 1)}_${schema}_schema`,
     );
     for (const name of names) {
