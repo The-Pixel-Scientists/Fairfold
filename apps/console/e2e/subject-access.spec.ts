@@ -32,6 +32,8 @@ const person = `/northfield/settings/subject-access/people/${PARTY}`;
 const exportPage = `/northfield/settings/subject-access/exports/${REQUEST}`;
 const READ = `GET /console/subject-access-requests/${REQUEST}`;
 const CREATE = 'POST /console/subject-access-requests';
+/** The development build mounts each page twice, so the first two reads both stay queued. */
+const QUEUED_READS = 2;
 
 test.describe('subject access', () => {
   test('finds a person, creates an export after step-up and offers the download', async ({
@@ -67,7 +69,7 @@ test.describe('subject access', () => {
     await stubGovernance(page, {
       [READ]: () => {
         reads += 1;
-        return reads === 1 ? { status: 200, body: queued } : { status: 200, body: ready };
+        return reads <= QUEUED_READS ? { status: 200, body: queued } : { status: 200, body: ready };
       },
     });
     await page.goto(exportPage);
@@ -84,7 +86,9 @@ test.describe('subject access', () => {
     await stubGovernance(page, {
       [READ]: () => {
         reads += 1;
-        return reads === 1 ? { status: 200, body: queued } : { status: 200, body: failed };
+        return reads <= QUEUED_READS
+          ? { status: 200, body: queued }
+          : { status: 200, body: failed };
       },
     });
     await page.goto(exportPage);

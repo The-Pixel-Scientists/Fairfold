@@ -95,7 +95,7 @@ export default function FindPage() {
             rows={found.results}
             rowKey={(row) => row.id}
             empty={
-              <EmptyState title="No people found" headingLevel="h3">
+              <EmptyState title="No people found">
                 <p>
                   Check the spelling, or try an email address. A person with no record in your
                   funder cannot be found here.

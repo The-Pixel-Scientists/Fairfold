@@ -70,7 +70,7 @@ function Status({ request }: { request: ErasureStatus }) {
             rows={countsOf(request.counts)}
             rowKey={(row) => `${row.tool}.${row.table}`}
             empty={
-              <EmptyState title="No rows needed changing" headingLevel="h3">
+              <EmptyState title="No rows needed changing">
                 <p>No tool held personal data for this person.</p>
               </EmptyState>
             }
