@@ -10,10 +10,11 @@ import type { GrantsAuditAction } from '../../contracts/index.ts';
 import type { GrantsDependencies } from '../programme/context.ts';
 import type { Tx } from '../programme/tables.ts';
 
-export type SubmissionDependencies = Pick<GrantsDependencies, 'notFound' | 'refuse'>;
+export type SubmissionDependencies = Pick<GrantsDependencies, 'notFound' | 'refuse' | 'publish'>;
 
 /** What a handler reads from the request context. */
 export interface SubmissionContext {
+  readonly requestId: string;
   readonly audit: {
     record(event: {
       readonly action: GrantsAuditAction;
