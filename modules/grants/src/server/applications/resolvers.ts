@@ -23,14 +23,14 @@ export interface ScopeCheck {
 const applicationParams = getApplication.params.loose();
 
 export const grantsResolvers = {
-  /** A round taking applications, by the database's clock. */
-  open_round: async ({ tx, input }: ScopeCheck): Promise<boolean> => {
+  /** A round taking applications, or open to an organisation of the caller's by an extension. */
+  open_round: async ({ tx, userId, input }: ScopeCheck): Promise<boolean> => {
     if (input.params === undefined) return true;
     const params = getOpenRound.params.safeParse(input.params);
-    return params.success && isOpenRound(tx, params.data.roundId);
+    return params.success && isOpenRound(tx, userId, params.data.roundId);
   },
 
-  /** An application whose applicant is the session's person. */
+  /** An application whose applicant is the session's person, once staff have submitted an assisted one. */
   own_application: async ({ tx, userId, input }: ScopeCheck): Promise<boolean> => {
     if (input.params === undefined) return true;
     const params = applicationParams.safeParse(input.params);
@@ -42,6 +42,7 @@ export const grantsResolvers = {
       .select('id')
       .where('id', '=', params.data.applicationId)
       .where('applicant_person_id', '=', personId)
+      .where((eb) => eb.or([eb('submission_route', '=', 'portal'), eb('status', '<>', 'draft')]))
       .executeTakeFirst();
     return row !== undefined;
   },

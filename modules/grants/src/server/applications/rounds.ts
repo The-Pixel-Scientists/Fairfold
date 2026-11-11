@@ -3,17 +3,21 @@
 // Rounds taking applications, as the portal reads them. A round is open when
 // its programme is open, its opening time has passed and its closing time has
 // not, by the database's clock, and it has a published form. Everything else
-// is not there for an applicant.
+// is not there for an applicant. An organisation with a deadline extension
+// can still start in the round until its extension ends (closing.ts).
 
 import type { FormDefinition } from '@pixel-scientists/domain/forms';
+import { isCurrentContact, personIdForUser } from '@pixel-scientists/party/server';
 
 import type { OpenRound, OpenRoundDetail } from '../../contracts/index.ts';
 import { definitionOf } from '../forms/read.ts';
 import type { Tx } from '../programme/tables.ts';
 import { localAt } from '../programme/time.ts';
+import { closingTime } from './closing.ts';
 import { applicationsDb, type ApplicationsDb } from './tables.ts';
 
-const openRounds = (db: ApplicationsDb) =>
+/** Rounds whose programme is open, whose opening time has passed and which have a published form. */
+const takingRounds = (db: ApplicationsDb) =>
   db
     .selectFrom('grants.round as r')
     .innerJoin('grants.programme as p', 'p.id', 'r.programme_id')
@@ -21,7 +25,6 @@ const openRounds = (db: ApplicationsDb) =>
     .where((eb) =>
       eb.and([
         eb('r.opens_at', '<=', eb.fn<Date>('now', [])),
-        eb('r.closes_at', '>', eb.fn<Date>('now', [])),
         eb.exists(
           eb
             .selectFrom('grants.form_version as f')
@@ -32,12 +35,64 @@ const openRounds = (db: ApplicationsDb) =>
       ]),
     );
 
-export async function isOpenRound(tx: Tx, roundId: string): Promise<boolean> {
-  const row = await openRounds(applicationsDb(tx))
+/** Those still open by the round's own closing time, which the list shows. */
+const openRounds = (db: ApplicationsDb) =>
+  takingRounds(db).where('r.closes_at', '>', (eb) => eb.fn<Date>('now', []));
+
+/**
+ * Whether the person can start an application in the round: it is open, or
+ * they are a current contact for an organisation whose extension has not ended.
+ */
+export async function isOpenRound(tx: Tx, userId: string, roundId: string): Promise<boolean> {
+  const db = applicationsDb(tx);
+  if (
+    (await takingRounds(db).select('r.id').where('r.id', '=', roundId).executeTakeFirst()) ===
+    undefined
+  ) {
+    return false;
+  }
+  if (
+    (await openRounds(db).select('r.id').where('r.id', '=', roundId).executeTakeFirst()) !==
+    undefined
+  ) {
+    return true;
+  }
+  const personId = await personIdForUser(tx, userId);
+  if (personId === null) return false;
+  const extended = await db
+    .selectFrom('grants.adjustment')
+    .select('organisation_id')
+    .distinct()
+    .where('round_id', '=', roundId)
+    .where('kind', '=', 'deadline_extension')
+    .where('application_id', 'is', null)
+    .execute();
+  for (const { organisation_id } of extended) {
+    const target = { roundId, organisationId: organisation_id, applicationId: null };
+    if (
+      (await isCurrentContact(tx, personId, organisation_id)) &&
+      !(await closingTime(tx, target)).closed
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** Whether an organisation can start an application in the round now, by its closing time. */
+export async function acceptsApplication(
+  tx: Tx,
+  roundId: string,
+  organisationId: string,
+): Promise<boolean> {
+  const taking = await takingRounds(applicationsDb(tx))
     .select('r.id')
     .where('r.id', '=', roundId)
     .executeTakeFirst();
-  return row !== undefined;
+  return (
+    taking !== undefined &&
+    !(await closingTime(tx, { roundId, organisationId, applicationId: null })).closed
+  );
 }
 
 const roundColumns = [
@@ -104,8 +159,9 @@ export async function latestPublishedForm(
   return row === undefined || definition === null ? undefined : { id: row.id, definition };
 }
 
+/** A round taking applications, whose scope rule has already checked its closing time. */
 export async function readOpenRound(tx: Tx, roundId: string): Promise<OpenRoundDetail | undefined> {
-  const row = await openRounds(applicationsDb(tx))
+  const row = await takingRounds(applicationsDb(tx))
     .select([...roundColumns, 'p.description as programme_description'])
     .where('r.id', '=', roundId)
     .executeTakeFirst();
