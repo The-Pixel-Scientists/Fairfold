@@ -1,6 +1,6 @@
 # Fairfold Impact
 
-**Planned for launch in 2027.** Nothing is built here yet.
+**Planned for launch in 2027.** The database schema and the API routes are built; the staff screens are not.
 
 Outcomes, indicators and evidence from grants and activities, so trustees can
 see what difference the money makes.
@@ -15,9 +15,9 @@ Code name: `impact`.
 
 ## Switching it on
 
-The module is registered with the platform, but nothing in it can be used
-yet: it has no routes or screens, and tenants can't switch it on until the
-platform's module switch supports it. Once it can, no tenant has it unless a
+The module is registered with the platform and its routes answer for a
+tenant that has it on, but it has no screens yet, and tenants can't switch
+it on until the platform's module switch supports it. Once it can, no tenant has it unless a
 tenant admin switches it on
 ([ADR 0024](../../docs/adr/0024-no-tool-on-by-default.md)). Switching it off
 keeps its data, which returns when it is switched back on.

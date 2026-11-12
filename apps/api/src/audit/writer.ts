@@ -18,6 +18,7 @@ import {
   type AuditAction,
 } from '@pixel-scientists/domain/platform';
 import { grantsSubjectRules } from '@pixel-scientists/grants/server';
+import { impactSubjectRules } from '@pixel-scientists/impact/server';
 import { partySubjectRules } from '@pixel-scientists/party/server';
 
 /**
@@ -54,7 +55,7 @@ export interface AuditEvent {
 
 /** Actions whose module rule says the event is about a party. */
 const subjectBearing: ReadonlySet<string> = new Set(
-  Object.entries({ ...partySubjectRules, ...grantsSubjectRules })
+  Object.entries({ ...partySubjectRules, ...grantsSubjectRules, ...impactSubjectRules })
     .filter(([, rule]) => !('none' in rule))
     .map(([action]) => action),
 );

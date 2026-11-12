@@ -32,8 +32,11 @@ import {
   grantsHandlers,
   grantsResolvers,
   grantsWarehouse,
+  programmeExists,
   type MailSender,
 } from '@pixel-scientists/grants/server';
+import { impactRoutes } from '@pixel-scientists/impact/contracts';
+import { impactHandlers } from '@pixel-scientists/impact/server';
 import { partyRoutes } from '@pixel-scientists/party/contracts';
 import {
   partyErasure,
@@ -162,6 +165,7 @@ export function composeModules(deps: {
     publish: publishGrantsEvent(deps.jobs ?? noJobs),
     ...(deps.mail ?? noMail),
   });
+  const impact = impactHandlers({ notFound, refuse, programmeExists });
   return {
     routes: [
       route(listAuditEvents, listAuditEventsHandler),
@@ -336,6 +340,37 @@ export function composeModules(deps: {
       route(exportRoutes.getPublisherSetting, grants.getPublisherSetting),
       route(exportRoutes.savePublisherSetting, grants.savePublisherSetting),
       route(exportRoutes.get360GivingExport, grants.get360GivingExport),
+      route(impactRoutes.listFrameworks, impact.listFrameworks),
+      route(impactRoutes.getFramework, impact.getFramework),
+      route(impactRoutes.createFramework, impact.createFramework, {
+        replay: ({ tx, context, id }) =>
+          impact.getFramework({ tx, context, input: { params: { frameworkId: created(id) } } }),
+      }),
+      route(impactRoutes.updateFramework, impact.updateFramework),
+      // Archiving twice answers the archived framework, so the route needs no key.
+      route(impactRoutes.archiveFramework, impact.archiveFramework),
+      route(impactRoutes.getFrameworkSummary, impact.getFrameworkSummary),
+      route(impactRoutes.listTargets, impact.listTargets),
+      route(impactRoutes.createTarget, impact.createTarget, {
+        replay: ({ tx, context, id }) =>
+          impact.getTarget({ tx, context, input: { params: { targetId: created(id) } } }),
+      }),
+      route(impactRoutes.updateTarget, impact.updateTarget),
+      route(impactRoutes.removeTarget, impact.removeTarget),
+      route(impactRoutes.listResults, impact.listResults),
+      route(impactRoutes.getResult, impact.getResult),
+      route(impactRoutes.createResult, impact.createResult, {
+        replay: ({ tx, context, id }) =>
+          impact.getResult({ tx, context, input: { params: { resultId: created(id) } } }),
+      }),
+      route(impactRoutes.updateResult, impact.updateResult),
+      route(impactRoutes.removeResult, impact.removeResult),
+      route(impactRoutes.listLearningNotes, impact.listLearningNotes),
+      route(impactRoutes.createLearningNote, impact.createLearningNote, {
+        replay: ({ tx, context, id }) =>
+          impact.getLearningNote({ tx, context, input: { params: { noteId: created(id) } } }),
+      }),
+      route(impactRoutes.removeLearningNote, impact.removeLearningNote),
     ],
     resolvers: { ...partyResolvers, ...grantsResolvers },
   };

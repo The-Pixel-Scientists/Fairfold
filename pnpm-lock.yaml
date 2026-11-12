@@ -248,6 +248,9 @@ importers:
       '@pixel-scientists/grants':
         specifier: workspace:*
         version: link:../../modules/grants
+      '@pixel-scientists/impact':
+        specifier: workspace:*
+        version: link:../../modules/impact
       '@pixel-scientists/party':
         specifier: workspace:*
         version: link:../../modules/party
@@ -483,6 +486,9 @@ importers:
 
   modules/impact:
     dependencies:
+      '@pixel-scientists/db':
+        specifier: workspace:*
+        version: link:../../packages/db
       '@pixel-scientists/domain':
         specifier: workspace:*
         version: link:../../packages/domain

@@ -20,6 +20,9 @@
     },
     {
       "path": "../../modules/grants/tsconfig.server.json"
+    },
+    {
+      "path": "../../modules/impact/tsconfig.server.json"
     }
   ]
 }

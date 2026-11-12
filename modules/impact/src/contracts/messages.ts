@@ -27,6 +27,10 @@ export const impactMessages = {
   decimalPlaces: 'Enter a number with up to 2 decimal places.',
   caption: 'Enter a caption that says what the file shows.',
   note: 'Enter the learning note.',
+  indicator: 'Choose an indicator from this framework.',
+  outcome: 'Choose an outcome from this framework.',
+  programme: 'Choose a programme from the list.',
+  evidenceFile: 'Choose a file that has finished uploading and is not used anywhere else.',
 } as const;
 
 export type ImpactMessage = (typeof impactMessages)[keyof typeof impactMessages];
@@ -36,8 +40,14 @@ export function says(message: ImpactMessage) {
   return { error: message, params: catalogueParams };
 }
 
-/** The detail of each problem impact's routes answer, all 409. */
+/** The detail of each problem impact's routes answer: 400 for `page`, 409 for the rest. */
 export const impactRefusals = {
+  page: 'This page of results is no longer available. Start again from the first page.',
+  nameTaken: 'Another framework already has this name. Enter a different name.',
+  itemTaken:
+    'An outcome or indicator here already belongs to another framework. Add it again as a new item.',
+  outcomeInUse:
+    "This outcome has learning notes, so it can't be removed. Remove those first, or keep the outcome.",
   archived: 'This framework is archived. Make a new framework to change it or record results.',
   indicatorInUse:
     "This indicator has results or targets, so it can't be removed. Remove those first, or keep the indicator.",

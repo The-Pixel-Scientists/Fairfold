@@ -9,6 +9,7 @@ import type { TenantId } from '@pixel-scientists/db';
 import type { App, Permission } from '@pixel-scientists/domain/platform';
 import type { ConfigDiff, ConfigEntityType } from '@pixel-scientists/domain/platform/settings';
 import { grantsSubjectRules } from '@pixel-scientists/grants/server';
+import { impactSubjectRules } from '@pixel-scientists/impact/server';
 import { partySubjectRules } from '@pixel-scientists/party/server';
 import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
 
@@ -49,7 +50,9 @@ export interface RequestAudit {
 }
 
 /** The modules' rules for the party an event is about (ADR 0027), by action. */
-const subjectRules = new Map(Object.entries({ ...partySubjectRules, ...grantsSubjectRules }));
+const subjectRules = new Map(
+  Object.entries({ ...partySubjectRules, ...grantsSubjectRules, ...impactSubjectRules }),
+);
 
 /**
  * `audit` with each party and grants event given the party it is about,
