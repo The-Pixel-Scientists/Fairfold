@@ -125,6 +125,11 @@ beforeAll(async () => {
 }, 60_000);
 
 afterAll(async () => {
+  // Migration 0021's down refuses while a membership holds a wave 1 role, so
+  // the round trip in packages/db/test/migrations.test.ts needs this one gone.
+  await rowsOf(t.tenantA, "UPDATE app.membership SET roles = '{reviewer}' WHERE id = $1", [
+    analyst.membershipId,
+  ]);
   await t.close();
 });
 
