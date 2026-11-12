@@ -79,6 +79,14 @@ function retryFirstNavigation(page: Page): void {
       return await goto(url, { ...options, timeout });
     } catch (error) {
       if (!(error instanceof errors.TimeoutError)) throw error;
+      // The page has moved on, so the navigation arrived and only its report
+      // was lost. Sending it again could differ only by the fragment, a
+      // same-document navigation Firefox never reports: wait for the load.
+      if (page.url() !== 'about:blank') {
+        const state = options?.waitUntil ?? 'load';
+        if (state !== 'commit') await page.waitForLoadState(state, { timeout: options?.timeout });
+        return null;
+      }
       return goto(url, options);
     }
   };
