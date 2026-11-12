@@ -17,6 +17,7 @@ export const moduleIds = [
   'forms',
   'privacy',
   'insight',
+  'impact',
 ] as const;
 
 export type ModuleId = (typeof moduleIds)[number];
@@ -32,6 +33,7 @@ export const modules = {
   forms: { label: toolNames.forms, schemas: ['forms'], switchable: true },
   privacy: { label: toolNames.privacy, schemas: ['privacy'], switchable: true },
   insight: { label: toolNames.insight, schemas: ['insight'], switchable: true },
+  impact: { label: toolNames.impact, schemas: ['impact'], switchable: true },
 } as const satisfies Record<
   ModuleId,
   { label: string; schemas: readonly string[]; switchable: boolean }

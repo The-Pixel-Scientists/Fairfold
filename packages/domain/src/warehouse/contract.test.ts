@@ -164,7 +164,7 @@ function withColumn(
 }
 
 describe('the data contract registry', () => {
-  it('has a slot for party, grants and each wave 1 module, all known modules', () => {
+  it('has a slot for party, grants and each later module, all known modules', () => {
     expect(Object.keys(dataContracts)).toEqual([
       'party',
       'grants',
@@ -173,6 +173,7 @@ describe('the data contract registry', () => {
       'forms',
       'privacy',
       'insight',
+      'impact',
     ]);
     for (const [module, contract] of Object.entries(dataContracts)) {
       expect(moduleIds).toContain(module);
@@ -180,7 +181,7 @@ describe('the data contract registry', () => {
     }
   });
 
-  it('holds party and grants at version 1, and the wave 1 slots empty', () => {
+  it('holds party and grants at version 1, and the later slots empty', () => {
     expect(dataContracts.party.version).toBe(1);
     expect(dataContracts.grants.version).toBe(1);
     expect(Object.keys(dataContracts.party.tables)).toEqual(['organisation', 'person']);
@@ -191,7 +192,7 @@ describe('the data contract registry', () => {
       'grants_application',
       'grants_score',
     ]);
-    for (const module of ['crm', 'assure', 'forms', 'privacy', 'insight'] as const) {
+    for (const module of ['crm', 'assure', 'forms', 'privacy', 'insight', 'impact'] as const) {
       expect(dataContracts[module]).toBeNull();
     }
   });

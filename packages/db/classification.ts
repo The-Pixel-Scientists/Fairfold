@@ -16,6 +16,7 @@ import * as authFile from './classification/auth.ts';
 import * as crmFile from './classification/crm.ts';
 import * as formsFile from './classification/forms.ts';
 import * as grantsFile from './classification/grants.ts';
+import * as impactFile from './classification/impact.ts';
 import * as insightFile from './classification/insight.ts';
 import * as partyFile from './classification/party.ts';
 import * as pgbossFile from './classification/pgboss.ts';
@@ -241,6 +242,7 @@ export const classification: ClassificationRegistry = mergeSchemaMaps<
   forms: formsFile.forms,
   privacy: privacyFile.privacy,
   insight: insightFile.insight,
+  impact: impactFile.impact,
 });
 
 export const subjectPaths: SubjectPathRegistry = mergeSchemaMaps({
@@ -250,6 +252,7 @@ export const subjectPaths: SubjectPathRegistry = mergeSchemaMaps({
   grants: grantsFile.grantsSubjects,
   assure: assureFile.assureSubjects,
   crm: crmFile.crmSubjects,
+  impact: impactFile.impactSubjects,
 });
 
 /** A schema file's `<schema>Processing` export, which a file with no tables yet does not have. */
@@ -271,6 +274,7 @@ const schemaFiles: Readonly<Record<string, Readonly<Record<string, unknown>>>> =
   forms: formsFile,
   privacy: privacyFile,
   insight: insightFile,
+  impact: impactFile,
 };
 
 export const processing: ProcessingMap = mergeSchemaMaps(

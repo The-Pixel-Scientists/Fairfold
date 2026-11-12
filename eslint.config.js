@@ -38,6 +38,7 @@ export const MODULES = new Map([
   ['forms', ['forms']],
   ['privacy', ['privacy']],
   ['insight', ['insight']],
+  ['impact', ['impact']],
 ]);
 const ENTRY_POINTS = ['contracts', 'server', 'console', 'portal'];
 

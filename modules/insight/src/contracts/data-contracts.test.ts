@@ -15,6 +15,7 @@ describe('the data contracts', () => {
       ['forms', null],
       ['privacy', null],
       ['insight', null],
+      ['impact', null],
     ]);
     const grants = list.contracts.find(({ module }) => module === 'grants');
     const programme = grants?.tables.find(({ name }) => name === 'programme');

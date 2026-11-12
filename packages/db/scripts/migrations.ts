@@ -26,6 +26,7 @@ export const SCHEMAS = [
   'forms',
   'privacy',
   'insight',
+  'impact',
 ] as const;
 
 const MIGRATION_NAME = /^(\d{4})_([a-z0-9]+)_[a-z0-9]+(?:_[a-z0-9]+)*$/;

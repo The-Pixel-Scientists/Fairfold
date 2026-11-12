@@ -22,6 +22,7 @@
     "@pixel-scientists/db": "workspace:*",
     "@pixel-scientists/domain": "workspace:*",
     "@pixel-scientists/grants": "workspace:*",
+    "@pixel-scientists/impact": "workspace:*",
     "@pixel-scientists/party": "workspace:*",
     "@smithy/signature-v4": "5.7.5",
     "better-auth": "1.7.17",

@@ -34,6 +34,7 @@ export const configEntityTypes = [
   'forms.form',
   'insight.report_definition',
   'insight.disclosure_rule',
+  'impact.framework',
 ] as const;
 
 export type ConfigEntityType = (typeof configEntityTypes)[number];
@@ -53,6 +54,7 @@ function pathChanges(pattern: RegExp) {
 
 /** An item's or filter's stable id: a uuid or a form field id. */
 const ITEM = String.raw`(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|f_[a-z0-9]{1,32})`;
+const UUID = String.raw`[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`;
 const FILTER = String.raw`filters\.${ITEM}\.(?:field|operator)`;
 const text = z.string().max(2000);
 
@@ -126,6 +128,11 @@ export const configDiffSchemas = {
       ]),
     )
     .min(1),
+  'impact.framework': pathChanges(
+    new RegExp(
+      `^(?:name|description|outcomes\\.${UUID}\\.(?:name|description)|indicators\\.${UUID}\\.(?:outcome|name|unit|direction|aggregation))$`,
+    ),
+  ),
 } as const satisfies Record<ConfigEntityType, z.ZodType>;
 
 export type ConfigDiff<T extends ConfigEntityType> = z.infer<(typeof configDiffSchemas)[T]>;

@@ -68,6 +68,9 @@ export const roles = {
       'forms.responses.read',
       'forms.responses.manage',
       'insight.reports.read',
+      'impact.frameworks.read',
+      'impact.frameworks.manage',
+      'impact.results.manage',
     ],
   },
   reviewer: {
@@ -108,6 +111,7 @@ export const roles = {
       'insight.reports.manage',
       'insight.publications.manage',
       'insight.monitoring.report',
+      'impact.frameworks.read',
     ],
   },
   applicant: {

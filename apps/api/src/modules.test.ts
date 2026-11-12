@@ -41,6 +41,7 @@ import {
   spreadRoutes,
   submissionRoutes,
 } from '@pixel-scientists/grants/contracts';
+import { impactRoutes } from '@pixel-scientists/impact/contracts';
 import { partyRoutes } from '@pixel-scientists/party/contracts';
 import { defineQueue } from '@pixel-scientists/db/jobs';
 import { describe, expect, it } from 'vitest';
@@ -56,7 +57,7 @@ const publicTenants = {
 };
 
 describe('composeModules', () => {
-  it('registers a handler for every platform, party and grants route contract, once', () => {
+  it('registers a handler for every platform, party, grants and impact route contract, once', () => {
     const { routes } = composeModules({ publicTenants });
 
     expect(routes.map((route) => route.contract)).toEqual([
@@ -95,6 +96,7 @@ describe('composeModules', () => {
       ...Object.values(reviewRoutes),
       ...Object.values(decisionRoutes),
       ...Object.values(exportRoutes),
+      ...Object.values(impactRoutes),
     ]);
   });
 

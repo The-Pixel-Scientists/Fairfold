@@ -45,7 +45,8 @@
       "assure": "/assure",
       "forms": "/forms",
       "privacy": "/privacy",
-      "insight": "/insight"
+      "insight": "/insight",
+      "impact": "/impact"
     },
     "extraLinks": { "grants": ["Programmes", "Submissions"] }
   }

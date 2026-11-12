@@ -33,6 +33,8 @@ export {
 } from './messages/job.ts';
 export { readApplicantContact, type ApplicantContact } from './applicant-contact.ts';
 export { grantsSubjectRules } from './audit.ts';
+// For a module that keeps a programme's id, such as impact: whether the tenant has the programme.
+export { programmeExists } from './programme/read.ts';
 export { monitoringCounts, type MonitoringCounts } from './monitoring/aggregate.ts';
 export { grantsWarehouse } from './warehouse.ts';
 export { grantsErasure } from './erasure.ts';

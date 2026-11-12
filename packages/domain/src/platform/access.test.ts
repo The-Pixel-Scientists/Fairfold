@@ -63,8 +63,16 @@ describe('permissions', () => {
 });
 
 describe('modules and scope rules', () => {
-  it('switch grants and the wave 1 tools, never the platform or party, and give each schema to one module', () => {
-    expect(switchableModuleIds).toEqual(['grants', 'crm', 'assure', 'forms', 'privacy', 'insight']);
+  it('switch grants and the tools after it, never the platform or party, and give each schema to one module', () => {
+    expect(switchableModuleIds).toEqual([
+      'grants',
+      'crm',
+      'assure',
+      'forms',
+      'privacy',
+      'insight',
+      'impact',
+    ]);
     const schemas = moduleIds.flatMap((id) => modules[id].schemas);
     expect(new Set(schemas).size).toBe(schemas.length);
   });
