@@ -6,6 +6,7 @@ import {
   PageHeader,
   SummaryList,
   Tabs,
+  useCan,
   useLoad,
   WhenLoaded,
 } from '@pixel-scientists/ui';
@@ -17,6 +18,8 @@ import type { Round, Stage } from '../../contracts/index.ts';
 import { ConfigHistory } from './ConfigHistory.tsx';
 import { formatLocal } from './format.ts';
 import { loadRound, loadRoundHistory } from './loaders.ts';
+import { MonitoringChoice } from './MonitoringChoice.tsx';
+import { RoundAdjustments } from './RoundAdjustments.tsx';
 import { LinkButton, ManagePage, useParam } from './Page.tsx';
 import { editRoundPath, PROGRAMMES_PATH, programmePath, rubricPath, stagesPath } from './paths.ts';
 
@@ -134,6 +137,7 @@ function namesOf(stages: readonly Stage[]): ReadonlyMap<string, string> {
 function RoundOverview({ roundId }: { roundId: string }) {
   const { state, retry } = useLoad(loadRound, roundId);
   const loaded = state.status === 'ready' ? state.value : null;
+  const adjust = useCan('grants.adjustments.manage');
 
   return (
     <>
@@ -164,6 +168,20 @@ function RoundOverview({ roundId }: { roundId: string }) {
                 id: 'stages',
                 label: 'Stages and rubrics',
                 content: <StagesTab roundId={roundId} stages={stages} />,
+              },
+              ...(adjust
+                ? [
+                    {
+                      id: 'adjustments',
+                      label: 'More time and adjustments',
+                      content: <RoundAdjustments round={round} />,
+                    },
+                  ]
+                : []),
+              {
+                id: 'monitoring',
+                label: 'Equality monitoring',
+                content: <MonitoringChoice roundId={roundId} timeZone={round.timeZone} />,
               },
               {
                 id: 'history',

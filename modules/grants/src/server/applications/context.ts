@@ -11,10 +11,11 @@ import type { GrantsAuditAction } from '../../contracts/index.ts';
 import type { GrantsDependencies } from '../programme/context.ts';
 import type { Tx } from '../programme/tables.ts';
 
-export type ApplicationDependencies = Pick<GrantsDependencies, 'notFound' | 'refuse'>;
+export type ApplicationDependencies = Pick<GrantsDependencies, 'notFound' | 'refuse' | 'publish'>;
 
 /** What a handler reads from the request context. */
 export interface ApplicationContext {
+  readonly requestId: string;
   readonly audit: {
     record(event: {
       readonly action: GrantsAuditAction | PartyAuditAction;
@@ -25,6 +26,9 @@ export interface ApplicationContext {
   readonly session: { readonly userId: string; readonly email: () => Promise<string> };
   readonly membership: { readonly id: string };
 }
+
+/** What acting on an application needs: the request, the audit writer and the session's member. */
+export type ActingContext = Pick<ApplicationContext, 'requestId' | 'audit' | 'membership'>;
 
 export interface ApplicationArgs<I> {
   readonly tx: Tx;

@@ -287,6 +287,79 @@ export const grants = {
     sent_at: internal,
     created_at: internal,
   },
+  // Triage (0059): ids, membership ids, colour tokens, flags and times. An
+  // owner and an applied label are kept as long as their application. The
+  // label set and saved views are tenant configuration, kept while the tenant
+  // is a customer; their names must not name applicants. A view's filter
+  // holds the submissions list's ids, enums and flags, never free text. Label
+  // names, view names and stored filters never go in an audit value.
+  // S11-102's retention functions enforce these rules.
+  'grants.application_owner': {
+    tenant_id: internal,
+    id: internal,
+    application_id: internal,
+    membership_id: internal,
+    assigned_by: internal,
+    assigned_at: internal,
+  },
+  'grants.label': {
+    ...keyAndActors,
+    name: internal,
+    colour: internal,
+    archived: internal,
+  },
+  'grants.application_label': {
+    tenant_id: internal,
+    id: internal,
+    application_id: internal,
+    label_id: internal,
+    added_by: internal,
+    added_at: internal,
+  },
+  'grants.saved_view': {
+    ...keyAndActors,
+    name: internal,
+    filter: internal,
+    sort: internal,
+    columns: internal,
+  },
+  // Reminders (0060 and 0061): ids, switches, whole days, versions, kinds,
+  // statuses, codes and times, all of which may be audit values. A round's
+  // setting is configuration about no subject, kept with its round. An outbox
+  // row holds no address or text; it is kept as long as the application or
+  // assignment it concerns, like a decision email (ADR 0020), and erasure
+  // clears its recipient (ADR 0027). S11-102's retention functions enforce
+  // these rules.
+  'grants.reminder_setting': {
+    ...keyAndActors,
+    round_id: internal,
+    draft_enabled: internal,
+    draft_days_before_1: internal,
+    draft_days_before_2: internal,
+    draft_days_before_3: internal,
+    draft_template_version_id: internal,
+    review_enabled: internal,
+    review_overdue_after_days: internal,
+    review_repeat_every_days: internal,
+    review_template_version_id: internal,
+    version: internal,
+  },
+  'grants.reminder_email': {
+    tenant_id: internal,
+    id: internal,
+    kind: internal,
+    application_id: internal,
+    assignment_id: internal,
+    recipient_person_id: internal,
+    template_version_id: internal,
+    occurrence: internal,
+    status: internal,
+    outcome_code: internal,
+    attempts: internal,
+    last_attempt_at: internal,
+    sent_at: internal,
+    created_at: internal,
+  },
 } satisfies ClassificationRegistry;
 
 const throughApplication = {
@@ -314,6 +387,11 @@ export const grantsSubjects: SubjectPathRegistry = {
   'grants.application_note': throughApplication,
   'grants.application_message': throughApplication,
   'grants.message_notification': { kind: 'party', column: 'recipient_person_id' },
+  'grants.application_owner': throughApplication,
+  'grants.application_label': throughApplication,
+  'grants.reminder_email': { kind: 'party', column: 'recipient_person_id' },
+  // grants.label, grants.saved_view and grants.reminder_setting are
+  // configuration, about no subject.
 };
 
 const stored = ['hosting', 'backup'] as const;
@@ -388,6 +466,16 @@ export const grantsProcessing: ProcessingRegistry<typeof grants> = {
   // The notification names the message's thread to the mail provider.
   'grants.message_notification': {
     ...application('grant_applications', 'contract'),
+    processors: [...stored, 'email'],
+  },
+  'grants.application_owner': application('assessment', 'contract'),
+  'grants.label': setUp,
+  'grants.application_label': application('assessment', 'contract'),
+  'grants.saved_view': setUp,
+  'grants.reminder_setting': setUp,
+  // The reminder names its draft or review to the mail provider.
+  'grants.reminder_email': {
+    ...application('grant_applications', 'legitimate_interests', ['applicant', 'reviewer']),
     processors: [...stored, 'email'],
   },
 };

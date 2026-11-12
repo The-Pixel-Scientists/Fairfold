@@ -60,11 +60,17 @@ async function applyWithFile(browser: Browser): Promise<string> {
 
   await page.getByRole('link', { name: /^Continue with / }).click();
   for (;;) {
-    await expect(page.getByText(/^Section \d+ of \d+/)).toBeVisible();
+    const progress = page.getByText(/^Section \d+ of \d+/);
+    await expect(progress).toBeVisible();
     if ((await h1(page, 'Documents').count()) > 0) break;
+    const [, current, total] =
+      /Section (\d+) of (\d+)/.exec((await progress.textContent()) ?? '') ?? [];
     await answerQuestions(page);
     await expect(page.getByText(/^Saved at \d/)).toBeVisible();
     await page.getByRole('button', { name: 'Save and continue' }).click();
+    await expect(
+      page.getByText(`Section ${String(Number(current) + 1)} of ${String(total)}`),
+    ).toBeVisible();
   }
   await page
     .locator('input[type="file"]')
@@ -96,7 +102,7 @@ async function downloadEvents(browser: Browser, origin: string, fileId: string) 
   if (ADMIN_EMAIL === undefined || ADMIN_PASSWORD === undefined || ADMIN_TOTP_KEY === undefined) {
     return null;
   }
-  const page = await (await browser.newContext()).newPage();
+  const page = await (await browser.newContext({ ignoreHTTPSErrors: true })).newPage();
   await page.goto(`${origin}/northfield/sign-in`);
   const send = async (path: string, body: unknown) =>
     page.request.post(`${origin}/api${path}`, { data: body });
@@ -119,6 +125,8 @@ async function downloadEvents(browser: Browser, origin: string, fileId: string) 
 }
 
 test.describe('downloading an applicant’s file against the real API', () => {
+  // The stack's certificate is self-signed, and the browser's request client checks it.
+  test.use({ ignoreHTTPSErrors: true });
   test.skip(
     process.env['TPS_E2E_STACK'] !== '1',
     'Runs against the stack: pnpm stack, then pnpm test:stack -- submissions-files.',

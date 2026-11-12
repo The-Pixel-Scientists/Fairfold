@@ -7,7 +7,7 @@
 import { classification, subjectPaths } from '@pixel-scientists/db/classification';
 import { describe, expect, it } from 'vitest';
 
-import { subjectTables, withheld } from './subject-data.ts';
+import { linkedTables, subjectTables, withheld } from './subject-data.ts';
 
 /** Grants tables with a subject path that the contribution leaves out, each with its reason. */
 const excluded: Record<string, string> = withheld.tables;
@@ -31,6 +31,25 @@ describe('grants subject tables', () => {
       );
     },
   );
+
+  it.each(Object.entries(linkedTables))(
+    '%s, a platform record, lists every classified column with its sensitivity',
+    (table, { columns }) => {
+      const mapped = Object.entries(classification[table] ?? {}).map(
+        ([column, { sensitivity }]) => [column, sensitivity],
+      );
+      expect([...columns].sort()).toEqual(mapped.sort());
+    },
+  );
+
+  it('reaches each platform record through a table it reads, by a column that table lists', () => {
+    for (const [table, { through, from }] of Object.entries(linkedTables)) {
+      expect(
+        subjectTables[through]?.columns.map(([name]) => name),
+        table,
+      ).toContain(from);
+    }
+  });
 
   it('reads a table after the parent it joins through', () => {
     const order = Object.keys(subjectTables);

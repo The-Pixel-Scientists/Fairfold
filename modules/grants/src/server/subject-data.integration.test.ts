@@ -33,7 +33,16 @@ import {
   emailRow,
 } from '../../../../packages/db/test/grants/decision-fixtures.ts';
 import { addCriterion } from '../../../../packages/db/test/grants/fixtures.ts';
+import {
+  addThread,
+  applicantMessage,
+  MESSAGE_TEXT,
+  noteRow,
+  NOTE_TEXT,
+  staffMessage,
+} from '../../../../packages/db/test/notes/fixtures.ts';
 import { addOrganisation, addPerson } from '../../../../packages/db/test/party/fixtures.ts';
+import { draftReminder, reviewReminder } from '../../../../packages/db/test/reminders/fixtures.ts';
 import {
   addMember,
   asMigratorIn,
@@ -78,6 +87,15 @@ interface Fixture {
   };
   /** Ids of the rows that join to the person's applications, by table. */
   readonly joined: Readonly<Record<string, string>>;
+  /** The notes and messages on the person's application, and a note on the bystander's. */
+  readonly talk: {
+    readonly note: string;
+    readonly otherNote: string;
+    readonly messages: readonly string[];
+    readonly notification: string;
+  };
+  /** Reminders to the person: one about a draft, one about a review. */
+  readonly reminders: { readonly draft: string; readonly review: string };
 }
 
 let db: ReturnType<typeof createDatabase<unknown>>;
@@ -120,7 +138,10 @@ async function addFixture(): Promise<Fixture> {
       }),
       await apply(parts.person, { answers: JSON.stringify({ f_name: 'First draft' }) }),
     ];
-    await apply(bystander, { form_version_id: form, answers: JSON.stringify({ f_name: 'Other' }) });
+    const otherApplication = await apply(bystander, {
+      form_version_id: form,
+      answers: JSON.stringify({ f_name: 'Other' }),
+    });
     await insertRow(
       client,
       'grants.decision_email',
@@ -205,6 +226,49 @@ async function addFixture(): Promise<Fixture> {
         created_by: parts.member,
       }),
     };
+    const noteOn = async (application: string, body: string) => {
+      const note = await insertRow(client, 'app.note', noteRow(tenant, parts.member, { body }));
+      await insertRow(client, 'grants.application_note', {
+        tenant_id: tenant.id,
+        note_id: note,
+        application_id: application,
+      });
+      return note;
+    };
+    const note = await noteOn(released.application, NOTE_TEXT);
+    const otherNote = await noteOn(otherApplication, `${NOTE_TEXT} about someone else`);
+    const thread = await addThread(client, tenant);
+    await insertRow(client, 'grants.application_message', {
+      tenant_id: tenant.id,
+      application_id: released.application,
+      thread_id: thread,
+    });
+    const funder = await insertRow(
+      client,
+      'app.message',
+      staffMessage(tenant, thread, parts.member),
+    );
+    const reply = await insertRow(
+      client,
+      'app.message',
+      applicantMessage(tenant, thread, parts.person),
+    );
+    const notification = await insertRow(client, 'grants.message_notification', {
+      tenant_id: tenant.id,
+      message_id: funder,
+      recipient_person_id: parts.person,
+      template_version_id: released.template,
+    });
+    const reminded = {
+      ...parts,
+      application: released.application,
+      assignment,
+      template: released.template,
+    };
+    const reminders = {
+      draft: await insertRow(client, 'grants.reminder_email', draftReminder(tenant, reminded)),
+      review: await insertRow(client, 'grants.reminder_email', reviewReminder(tenant, reminded)),
+    };
     return {
       tenant,
       person: parts.person,
@@ -213,6 +277,8 @@ async function addFixture(): Promise<Fixture> {
       applications: [...applications, pendingId],
       pending: { decision: unreleased, reviewer, mover },
       joined,
+      talk: { note, otherNote, messages: [funder, reply], notification },
+      reminders,
     };
   });
 }
@@ -282,6 +348,45 @@ describe('grantsSubjectData', { timeout: 30_000 }, () => {
       ).toContain(id);
     }
     expect(data['grants.decision']?.[0]?.['grants.decision.outcome']?.value).toBe('accepted');
+  });
+
+  it('returns the messages on their applications, bodies included, and their notifications', async () => {
+    const data = await read(a.tenant, a.person);
+    const ids = (table: string) => data[table]?.map((row) => row[`${table}.id`]?.value);
+
+    expect(ids('app.message')?.slice().sort()).toEqual([...a.talk.messages].sort());
+    expect(data['app.message']?.[0]?.['app.message.body']?.sensitivity).toBe('personal');
+    expect(JSON.stringify(data['app.message'])).toContain(MESSAGE_TEXT);
+    expect(ids('grants.application_message')).toHaveLength(1);
+    expect(ids('grants.message_notification')).toEqual([a.talk.notification]);
+  });
+
+  it('returns no one else’s messages and nothing of another tenant’s, and no staff note', async () => {
+    const other = await read(a.tenant, a.bystander);
+    expect(other['app.message']).toEqual([]);
+    expect(other['grants.message_notification']).toEqual([]);
+
+    const inB = await read(b.tenant, a.person);
+    for (const table of ['app.message', 'grants.message_notification']) {
+      expect(inB[table], table).toEqual([]);
+    }
+    expect(JSON.stringify(await read(a.tenant, a.person))).not.toContain(NOTE_TEXT);
+  });
+
+  it('returns reminders about a draft, but none about a review, and none for anyone else', async () => {
+    const data = await read(a.tenant, a.person);
+    const rows = data['grants.reminder_email'] ?? [];
+    expect(rows.map((row) => row['grants.reminder_email.id']?.value)).toEqual([a.reminders.draft]);
+    expect(JSON.stringify(rows)).not.toContain(a.reminders.review);
+    expect(rows[0]).not.toHaveProperty(['grants.reminder_email.assignment_id']);
+    expect((await read(a.tenant, a.bystander))['grants.reminder_email']).toEqual([]);
+    expect((await read(b.tenant, a.person))['grants.reminder_email']).toEqual([]);
+  });
+
+  it('leaves out who owns an application and the labels on it', async () => {
+    const data = await read(a.tenant, a.person);
+    expect(data['grants.application_owner']).toBeUndefined();
+    expect(data['grants.application_label']).toBeUndefined();
   });
 
   it('carries no score, reviewer, unreleased decision or later stage move', async () => {

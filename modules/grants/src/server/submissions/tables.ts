@@ -5,7 +5,14 @@
 // db package exports them. Inserts take `tenant_id` from
 // `app.current_tenant_id()`, the transaction's own tenant, never from a value.
 
-import type { ApplicationStatus, EligibilityOutcome } from '../../contracts/index.ts';
+import type {
+  AdjustmentKind,
+  AdjustmentReason,
+  ApplicationStatus,
+  EligibilityOutcome,
+  RevokeReason,
+  SubmissionRoute,
+} from '../../contracts/index.ts';
 import type { Tx } from '../programme/tables.ts';
 
 /** A column the database fills in, so an insert may leave it out (kysely's `Generated`). */
@@ -17,7 +24,28 @@ type Generated<T> = {
 
 export type SubmissionTables = {
   'grants.programme': { id: string; title: string };
-  'grants.round': { id: string; programme_id: string; title: string };
+  'grants.round': {
+    id: string;
+    programme_id: string;
+    title: string;
+    closes_at: Date;
+    timezone: string;
+  };
+  'grants.adjustment': {
+    id: Generated<string>;
+    tenant_id: string;
+    round_id: string;
+    organisation_id: string;
+    application_id: string | null;
+    kind: AdjustmentKind;
+    closes_at: Date | null;
+    reason_code: AdjustmentReason;
+    granted_by: string;
+    granted_at: Generated<Date>;
+    revoked_by: string | null;
+    revoked_at: Date | null;
+    revoke_reason_code: RevokeReason | null;
+  };
   'grants.stage': { id: string; round_id: string; name: string };
   'grants.form_version': { id: string; version: number; definition: unknown };
   'grants.application': {
@@ -33,6 +61,8 @@ export type SubmissionTables = {
     submitted_at: Date;
     submitted_late: boolean;
     withdrawn_at: Date | null;
+    submission_route: SubmissionRoute;
+    submitted_by: string | null;
     created_by: string | null;
     updated_by: string | null;
   };

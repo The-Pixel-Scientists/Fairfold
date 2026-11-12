@@ -14,10 +14,12 @@ import {
   APPLICATION_PATH,
   CHECK_PATH,
   ELIGIBILITY_PATH,
+  MONITORING_PATH,
   OUTCOME_PATH,
   PROGRAMMES_PATH,
   PROGRAMME_PATH,
   SECTION_PATH,
+  SENT_PATH,
   START_APPLICATION_PATH,
   SUBMITTED_PATH,
 } from '../paths.ts';
@@ -100,5 +102,17 @@ export const applyRoutes: readonly RouteDefinition[] = [
     title: 'Your outcome',
     params: application,
     load: () => import('./OutcomePage.tsx'),
+  },
+  {
+    path: SENT_PATH,
+    title: 'What was sent',
+    params: application,
+    load: () => import('./SentPage.tsx'),
+  },
+  {
+    path: MONITORING_PATH,
+    title: 'Equality monitoring',
+    params: application,
+    load: () => import('./MonitoringPage.tsx'),
   },
 ];

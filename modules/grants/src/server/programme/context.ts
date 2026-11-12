@@ -5,6 +5,7 @@
 // the request and from the platform's own tables.
 
 import type { AuditChanges } from '@pixel-scientists/db';
+import type { EventDefinition } from '@pixel-scientists/domain/events';
 import type { FieldProblem } from '@pixel-scientists/domain/platform';
 
 import type {
@@ -36,6 +37,12 @@ export interface ConfigHistoryRow {
   readonly diff: unknown;
 }
 
+/** The request and the member whose action causes an event; the platform adds the tenant. */
+export interface EventCause {
+  readonly requestId: string;
+  readonly membershipId: string;
+}
+
 /** What the platform passes in. */
 export interface GrantsDependencies {
   /** A failure that reads exactly as a missing record does. */
@@ -43,6 +50,16 @@ export interface GrantsDependencies {
   /** A failure the caller can fix, in plain words, with the fields at fault. */
   readonly refuse: (status: 400 | 409, detail: string, errors?: readonly FieldProblem[]) => Error;
   readonly tenantTimeZone: (tx: Tx, tenant: string) => Promise<string>;
+  /**
+   * Publishes an event in the request's transaction (ADR 0034), so its jobs commit or roll back
+   * with the change. The platform checks the data against the event and fills in the envelope.
+   */
+  readonly publish: <E extends EventDefinition>(
+    tx: Tx,
+    event: E,
+    data: E['data']['_zod']['input'],
+    cause: EventCause,
+  ) => Promise<void>;
   /** Writes the entity's next configuration version (rule 10) in the request's transaction. */
   readonly recordConfig: (
     tx: Tx,

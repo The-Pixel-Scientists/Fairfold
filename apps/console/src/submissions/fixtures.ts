@@ -6,6 +6,8 @@
 
 import { projectedAnswersSchemas } from '@pixel-scientists/domain/api';
 import type {
+  Adjustment,
+  AssistedApplication,
   ProgrammeList,
   Submission,
   SubmissionPage,
@@ -140,6 +142,10 @@ export const api = {
   one: (id: string) => `GET /console/submissions/${id}`,
   files: (id: string) => `GET /console/submissions/${id}/files`,
   assignments: (id: string) => `GET /console/submissions/${id}/assignments`,
+  adjustments: (id: string) => `GET /console/submissions/${id}/adjustments`,
+  roundAdjustments: `GET /console/rounds/${ids.round}/adjustments`,
+  give: `POST /console/rounds/${ids.round}/adjustments`,
+  revoke: (id: string) => `POST /console/adjustments/${id}/revoke`,
   move: (stageId: string) => `POST /console/stages/${stageId}/submissions`,
 } as const;
 
@@ -155,3 +161,58 @@ export const heading = (name: string) => screen.findByRole('heading', { level: 1
 
 /** The rows of the table, header row left out. */
 export const rowsOfTable = () => screen.getAllByRole('row').slice(1);
+
+/** An extension granted by Ada Reed: the nth in the round, for the organisation of submission 1. */
+export function adjustment(n: number, change: Partial<Adjustment> = {}): Adjustment {
+  return {
+    id: uuid(700 + n),
+    roundId: ids.round,
+    organisation: { id: summary(1).organisation.id, name: summary(1).organisation.name },
+    applicationId: null,
+    kind: 'deadline_extension',
+    closesAt: '2026-11-09T17:00',
+    timeZone: 'Europe/London',
+    reasonCode: 'technical_problem',
+    grantedBy: { membershipId: uuid(11), name: 'Ada Reed' },
+    grantedAt: '2026-11-01T10:30:00.000Z',
+    revoked: null,
+    ...change,
+  };
+}
+
+/** What the adjustments panel reads: the adjustments, and when the submission closes. */
+export const adjustmentsFor = (
+  adjustments: readonly Adjustment[],
+  closesAt = '2026-11-02T17:00',
+) => ({
+  adjustments: [...adjustments],
+  closesAt,
+  timeZone: 'Europe/London',
+});
+
+/** An application a member is filling in for Harbourside Youth Project. */
+export const APPLICATION = uuid(900);
+
+export const complete = {
+  f_name: 'Harbourside Youth Project',
+  f_charity: true,
+  f_number: '1234567',
+  f_story: 'We run a youth club every Friday.',
+  f_spend: 'building',
+};
+
+export function assisted(answers: Record<string, unknown> = complete): AssistedApplication {
+  return {
+    id: APPLICATION,
+    organisation: { id: uuid(201), name: 'Harbourside Youth Project' },
+    contact: { personId: uuid(400), name: 'Sam Patel' },
+    updatedAt: '2026-10-30T09:00:00.000Z',
+    round: { id: ids.round, title: 'Autumn 2026' },
+    closesAt: '2026-11-09T17:00',
+    timeZone: 'Europe/London',
+    form: { id: uuid(300), definition: organisationForm },
+    answers: projectedAnswersSchemas.staff.parse(answers),
+    answersVersion: 4,
+    eligibility: { status: 'eligible' },
+  };
+}

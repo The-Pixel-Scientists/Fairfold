@@ -11,3 +11,6 @@ export const submissionsPath = (search = '') => `${SUBMISSIONS_PATH}${search}`;
 
 export const submissionPath = (submissionId: string, search = '') =>
   `${SUBMISSIONS_PATH}/${submissionId}${search}`;
+
+/** An application a member fills in for an applicant, by the application's id. */
+export const assistedPath = (applicationId: string) => `/assisted-applications/${applicationId}`;

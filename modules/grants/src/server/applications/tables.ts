@@ -6,7 +6,13 @@
 // from `app.current_tenant_id()`, the transaction's own tenant, never from a
 // value.
 
-import type { ApplicationStatus, EligibilityOutcome, Outcome } from '../../contracts/index.ts';
+import type {
+  AdjustmentKind,
+  ApplicationStatus,
+  EligibilityOutcome,
+  Outcome,
+  SubmissionRoute,
+} from '../../contracts/index.ts';
 import { grantsDb, type Tx } from '../programme/tables.ts';
 
 /** A column the database fills in, so an insert may leave it out (kysely's `Generated`). */
@@ -47,8 +53,19 @@ type ApplicationTables = {
     submitted_late: Generated<boolean>;
     withdrawn_at: Generated<Date | null>;
     updated_at: Generated<Date>;
+    submission_route: Generated<SubmissionRoute>;
+    submitted_by: Generated<string | null>;
     created_by: string;
     updated_by: string;
+  };
+  'grants.adjustment': {
+    id: string;
+    round_id: string;
+    organisation_id: string;
+    application_id: string | null;
+    kind: AdjustmentKind;
+    closes_at: Date | null;
+    revoked_at: Date | null;
   };
   'grants.application_file': {
     tenant_id: string;

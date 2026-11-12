@@ -81,7 +81,7 @@ export function uploadHandler(deps: ApplicationDependencies) {
 
     const draft = await lockOwn(tx, deps, userId, applicationId, false);
     if (draft.status !== 'draft') throw deps.refuse(409, refusals.notDraft);
-    const round = await closing(tx, draft.roundId);
+    const round = await closing(tx, draft);
     if (!round.taking) throw deps.notFound();
     if (round.closed && round.late_policy === 'refuse') throw deps.refuse(409, refusals.closed);
     const field = await fileQuestion(tx, draft, fieldId);

@@ -10,6 +10,7 @@ import { AnswerView, Link, buttonClassName, useParams } from '@pixel-scientists/
 
 import { useFunderName } from '../funder.tsx';
 import { APPLICATIONS_PATH, applicationPath } from '../paths.ts';
+import { AssistedPanel, MonitoringOffer } from './afterSubmit.tsx';
 import { downloadHref } from './files.ts';
 import { dateAndTimeOf } from './format.ts';
 import { helpers } from './helpers.ts';
@@ -151,10 +152,12 @@ function submittedView(loaded: ApplicationWithFiles): View {
       body: (
         <>
           <Sent application={application} />
+          <AssistedPanel application={application} />
           <SentFiles {...loaded} />
           <Block title="What happens next">
             <Steps steps={steps} />
           </Block>
+          <MonitoringOffer application={application} />
           {toApplications}
         </>
       ),

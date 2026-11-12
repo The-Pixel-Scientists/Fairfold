@@ -11,7 +11,10 @@
 // Every file linked to those applications is erased through app.erase_file(),
 // whatever its question's class or its scan state: the database clears its
 // name, hash and key and keeps the link, and the file sweep then deletes the
-// object, which no row points at. It runs whether or not the tenant has the
+// object, which no row points at. The bodies of the notes and messages on
+// those applications are cleared through app.erase_subject_notes(), which keeps
+// their ids, sides and times, and the notifications to the person are failed
+// and lose their recipient. It runs whether or not the tenant has the
 // module switched on.
 
 import { classifyAnswers, pinnedDefinitions } from '@pixel-scientists/db';
@@ -29,7 +32,7 @@ export const grantsErasure: ErasureContribution<'grants', Tx> = {
     const applications = await tx
       .$extendTables<Tables>()
       .selectFrom('grants.application')
-      .select(['id', 'answers'])
+      .select(['id', 'applicant_person_id', 'answers'])
       .where(
         'applicant_person_id',
         'in',
@@ -81,6 +84,17 @@ export const grantsErasure: ErasureContribution<'grants', Tx> = {
         .executeTakeFirstOrThrow();
       if (erased) files++;
     }
-    return { 'grants.application': changed, 'app.file': files };
+
+    // Every erased applicant here has applications, and the function refuses a party erased elsewhere.
+    const notes: Record<string, number> = {};
+    for (const partyId of new Set(applications.map((row) => String(row['applicant_person_id'])))) {
+      const { counts } = await tx
+        .selectNoFrom((eb) =>
+          eb.fn<Record<string, number>>('app.erase_subject_notes', [eb.val(partyId)]).as('counts'),
+        )
+        .executeTakeFirstOrThrow();
+      for (const [table, n] of Object.entries(counts)) notes[table] = (notes[table] ?? 0) + n;
+    }
+    return { 'grants.application': changed, 'app.file': files, ...notes };
   },
 };

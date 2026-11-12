@@ -22,6 +22,7 @@ import { callApi } from '../api.ts';
 import { useFunderName } from '../funder.tsx';
 import { applicationPath, eligibilityPath, sectionPath, submittedPath } from '../paths.ts';
 import { downloadHref } from './files.ts';
+import { deadlineOf } from './format.ts';
 import {
   ELIGIBILITY_SCREEN,
   problemsOf,
@@ -231,10 +232,13 @@ function checkView({ application, files }: ApplicationWithFiles, reload: () => v
       title: 'Check your answers',
       breadcrumbs: crumbs(application, 'Check your answers'),
       intro: (
-        <p>
-          Read through your answers before you send them. You can change anything. We have saved
-          every answer, so you will not lose them.
-        </p>
+        <>
+          <p>
+            Read through your answers before you send them. You can change anything. We have saved
+            every answer, so you will not lose them.
+          </p>
+          <p>Your deadline is {deadlineOf(application)}.</p>
+        </>
       ),
     },
     body: <Answers application={application} files={files} reload={reload} />,

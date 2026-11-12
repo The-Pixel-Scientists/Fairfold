@@ -10,6 +10,7 @@ import { Link, buttonClassName } from '@pixel-scientists/ui';
 import type { BreadcrumbItem } from '@pixel-scientists/ui';
 
 import { APPLICATIONS_PATH, applicationPath, outcomePath, submittedPath } from '../paths.ts';
+import { AssistedPanel, MonitoringOffer } from './afterSubmit.tsx';
 import type { Heading, Missing, View } from './parts.tsx';
 import { StatusTag } from './status.tsx';
 
@@ -77,6 +78,7 @@ export function notDraft(application: Application): View {
           Status
           <StatusTag status={application.status} />
         </p>
+        <AssistedPanel application={application} />
         <div className="flex flex-col gap-3 sm:flex-row">
           <ReadOutcome application={application} />
           <Link
@@ -86,6 +88,7 @@ export function notDraft(application: Application): View {
             See your application
           </Link>
         </div>
+        <MonitoringOffer application={application} />
       </>
     ),
   };

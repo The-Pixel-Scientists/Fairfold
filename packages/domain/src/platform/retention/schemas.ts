@@ -48,6 +48,8 @@ export const retentionPolicyListSchema = z.strictObject({
 /** Names for the policies the classification map uses; a policy not listed shows its id. */
 export const retentionPolicyLabels: Readonly<Record<string, string>> = {
   audit: 'Audit log',
+  crm_import_jobs: 'Contact import jobs',
+  crm_import_rows: 'Contact import rows',
 };
 
 /**

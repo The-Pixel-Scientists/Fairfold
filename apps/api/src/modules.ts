@@ -10,14 +10,18 @@ import type { FieldProblem } from '@pixel-scientists/domain/platform';
 import { listAuditEvents } from '@pixel-scientists/domain/platform/audit-log';
 import { getWarehouseSnapshot } from '@pixel-scientists/domain/warehouse';
 import {
+  adjustmentRoutes,
   applicationRoutes,
   assessmentRoutes,
+  assistedRoutes,
   assignReviewersAutomatically,
   attachmentRoutes,
   decisionRoutes,
   exportRoutes,
   FORM_DEFINITION_MAX_BYTES,
   formRoutes,
+  messageRoutes,
+  noteRoutes,
   programmeRoutes,
   reviewRoutes,
   spreadRoutes,
@@ -40,10 +44,13 @@ import {
 
 import type { PublicTenants, TenantTransaction } from './database.ts';
 import { queueReleaseEmail } from './decision-emails.ts';
+import { publishGrantsEvent } from './grant-events.ts';
+import { queueMessageNotification } from './message-notifications.ts';
 import { listAuditEventsHandler } from './platform/audit-log/index.ts';
 import { insertConfigVersion, readConfigHistory } from './platform/config-versions.ts';
 import { erasureRoutes, type Contribution } from './platform/erasure/index.ts';
 import { membersWith } from './platform/members.ts';
+import { notesPlatform } from './platform/notes/index.ts';
 import { retentionRoutes } from './platform/retention/index.ts';
 import { settingsRoutes } from './platform/settings/index.ts';
 import { settingsTables } from './platform/settings/tables.ts';
@@ -150,6 +157,9 @@ export function composeModules(deps: {
     configHistory: readConfigHistory,
     membersWith,
     queueEmail: queueReleaseEmail(deps.jobs ?? noJobs),
+    queueNotification: queueMessageNotification(deps.jobs ?? noJobs),
+    notes: notesPlatform,
+    publish: publishGrantsEvent(deps.jobs ?? noJobs),
     ...(deps.mail ?? noMail),
   });
   return {
@@ -257,6 +267,51 @@ export function composeModules(deps: {
       route(submissionRoutes.listSubmissions, grants.listSubmissions),
       route(submissionRoutes.getSubmission, grants.getSubmission),
       route(submissionRoutes.moveSubmissionsToStage, grants.moveSubmissionsToStage),
+      route(adjustmentRoutes.listRoundAdjustments, grants.listRoundAdjustments),
+      route(adjustmentRoutes.listSubmissionAdjustments, grants.listSubmissionAdjustments),
+      route(adjustmentRoutes.grantAdjustment, grants.grantAdjustment, {
+        replay: ({ tx, id }) => grants.replayGrant({ tx, id: created(id) }),
+      }),
+      route(adjustmentRoutes.revokeAdjustment, grants.revokeAdjustment),
+      route(assistedRoutes.listAssistedApplications, grants.listAssistedApplications),
+      route(assistedRoutes.startAssistedApplication, grants.startAssistedApplication, {
+        replay: ({ tx, context, id }) =>
+          grants.getAssistedApplication({
+            tx,
+            context,
+            input: { params: { applicationId: created(id) } },
+          }),
+      }),
+      route(assistedRoutes.getAssistedApplication, grants.getAssistedApplication),
+      route(assistedRoutes.saveAssistedAnswers, grants.saveAssistedAnswers),
+      route(assistedRoutes.checkAssistedEligibility, grants.checkAssistedEligibility),
+      route(assistedRoutes.submitAssistedApplication, grants.submitAssistedApplication),
+      route(noteRoutes.listNotes, grants.listNotes),
+      route(noteRoutes.addNote, grants.addNote, {
+        replay: async ({ tx, context, input, id }) =>
+          (await grants.listNotes({ tx, context, input })).notes.find((n) => n.id === id) ??
+          missing(),
+      }),
+      route(noteRoutes.listMentionableMembers, grants.listMentionableMembers),
+      route(messageRoutes.getApplicantThread, grants.getApplicantThread),
+      route(messageRoutes.sendApplicantMessage, grants.sendApplicantMessage, {
+        replay: async ({ tx, context, input, id }) =>
+          (await grants.getApplicantThread({ tx, context, input })).messages.find(
+            (m) => m.id === id,
+          ) ?? missing(),
+      }),
+      route(messageRoutes.markApplicantThreadRead, grants.markApplicantThreadRead),
+      route(messageRoutes.getStaffThread, grants.getStaffThread),
+      route(messageRoutes.sendStaffMessage, grants.sendStaffMessage, {
+        replay: async ({ tx, context, input, id }) =>
+          (await grants.getStaffThread({ tx, context, input })).messages.find((m) => m.id === id) ??
+          missing(),
+      }),
+      route(messageRoutes.markStaffThreadRead, grants.markStaffThreadRead),
+      // The monitoring routes stay unregistered until the audit log hides
+      // `grants.monitoring.*` from everyone without `platform.audit.read` and
+      // `grants.monitoring.disclose` and the subject access walk withholds it
+      // (ADR 0032); registering them first would show who answered and who withdrew.
       route(assessmentRoutes.getReviewerPool, grants.getReviewerPool),
       route(assessmentRoutes.listReviewerCandidates, grants.listReviewerCandidates),
       route(assessmentRoutes.addReviewers, grants.addReviewers),

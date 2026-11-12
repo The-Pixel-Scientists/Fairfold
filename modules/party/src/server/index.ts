@@ -8,7 +8,9 @@
 // routes and the scope rules. `partySubjectRules` is for the platform's audit
 // writer alone. `partyWarehouse` feeds the warehouse snapshot.
 // `partySubjectData` and `partyMergeSet` serve subject access. `partyErasure` and
-// `partyErasureTarget` serve erasure.
+// `partyErasureTarget` serve erasure. `partyRecordHandlers` serves the staff
+// routes that change records. `createPartyMerges` is crm's merge, duplicate and
+// resolve contract, over the re-points apps/api registers with `partyRepoint`.
 
 export {
   contactDetails,
@@ -24,6 +26,10 @@ export {
   type PartyContext,
   type PartyDependencies,
 } from './handlers.ts';
+export { partyRecordHandlers, type PartyRecordDependencies } from './record-handlers.ts';
+export { createPartyMerges } from './merge.ts';
+export type { PartyRequest } from './request.ts';
+export { partyRepoint } from './repoint.ts';
 export { partySubjectRules, type SubjectRule } from './audit.ts';
 export { partyWarehouse } from './warehouse.ts';
 export {

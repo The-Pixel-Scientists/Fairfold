@@ -18,6 +18,14 @@ import {
   addParts,
   applicationRow,
 } from '../../../../packages/db/test/grants/application-fixtures.ts';
+import {
+  addThread,
+  applicantMessage,
+  MESSAGE_TEXT,
+  noteRow,
+  NOTE_TEXT,
+  staffMessage,
+} from '../../../../packages/db/test/notes/fixtures.ts';
 import { addOrganisation, addPerson } from '../../../../packages/db/test/party/fixtures.ts';
 import {
   asMigratorIn,
@@ -65,6 +73,10 @@ interface Fixture {
   /** The person's linked file, and the bystander's. */
   readonly file: string;
   readonly otherFile: string;
+  /** The notes and messages on the person's applications, and a note on the bystander's. */
+  readonly notes: readonly string[];
+  readonly otherNote: string;
+  readonly messages: readonly string[];
 }
 
 let db: ReturnType<typeof createDatabase<unknown>>;
@@ -117,8 +129,43 @@ async function addFixture(): Promise<Fixture> {
     };
     const file = await link(applications[1] ?? '');
     const otherFile = await link(other);
+    const noteOn = async (application: string, body: string) => {
+      const note = await insertRow(client, 'app.note', noteRow(tenant, parts.member, { body }));
+      await insertRow(client, 'grants.application_note', {
+        tenant_id: tenant.id,
+        note_id: note,
+        application_id: application,
+      });
+      return note;
+    };
+    const notes = [
+      await noteOn(applications[0] ?? '', NOTE_TEXT),
+      await noteOn(applications[1] ?? '', NOTE_TEXT),
+    ];
+    const otherNote = await noteOn(other, NOTE_TEXT);
+    const thread = await addThread(client, tenant);
+    await insertRow(client, 'grants.application_message', {
+      tenant_id: tenant.id,
+      application_id: applications[1],
+      thread_id: thread,
+    });
+    const messages = [
+      await insertRow(client, 'app.message', staffMessage(tenant, thread, parts.member)),
+      await insertRow(client, 'app.message', applicantMessage(tenant, thread, parts.person)),
+    ];
     await addErasureRequest(client, tenant, parts.member, parts.person);
-    return { tenant, person: parts.person, bystander, applications, other, file, otherFile };
+    return {
+      tenant,
+      person: parts.person,
+      bystander,
+      applications,
+      other,
+      file,
+      otherFile,
+      notes,
+      otherNote,
+      messages,
+    };
   });
 }
 
@@ -143,6 +190,15 @@ const fileOf = (fixture: Fixture, id: string) =>
       [id],
     );
     return rows[0];
+  });
+
+/** The body of each note and message in the tenant, by id. */
+const bodiesOf = (fixture: Fixture) =>
+  asMigratorIn(fixture.tenant.id, async (client) => {
+    const { rows } = await client.query<{ id: string; body: string }>(
+      'SELECT id, body FROM app.note UNION ALL SELECT id, body FROM app.message',
+    );
+    return new Map(rows.map((row) => [row.id, row.body]));
   });
 
 const subjectsOf = (fixture: Fixture) => [
@@ -205,7 +261,13 @@ describe('grantsErasure', () => {
     await eraseApplicant(a);
     const counts = await inTenant(a, (tx) => grantsErasure.erase(tx, subjectsOf(a)));
 
-    expect(counts).toEqual({ 'grants.application': 2, 'app.file': 1 });
+    expect(counts).toEqual({
+      'grants.application': 2,
+      'app.file': 1,
+      'app.note': 2,
+      'app.message': 2,
+      'grants.message_notification': 0,
+    });
     expect(await answersOf(a, a.applications[0] ?? '')).toEqual({
       f_name: 'Hall roof',
       f_note: 'Second round',
@@ -231,10 +293,24 @@ describe('grantsErasure', () => {
     expect(await fileOf(b, b.file)).toMatchObject({ name: 'Accounts 2025.pdf', erased: false });
   });
 
+  it('clears the notes and messages on the applications, keeps their ids, and leaves a bystander’s and tenant B’s', async () => {
+    const bodies = await bodiesOf(a);
+
+    for (const id of [...a.notes, ...a.messages]) expect(bodies.get(id), id).toBe('erased');
+    expect(bodies.get(a.otherNote)).toBe(NOTE_TEXT);
+    const inB = await bodiesOf(b);
+    expect([...inB.values()]).not.toContain('erased');
+    expect([...inB.values()]).toEqual(expect.arrayContaining([NOTE_TEXT, MESSAGE_TEXT]));
+    expect([...bodies.values()].join()).not.toContain(MESSAGE_TEXT);
+  });
+
   it('changes nothing the second time', async () => {
     expect(await inTenant(a, (tx) => grantsErasure.erase(tx, subjectsOf(a)))).toEqual({
       'grants.application': 0,
       'app.file': 0,
+      'app.note': 0,
+      'app.message': 0,
+      'grants.message_notification': 0,
     });
   });
 });

@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
 // The grants module's contribution to subject access (ADR 0016, ADR 0027):
-// the person's applications and the decision emails sent to them, and every
+// the person's applications, the decision emails and message notifications sent to
+// them, the messages on their applications (bodies included, as the person is
+// owed them), and every
 // table that joins to an application by its subject path (eligibility
 // results, the first stage entry, file links and released decisions), each
 // classified column keyed by its field id with its sensitivity. Scores,
@@ -83,6 +85,38 @@ export const subjectTables: Readonly<
       ),
     ],
   },
+  'grants.message_notification': {
+    column: 'recipient_person_id',
+    columns: [
+      ...internal('tenant_id', 'id', 'message_id'),
+      ['recipient_person_id', 'personal'],
+      ...internal('template_version_id', 'status', 'error_code', 'sent_at', 'created_at'),
+    ],
+  },
+  'grants.application_message': {
+    column: 'application_id',
+    parent: 'grants.application',
+    columns: internal('tenant_id', 'id', 'application_id', 'thread_id', 'created_at'),
+  },
+  'grants.reminder_email': {
+    column: 'recipient_person_id',
+    only: ['assignment_id', 'is'],
+    columns: internal(
+      'tenant_id',
+      'id',
+      'kind',
+      'application_id',
+      'recipient_person_id',
+      'template_version_id',
+      'occurrence',
+      'status',
+      'outcome_code',
+      'attempts',
+      'last_attempt_at',
+      'sent_at',
+      'created_at',
+    ),
+  },
   'grants.eligibility_result': {
     column: 'application_id',
     parent: 'grants.application',
@@ -146,6 +180,26 @@ export const subjectTables: Readonly<
 };
 
 /**
+ * The platform's messages (ADR 0030), read by the thread ids an application's join table holds,
+ * since their own rows name no applicant: the `from` column of each `through` row is the
+ * record's `column`.
+ */
+export const linkedTables: Readonly<
+  Record<string, { through: string; from: string; column: string; columns: Columns }>
+> = {
+  'app.message': {
+    through: 'grants.application_message',
+    from: 'thread_id',
+    column: 'thread_id',
+    columns: [
+      ...internal('tenant_id', 'id', 'thread_id', 'side'),
+      ['body', 'personal'],
+      ...internal('author_membership_id', 'author_person_id', 'created_at'),
+    ],
+  },
+};
+
+/**
  * What a subject access export leaves out until a check before release
  * exists (rule 8: decisions are private until released), in plain words, by
  * table, column and rows.
@@ -155,18 +209,19 @@ export const withheld = {
     'grants.score': 'Scores and comments stay private until a check before release exists.',
     'grants.assignment':
       'Who reviews an application, and how far their reviews have gone, stays private. The row can name the reviewer and show how far the application has moved.',
+    'grants.application_note':
+      'Staff notes about an application are not yet read for export: the export job cannot read them until the database grants it.',
+    'grants.application_owner': 'Who owns an application is staff triage and names a staff member.',
+    'grants.application_label':
+      'Labels on an application are staff triage, not shown to applicants.',
     'grants.adjustment':
       'Its reason codes are not shown to applicants, and it is about the organisation, not the person.',
     'grants.monitoring_response':
       'Monitoring responses are a separate output (ADR 0032), not part of this export.',
-    'grants.application_note':
-      'Staff notes about an application are not yet read for export; the grants module adds them.',
-    'grants.application_message':
-      'Messages about an application are not yet read for export; the grants module adds them.',
-    'grants.message_notification':
-      'Notifications of messages are not yet read for export; the grants module adds them.',
   },
   columns: {
+    'grants.reminder_email.assignment_id':
+      'It names a review assignment, which shows who reviews an application.',
     'grants.application.submitted_by':
       'It names the staff member who submitted the application for the applicant.',
     'grants.application.stage_id':
@@ -177,6 +232,8 @@ export const withheld = {
       'Once an application is submitted, it names the staff member who moved it on.',
   },
   rows: {
+    'grants.reminder_email':
+      'Only reminders about a draft are included. Overdue review reminders show who reviews an application.',
     'grants.decision': 'A decision is included only once it has been released.',
     'grants.stage_transition':
       'Only the move into the first stage is included. Later moves show how far the application has gone.',
@@ -245,21 +302,33 @@ export const grantsSubjectData: SubjectDataContribution<'grants', Tx> = {
   module: 'grants',
   async subjectData(tx, subjectPartyId) {
     const data: SubjectData = {};
-    const ids: Record<string, string[]> = {};
+    const read: Record<string, StoredRow[]> = {};
     for (const [table, { column, parent, columns, only }] of Object.entries(subjectTables)) {
       const rows = await rowsOf(
         tx,
         table,
         column,
         columns,
-        parent === undefined ? [subjectPartyId] : (ids[parent] ?? []),
+        parent === undefined
+          ? [subjectPartyId]
+          : (read[parent] ?? []).map((row) => String(row['id'])),
         only,
       );
-      ids[table] = rows.map((row) => String(row['id']));
+      read[table] = rows;
       data[table] =
         table === 'grants.application'
           ? await withAnswers(tx, columns, rows)
           : rows.map((row) => toRow(table, columns, row));
+    }
+    for (const [table, { through, from, column, columns }] of Object.entries(linkedTables)) {
+      const rows = await rowsOf(
+        tx,
+        table,
+        column,
+        columns,
+        (read[through] ?? []).map((row) => String(row[from])),
+      );
+      data[table] = rows.map((row) => toRow(table, columns, row));
     }
     return data;
   },

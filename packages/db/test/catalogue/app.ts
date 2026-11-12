@@ -149,10 +149,44 @@ export const app: SchemaCatalogue = {
       'app.apply_retention(text)',
       {
         owner: 'owner_app_apply_retention',
-        // No column outside the audit tables has a tenant_policy rule yet,
-        // so it has no targets, and no rights on any table.
-        rights: ['USAGE on schema app', 'EXECUTE on function app.current_tenant_id()'],
-        policies: [],
+        // Its targets are the crm import tables (migration 0064). It reads
+        // the tenant's settings, writes its own event, and releases a
+        // deleted job's file; never a column the database sets.
+        rights: [
+          'USAGE on schema app',
+          'USAGE on schema crm',
+          'EXECUTE on function app.current_tenant_id()',
+          'EXECUTE on function app.release_file(uuid)',
+          ...['tenant_id', 'policy', 'days'].map(
+            (column) => `SELECT on column app.retention_policy.${column}`,
+          ),
+          ...['tenant_id', 'id', 'job_id'].map(
+            (column) => `SELECT on column crm.import_row.${column}`,
+          ),
+          'DELETE on crm.import_row',
+          ...['tenant_id', 'id', 'updated_at'].map(
+            (column) => `SELECT on column crm.import_job.${column}`,
+          ),
+          'DELETE on crm.import_job',
+          ...['tenant_id', 'id', 'released_at'].map(
+            (column) => `SELECT on column app.file.${column}`,
+          ),
+          'UPDATE on column app.file.released_at',
+          ...[
+            'tenant_id',
+            'request_id',
+            'actor_kind',
+            'action',
+            'entity_type',
+            'entity_id',
+            'changes',
+          ].map((column) => `INSERT on column app.audit_event.${column}`),
+        ],
+        policies: [
+          'crm.import_row policy retention_delete',
+          'crm.import_job policy retention_delete',
+          'app.audit_event policy retention_insert',
+        ],
       },
     ],
     [

@@ -22,7 +22,10 @@ export interface MailSender {
   >;
 }
 
-export interface DecisionDependencies extends Pick<GrantsDependencies, 'notFound' | 'refuse'> {
+export interface DecisionDependencies extends Pick<
+  GrantsDependencies,
+  'notFound' | 'refuse' | 'publish'
+> {
   /**
    * Queues the job that sends one outbox row's email, in the request's transaction (ADR 0009).
    * The platform supplies it; the job commits or rolls back with the release. It answers whether

@@ -1,0 +1,251 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+//
+// The catalogue test's allowlists for the assure schema (migrations 0053 to
+// 0058), and every right an app role holds in it
+// (test/assure/catalogue.test.ts).
+
+import type { AppRole } from '../connect.ts';
+import type { SchemaCatalogue } from './index.ts';
+
+const columns = (privilege: string, table: string, names: readonly string[]) =>
+  names.map((name) => `${privilege} on column assure.${table}.${name}`);
+
+const ADDRESS = [
+  'address_line1',
+  'address_line2',
+  'address_town',
+  'address_postcode',
+  'address_country_code',
+];
+
+export const assure: SchemaCatalogue = {
+  // The erasure job, once the party is erased (ADR 0027).
+  executableBy: [['assure.erase_subject(uuid)', ['app_worker']]],
+  definerFunctions: [
+    [
+      'assure.erase_subject(uuid)',
+      {
+        owner: 'owner_assure_erase_subject',
+        rights: [
+          'USAGE on schema app',
+          'USAGE on schema assure',
+          'USAGE on schema grants',
+          'USAGE on schema party',
+          'EXECUTE on function app.current_tenant_id()',
+          ...['tenant_id', 'id', 'status'].map((name) => `SELECT on column party.party.${name}`),
+          ...['tenant_id', 'id', 'applicant_person_id'].map(
+            (name) => `SELECT on column grants.application.${name}`,
+          ),
+          ...columns('SELECT', 'lookup_officer', ['tenant_id', 'person_id', 'name']),
+          ...columns('UPDATE', 'lookup_officer', ['name']),
+          ...columns('SELECT', 'screening_match', [
+            'tenant_id',
+            'subject_party_id',
+            'screened_name',
+          ]),
+          ...columns('UPDATE', 'screening_match', ['screened_name']),
+          ...columns('SELECT', 'lookup_snapshot', [
+            'tenant_id',
+            'organisation_id',
+            'address_line1',
+          ]),
+          ...columns('UPDATE', 'lookup_snapshot', ADDRESS),
+          ...columns('SELECT', 'checklist_response', ['tenant_id', 'application_id', 'answers']),
+          ...columns('UPDATE', 'checklist_response', ['answers']),
+          ...columns('SELECT', 'monitoring_visit', [
+            'tenant_id',
+            'id',
+            'organisation_id',
+            'findings',
+            'follow_ups',
+          ]),
+          ...columns('UPDATE', 'monitoring_visit', ['findings', 'follow_ups']),
+          ...columns('SELECT', 'visit_evidence', ['tenant_id', 'visit_id', 'caption']),
+          ...columns('UPDATE', 'visit_evidence', ['caption']),
+          ...columns('SELECT', 'visit_attendee', ['tenant_id', 'person_id']),
+          'DELETE on assure.visit_attendee',
+        ],
+        policies: [],
+      },
+    ],
+  ],
+  // ADR 0031, "Reference lists": the one exception that ADR makes to rule 2.
+  nonTenantTables: [
+    [
+      'assure.reference_list',
+      'ADR 0031: one row per sanctions list or register download, the same for every tenant. App roles read it only.',
+    ],
+    [
+      'assure.sanctions_entry',
+      'ADR 0031: the published UK sanctions list, the same for every tenant. App roles read it only.',
+    ],
+  ],
+};
+
+/** Each app role's rights in the assure schema, as "<privilege> on <object>". */
+export const ASSURE_RIGHTS: Readonly<Record<AppRole, readonly string[]>> = {
+  app_api: [
+    'USAGE on schema assure',
+    ...[
+      'reference_list',
+      'sanctions_entry',
+      'lookup_snapshot',
+      'lookup_officer',
+      'screening_run',
+      'screening_match',
+      'match_decision',
+      'checklist',
+      'checklist_version',
+      'checklist_response',
+      'checklist_response_file',
+      'monitoring_visit',
+      'visit_attendee',
+      'visit_evidence',
+    ].map((table) => `SELECT on assure.${table}`),
+    ...columns('UPDATE', 'lookup_officer', ['person_id', 'linked_by']),
+    ...columns('INSERT', 'screening_run', ['tenant_id', 'party_id', 'trigger', 'requested_by']),
+    ...columns('UPDATE', 'screening_match', ['subject_party_id']),
+    ...columns('INSERT', 'match_decision', [
+      'tenant_id',
+      'match_id',
+      'outcome',
+      'reason_code',
+      'decided_by',
+    ]),
+    ...columns('INSERT', 'checklist', [
+      'tenant_id',
+      'programme_id',
+      'name',
+      'created_by',
+      'updated_by',
+    ]),
+    ...columns('UPDATE', 'checklist', ['name', 'current_version', 'archived_at', 'updated_by']),
+    ...columns('INSERT', 'checklist_version', [
+      'tenant_id',
+      'checklist_id',
+      'version',
+      'name',
+      'description',
+      'items',
+      'published_by',
+    ]),
+    ...columns('INSERT', 'checklist_response', [
+      'tenant_id',
+      'application_id',
+      'checklist_id',
+      'checklist_version_id',
+      'answers',
+      'saved_by',
+    ]),
+    ...columns('UPDATE', 'checklist_response', ['answers', 'saved_by']),
+    'DELETE on assure.checklist_response_file',
+    ...columns('INSERT', 'checklist_response_file', [
+      'tenant_id',
+      'response_id',
+      'item_id',
+      'file_id',
+      'created_by',
+    ]),
+    ...columns('INSERT', 'monitoring_visit', [
+      'tenant_id',
+      'organisation_id',
+      'application_id',
+      'visited_on',
+      'visit_type',
+      'findings',
+      'follow_ups',
+      'recorded_by',
+      'updated_by',
+    ]),
+    ...columns('UPDATE', 'monitoring_visit', [
+      'visited_on',
+      'visit_type',
+      'findings',
+      'follow_ups',
+      'updated_by',
+    ]),
+    'DELETE on assure.visit_attendee',
+    ...columns('INSERT', 'visit_attendee', ['tenant_id', 'visit_id', 'person_id']),
+    'DELETE on assure.visit_evidence',
+    ...columns('INSERT', 'visit_evidence', [
+      'tenant_id',
+      'visit_id',
+      'file_id',
+      'caption',
+      'added_by',
+    ]),
+    ...columns('UPDATE', 'visit_evidence', ['caption']),
+  ],
+  app_worker: [
+    'USAGE on schema assure',
+    'EXECUTE on function assure.erase_subject(uuid)',
+    ...[
+      'reference_list',
+      'sanctions_entry',
+      'lookup_snapshot',
+      'lookup_officer',
+      'screening_run',
+      'screening_match',
+      'match_decision',
+      'checklist',
+      'checklist_version',
+      'checklist_response',
+      'checklist_response_file',
+      'monitoring_visit',
+      'visit_attendee',
+      'visit_evidence',
+    ].map((table) => `SELECT on assure.${table}`),
+    ...columns('INSERT', 'lookup_snapshot', [
+      'tenant_id',
+      'organisation_id',
+      'registry',
+      'scheme',
+      'identifier',
+      'outcome',
+      'list_id',
+      'registry_status',
+      'registered_name',
+      ...ADDRESS,
+      'registered_on',
+      'removed_on',
+      'accounts_period_end',
+      'income_minor',
+      'income_currency',
+      'expenditure_minor',
+      'expenditure_currency',
+      'accounts_overdue',
+    ]),
+    ...columns('INSERT', 'lookup_officer', ['tenant_id', 'snapshot_id', 'name', 'role']),
+    ...columns('INSERT', 'screening_run', ['tenant_id', 'party_id', 'trigger']),
+    ...columns('UPDATE', 'screening_run', [
+      'status',
+      'list_id',
+      'list_last_checked_at',
+      'threshold',
+      'names_screened',
+      'matches_raised',
+      'error_code',
+    ]),
+    ...columns('INSERT', 'screening_match', [
+      'tenant_id',
+      'run_id',
+      'party_id',
+      'name_source',
+      'officer_id',
+      'subject_party_id',
+      'screened_name',
+      'list_id',
+      'designation_id',
+      'entry_kind',
+      'entry_name',
+      'regime',
+      'designated_on',
+      'dates_of_birth',
+      'nationalities',
+      'country',
+      'similarity',
+    ]),
+  ],
+  app_auth: [],
+  app_queue: [],
+};

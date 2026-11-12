@@ -16,7 +16,7 @@ import {
 import type { TaskItem } from '@pixel-scientists/ui';
 
 import { checkPath, eligibilityPath, sectionPath } from '../paths.ts';
-import { closingTime } from './format.ts';
+import { deadlineOf, hasMoreTime } from './format.ts';
 import {
   ELIGIBILITY_SCREEN,
   problemsOf,
@@ -86,7 +86,6 @@ function overviewView(loaded: ApplicationWithFiles): View {
   const items = tasksOf(loaded);
   const completed = items.filter(({ status }) => status === 'completed').length;
   const next = items.find(({ to, status }) => to !== undefined && status !== 'completed');
-  const { round } = application;
 
   return {
     heading: {
@@ -97,6 +96,9 @@ function overviewView(loaded: ApplicationWithFiles): View {
           <p className="[overflow-wrap:anywhere]">
             This application is for {application.organisation.name}.
           </p>
+          {hasMoreTime(application) && (
+            <p>You have more time to apply. Your deadline is {deadlineOf(application)}.</p>
+          )}
           <p>Do one section at a time. You can leave and come back whenever you like.</p>
         </>
       ),
@@ -105,9 +107,13 @@ function overviewView(loaded: ApplicationWithFiles): View {
       <>
         <div className="grid gap-x-8 gap-y-5 border-y border-divider py-6 sm:grid-cols-2">
           <div className="flex flex-col gap-1">
-            <p className="text-sm font-medium text-muted">Applications close</p>
+            <p className="text-sm font-medium text-muted">
+              {hasMoreTime(application) ? 'Your deadline' : 'Applications close'}
+            </p>
             <p className="text-xl font-semibold tracking-tight text-ink">
-              <time dateTime={round.closesAt}>{closingTime(round.closesAt, round.timeZone)}</time>
+              <time dateTime={application.closesAt ?? application.round.closesAt}>
+                {deadlineOf(application)}
+              </time>
             </p>
           </div>
           <div className="flex flex-col gap-1">

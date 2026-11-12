@@ -191,6 +191,10 @@ export interface Application {
   updatedAt: string;
   submittedAt: string | null;
   withdrawnAt: string | null;
+  /** When the application closes, if the applicant has more time than the round. */
+  closesAt?: string;
+  /** `assisted` when the funder sent it for the applicant. */
+  submissionRoute?: 'portal' | 'assisted';
 }
 
 /** A draft that has just been started. */
@@ -226,6 +230,10 @@ const summaryOf = (application: Application, organisation: { id: string; name: s
     timeZone: round.timeZone,
   },
   organisation,
+  ...(application.closesAt === undefined ? {} : { closesAt: application.closesAt }),
+  ...(application.submissionRoute === undefined
+    ? {}
+    : { submissionRoute: application.submissionRoute }),
   status: application.status,
   updatedAt: application.updatedAt,
   submittedAt: application.submittedAt,

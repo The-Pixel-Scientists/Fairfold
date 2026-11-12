@@ -74,6 +74,15 @@ export interface GrantsApplicationFile {
   tenant_id: string;
 }
 
+export interface GrantsApplicationLabel {
+  added_at: Generated<Timestamp>;
+  added_by: string;
+  application_id: string;
+  id: Generated<string>;
+  label_id: string;
+  tenant_id: string;
+}
+
 export interface GrantsApplicationMessage {
   application_id: string;
   created_at: Generated<Timestamp>;
@@ -87,6 +96,15 @@ export interface GrantsApplicationNote {
   created_at: Generated<Timestamp>;
   id: Generated<string>;
   note_id: string;
+  tenant_id: string;
+}
+
+export interface GrantsApplicationOwner {
+  application_id: string;
+  assigned_at: Generated<Timestamp>;
+  assigned_by: string;
+  id: Generated<string>;
+  membership_id: string;
   tenant_id: string;
 }
 
@@ -185,6 +203,18 @@ export interface GrantsFormVersion {
   version: number;
 }
 
+export interface GrantsLabel {
+  archived: Generated<boolean>;
+  colour: string | null;
+  created_at: Generated<Timestamp>;
+  created_by: string;
+  id: Generated<string>;
+  name: string;
+  tenant_id: string;
+  updated_at: Generated<Timestamp>;
+  updated_by: string;
+}
+
 export interface GrantsMessageNotification {
   created_at: Generated<Timestamp>;
   error_code: string | null;
@@ -234,6 +264,43 @@ export interface GrantsPublisherSetting {
   updated_by: string | null;
 }
 
+export interface GrantsReminderEmail {
+  application_id: string | null;
+  assignment_id: string | null;
+  attempts: Generated<number>;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  kind: string;
+  last_attempt_at: Timestamp | null;
+  occurrence: number;
+  outcome_code: string | null;
+  recipient_person_id: string | null;
+  sent_at: Timestamp | null;
+  status: Generated<string>;
+  template_version_id: string;
+  tenant_id: string;
+}
+
+export interface GrantsReminderSetting {
+  created_at: Generated<Timestamp>;
+  created_by: string;
+  draft_days_before_1: number | null;
+  draft_days_before_2: number | null;
+  draft_days_before_3: number | null;
+  draft_enabled: boolean;
+  draft_template_version_id: string | null;
+  id: Generated<string>;
+  review_enabled: boolean;
+  review_overdue_after_days: number;
+  review_repeat_every_days: number;
+  review_template_version_id: string | null;
+  round_id: string;
+  tenant_id: string;
+  updated_at: Generated<Timestamp>;
+  updated_by: string;
+  version: Generated<number>;
+}
+
 export interface GrantsReviewer {
   added_at: Generated<Timestamp>;
   added_by: string;
@@ -278,6 +345,19 @@ export interface GrantsRubricCriterion {
   weight: number;
 }
 
+export interface GrantsSavedView {
+  columns: string[];
+  created_at: Generated<Timestamp>;
+  created_by: string;
+  filter: Json;
+  id: Generated<string>;
+  name: string;
+  sort: Json;
+  tenant_id: string;
+  updated_at: Generated<Timestamp>;
+  updated_by: string;
+}
+
 export interface GrantsScore {
   assignment_id: string;
   comment: Generated<string>;
@@ -319,8 +399,10 @@ export interface DB {
   'grants.adjustment': GrantsAdjustment;
   'grants.application': GrantsApplication;
   'grants.application_file': GrantsApplicationFile;
+  'grants.application_label': GrantsApplicationLabel;
   'grants.application_message': GrantsApplicationMessage;
   'grants.application_note': GrantsApplicationNote;
+  'grants.application_owner': GrantsApplicationOwner;
   'grants.assignment': GrantsAssignment;
   'grants.conflict_declaration': GrantsConflictDeclaration;
   'grants.decision': GrantsDecision;
@@ -328,13 +410,17 @@ export interface DB {
   'grants.eligibility_result': GrantsEligibilityResult;
   'grants.email_template_version': GrantsEmailTemplateVersion;
   'grants.form_version': GrantsFormVersion;
+  'grants.label': GrantsLabel;
   'grants.message_notification': GrantsMessageNotification;
   'grants.monitoring_response': GrantsMonitoringResponse;
   'grants.programme': GrantsProgramme;
   'grants.publisher_setting': GrantsPublisherSetting;
+  'grants.reminder_email': GrantsReminderEmail;
+  'grants.reminder_setting': GrantsReminderSetting;
   'grants.reviewer': GrantsReviewer;
   'grants.round': GrantsRound;
   'grants.rubric_criterion': GrantsRubricCriterion;
+  'grants.saved_view': GrantsSavedView;
   'grants.score': GrantsScore;
   'grants.stage': GrantsStage;
   'grants.stage_transition': GrantsStageTransition;

@@ -36,33 +36,32 @@ export interface LockedApplication {
   readonly definition: FormDefinition;
 }
 
-/** With `lock` false, the application is read without waiting for other requests on it. */
-export async function lockOwn(
+const lockColumns = [
+  'id',
+  'status',
+  'answers',
+  'answers_version',
+  'form_version_id',
+  'round_id',
+  'organisation_id',
+] as const;
+
+type LockRow = {
+  id: string;
+  status: ApplicationStatus;
+  answers: unknown;
+  answers_version: number;
+  form_version_id: string;
+  round_id: string;
+  organisation_id: string;
+};
+
+/** The row with its pinned form version, or a 404 where either is missing. */
+async function withDefinition(
   tx: Tx,
   deps: ApplicationDependencies,
-  userId: string,
-  applicationId: string,
-  lock = true,
+  row: LockRow | undefined,
 ): Promise<LockedApplication> {
-  const personId = await personIdForUser(tx, userId);
-  const row =
-    personId === null
-      ? undefined
-      : await applicationsDb(tx)
-          .selectFrom('grants.application')
-          .select([
-            'id',
-            'status',
-            'answers',
-            'answers_version',
-            'form_version_id',
-            'round_id',
-            'organisation_id',
-          ])
-          .where('id', '=', applicationId)
-          .where('applicant_person_id', '=', personId)
-          .$if(lock, (query) => query.forUpdate())
-          .executeTakeFirst();
   const version = row === undefined ? undefined : await findVersion(tx, row.form_version_id);
   const definition = definitionOf(version?.definition ?? null);
   if (row === undefined || definition === null) throw deps.notFound();
@@ -76,6 +75,51 @@ export async function lockOwn(
     organisationId: row.organisation_id,
     definition,
   };
+}
+
+/**
+ * With `lock` false, the application is read without waiting for other
+ * requests on it. An assisted draft is not there for its applicant until
+ * staff have submitted it.
+ */
+export async function lockOwn(
+  tx: Tx,
+  deps: ApplicationDependencies,
+  userId: string,
+  applicationId: string,
+  lock = true,
+): Promise<LockedApplication> {
+  const personId = await personIdForUser(tx, userId);
+  const row =
+    personId === null
+      ? undefined
+      : await applicationsDb(tx)
+          .selectFrom('grants.application')
+          .select(lockColumns)
+          .where('id', '=', applicationId)
+          .where('applicant_person_id', '=', personId)
+          .where((eb) =>
+            eb.or([eb('submission_route', '=', 'portal'), eb('status', '<>', 'draft')]),
+          )
+          .$if(lock, (query) => query.forUpdate())
+          .executeTakeFirst();
+  return withDefinition(tx, deps, row);
+}
+
+/** An application staff started or submitted for the applicant, locked until the request ends. */
+export async function lockAssisted(
+  tx: Tx,
+  deps: ApplicationDependencies,
+  applicationId: string,
+): Promise<LockedApplication> {
+  const row = await applicationsDb(tx)
+    .selectFrom('grants.application')
+    .select(lockColumns)
+    .where('id', '=', applicationId)
+    .where('submission_route', '=', 'assisted')
+    .forUpdate()
+    .executeTakeFirst();
+  return withDefinition(tx, deps, row);
 }
 
 /** The application as a draft, based on the answers version the applicant last saw. */

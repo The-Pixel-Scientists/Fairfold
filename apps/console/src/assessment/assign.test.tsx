@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 
 import { api as decisionApi, list as decisionList } from '../decisions/fixtures.ts';
 import {
+  adjustmentsFor,
   api as submissionApi,
   detail,
   listReads,
@@ -39,6 +40,7 @@ const detailReads = (assignments: readonly object[] = [], extra = {}) => ({
   [submissionApi.files(one.id)]: okReply({ attachments: [] }),
   [submissionApi.list()]: okReply(page([one])),
   [submissionApi.assignments(one.id)]: ok({ assignments }),
+  [submissionApi.adjustments(one.id)]: okReply(adjustmentsFor([])),
   [api.pool]: ok({ reviewers: pool }),
   [decisionApi.list]: ok(decisionList([])),
   ...extra,

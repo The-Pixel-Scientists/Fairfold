@@ -23,15 +23,55 @@ function clock(hours: number, minutes: number): string {
 }
 
 /**
- * A round's closing time, which is local to its time zone, in words:
- * "5pm on 2 November 2026, UK time". A time that cannot be read is shown as it came.
+ * A closing time, which is local to its time zone, in words: "5pm on 2 November
+ * 2026, UK time". Midday is "midday", and midnight is the end of the day before,
+ * so nobody reads it as the start of the next. A time that cannot be read is
+ * shown as it came.
  */
 export function closingTime(closesAt: string, timeZone: string): string {
   const parts = LOCAL_TIME.exec(closesAt)?.slice(1).map(Number);
   if (parts === undefined) return closesAt;
   const [year = 0, month = 1, date = 1, hours = 0, minutes = 0] = parts;
   const zone = timeZone === 'Europe/London' ? 'UK time' : `${timeZone.replaceAll('_', ' ')} time`;
-  return `${clock(hours, minutes)} on ${day.format(Date.UTC(year, month - 1, date))}, ${zone}`;
+  if (hours === 0 && minutes === 0) {
+    return `midnight at the end of ${day.format(Date.UTC(year, month - 1, date - 1))}, ${zone}`;
+  }
+  const time = hours === 12 && minutes === 0 ? 'midday' : clock(hours, minutes);
+  return `${time} on ${day.format(Date.UTC(year, month - 1, date))}, ${zone}`;
+}
+
+interface Closing {
+  closesAt?: string | undefined;
+  round: { closesAt: string; timeZone: string };
+}
+
+/** When this application closes, in words. The server's time for it, not the round's, when it sends one. */
+export function deadlineOf({ closesAt, round }: Closing): string {
+  return closingTime(closesAt ?? round.closesAt, round.timeZone);
+}
+
+/** Whether the application closes later than its round does, which is the only thing said about an extension. */
+export function hasMoreTime({ closesAt, round }: Closing): boolean {
+  return closesAt !== undefined && closesAt > round.closesAt;
+}
+
+const ukMoment = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'Europe/London',
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+  hour: 'numeric',
+  minute: 'numeric',
+  hourCycle: 'h23',
+});
+
+/** A moment the API sent as an ISO time, in UK time whatever the device says: "1 March 2027 at 2:14pm, UK time". */
+export function ukTimeOf(iso: string): string {
+  const part = Object.fromEntries(
+    ukMoment.formatToParts(new Date(iso)).map(({ type, value }) => [type, value]),
+  );
+  const clockTime = clock(Number(part['hour']), Number(part['minute']));
+  return `${part['day'] ?? ''} ${part['month'] ?? ''} ${part['year'] ?? ''} at ${clockTime}, UK time`;
 }
 
 /** The lowest and highest award a round makes: "£5,000 to £25,000", or one amount when they match. */

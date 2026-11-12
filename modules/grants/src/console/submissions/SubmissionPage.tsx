@@ -8,6 +8,7 @@ import { AssignmentsPanel } from '../assessment/AssignmentsPanel.tsx';
 import { DecisionPanel } from '../decisions/DecisionPanel.tsx';
 import { formatMoment } from '../programme/format.ts';
 import { useParam } from '../programme/Page.tsx';
+import { AdjustmentsPanel } from './adjustments/AdjustmentsPanel.tsx';
 import { Aside } from './detail/Aside.tsx';
 import { ApplicationTab } from './detail/ApplicationTab.tsx';
 import { EligibilityTab } from './detail/EligibilityTab.tsx';
@@ -28,6 +29,11 @@ function About({ submission }: { submission: Submission }) {
       <Tag tone="info">{submission.stage.name}</Tag>
       <StatusTag status={submission.status} />
       {submission.late && <Tag tone="warning">Late</Tag>}
+      {submission.submissionRoute === 'assisted' && (
+        <Tag tone="info">
+          Submitted by staff{submission.submittedBy?.name ? `: ${submission.submittedBy.name}` : ''}
+        </Tag>
+      )}
       <EligibilityTag outcome={submission.eligibility} />
       <span>
         {submission.programme.title}, {submission.round.title}
@@ -78,13 +84,19 @@ function Detail({ submissionId }: { submissionId: string }) {
                 {
                   id: 'history',
                   label: 'History',
-                  content: <HistoryTab history={submission.history} />,
+                  content: (
+                    <HistoryTab
+                      history={submission.history}
+                      assisted={submission.submissionRoute === 'assisted'}
+                    />
+                  ),
                 },
               ]}
             />
             <div className="flex flex-col gap-5">
               <AssignmentsPanel submission={submission} />
               <DecisionPanel submission={submission} />
+              <AdjustmentsPanel submission={submission} />
               <Aside submission={submission} />
             </div>
           </div>

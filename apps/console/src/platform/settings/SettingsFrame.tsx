@@ -6,7 +6,9 @@ import type { ReactNode } from 'react';
 
 import { Screen } from '../../auth/Screen.tsx';
 import { tabLinkClassName } from '../../shell/navLink.ts';
+import { RETENTION_PATH } from '../retention/paths.ts';
 import { SSO_PATH } from '../sso/paths.ts';
+import { SUBJECT_ACCESS_PATH } from '../subject-access/paths.ts';
 import type { Loaded } from './useLoad.ts';
 
 const base = [
@@ -18,7 +20,17 @@ const base = [
 /** The pages of the settings section. Single sign-on shows only to those who can manage it. */
 export function SettingsSections() {
   const sso = useCan('platform.sso.manage');
-  const sections = sso ? [...base, { to: SSO_PATH, label: 'Single sign-on' }] : base;
+  const retention = useCan('platform.retention.manage');
+  const canExport = useCan('platform.subject_access.request');
+  const canErase = useCan('platform.erasure.request');
+  const sections = [
+    ...base,
+    ...(sso ? [{ to: SSO_PATH, label: 'Single sign-on' }] : []),
+    ...(retention ? [{ to: RETENTION_PATH, label: 'Data retention' }] : []),
+    ...(canExport || canErase
+      ? [{ to: SUBJECT_ACCESS_PATH, label: 'Subject access and erasure' }]
+      : []),
+  ];
   return (
     <nav aria-label="Settings">
       <ul role="list" className="flex flex-wrap gap-x-6 border-b border-divider">

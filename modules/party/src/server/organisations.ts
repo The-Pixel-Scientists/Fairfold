@@ -12,6 +12,7 @@ import {
   normaliseIdentifier,
   type ConsoleOrganisation,
   type IdentifierInput,
+  type OrganisationDetailsInput,
   type OrganisationInput,
   type OrganisationPage,
   type OrganisationQuery,
@@ -30,7 +31,8 @@ interface Actor {
 const blankAsNull = (value: string | undefined): string | null =>
   value === undefined || value === '' ? null : value;
 
-function organisationColumns(input: OrganisationInput) {
+/** The columns an organisation's details are stored in. */
+export function organisationColumns(input: OrganisationDetailsInput) {
   const address = input.registeredAddress;
   return {
     name: input.name,
@@ -339,10 +341,10 @@ function identifierCandidates(search: string): string[] {
 
 const escapeLike = (value: string): string => value.replace(/[\\%_]/g, (char) => `\\${char}`);
 
-const encodeCursor = (id: string): string =>
+export const encodeCursor = (id: string): string =>
   Buffer.from(id.replaceAll('-', ''), 'hex').toString('base64url');
 
-function decodeCursor(cursor: string): string | null {
+export function decodeCursor(cursor: string): string | null {
   const hex = Buffer.from(cursor, 'base64url').toString('hex');
   return hex.length === 32 && encodeCursor(hex) === cursor
     ? `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
