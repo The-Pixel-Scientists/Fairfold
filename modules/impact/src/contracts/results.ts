@@ -3,8 +3,10 @@
 // Results: the figure reported for an indicator over a period, for one
 // programme or for the funder as a whole, with a note and evidence. A result
 // is a total about the work, never a record about one person: it names no
-// party, and the console says so beside the note. The note is still free
-// text and may name people, so it is classified as personal.
+// party. Its note and captions must not name a person either, as the
+// console says beside each box, so they are classified as internal
+// (packages/db/classification): impact has no path from a row to a
+// person, so it could not answer a subject access request for one.
 //
 // Evidence is `app.file` ids with a caption (ADR 0030); files are uploaded
 // through the platform's file routes first. A result a grantee reports on a

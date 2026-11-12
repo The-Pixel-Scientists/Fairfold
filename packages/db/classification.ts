@@ -252,6 +252,7 @@ export const subjectPaths: SubjectPathRegistry = mergeSchemaMaps({
   grants: grantsFile.grantsSubjects,
   assure: assureFile.assureSubjects,
   crm: crmFile.crmSubjects,
+  impact: impactFile.impactSubjects,
 });
 
 /** A schema file's `<schema>Processing` export, which a file with no tables yet does not have. */

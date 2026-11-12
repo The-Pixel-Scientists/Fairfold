@@ -145,6 +145,11 @@ describe('migrations', { timeout: 30_000 }, () => {
       await sql`TRUNCATE crm.list, crm.list_member, crm.segment, crm.interaction,
                          crm.merge_record, crm.import_job, crm.import_row,
                          crm.external_reference`.execute(trx);
+      // And 0067's down refuses while any impact table holds a row, which
+      // the impact tests leave behind.
+      await sql`TRUNCATE impact.framework, impact.outcome, impact.indicator, impact.target,
+                         impact.result, impact.result_evidence,
+                         impact.learning_note`.execute(trx);
       // After the loop, before[i] is the schema with the first i migrations applied.
       const before = [await stableSnapshot(trx)];
       for (const { name, down } of [...migrations].reverse()) {

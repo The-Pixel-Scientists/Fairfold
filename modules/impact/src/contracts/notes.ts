@@ -2,8 +2,10 @@
 //
 // Learning notes: what a funder's staff learned from the results, kept
 // against a framework and, where it helps, one of its outcomes. A note is
-// free text and may name people, so it is classified as personal. A note is
-// added or removed, never edited, so what was learned when stays on record.
+// about the work and must not name a person, as the console says beside
+// the box, so it is classified as internal (packages/db/classification).
+// It is added or removed, never edited, so what was learned when stays on
+// record.
 
 import { idSchema } from '@pixel-scientists/domain';
 import { z } from 'zod';
