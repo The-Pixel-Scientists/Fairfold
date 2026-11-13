@@ -4,7 +4,7 @@
 // apps/api/src/modules.ts alone, which registers the routes.
 // `grantsSubjectRules` is for the platform's audit writer alone. `grantsWarehouse`
 // feeds the warehouse snapshot. `grantsSubjectData` serves subject access.
-// `grantsErasure` serves erasure. `readApplicantContact` is for assure's duplicate flags. `monitoringCounts` serves insight's reports. `sendReleaseEmail` is for the worker's release email job alone. `sendMessageNotification` is for the worker's message notification job alone.
+// `grantsErasure` serves erasure. `readApplicantContact` is for assure's duplicate flags. `monitoringCounts` serves insight's reports. `sendReleaseEmail` is for the worker's release email job alone. `sendMessageNotification` is for the worker's message notification job alone. `scanReminders` and `sendReminder` are for the worker's reminder jobs alone.
 
 export {
   grantsHandlers,
@@ -18,7 +18,16 @@ export {
   type MessageDependencies,
   type NoteDependencies,
   type NotesPlatform,
+  type ReminderDependencies,
+  type TemplateDependencies,
+  type ViewDependencies,
 } from './routes.ts';
+export {
+  resolveViewForViewer,
+  type ResolvedView,
+  type Unusable,
+  type Viewer,
+} from './views/resolve.ts';
 export {
   sendReleaseEmail,
   type ReleaseEmailDependencies,
@@ -31,6 +40,13 @@ export {
   type MessageNotificationJob,
   type MessageNotificationOutcome,
 } from './messages/job.ts';
+export { databaseNow, scanReminders, type QueueReminder } from './reminders/scan.ts';
+export {
+  sendReminder,
+  type ReminderSendDependencies,
+  type ReminderSendJob,
+  type ReminderSendOutcome,
+} from './reminders/send.ts';
 export { readApplicantContact, type ApplicantContact } from './applicant-contact.ts';
 export { grantsSubjectRules } from './audit.ts';
 // For a module that keeps a programme's id, such as impact: whether the tenant has the programme.

@@ -1,11 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// Fixtures for the reminder tests (migrations 0060 to 0062): an application
-// with an assignment, its programme's template, a setting for its round and
-// rows of the outbox, added through a client with the tenant set.
-// grants.email_template_version holds decision outcomes only, so a decision
-// template stands in until it holds reminder templates and the reminder keys
-// pin the template's kind.
+// Fixtures for the reminder tests (migrations 0060 to 0062 and 0068): an
+// application with an assignment, its programme's template for each reminder
+// kind and an accepted one, a setting for its round and rows of the outbox,
+// added through a client with the tenant set.
 
 import type pg from 'pg';
 
@@ -16,14 +14,31 @@ import { insertRow, type Row, type TestTenant } from '../tenants.ts';
 /** What a reminder setting and a reminder refer to. */
 export interface Reminded {
   readonly member: string;
+  readonly programme: string;
   readonly round: string;
   readonly application: string;
   readonly assignment: string;
   readonly person: string;
-  readonly template: string;
+  readonly draftTemplate: string;
+  readonly reviewTemplate: string;
+  readonly decisionTemplate: string;
 }
 
-/** A new application under review, with a template of its programme, as migrator. */
+/** A template version of `programme` for each reminder kind, as migrator. */
+export async function addReminderTemplates(
+  client: pg.ClientBase,
+  tenant: TestTenant,
+  programme: string,
+): Promise<Pick<Reminded, 'draftTemplate' | 'reviewTemplate'>> {
+  const template = (outcome: string) =>
+    insertRow(client, 'grants.email_template_version', templateRow(tenant, programme, { outcome }));
+  return {
+    draftTemplate: await template('draft_closing'),
+    reviewTemplate: await template('review_overdue'),
+  };
+}
+
+/** A new application under review, with templates of its programme, as migrator. */
 export async function addReminded(client: pg.ClientBase, tenant: TestTenant): Promise<Reminded> {
   const { id: assignment, review } = await addAssignment(client, tenant);
   const { rows } = await client.query<{ programme_id: string }>(
@@ -34,11 +49,13 @@ export async function addReminded(client: pg.ClientBase, tenant: TestTenant): Pr
   if (programme === undefined) throw new Error('The round has no programme.');
   return {
     member: review.parts.member,
+    programme,
     round: review.parts.round,
     application: review.application,
     assignment,
     person: review.parts.person,
-    template: await insertRow(
+    ...(await addReminderTemplates(client, tenant, programme)),
+    decisionTemplate: await insertRow(
       client,
       'grants.email_template_version',
       templateRow(tenant, programme),
@@ -54,34 +71,42 @@ export const settingRow = (tenant: TestTenant, to: Reminded, change: Row = {}): 
   draft_days_before_1: 14,
   draft_days_before_2: 7,
   draft_days_before_3: 1,
-  draft_template_version_id: to.template,
+  draft_template_version_id: to.draftTemplate,
   review_enabled: true,
   review_overdue_after_days: 14,
   review_repeat_every_days: 7,
-  review_template_version_id: to.template,
+  review_template_version_id: to.reviewTemplate,
   created_by: to.member,
   updated_by: to.member,
   ...change,
 });
 
 /** Columns app_worker may insert for the draft's reminder seven days before it closes. */
-export const draftReminder = (tenant: TestTenant, to: Reminded, change: Row = {}): Row => ({
+export const draftReminder = (
+  tenant: TestTenant,
+  to: Pick<Reminded, 'application' | 'person' | 'draftTemplate'>,
+  change: Row = {},
+): Row => ({
   tenant_id: tenant.id,
   kind: 'draft_closing',
   application_id: to.application,
   recipient_person_id: to.person,
-  template_version_id: to.template,
+  template_version_id: to.draftTemplate,
   occurrence: 7,
   ...change,
 });
 
 /** Columns app_worker may insert for the assignment's first overdue reminder. */
-export const reviewReminder = (tenant: TestTenant, to: Reminded, change: Row = {}): Row => ({
+export const reviewReminder = (
+  tenant: TestTenant,
+  to: Pick<Reminded, 'assignment' | 'person' | 'reviewTemplate'>,
+  change: Row = {},
+): Row => ({
   tenant_id: tenant.id,
   kind: 'review_overdue',
   assignment_id: to.assignment,
   recipient_person_id: to.person,
-  template_version_id: to.template,
+  template_version_id: to.reviewTemplate,
   occurrence: 1,
   ...change,
 });

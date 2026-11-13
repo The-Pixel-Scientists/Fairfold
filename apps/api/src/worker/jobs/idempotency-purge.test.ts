@@ -43,7 +43,7 @@ describe('the idempotency purge', () => {
       expect.objectContaining({
         queue: fanOutQueue,
         cron: '0 * * * *',
-        data: { target: idempotencyPurgeQueue.name },
+        data: { target: idempotencyPurgeQueue.name, also: 'grants.reminder_scan' },
       }),
     );
   });

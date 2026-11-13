@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { monitoringTemplate } from '@pixel-scientists/grants/contracts';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
@@ -53,8 +53,9 @@ describe('the equality monitoring form', () => {
     expect(boxes).toHaveLength(monitoringTemplate().sections[0]?.fields.length ?? 0);
     expect(boxes.every((box) => (box as HTMLInputElement).checked)).toBe(true);
     expect(screen.getByText(/seen only in totals/)).toBeTruthy();
-    expect(screen.queryByRole('combobox')).toBeNull();
-    expect(screen.queryByText(/identity|file/i)).toBeNull();
+    const page = within(screen.getByRole('main'));
+    expect(page.queryByRole('combobox')).toBeNull();
+    expect(page.queryByText(/identity|file/i)).toBeNull();
   });
 
   it('leaves a question out and saves the questions that are left', async () => {

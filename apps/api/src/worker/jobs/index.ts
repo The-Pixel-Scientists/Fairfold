@@ -16,6 +16,7 @@ import { auditPurgeHandler, retentionSweepHandler } from './retention.ts';
 export const fanOutQueue = defineFanOut('platform.fan_out', [
   'platform.idempotency_purge',
   'platform.job_request_expiry',
+  'grants.reminder_scan',
 ]);
 
 /** Migration 0043's daily fan-out, which sends each tenant its files job. */

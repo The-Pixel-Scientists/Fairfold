@@ -23,7 +23,7 @@ import { createGrantsTenant } from './modules-on.ts';
 import { addMember, type Member } from './settings-api.ts';
 import { smtpTestSettings, testAuth, testSession } from './support.ts';
 
-export type Method = 'GET' | 'POST' | 'PUT' | 'DELETE';
+export type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 export interface Programme {
   id: string;

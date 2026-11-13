@@ -86,10 +86,13 @@ ADR 0002's pipeline hardening:
 
 ### What waits for staging
 
-Exact versions, digests and checksums are recorded with the commit that first
-uses each tool, along with the checks of its licence and release date. Nothing
-has been installed, pinned or run yet, and the first real `apply` needs a
-staging project.
+Each root pins OpenTofu 1.13.1 and the Google provider 7.46.2, and no root has
+been applied. Still to come:
+
+- the checksum and signature of the OpenTofu release CI downloads, committed
+  with the CI job that runs it;
+- Trivy's bundled code, checked when `trivy config` first runs on this folder;
+- the first real `apply`, which needs a staging project.
 
 ## Consequences
 
@@ -114,11 +117,11 @@ licence files at that version, because a repository's reported licence can miss
 a second licence on its release binaries. A version that carries BUSL-1.1 code
 cannot be used under ADR 0002.
 
-| Tool                                                    | Licence                                | ADR 0002 class                          | Version, release date, digest or checksum                                   |
-| ------------------------------------------------------- | -------------------------------------- | --------------------------------------- | --------------------------------------------------------------------------- |
-| OpenTofu                                                | MPL-2.0                                | Allowed                                 | Recorded with first use                                                     |
-| `hashicorp/google` provider, from the OpenTofu registry | MPL-2.0                                | Allowed                                 | Recorded with first use                                                     |
-| Trivy (`trivy config`)                                  | Apache-2.0                             | Allowed                                 | 0.74.0 and its record in ADR 0002; bundled code checked with first use here |
-| tflint (not chosen)                                     | MPL-2.0 + BUSL-1.1 in release binaries | Denied                                  | Not applicable                                                              |
-| tflint Google ruleset (not chosen)                      | MPL-2.0                                | Allowed, but runs only as tflint plugin | Not applicable                                                              |
-| Terraform 1.6 or later (not chosen)                     | BUSL-1.1                               | Denied                                  | Not applicable                                                              |
+| Tool                                                    | Licence                                | ADR 0002 class                          | Version, release date, digest or checksum                                                                                                                                                 |
+| ------------------------------------------------------- | -------------------------------------- | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| OpenTofu                                                | MPL-2.0                                | Allowed                                 | 1.13.1, release files dated 1 October 2026, series supported to 1 August 2027; its LICENSE is MPL-2.0 alone                                                                               |
+| `hashicorp/google` provider, from the OpenTofu registry | MPL-2.0                                | Allowed                                 | 7.46.2, released 23 October 2026 on the maintained 7.x series and built with Go 1.26.10 for its crypto/x509 security fixes; its LICENSE is MPL-2.0 alone; hashes in each root's lock file |
+| Trivy (`trivy config`)                                  | Apache-2.0                             | Allowed                                 | 0.74.0 and its record in ADR 0002; bundled code checked with first use here                                                                                                               |
+| tflint (not chosen)                                     | MPL-2.0 + BUSL-1.1 in release binaries | Denied                                  | Not applicable                                                                                                                                                                            |
+| tflint Google ruleset (not chosen)                      | MPL-2.0                                | Allowed, but runs only as tflint plugin | Not applicable                                                                                                                                                                            |
+| Terraform 1.6 or later (not chosen)                     | BUSL-1.1                               | Denied                                  | Not applicable                                                                                                                                                                            |

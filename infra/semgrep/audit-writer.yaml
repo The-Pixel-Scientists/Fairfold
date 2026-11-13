@@ -33,6 +33,9 @@ rules:
         - /packages/db/test/
         # Seeds the audit log that its search and export tests read.
         - /apps/api/src/platform/audit-log/audit-log.integration.test.ts
+        # Seeds system events about a person, and more than a page of them,
+        # for the search's subject filter and cursor tests to find.
+        - /apps/api/src/platform/audit-log/search.integration.test.ts
         # Inserts a duplicate event as app_api to prove the unique key holds.
         - /apps/api/src/auth/auth.integration.test.ts
         # Seeds events that expired a month ago, which the writer cannot: it

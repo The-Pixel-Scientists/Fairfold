@@ -14,21 +14,48 @@
 // object, which no row points at. The bodies of the notes and messages on
 // those applications are cleared through app.erase_subject_notes(), which keeps
 // their ids, sides and times, and the notifications to the person are failed
-// and lose their recipient. It runs whether or not the tenant has the
-// module switched on.
+// and lose their recipient. Reminders to the person, whether as applicant or
+// as reviewer, lose their recipient through grants.erase_reminders(). It runs
+// whether or not the tenant has the module switched on.
 
 import { classifyAnswers, pinnedDefinitions } from '@pixel-scientists/db';
 import type { Answers } from '@pixel-scientists/domain/forms';
 import type { ErasureContribution } from '@pixel-scientists/domain/platform/subject-access';
-import { runningErasureRequest } from '@pixel-scientists/party/server';
+import { partyErasureTarget, runningErasureRequest } from '@pixel-scientists/party/server';
 
 import type { Tx } from './programme/tables.ts';
 
 type Tables = Record<string, Record<string, unknown>>;
 
+/**
+ * Clears the recipient of each reminder to the parties this tenant has, which the approved
+ * function refuses unless they are already erased here. A party of another tenant is not here, so
+ * nothing is touched.
+ */
+async function eraseReminders(
+  tx: Tx,
+  partyIds: readonly string[],
+): Promise<Record<string, number>> {
+  let cleared = 0;
+  for (const partyId of partyIds) {
+    if ((await partyErasureTarget(tx, partyId)) === null) continue;
+    const { counts } = await tx
+      .selectNoFrom((eb) =>
+        eb.fn<Record<string, number>>('grants.erase_reminders', [eb.val(partyId)]).as('counts'),
+      )
+      .executeTakeFirstOrThrow();
+    cleared += counts['grants.reminder_email'] ?? 0;
+  }
+  return { 'grants.reminder_email': cleared };
+}
+
 export const grantsErasure: ErasureContribution<'grants', Tx> = {
   module: 'grants',
   async erase(tx, subjects) {
+    const reminders = await eraseReminders(
+      tx,
+      subjects.map(({ partyId }) => partyId),
+    );
     const applications = await tx
       .$extendTables<Tables>()
       .selectFrom('grants.application')
@@ -40,7 +67,7 @@ export const grantsErasure: ErasureContribution<'grants', Tx> = {
       )
       .orderBy('id')
       .execute();
-    if (applications.length === 0) return { 'grants.application': 0, 'app.file': 0 };
+    if (applications.length === 0) return { 'grants.application': 0, 'app.file': 0, ...reminders };
     const ids = applications.map((row) => String(row['id']));
     const definitions = await pinnedDefinitions(tx, ids);
     let changed = 0;
@@ -95,6 +122,6 @@ export const grantsErasure: ErasureContribution<'grants', Tx> = {
         .executeTakeFirstOrThrow();
       for (const [table, n] of Object.entries(counts)) notes[table] = (notes[table] ?? 0) + n;
     }
-    return { 'grants.application': changed, 'app.file': files, ...notes };
+    return { 'grants.application': changed, 'app.file': files, ...notes, ...reminders };
   },
 };

@@ -63,18 +63,16 @@ describe('finding a person', () => {
     const user = userEvent.setup();
     open('/settings/subject-access', { [SEARCH]: ok({ results: [], nextCursor: null }) });
     await heading('Subject access and erasure');
-    const live = screen
-      .getAllByRole('status')
-      .find((node) => node.className.includes('text-muted'));
-    expect(live?.textContent).toBe('');
+    const live = within(screen.getByRole('main')).getByRole('status');
+    expect(live.textContent).toBe('');
 
     await user.type(screen.getByLabelText('Name or email address'), 'nobody');
     await user.click(screen.getByRole('button', { name: 'Find person' }));
 
     await waitFor(() => {
-      expect(live?.textContent).toBe('No people found.');
+      expect(live.textContent).toBe('No people found.');
     });
-    expect(live?.isConnected).toBe(true);
+    expect(live.isConnected).toBe(true);
   });
 
   it('says what to do when nobody is found', async () => {

@@ -6,6 +6,7 @@ import type { ReactNode } from 'react';
 
 import { productName } from '../product.ts';
 import { AccountControls } from './AccountControls.tsx';
+import { GlobalSearch } from './search/GlobalSearch.tsx';
 import { navLinkClassName } from './navLink.ts';
 import { visibleItems } from './navigation.ts';
 import type { NavigationItem } from './navigation.ts';
@@ -33,7 +34,12 @@ export function ConsoleShell({ session, children }: { session: SessionData; chil
       homeHref="/"
       areaName="Staff console"
       navigation={items.length > 0 ? <Navigation items={items} /> : undefined}
-      actions={<AccountControls session={session} />}
+      actions={
+        <>
+          <GlobalSearch session={session} />
+          <AccountControls session={session} />
+        </>
+      }
     >
       {children}
     </AppShell>

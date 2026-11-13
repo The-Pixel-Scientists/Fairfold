@@ -1,0 +1,107 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Checks every change to the infrastructure code (ADR 0015): formatting, then
+# each root under infra/terraform/gcp/ initialised without a backend against
+# its committed lock file, validated, and its mocked tests run; then Trivy's
+# configuration scan. The job holds no cloud credentials and never plans,
+# imports or applies: applying is done by hand.
+#
+# OpenTofu and Trivy are downloaded and checked against the SHA-256 committed
+# in .github/tool-checksums.sha256 and against their publishers' signatures,
+# as in ci.yml. tflint is not run: its release binaries carry BUSL-1.1 code,
+# which ADR 0002 denies (ADR 0015, option 7).
+
+name: OpenTofu
+
+on:
+  pull_request:
+    paths:
+      - 'infra/terraform/**'
+      - '.github/workflows/opentofu.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: opentofu-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  COSIGN_VERSION: 3.1.3
+  TOFU_VERSION: 1.13.1
+  TRIVY_VERSION: 0.74.0
+  GITHUB_OIDC_ISSUER: https://token.actions.githubusercontent.com
+  TF_IN_AUTOMATION: '1'
+  TF_INPUT: '0'
+
+jobs:
+  check:
+    name: Format, validate, test and scan the infrastructure code
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install cosign
+        run: |
+          bash .github/scripts/fetch-tool.sh \
+            "https://github.com/sigstore/cosign/releases/download/v${COSIGN_VERSION}/cosign-linux-amd64" \
+            "$RUNNER_TEMP/tools"
+          chmod +x "$RUNNER_TEMP/tools/cosign-linux-amd64"
+      - name: Install OpenTofu and verify its signed checksums
+        working-directory: ${{ runner.temp }}/tools
+        run: |
+          base="https://github.com/opentofu/opentofu/releases/download/v${TOFU_VERSION}"
+          archive="tofu_${TOFU_VERSION}_linux_amd64.tar.gz"
+          checksums="tofu_${TOFU_VERSION}_SHA256SUMS"
+          bash "$GITHUB_WORKSPACE/.github/scripts/fetch-tool.sh" "${base}/${archive}" .
+          for file in "$checksums" "${checksums}.sig" "${checksums}.pem"; do
+            curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 --retry 3 \
+              --output "$file" "${base}/${file}"
+          done
+          ./cosign-linux-amd64 verify-blob "$checksums" \
+            --signature "${checksums}.sig" \
+            --certificate "${checksums}.pem" \
+            --certificate-identity "https://github.com/opentofu/opentofu/.github/workflows/release.yml@refs/heads/v${TOFU_VERSION%.*}" \
+            --certificate-oidc-issuer "$GITHUB_OIDC_ISSUER"
+          grep " ${archive}\$" "$checksums" | sha256sum --check --strict -
+          tar -xzf "$archive" tofu
+      - name: Install Trivy and verify its signature
+        working-directory: ${{ runner.temp }}/tools
+        run: |
+          archive="trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          bash "$GITHUB_WORKSPACE/.github/scripts/fetch-tool.sh" \
+            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/${archive}" .
+          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 --retry 3 \
+            --output "${archive}.sigstore.json" \
+            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/${archive}.sigstore.json"
+          ./cosign-linux-amd64 verify-blob "$archive" \
+            --bundle "${archive}.sigstore.json" \
+            --certificate-identity "https://github.com/aquasecurity/trivy/.github/workflows/reusable-release.yaml@refs/tags/v${TRIVY_VERSION}" \
+            --certificate-oidc-issuer "$GITHUB_OIDC_ISSUER"
+          tar -xzf "$archive" trivy
+      - name: Check formatting
+        run: >-
+          "$RUNNER_TEMP/tools/tofu" -chdir=infra/terraform fmt -check -recursive -diff
+      # A root without a lock file, or one that would change it, fails here.
+      - name: Validate and test every root
+        run: |
+          for root in infra/terraform/gcp/*/; do
+            echo "::group::$root"
+            "$RUNNER_TEMP/tools/tofu" -chdir="$root" init -backend=false -lockfile=readonly
+            "$RUNNER_TEMP/tools/tofu" -chdir="$root" validate
+            if [ -d "${root}tests" ]; then
+              "$RUNNER_TEMP/tools/tofu" -chdir="$root" test
+            fi
+            echo "::endgroup::"
+          done
+      - name: Scan the configuration with Trivy
+        run: >-
+          "$RUNNER_TEMP/tools/trivy" config --quiet
+          --cache-dir "$RUNNER_TEMP/trivy-cache"
+          --severity HIGH,CRITICAL --exit-code 1 infra/terraform

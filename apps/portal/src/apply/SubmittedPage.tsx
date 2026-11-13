@@ -14,6 +14,7 @@ import { AssistedPanel, MonitoringOffer } from './afterSubmit.tsx';
 import { downloadHref } from './files.ts';
 import { dateAndTimeOf } from './format.ts';
 import { helpers } from './helpers.ts';
+import { MessagesLink } from './messagesLink.tsx';
 import { ApplyPage, ApplyScreen, Block, Steps } from './parts.tsx';
 import type { View } from './parts.tsx';
 import { useApplicationFilesRead } from './reads.ts';
@@ -158,6 +159,14 @@ function submittedView(loaded: ApplicationWithFiles): View {
             <Steps steps={steps} />
           </Block>
           <MonitoringOffer application={application} />
+          <Block title="Messages">
+            <p className="max-w-prose text-body text-ink">
+              You can write to the funder about this application, and read what they write back.
+            </p>
+            <div>
+              <MessagesLink applicationId={application.id} />
+            </div>
+          </Block>
           {toApplications}
         </>
       ),

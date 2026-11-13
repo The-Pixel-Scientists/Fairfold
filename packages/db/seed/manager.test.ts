@@ -90,6 +90,7 @@ describe("the CI stack job's patterns for the manager's journeys", () => {
       ['apps/console/e2e/submissions-journey.spec.ts'],
       ['apps/console/e2e/assessment-journey.spec.ts'],
       ['apps/console/e2e/decisions-journey.spec.ts'],
+      ['apps/console/e2e/submission-notes-messages.spec.ts'],
       ['apps/console/e2e/programme-journey.spec.ts'],
     ]);
     expect(runs.flatMap(matches).sort()).toEqual(specs.filter(signsIn).sort());

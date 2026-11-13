@@ -1,0 +1,382 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Releases are tagged, built once, signed and promoted unchanged (V1-PLAN).
+# Pushing a tag vX.Y.Z builds the api, console and portal images from the
+# tagged commit with the stack's Dockerfiles and build arguments, pushes them
+# to the release registry, scans each digest, signs it keyless and attaches
+# SPDX and CycloneDX SBOMs from Syft as attestations. Promotion verifies every
+# digest, runs the migrate job on the new API image and, only once it has
+# succeeded, rolls out api, worker, console and portal to the same digests.
+# Running this workflow by hand with a tag promotes that tag's signed images
+# again and builds nothing. Only Aaron pushes tags.
+#
+# No credential is stored. A job that reaches Google Cloud exchanges its
+# GitHub OIDC token through Workload Identity Federation for a short-lived
+# token of one service account: the publisher, in the `release` environment
+# (v*.*.* tags only), may push to the release repository and nothing else;
+# the deployer, in the `staging` environment (Aaron approves each run), may
+# read that repository, update and run the five workloads and act as their
+# service accounts, and nothing else. Only the promote job knows about Cloud
+# Run, so another cell adds its own promote job and leaves build and signing
+# as they are.
+#
+# Staging takes no traffic until S11-36, S11-32, S11-24, S11-30 and S11-69
+# have merged and no high or critical finding from second-pass parts 1 to 3
+# is open. It holds synthetic data only, with no design partner or other
+# external account, until S12-38's external review fixes have merged and the
+# reviewer has confirmed them. Check both in main's history before approving
+# the first promotion.
+#
+# Rolling back (infra/terraform/gcp/services/README.md):
+# 1. Code only: send each service's traffic back to its previous revision
+#    and re-apply the worker with its previous digest; the next promotion
+#    sends all traffic back to the latest revision. The schema stays ahead,
+#    so this is safe only while migrations are expand-only.
+# 2. Code and schema: while the migrate job still runs the newer image, run
+#    it once for each migration the newer release added, as the migrator,
+#    as `pnpm db:rollback` does:
+#      gcloud run jobs execute tps-staging-uk-migrate --region=europe-west2 \
+#        --wait --args=node,packages/db/scripts/db.ts,down
+#    Only then run this workflow by hand with the previous tag. Re-promoting
+#    an older tag first fails at the migrate step, because the migrator
+#    refuses a database that has run a migration the image does not hold,
+#    and leaves the job on the older image, which cannot roll back either.
+
+name: Release
+
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag whose signed images to promote, for example v1.2.3
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  COSIGN_VERSION: 3.1.3
+  SYFT_VERSION: 1.52.0
+  TRIVY_VERSION: 0.74.0
+  GITHUB_OIDC_ISSUER: https://token.actions.githubusercontent.com
+  PLAYWRIGHT_IMAGE: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
+  TAG: ${{ inputs.tag || github.ref_name }}
+  # europe-west2-docker.pkg.dev/<project>/<repository>
+  REGISTRY: ${{ vars.TPS_RELEASE_REGISTRY }}
+  # projects/<number>/locations/global/workloadIdentityPools/<pool>/providers/<provider>
+  WIF_PROVIDER: ${{ vars.TPS_WIF_PROVIDER }}
+
+jobs:
+  build:
+    name: Build, scan, sign and attest the release images
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      SERVICE_ACCOUNT: ${{ vars.TPS_PUBLISHER }}
+    outputs:
+      api: ${{ steps.push.outputs.api }}
+      console: ${{ steps.push.outputs.console }}
+      portal: ${{ steps.push.outputs.portal }}
+    steps:
+      - name: Check the tag
+        run: |
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "A release tag is vX.Y.Z; '$TAG' is not." >&2
+            exit 1
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install cosign
+        run: |
+          bash .github/scripts/fetch-tool.sh \
+            "https://github.com/sigstore/cosign/releases/download/v${COSIGN_VERSION}/cosign-linux-amd64" \
+            "$RUNNER_TEMP/tools"
+          chmod +x "$RUNNER_TEMP/tools/cosign-linux-amd64"
+      - name: Install Trivy and verify its signature
+        working-directory: ${{ runner.temp }}/tools
+        run: |
+          archive="trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          bash "$GITHUB_WORKSPACE/.github/scripts/fetch-tool.sh" \
+            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/${archive}" .
+          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 --retry 3 \
+            --output "${archive}.sigstore.json" \
+            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/${archive}.sigstore.json"
+          ./cosign-linux-amd64 verify-blob "$archive" \
+            --bundle "${archive}.sigstore.json" \
+            --certificate-identity "https://github.com/aquasecurity/trivy/.github/workflows/reusable-release.yaml@refs/tags/v${TRIVY_VERSION}" \
+            --certificate-oidc-issuer "$GITHUB_OIDC_ISSUER"
+          tar -xzf "$archive" trivy
+      - name: Install Syft and verify its signed checksums
+        working-directory: ${{ runner.temp }}/tools
+        run: |
+          base="https://github.com/anchore/syft/releases/download/v${SYFT_VERSION}"
+          archive="syft_${SYFT_VERSION}_linux_amd64.tar.gz"
+          checksums="syft_${SYFT_VERSION}_checksums.txt"
+          bash "$GITHUB_WORKSPACE/.github/scripts/fetch-tool.sh" "${base}/${archive}" .
+          for file in "$checksums" "${checksums}.sig" "${checksums}.pem"; do
+            curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 --retry 3 \
+              --output "$file" "${base}/${file}"
+          done
+          ./cosign-linux-amd64 verify-blob "$checksums" \
+            --signature "${checksums}.sig" \
+            --certificate "${checksums}.pem" \
+            --certificate-identity "https://github.com/anchore/syft/.github/workflows/release.yaml@refs/heads/main" \
+            --certificate-oidc-issuer "$GITHUB_OIDC_ISSUER"
+          grep " ${archive}\$" "$checksums" | sha256sum --check --strict -
+          tar -xzf "$archive" syft
+      # The same Dockerfiles and build arguments as infra/compose/compose.stack.yaml.
+      - name: Build the images
+        run: |
+          docker build --file infra/docker/api.Dockerfile --tag "$REGISTRY/api:$TAG" .
+          for app in console portal; do
+            docker build --file infra/docker/web.Dockerfile --build-arg "APP=$app" --tag "$REGISTRY/$app:$TAG" .
+          done
+      # The OIDC token's audience is the provider; STS exchanges it for a
+      # federated token, which may only impersonate the job's service account.
+      - name: Sign in to Google Cloud as the publisher
+        run: &sign-in |
+          if [[ ! "$REGISTRY" =~ ^[a-z0-9-]+-docker\.pkg\.dev/[a-z0-9-]+/[a-z0-9-]+$ ]]; then
+            echo "TPS_RELEASE_REGISTRY must be <region>-docker.pkg.dev/<project>/<repository>." >&2
+            exit 1
+          fi
+          umask 077
+          oidc=$(curl --fail --silent --show-error --proto '=https' \
+            --header "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://iam.googleapis.com/$WIF_PROVIDER" | jq --exit-status --raw-output .value)
+          federated=$(jq --null-input --arg audience "//iam.googleapis.com/$WIF_PROVIDER" --arg token "$oidc" '{
+              grantType: "urn:ietf:params:oauth:grant-type:token-exchange",
+              requestedTokenType: "urn:ietf:params:oauth:token-type:access_token",
+              subjectTokenType: "urn:ietf:params:oauth:token-type:jwt",
+              scope: "https://www.googleapis.com/auth/cloud-platform",
+              audience: $audience, subjectToken: $token }' \
+            | curl --fail --silent --show-error --proto '=https' --header 'Content-Type: application/json' \
+              --data @- https://sts.googleapis.com/v1/token | jq --exit-status --raw-output .access_token)
+          curl --fail --silent --show-error --proto '=https' \
+            --header "Authorization: Bearer $federated" --header 'Content-Type: application/json' \
+            --data '{"scope":["https://www.googleapis.com/auth/cloud-platform"],"lifetime":"3600s"}' \
+            "https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/$SERVICE_ACCOUNT:generateAccessToken" \
+            | jq --exit-status --raw-output .accessToken > "$RUNNER_TEMP/google-token"
+          echo "::add-mask::$(cat "$RUNNER_TEMP/google-token")"
+          docker login --username oauth2accesstoken --password-stdin "${REGISTRY%%/*}" < "$RUNNER_TEMP/google-token"
+      - name: Push the images and record their digests
+        id: push
+        run: |
+          for image in api console portal; do
+            docker push --quiet "$REGISTRY/$image:$TAG"
+            digest=$(docker inspect --format '{{json .RepoDigests}}' "$REGISTRY/$image:$TAG" \
+              | jq --exit-status --raw-output --arg repo "$REGISTRY/$image" '.[] | select(startswith($repo + "@sha256:"))')
+            echo "$image=$digest" >> "$GITHUB_OUTPUT"
+          done
+      # Every later step names the pushed digest, never the tag.
+      - name: Scan, sign and attest each digest
+        env:
+          SYFT_CHECK_FOR_APP_UPDATE: 'false'
+          IMAGES: ${{ steps.push.outputs.api }} ${{ steps.push.outputs.console }} ${{ steps.push.outputs.portal }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/sbom"
+          for ref in $IMAGES; do
+            name=${ref##*/}
+            name=${name%@*}
+            "$RUNNER_TEMP/tools/trivy" image --quiet --cache-dir "$RUNNER_TEMP/trivy-cache" --image-src remote \
+              --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 "$ref"
+            "$RUNNER_TEMP/tools/cosign-linux-amd64" sign --yes "$ref"
+            "$RUNNER_TEMP/tools/syft" scan "registry:$ref" --quiet \
+              --output "spdx-json=$RUNNER_TEMP/sbom/$name.spdx.json" \
+              --output "cyclonedx-json=$RUNNER_TEMP/sbom/$name.cdx.json"
+            "$RUNNER_TEMP/tools/cosign-linux-amd64" attest --yes --type spdxjson \
+              --predicate "$RUNNER_TEMP/sbom/$name.spdx.json" "$ref"
+            "$RUNNER_TEMP/tools/cosign-linux-amd64" attest --yes --type cyclonedx \
+              --predicate "$RUNNER_TEMP/sbom/$name.cdx.json" "$ref"
+          done
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-sbom
+          path: ${{ runner.temp }}/sbom/
+          if-no-files-found: error
+          retention-days: 90
+
+  promote:
+    name: Verify, migrate and roll out to staging
+    needs: build
+    if: >-
+      ${{ !cancelled() && (needs.build.result == 'success'
+      || (github.event_name == 'workflow_dispatch' && needs.build.result == 'skipped')) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    environment: staging
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      SERVICE_ACCOUNT: ${{ vars.TPS_DEPLOYER }}
+      PROJECT: ${{ vars.TPS_GCP_PROJECT }}
+      REGION: europe-west2
+      NAME: tps-staging-uk
+      BUILT: ${{ needs.build.outputs.api }} ${{ needs.build.outputs.console }} ${{ needs.build.outputs.portal }}
+    steps:
+      - name: Check the tag
+        run: |
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "A release tag is vX.Y.Z; '$TAG' is not." >&2
+            exit 1
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install cosign
+        run: |
+          bash .github/scripts/fetch-tool.sh \
+            "https://github.com/sigstore/cosign/releases/download/v${COSIGN_VERSION}/cosign-linux-amd64" \
+            "$RUNNER_TEMP/tools"
+          chmod +x "$RUNNER_TEMP/tools/cosign-linux-amd64"
+      - name: Sign in to Google Cloud as the deployer
+        run: *sign-in
+      # A run by hand finds the tag's digests once; verification then holds
+      # each to a signature from this workflow on that tag.
+      - name: Verify each digest's signature and SBOM attestations
+        run: |
+          read -r -a images <<< "$BUILT"
+          if [ "${#images[@]}" -eq 0 ]; then
+            for image in api console portal; do
+              images+=("$REGISTRY/$image@$(docker buildx imagetools inspect "$REGISTRY/$image:$TAG" \
+                --format '{{json .Manifest}}' | jq --exit-status --raw-output .digest)")
+            done
+          fi
+          identity="https://github.com/$GITHUB_REPOSITORY/.github/workflows/release.yml@refs/tags/$TAG"
+          verify() {
+            "$RUNNER_TEMP/tools/cosign-linux-amd64" "$@" --certificate-identity "$identity" \
+              --certificate-oidc-issuer "$GITHUB_OIDC_ISSUER" "$ref" > /dev/null
+          }
+          for ref in "${images[@]}"; do
+            if [[ ! "$ref" =~ ^"$REGISTRY"/(api|console|portal)@sha256:[0-9a-f]{64}$ ]]; then
+              echo "$ref is not a release image by digest." >&2
+              exit 1
+            fi
+            name=${BASH_REMATCH[1]}
+            verify verify
+            verify verify-attestation --type spdxjson
+            verify verify-attestation --type cyclonedx
+            echo "${name^^}_IMAGE=$ref" >> "$GITHUB_ENV"
+          done
+      # Each change is a long-running operation; a failed one stops the run.
+      # A revision that never becomes ready leaves the previous one serving.
+      - name: Run the migrations, then roll out the services
+        run: |
+          : "${API_IMAGE:?}" "${CONSOLE_IMAGE:?}" "${PORTAL_IMAGE:?}"
+          run=https://run.googleapis.com/v2
+          base="$run/projects/$PROJECT/locations/$REGION"
+          call() {
+            curl --fail --silent --show-error --proto '=https' --header 'Content-Type: application/json' \
+              --header "Authorization: Bearer $(cat "$RUNNER_TEMP/google-token")" "$@"
+          }
+          # Waits for the operation in operation.json, and fails if it failed.
+          settle() {
+            local operation
+            operation=$(jq --exit-status --raw-output .name "$RUNNER_TEMP/operation.json")
+            until jq --exit-status .done "$RUNNER_TEMP/operation.json" > /dev/null; do
+              sleep 10
+              call "$run/$operation" > "$RUNNER_TEMP/operation.json"
+            done
+            ! jq --exit-status '.error // empty' "$RUNNER_TEMP/operation.json" >&2
+          }
+          # collection, workload, path to its image, image, then any other change
+          update() {
+            call "$base/$1/$NAME-$2" | jq --arg image "$4" "$3 = \$image${5:+ | $5}" > "$RUNNER_TEMP/$2.json"
+            call --request PATCH --data "@$RUNNER_TEMP/$2.json" "$base/$1/$NAME-$2" > "$RUNNER_TEMP/operation.json"
+            settle
+          }
+          # A rollback pins traffic to an older revision; promotion unpins it,
+          # then checks the new revision is ready and serving all of it.
+          latest='{type: "TRAFFIC_TARGET_ALLOCATION_TYPE_LATEST", percent: 100}'
+          roll_out() {
+            update services "$1" '.template.containers[0].image' "$2" ".traffic = [$latest]"
+            if ! call "$base/services/$NAME-$1" | jq --exit-status ".latestReadyRevision == .latestCreatedRevision
+                and [.trafficStatuses[] | select(.percent > 0) | {type, percent}] == [$latest]" > /dev/null; then
+              echo "$1's new revision is not serving all its traffic." >&2
+              exit 1
+            fi
+          }
+
+          update jobs migrate '.template.template.containers[0].image' "$API_IMAGE"
+          execution=$(call --request POST --data '{}' "$base/jobs/$NAME-migrate:run" | jq --exit-status --raw-output .metadata.name)
+          until jq --exit-status .completionTime "$RUNNER_TEMP/execution.json" > /dev/null 2>&1; do
+            sleep 15
+            call "$run/$execution" > "$RUNNER_TEMP/execution.json"
+          done
+          if ! jq --exit-status '.succeededCount == .taskCount' "$RUNNER_TEMP/execution.json" > /dev/null; then
+            echo "The migrations failed ($execution). No service was changed." >&2
+            exit 1
+          fi
+
+          roll_out api "$API_IMAGE"
+          update workerPools worker '.template.containers[0].image' "$API_IMAGE" \
+            '.instanceSplits = [{type: "INSTANCE_SPLIT_ALLOCATION_TYPE_LATEST", percent: 100}]'
+          roll_out console "$CONSOLE_IMAGE"
+          roll_out portal "$PORTAL_IMAGE"
+          {
+            echo "### $TAG in staging"
+            echo
+            echo "| Workload | Image |"
+            echo "| --- | --- |"
+            echo "| migrate, api, worker | \`$API_IMAGE\` |"
+            echo "| console | \`$CONSOLE_IMAGE\` |"
+            echo "| portal | \`$PORTAL_IMAGE\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # Off until playwright.config.ts can take staging's addresses and staging
+  # has a mail catcher the journey can read (TPS_STAGING_E2E). Run from the
+  # tagged commit, with no Google credentials.
+  journey:
+    name: MVP1 journey and isolation specs against staging
+    needs: promote
+    if: vars.TPS_STAGING_E2E == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment: staging
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/${{ env.TAG }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - name: Enable pnpm through Corepack
+        run: |
+          npm install --global --ignore-scripts corepack@0.36.0
+          corepack enable
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Run the journey project against staging
+        env:
+          TPS_E2E_CONSOLE_URL: ${{ secrets.TPS_E2E_CONSOLE_URL }}
+          TPS_E2E_PORTAL_URL: ${{ secrets.TPS_E2E_PORTAL_URL }}
+          TPS_MAILPIT_URL: ${{ secrets.TPS_E2E_MAIL_URL }}
+          SEED_PASSWORD: ${{ secrets.TPS_E2E_SEED_PASSWORD }}
+        run: |
+          umask 077
+          printf '%s' "$SEED_PASSWORD" > "$RUNNER_TEMP/seed-password"
+          docker run --rm --ipc host --volume "$PWD:$PWD" --workdir "$PWD" \
+            --volume "$RUNNER_TEMP/seed-password:/run/secrets/seed-password:ro" \
+            --env CI --env TPS_E2E_CONSOLE_URL --env TPS_E2E_PORTAL_URL \
+            --env TPS_MAILPIT_URL --env TPS_SEED_PASSWORD_FILE=/run/secrets/seed-password \
+            "$PLAYWRIGHT_IMAGE" \
+            node node_modules/@playwright/test/cli.js test --project=journey

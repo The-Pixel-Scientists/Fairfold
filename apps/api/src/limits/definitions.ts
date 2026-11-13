@@ -39,6 +39,9 @@ const limits = {
   general_ip: { bucket: 'general', windowSeconds: 60, max: 1200, metric: 'api' },
   // 5 requests a second from one signed-in user: a screen makes about ten.
   general_session: { bucket: 'general', windowSeconds: 60, max: 300, metric: 'api' },
+  // A search runs a query for every provider and writes audit rows. A person
+  // typing with a pause between keys sends a few a second; 120 a minute stops a script.
+  search: { bucket: 'general', windowSeconds: 60, max: 120, metric: 'api' },
 } as const satisfies Record<string, Limit>;
 
 /** The four upload counters (ADR 0030); their limits are the domain's. */

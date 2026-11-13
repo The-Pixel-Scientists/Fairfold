@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { listAuditEvents } from '@pixel-scientists/domain/platform/audit-log';
+import { listAuditEvents, searchAuditEvents } from '@pixel-scientists/domain/platform/audit-log';
 import { retentionRoutes } from '@pixel-scientists/domain/platform/retention';
+import { searchTerm } from '@pixel-scientists/domain/platform/search';
 import {
   readErasureRequest,
   requestErasure,
@@ -37,9 +38,13 @@ import {
   monitoringRoutes,
   noteRoutes,
   programmeRoutes,
+  reminderRoutes,
   reviewRoutes,
+  savedViewRoutes,
   spreadRoutes,
   submissionRoutes,
+  templateRoutes,
+  triageRoutes,
 } from '@pixel-scientists/grants/contracts';
 import { impactRoutes } from '@pixel-scientists/impact/contracts';
 import { partyRoutes } from '@pixel-scientists/party/contracts';
@@ -62,6 +67,8 @@ describe('composeModules', () => {
 
     expect(routes.map((route) => route.contract)).toEqual([
       listAuditEvents,
+      searchAuditEvents,
+      searchTerm,
       ...Object.values(teamRoutes),
       getSettings,
       updateSettings,
@@ -90,12 +97,20 @@ describe('composeModules', () => {
       ...Object.values(assistedRoutes),
       ...Object.values(noteRoutes),
       ...Object.values(messageRoutes),
+      triageRoutes.setOwner,
+      triageRoutes.setOwners,
+      triageRoutes.changeLabels,
+      triageRoutes.changeLabelsInBulk,
+      triageRoutes.listLabels,
+      ...Object.values(savedViewRoutes),
+      ...Object.values(templateRoutes),
       ...Object.values(assessmentRoutes),
       assignReviewersAutomatically,
       ...Object.values(spreadRoutes),
       ...Object.values(reviewRoutes),
       ...Object.values(decisionRoutes),
       ...Object.values(exportRoutes),
+      ...Object.values(reminderRoutes),
       ...Object.values(impactRoutes),
     ]);
   });
@@ -127,6 +142,7 @@ describe('composeModules', () => {
         ...Object.values(reviewRoutes),
         ...Object.values(exportRoutes),
         ...Object.values(decisionRoutes),
+        ...Object.values(reminderRoutes),
       ].map((contract) => contract.scope),
     );
 

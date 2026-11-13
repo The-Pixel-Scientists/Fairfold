@@ -215,7 +215,7 @@ jobs:
     # test fails.
     env:
       MANAGER_JOURNEYS: outcome-journey\.spec\.ts form-builder-journey\.spec\.ts forms-builder-table-file-journey\.spec\.ts submissions-files-journey\.spec\.ts
-      REVIEW_JOURNEYS: submissions-journey\.spec\.ts assessment-journey\.spec\.ts decisions-journey\.spec\.ts
+      REVIEW_JOURNEYS: submissions-journey\.spec\.ts assessment-journey\.spec\.ts decisions-journey\.spec\.ts submission-notes-messages\.spec\.ts
       PROGRAMME_JOURNEY: programme-journey\.spec\.ts
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

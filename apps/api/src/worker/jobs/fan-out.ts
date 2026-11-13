@@ -25,12 +25,16 @@ import {
 } from '@pixel-scientists/db/jobs';
 import { z } from 'zod';
 
-/** Declare the fan-out queue `name`, which can send to `targets` only. */
+/**
+ * Declare the fan-out queue `name`, which can send to `targets` only. A queue keeps one schedule,
+ * so a schedule may name a second target (`also`) to send each tenant in the same run.
+ */
 export function defineFanOut<const T extends readonly [string, ...string[]]>(
   name: string,
   targets: T,
 ) {
-  return defineQueue(name, 'platform', z.strictObject({ target: z.enum(targets) }));
+  const target = z.enum(targets);
+  return defineQueue(name, 'platform', z.strictObject({ target, also: target.optional() }));
 }
 export type FanOutQueue = ReturnType<typeof defineFanOut>;
 
@@ -39,23 +43,28 @@ type Platform = Parameters<typeof forEachTenant<unknown>>[0];
 /** Sends the job's target queue one job per active tenant; one tenant's failure fails the job after the rest are sent. */
 export async function sendToEachTenant(
   db: Platform,
-  job: RunningJob<{ readonly target: string }>,
+  job: RunningJob<{ readonly target: string; readonly also?: string | undefined }>,
   logger: JobLogger,
 ): Promise<void> {
-  const target = definedQueues().find(({ name }) => name === job.data.target);
   const send = { slot: job.id };
-  if (target?.kind !== 'tenant' || !target.data.safeParse(send).success) {
-    throw new JobError('precondition_failed');
-  }
+  const targets = [job.data.target, ...(job.data.also === undefined ? [] : [job.data.also])].map(
+    (name) => definedQueues().find((queue) => queue.name === name),
+  );
+  const tenantTargets = targets.flatMap((target) =>
+    target?.kind === 'tenant' && target.data.safeParse(send).success ? [target] : [],
+  );
+  if (tenantTargets.length !== targets.length) throw new JobError('precondition_failed');
   let failed = 0;
   await forEachTenant(db, async (trx) => {
-    try {
-      await sendJob(trx, target, send, job.context, { singletonOn: ['slot'] });
-    } catch (error) {
-      // The others still run; the job then fails and its retry sends to every tenant again.
-      failed++;
-      const code = error instanceof JobSendError ? error.code : 'internal';
-      logger.error({ queue: target.name, jobId: job.id, code }, 'A tenant job was not sent.');
+    for (const target of tenantTargets) {
+      try {
+        await sendJob(trx, target, send, job.context, { singletonOn: ['slot'] });
+      } catch (error) {
+        // The others still run; the job then fails and its retry sends to every tenant again.
+        failed++;
+        const code = error instanceof JobSendError ? error.code : 'internal';
+        logger.error({ queue: target.name, jobId: job.id, code }, 'A tenant job was not sent.');
+      }
     }
   });
   if (failed > 0) throw new JobError('internal');
