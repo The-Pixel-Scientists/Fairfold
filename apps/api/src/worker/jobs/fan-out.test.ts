@@ -42,6 +42,28 @@ describe('the fan-out handler', () => {
     expect(sendJob.mock.calls[0]?.[4]).toEqual({ singletonOn: ['slot'] });
   });
 
+  it('sends each tenant the second target too, and sends none if either target is refused', async () => {
+    const second = defineQueue('test_fan_out_second', 'tenant', z.strictObject({ slot: idSchema }));
+    const both = defineFanOut('test_fan_out_both', [target.name, second.name, other.name]);
+    const running = { ...job(target.name), data: { target: target.name, also: second.name } };
+    await fanOutHandler(both, logger).handle({} as never, running);
+    expect(sendJob.mock.calls.map((call) => (call[1] as { name: string }).name)).toEqual([
+      target.name,
+      second.name,
+      target.name,
+      second.name,
+      target.name,
+      second.name,
+    ]);
+
+    sendJob.mockReset();
+    const refused = { ...running, data: { target: target.name, also: other.name } };
+    await expect(fanOutHandler(both, logger).handle({} as never, refused)).rejects.toBeInstanceOf(
+      JobError,
+    );
+    expect(sendJob).not.toHaveBeenCalled();
+  });
+
   it('finishes the other tenants when one send fails, then fails with a code only', async () => {
     sendJob
       .mockResolvedValueOnce('1')
