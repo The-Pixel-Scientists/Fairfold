@@ -32,11 +32,13 @@ resource "google_sql_database_instance" "main" {
 
     # The Google-managed CAS mode issues server certificates that name the
     # instance's private services access DNS name (local.host), so
-    # verify-full can check the host name.
+    # verify-full can check the host name. Clients sign in with IAM over
+    # TLS and present no certificate: requiring one would tie the app to
+    # Cloud SQL's connector or client certificates (rule 1).
     ip_configuration {
       ipv4_enabled    = false
       private_network = var.network
-      ssl_mode        = "ENCRYPTED_ONLY"
+      ssl_mode        = "ENCRYPTED_ONLY" # nosemgrep: gcp-sql-database-ssl-insecure-value-postgres-mysql -- TLS is required and the server verified (verify-full); clients authenticate with IAM, not certificates (S11-35)
       server_ca_mode  = "GOOGLE_MANAGED_CAS_CA"
     }
 
