@@ -23,6 +23,7 @@ import {
   messageRoutes,
   noteRoutes,
   programmeRoutes,
+  reminderRoutes,
   reviewRoutes,
   savedViewRoutes,
   spreadRoutes,
@@ -373,6 +374,10 @@ export function composeModules(deps: {
       route(exportRoutes.getPublisherSetting, grants.getPublisherSetting),
       route(exportRoutes.savePublisherSetting, grants.savePublisherSetting),
       route(exportRoutes.get360GivingExport, grants.get360GivingExport),
+      route(reminderRoutes.getReminderSetting, grants.getReminderSetting),
+      route(reminderRoutes.saveReminderSetting, grants.saveReminderSetting),
+      route(reminderRoutes.listSubmissionReminders, grants.listSubmissionReminders),
+      route(reminderRoutes.listAssignmentReminders, grants.listAssignmentReminders),
       route(impactRoutes.listFrameworks, impact.listFrameworks),
       route(impactRoutes.getFramework, impact.getFramework),
       route(impactRoutes.createFramework, impact.createFramework, {

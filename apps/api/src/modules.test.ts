@@ -37,6 +37,7 @@ import {
   monitoringRoutes,
   noteRoutes,
   programmeRoutes,
+  reminderRoutes,
   reviewRoutes,
   savedViewRoutes,
   spreadRoutes,
@@ -107,6 +108,7 @@ describe('composeModules', () => {
       ...Object.values(reviewRoutes),
       ...Object.values(decisionRoutes),
       ...Object.values(exportRoutes),
+      ...Object.values(reminderRoutes),
       ...Object.values(impactRoutes),
     ]);
   });
@@ -138,6 +140,7 @@ describe('composeModules', () => {
         ...Object.values(reviewRoutes),
         ...Object.values(exportRoutes),
         ...Object.values(decisionRoutes),
+        ...Object.values(reminderRoutes),
       ].map((contract) => contract.scope),
     );
 
