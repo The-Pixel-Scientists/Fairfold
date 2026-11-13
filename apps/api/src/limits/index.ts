@@ -9,6 +9,7 @@
 //   /openapi.json            openapi      per address
 //   routes with no sign-in   public       per address (/public/tenants/*)
 //   everything else          general_ip   per address, then general_session
+//   the console search       search       per user, after general_session
 //
 // A refusal is a 429 with Retry-After, and nothing else happens. A refused key
 // is remembered in memory until its window ends, so a client that keeps
@@ -74,6 +75,15 @@ type ReadSession = (request: FastifyRequest) => Promise<SessionRead>;
 function audienceOf(request: FastifyRequest): unknown {
   const config = request.routeOptions.config as { contract?: { audience?: unknown } } | undefined;
   return config?.contract?.audience;
+}
+
+/** Routes with a limit of their own on top of the general one, by the permission they need. */
+const ROUTE_LIMITS: Readonly<Record<string, LimitName>> = { 'platform.search.use': 'search' };
+
+function routeLimit(request: FastifyRequest): LimitName | undefined {
+  const config = request.routeOptions.config as { contract?: { permission?: unknown } } | undefined;
+  const permission = config?.contract?.permission;
+  return typeof permission === 'string' ? ROUTE_LIMITS[permission] : undefined;
 }
 
 function addressLimit(request: FastifyRequest): LimitName {
@@ -243,6 +253,8 @@ export function registerLimits(server: FastifyInstance, options: LimitOptions) {
       if (found.session !== null) {
         const user = `${found.session.app}:${found.session.userId}`;
         await charge(request, 'general_session', user, user);
+        const own = routeLimit(request);
+        if (own !== undefined) await charge(request, own, user, user);
       }
       return found;
     };

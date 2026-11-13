@@ -20,8 +20,10 @@ import {
 } from '../../../../../packages/db/test/tenants.ts';
 import { captureLogs, smtpTestSettings, testAuth, testSession } from '../../../test/support.ts';
 import { buildApp } from '../../app.ts';
-import { loadConfig } from '../../config.ts';
+import { loadConfig, Secret } from '../../config.ts';
 import { openDatabase, type ApiDatabase } from '../../database.ts';
+import { keyHash } from '../../limits/client-key.ts';
+import { LIMITS } from '../../limits/definitions.ts';
 import { createLogger } from '../../logger.ts';
 import { composeModules } from '../../modules.ts';
 
@@ -271,5 +273,58 @@ describe('the term', () => {
 
     const events = await rows(tenantA, 'SELECT * FROM app.audit_event');
     expect(JSON.stringify(events).toLowerCase()).not.toContain(TERM.toLowerCase());
+  });
+});
+
+describe('the search limit', () => {
+  it('refuses a user past their limit with 429 before any provider call or audit row', async () => {
+    const key = new Secret('a-key-of-at-least-thirty-two-bytes!');
+    const full = keyHash(key, 'search', `console:${managerA.userId}`).toString('hex');
+    const limited = await buildApp({
+      logger: createLogger({ level: 'silent' }),
+      checkDatabase: () => database.check(),
+      inTenant: database.inTenant,
+      auth: auth.module,
+      limits: {
+        key,
+        store: {
+          count: (_bucket, hash) =>
+            Promise.resolve({
+              count: hash.toString('hex') === full ? LIMITS.search.max + 1 : 1,
+              retryAfter: 9,
+            }),
+        },
+      },
+      ...composeModules({ publicTenants: database.publicTenants }),
+    });
+    const as = (member: Member) =>
+      limited.inject({
+        method: 'POST',
+        url: '/api/console/search',
+        payload: { term: TERM },
+        headers: auth.as({
+          app: member.app,
+          session: testSession({
+            app: member.app,
+            userId: member.userId,
+            tenant: member.tenant.id,
+          }),
+        }),
+      });
+    const events = async () =>
+      (await rows<{ n: string }>(tenantA, 'SELECT count(*) AS n FROM app.audit_event'))[0]?.n;
+    try {
+      const before = await events();
+
+      const refused = await as(managerA);
+      expect(refused.statusCode).toBe(429);
+      expect(refused.headers['retry-after']).toBe('9');
+      expect(refused.body.toLowerCase()).not.toContain(TERM.toLowerCase());
+      expect(await events()).toBe(before);
+
+      expect((await as(reviewerA)).statusCode).toBe(200);
+    } finally {
+      await limited.close();
+    }
   });
 });
