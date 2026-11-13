@@ -11,6 +11,7 @@
 // `partyErasureTarget` serve erasure. `partyRecordHandlers` serves the staff
 // routes that change records. `createPartyMerges` is crm's merge, duplicate and
 // resolve contract, over the re-points apps/api registers with `partyRepoint`.
+// `partySearch` feeds the console search across tools.
 
 export {
   contactDetails,
@@ -31,6 +32,7 @@ export { createPartyMerges } from './merge.ts';
 export type { PartyRequest } from './request.ts';
 export { partyRepoint } from './repoint.ts';
 export { partySubjectRules, type SubjectRule } from './audit.ts';
+export { partySearch } from './search/index.ts';
 export { partyWarehouse } from './warehouse.ts';
 export {
   partyErasure,
