@@ -22,6 +22,7 @@ import type { MessageDependencies } from './messages/context.ts';
 import { monitoringHandlers } from './monitoring/handlers.ts';
 import { noteHandlers } from './notes/handlers.ts';
 import { programmeSetUpHandlers } from './programme/handlers.ts';
+import { reminderHandlers, type ReminderDependencies } from './reminders/handlers.ts';
 import { submissionHandlers } from './submissions/handlers.ts';
 import { templateHandlers, type TemplateDependencies } from './templates/test-send.ts';
 import { triageHandlers } from './triage/handlers.ts';
@@ -33,6 +34,7 @@ export type { DecisionDependencies, MailSender } from './decisions/context.ts';
 export type { ExportDependencies } from './export/publisher.ts';
 export type { MessageDependencies } from './messages/context.ts';
 export type { NoteDependencies, NotesPlatform } from './notes/context.ts';
+export type { ReminderDependencies } from './reminders/handlers.ts';
 export type { TemplateDependencies } from './templates/test-send.ts';
 export type { ViewDependencies } from './views/context.ts';
 export type { FormDependencies } from './forms/context.ts';
@@ -49,7 +51,8 @@ export function grantsHandlers(
     ExportDependencies &
     MessageDependencies &
     ViewDependencies &
-    TemplateDependencies,
+    TemplateDependencies &
+    ReminderDependencies,
 ) {
   return {
     ...programmeSetUpHandlers(deps),
@@ -66,5 +69,6 @@ export function grantsHandlers(
     ...assessmentHandlers(deps),
     ...decisionHandlers(deps),
     ...exportHandlers(deps),
+    ...reminderHandlers(deps),
   };
 }
