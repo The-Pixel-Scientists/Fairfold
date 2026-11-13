@@ -234,7 +234,9 @@ describe('what a search returns', () => {
     await asMigratorIn(tenant.id, async (client) => {
       await client.query(`UPDATE app.tenant SET timezone = 'Europe/London'`);
       // The clocks went forward at 01:00 UTC on 29 March 2026, so that day
-      // ran from 00:00 UTC to 22:59:59 UTC.
+      // ran from 00:00 UTC to 22:59:59 UTC. The trigger stamps the time of
+      // the insert, so it is switched off to place these events.
+      await client.query('ALTER TABLE app.audit_event DISABLE TRIGGER set_audit_retention');
       for (const at of [
         '2026-03-28T23:59:59Z',
         '2026-03-29T00:00:00Z',
@@ -250,8 +252,10 @@ describe('what a search returns', () => {
           entity_id: randomUUID(),
           changes: {},
           occurred_at: at,
+          retain_until: '2028-01-01T00:00:00Z',
         });
       }
+      await client.query('ALTER TABLE app.audit_event ENABLE TRIGGER set_audit_retention');
     });
 
     const times = (await page(admin, { from: '2026-03-29', to: '2026-03-29' })).events.map(
