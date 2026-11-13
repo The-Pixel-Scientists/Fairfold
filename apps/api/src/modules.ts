@@ -7,7 +7,7 @@
 
 import type { JobSender } from '@pixel-scientists/db/jobs';
 import type { FieldProblem } from '@pixel-scientists/domain/platform';
-import { listAuditEvents } from '@pixel-scientists/domain/platform/audit-log';
+import { listAuditEvents, searchAuditEvents } from '@pixel-scientists/domain/platform/audit-log';
 import { getWarehouseSnapshot } from '@pixel-scientists/domain/warehouse';
 import {
   adjustmentRoutes,
@@ -52,7 +52,7 @@ import type { PublicTenants, TenantTransaction } from './database.ts';
 import { queueReleaseEmail } from './decision-emails.ts';
 import { publishGrantsEvent } from './grant-events.ts';
 import { queueMessageNotification } from './message-notifications.ts';
-import { listAuditEventsHandler } from './platform/audit-log/index.ts';
+import { listAuditEventsHandler, searchAuditEventsHandler } from './platform/audit-log/index.ts';
 import { insertConfigVersion, readConfigHistory } from './platform/config-versions.ts';
 import { erasureRoutes, type Contribution } from './platform/erasure/index.ts';
 import { membersWith } from './platform/members.ts';
@@ -184,6 +184,7 @@ export function composeModules(deps: {
   return {
     routes: [
       route(listAuditEvents, listAuditEventsHandler),
+      route(searchAuditEvents, searchAuditEventsHandler),
       ...teamRoutes(deps.auth ?? noAuth),
       ...settingsRoutes,
       ...retentionRoutes,

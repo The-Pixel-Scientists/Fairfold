@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { listAuditEvents } from '@pixel-scientists/domain/platform/audit-log';
+import { listAuditEvents, searchAuditEvents } from '@pixel-scientists/domain/platform/audit-log';
 import { retentionRoutes } from '@pixel-scientists/domain/platform/retention';
 import {
   readErasureRequest,
@@ -65,6 +65,7 @@ describe('composeModules', () => {
 
     expect(routes.map((route) => route.contract)).toEqual([
       listAuditEvents,
+      searchAuditEvents,
       ...Object.values(teamRoutes),
       getSettings,
       updateSettings,

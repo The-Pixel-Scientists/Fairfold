@@ -6,14 +6,18 @@
 // staff members' only, from the party module, so the log holds no applicant's
 // personal details and reading it is not itself audited.
 
-import type {
-  AuditEvent,
-  AuditEventPage,
-  listAuditEvents,
+import {
+  auditEventSchema,
+  type AuditEvent,
+  type AuditSearch,
+  type AuditSearchPage,
+  type listAuditEvents,
+  type searchAuditEvents,
 } from '@pixel-scientists/domain/platform/audit-log';
 import { roles } from '@pixel-scientists/domain/platform';
 import { peopleByUserIds } from '@pixel-scientists/party/server';
 
+import type { TenantTransaction } from '../../database.ts';
 import type { Handler } from '../../routes/register.ts';
 import { decodeCursor, encodeCursor } from './cursor.ts';
 
@@ -31,6 +35,7 @@ type AuditTables = {
     entity_type: string;
     entity_id: string;
     changes: AuditEvent['changes'];
+    subject_party_id: string | null;
   };
   'app.membership': { id: string; user_id: string; roles: string[] };
   'app.tenant': { timezone: string };
@@ -48,8 +53,11 @@ export function isStaff(memberRoles: readonly string[]): boolean {
 const nextDay = (date: string): string =>
   new Date(Date.parse(`${date}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
 
-export const listAuditEventsHandler: Handler<typeof listAuditEvents> = async ({ tx, input }) => {
-  const { query } = input;
+/** A page of the tenant's events that match the filters, newest first, each with the party it is about. */
+export async function readAuditPage(
+  tx: TenantTransaction,
+  query: AuditSearch,
+): Promise<AuditSearchPage> {
   const db = tx.$extendTables<AuditTables>();
 
   const events = db
@@ -63,6 +71,7 @@ export const listAuditEventsHandler: Handler<typeof listAuditEvents> = async ({ 
       'entity_type',
       'entity_id',
       'changes',
+      'subject_party_id',
     ])
     .select((eb) =>
       eb
@@ -93,6 +102,9 @@ export const listAuditEventsHandler: Handler<typeof listAuditEvents> = async ({ 
         ...(query.entityType === undefined ? [] : [eb('entity_type', '=', query.entityType)]),
         ...(query.entityId === undefined ? [] : [eb('entity_id', '=', query.entityId)]),
         ...(query.byMembershipId === undefined ? [] : [eb('actor_id', '=', query.byMembershipId)]),
+        ...(query.subjectPartyId === undefined
+          ? []
+          : [eb('subject_party_id', '=', query.subjectPartyId)]),
         ...(query.from === undefined ? [] : [eb('occurred_at', '>=', startOf(query.from))]),
         ...(query.to === undefined ? [] : [eb('occurred_at', '<', startOf(nextDay(query.to)))]),
         ...(after === undefined
@@ -150,7 +162,7 @@ export const listAuditEventsHandler: Handler<typeof listAuditEvents> = async ({ 
     return { kind: 'staff', membershipId: row.actor_id, name: name === '' ? null : name };
   };
 
-  const page: AuditEventPage = {
+  return {
     events: rows.map((row) => ({
       id: row.id,
       occurredAt: row.occurred_at.toISOString(),
@@ -159,8 +171,19 @@ export const listAuditEventsHandler: Handler<typeof listAuditEvents> = async ({ 
       entityId: row.entity_id,
       actor: actor(row),
       changes: row.changes,
+      subjectPartyId: row.subject_party_id,
     })),
     nextCursor: more ? encodeCursor({ occurredAt: last.cursor_at, id: last.id }) : null,
   };
-  return page;
+}
+
+export const listAuditEventsHandler: Handler<typeof listAuditEvents> = async ({ tx, input }) => {
+  const { events, nextCursor } = await readAuditPage(tx, input.query);
+  return {
+    events: events.map((event) => auditEventSchema.parse(event)),
+    nextCursor,
+  };
 };
+
+export const searchAuditEventsHandler: Handler<typeof searchAuditEvents> = ({ tx, input }) =>
+  readAuditPage(tx, input.body);
