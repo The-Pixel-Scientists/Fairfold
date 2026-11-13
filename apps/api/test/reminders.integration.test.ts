@@ -642,11 +642,12 @@ describe('reminders only remind (rule 9)', () => {
 
     const snapshot = () =>
       t.rows(
-        `SELECT 'application' AS kind, to_jsonb(a) AS row FROM grants.application a WHERE a.round_id = $1
-         UNION ALL SELECT 'assignment', to_jsonb(s) FROM grants.assignment s WHERE s.round_id = $1
-         UNION ALL SELECT 'decision', to_jsonb(d) FROM grants.decision d
-           JOIN grants.application a ON a.id = d.application_id WHERE a.round_id = $1
-         ORDER BY 1, 2::text`,
+        `SELECT kind, row FROM (
+           SELECT 'application' AS kind, to_jsonb(a) AS row FROM grants.application a WHERE a.round_id = $1
+           UNION ALL SELECT 'assignment', to_jsonb(s) FROM grants.assignment s WHERE s.round_id = $1
+           UNION ALL SELECT 'decision', to_jsonb(d) FROM grants.decision d
+             JOIN grants.application a ON a.id = d.application_id WHERE a.round_id = $1
+         ) snapshot ORDER BY kind, row::text`,
         [r.roundId],
       );
     const before = await snapshot();
