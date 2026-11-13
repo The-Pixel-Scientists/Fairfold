@@ -8,6 +8,7 @@
 import type { JobSender } from '@pixel-scientists/db/jobs';
 import type { FieldProblem } from '@pixel-scientists/domain/platform';
 import { listAuditEvents, searchAuditEvents } from '@pixel-scientists/domain/platform/audit-log';
+import { searchTerm } from '@pixel-scientists/domain/platform/search';
 import { getWarehouseSnapshot } from '@pixel-scientists/domain/warehouse';
 import {
   adjustmentRoutes,
@@ -59,6 +60,7 @@ import { erasureRoutes, type Contribution } from './platform/erasure/index.ts';
 import { membersWith } from './platform/members.ts';
 import { notesPlatform } from './platform/notes/index.ts';
 import { retentionRoutes } from './platform/retention/index.ts';
+import { searchHandler } from './platform/search/index.ts';
 import { settingsRoutes } from './platform/settings/index.ts';
 import { settingsTables } from './platform/settings/tables.ts';
 import { teamRoutes, type TeamAuth } from './platform/team/index.ts';
@@ -186,6 +188,7 @@ export function composeModules(deps: {
     routes: [
       route(listAuditEvents, listAuditEventsHandler),
       route(searchAuditEvents, searchAuditEventsHandler),
+      route(searchTerm, searchHandler()),
       ...teamRoutes(deps.auth ?? noAuth),
       ...settingsRoutes,
       ...retentionRoutes,

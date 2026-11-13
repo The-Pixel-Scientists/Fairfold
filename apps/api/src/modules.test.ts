@@ -2,6 +2,7 @@
 
 import { listAuditEvents, searchAuditEvents } from '@pixel-scientists/domain/platform/audit-log';
 import { retentionRoutes } from '@pixel-scientists/domain/platform/retention';
+import { searchTerm } from '@pixel-scientists/domain/platform/search';
 import {
   readErasureRequest,
   requestErasure,
@@ -67,6 +68,7 @@ describe('composeModules', () => {
     expect(routes.map((route) => route.contract)).toEqual([
       listAuditEvents,
       searchAuditEvents,
+      searchTerm,
       ...Object.values(teamRoutes),
       getSettings,
       updateSettings,
