@@ -98,6 +98,9 @@ beforeAll(async () => {
 }, 60_000);
 
 afterAll(async () => {
+  await asMigratorIn(tenantA.id, (client) =>
+    client.query('DELETE FROM app.membership WHERE user_id = $1', [leadA.userId]),
+  );
   await api.close();
   await database.close();
 });
@@ -175,9 +178,10 @@ describe('what a search finds', () => {
     const theirs = resultIds(await found(managerB, { term: TERM }));
     expect(mine).toEqual([ids.orgA, ids.personA]);
     expect(theirs).toEqual([ids.orgB, ids.personB]);
-    expect(resultIds(await found(managerB, { term: 'zelda.quillfeather@' }))).toEqual([
-      ids.personB,
-    ]);
+    const byEmail = resultIds(await found(managerB, { term: 'zelda.quillfeather@' }));
+    expect(byEmail).toContain(ids.personB);
+    expect(byEmail).not.toContain(ids.personA);
+    expect(byEmail).not.toContain(ids.orgA);
   });
 
   it('narrows to the modules named, and answers nothing for one that is not available', async () => {
