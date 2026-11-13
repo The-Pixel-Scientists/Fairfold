@@ -115,11 +115,11 @@ describe('saving a view', () => {
     const [event] = await events('grants.saved_view.created', view.id);
     expect(event).toMatchObject({ actor_id: t.managerA.membershipId });
     expect(JSON.stringify(event?.changes)).not.toMatch(/Synthetic|late|submitted/);
-    expect(Object.keys(event?.changes ?? {})).toEqual([
-      'grants.saved_view.name',
-      'grants.saved_view.filter',
-      'grants.saved_view.sort',
+    expect(Object.keys(event?.changes ?? {}).sort()).toEqual([
       'grants.saved_view.columns',
+      'grants.saved_view.filter',
+      'grants.saved_view.name',
+      'grants.saved_view.sort',
     ]);
   });
 
