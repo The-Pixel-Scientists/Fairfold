@@ -145,6 +145,45 @@ other than public recipients.
 Where the escrow is held, and who may recover from it, is decided before live
 data is held.
 
+## Setting up the backup store
+
+The managed service's store is at PeaSoup, created by hand by the account's
+owner; any S3-compatible store with object lock works the same way.
+
+1. Create the bucket with object lock and versioning on. Object lock can only
+   be turned on when a bucket is created. Set no default retention: the job
+   sets each object's own date.
+2. Create an access key for the job alone. It may put and get objects and
+   object versions, list object versions, read and set object retention, read
+   the bucket's versioning and object lock settings, and delete object
+   versions, which prune needs and each lock holds back until its date. It may
+   not change the bucket's settings or policy, or anyone's keys.
+3. Write the key as a shared-credentials file, a `[default]` section with
+   `aws_access_key_id` and `aws_secret_access_key`, for
+   `TPS_BACKUP_STORE_CREDENTIALS_FILE`.
+4. Before the first 1 January run, confirm with the provider that a
+   compliance-mode date can be set on each object through its S3 API, for 7
+   years, and lengthened later. Until it confirms, pause the schedule over
+   1 January, so no 7-year lock is set there.
+
+## Running it
+
+Run the job once a night, one run at a time, early in the day in UTC, so that
+a failed run on the 1st can be repeated before the day ends. Outside the
+managed service a cron entry or a systemd timer does this. The job needs only
+the settings above, network access to the database, the live file store and
+the backup store, and a scratch directory with room for the largest encrypted
+dump. The managed service's schedule and identity are in `infra/terraform/`.
+
+Alert when no run record with outcome `ok` or `already_complete` has arrived
+for 26 hours.
+
+## Rolling back
+
+Stop the schedule. Nothing the job has written can be removed before its date,
+by anyone, so a change to the job is rolled back by running the previous
+version, and the objects it wrote stay until their locks expire.
+
 ## Tests
 
 ```
