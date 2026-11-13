@@ -57,7 +57,7 @@ const labelsOn = async (id: string) =>
 
 const LABEL_NAME = 'Synthetic label: needs a site visit';
 
-async function aLabel(name = `${LABEL_NAME} ${randomUUID()}`, archived = false) {
+async function aLabel(name = `${LABEL_NAME} ${randomUUID().slice(0, 4)}`, archived = false) {
   const [row] = await asMigratorIn(
     t.tenantA.id,
     async (client) =>
