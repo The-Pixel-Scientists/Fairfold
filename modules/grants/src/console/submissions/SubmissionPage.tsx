@@ -8,6 +8,7 @@ import { AssignmentsPanel } from '../assessment/AssignmentsPanel.tsx';
 import { DecisionPanel } from '../decisions/DecisionPanel.tsx';
 import { formatMoment } from '../programme/format.ts';
 import { useParam } from '../programme/Page.tsx';
+import { ReminderHistory, loadSubmissionReminders } from '../reminders/ReminderHistory.tsx';
 import { AdjustmentsPanel } from './adjustments/AdjustmentsPanel.tsx';
 import { Aside } from './detail/Aside.tsx';
 import { ApplicationTab } from './detail/ApplicationTab.tsx';
@@ -109,6 +110,7 @@ function Detail({ submissionId }: { submissionId: string }) {
               <AssignmentsPanel submission={submission} />
               <DecisionPanel submission={submission} />
               <AdjustmentsPanel submission={submission} />
+              <ReminderHistory load={loadSubmissionReminders} id={submission.id} />
               <Aside submission={submission} />
             </div>
           </div>
