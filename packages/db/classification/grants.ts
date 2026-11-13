@@ -323,7 +323,7 @@ export const grants = {
     sort: internal,
     columns: internal,
   },
-  // Reminders (0060 and 0061): ids, switches, whole days, versions, kinds,
+  // Reminders (0060, 0061 and 0068): ids, switches, whole days, versions, kinds,
   // statuses, codes and times, all of which may be audit values. A round's
   // setting is configuration about no subject, kept with its round. An outbox
   // row holds no address or text; it is kept as long as the application or
@@ -338,10 +338,12 @@ export const grants = {
     draft_days_before_2: internal,
     draft_days_before_3: internal,
     draft_template_version_id: internal,
+    draft_template_kind: internal,
     review_enabled: internal,
     review_overdue_after_days: internal,
     review_repeat_every_days: internal,
     review_template_version_id: internal,
+    review_template_kind: internal,
     version: internal,
   },
   'grants.reminder_email': {

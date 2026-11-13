@@ -150,6 +150,10 @@ describe('migrations', { timeout: 30_000 }, () => {
       await sql`TRUNCATE impact.framework, impact.outcome, impact.indicator, impact.target,
                          impact.result, impact.result_evidence,
                          impact.learning_note`.execute(trx);
+      // And 0068's down cannot validate the outcome check while a reminder
+      // template exists, which the reminder tests leave behind. Empty the
+      // template versions and every table that refers to them.
+      await sql`TRUNCATE grants.email_template_version CASCADE`.execute(trx);
       // After the loop, before[i] is the schema with the first i migrations applied.
       const before = [await stableSnapshot(trx)];
       for (const { name, down } of [...migrations].reverse()) {
