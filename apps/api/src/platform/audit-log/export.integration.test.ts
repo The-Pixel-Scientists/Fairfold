@@ -292,7 +292,7 @@ describe('reading the status', () => {
         permission: 'grants.data.export',
         filters: JSON.stringify({}),
         field_ids: ['app.audit_event.action'],
-        output_sensitivity: 'audit',
+        output_sensitivity: 'personal',
         request_id: randomUUID(),
       }),
     );
