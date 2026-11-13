@@ -38,8 +38,11 @@ import {
   noteRoutes,
   programmeRoutes,
   reviewRoutes,
+  savedViewRoutes,
   spreadRoutes,
   submissionRoutes,
+  templateRoutes,
+  triageRoutes,
 } from '@pixel-scientists/grants/contracts';
 import { impactRoutes } from '@pixel-scientists/impact/contracts';
 import { partyRoutes } from '@pixel-scientists/party/contracts';
@@ -90,6 +93,13 @@ describe('composeModules', () => {
       ...Object.values(assistedRoutes),
       ...Object.values(noteRoutes),
       ...Object.values(messageRoutes),
+      triageRoutes.setOwner,
+      triageRoutes.setOwners,
+      triageRoutes.changeLabels,
+      triageRoutes.changeLabelsInBulk,
+      triageRoutes.listLabels,
+      ...Object.values(savedViewRoutes),
+      ...Object.values(templateRoutes),
       ...Object.values(assessmentRoutes),
       assignReviewersAutomatically,
       ...Object.values(spreadRoutes),

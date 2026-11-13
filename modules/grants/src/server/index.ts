@@ -18,7 +18,15 @@ export {
   type MessageDependencies,
   type NoteDependencies,
   type NotesPlatform,
+  type TemplateDependencies,
+  type ViewDependencies,
 } from './routes.ts';
+export {
+  resolveViewForViewer,
+  type ResolvedView,
+  type Unusable,
+  type Viewer,
+} from './views/resolve.ts';
 export {
   sendReleaseEmail,
   type ReleaseEmailDependencies,

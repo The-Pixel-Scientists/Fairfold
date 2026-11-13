@@ -24,8 +24,11 @@ import {
   noteRoutes,
   programmeRoutes,
   reviewRoutes,
+  savedViewRoutes,
   spreadRoutes,
   submissionRoutes,
+  templateRoutes,
+  triageRoutes,
 } from '@pixel-scientists/grants/contracts';
 import {
   grantsErasure,
@@ -110,6 +113,16 @@ const refuse = (status: 400 | 409, detail: string, errors?: readonly FieldProble
 /** The id a replay reads by; a route whose first answer had none has nothing to replay. */
 const created = (id: string | null): string => id ?? missing();
 
+/** A member's own action refused, with no reason beyond the status. */
+const forbidden = (): Error => new ApiError(403, undefined, { reason: 'not_allowed' });
+
+/** More test emails than a member may send in an hour. */
+const slowDown = (retryAfterSeconds: number): Error =>
+  new ApiError(429, undefined, {
+    reason: 'test_send_limit',
+    headers: { 'Retry-After': String(retryAfterSeconds) },
+  });
+
 const tenantTimeZone = async (tx: TenantTransaction, tenant: string): Promise<string> =>
   (
     await settingsTables(tx)
@@ -155,6 +168,8 @@ export function composeModules(deps: {
   const grants = grantsHandlers({
     notFound,
     refuse,
+    forbidden,
+    slowDown,
     tenantTimeZone,
     recordConfig: insertConfigVersion,
     configHistory: readConfigHistory,
@@ -312,6 +327,23 @@ export function composeModules(deps: {
           missing(),
       }),
       route(messageRoutes.markStaffThreadRead, grants.markStaffThreadRead),
+      route(triageRoutes.setOwner, grants.setOwner),
+      route(triageRoutes.setOwners, grants.setOwners),
+      route(triageRoutes.changeLabels, grants.changeLabels),
+      route(triageRoutes.changeLabelsInBulk, grants.changeLabelsInBulk),
+      route(triageRoutes.listLabels, grants.listLabels),
+      route(savedViewRoutes.listSavedViews, grants.listSavedViews),
+      route(savedViewRoutes.getSavedView, grants.getSavedView),
+      route(savedViewRoutes.createSavedView, grants.createSavedView, {
+        replay: ({ tx, context, id }) =>
+          grants.getSavedView({ tx, context, input: { params: { viewId: created(id) } } }),
+      }),
+      route(savedViewRoutes.updateSavedView, grants.updateSavedView),
+      route(savedViewRoutes.deleteSavedView, grants.deleteSavedView),
+      // A replay sends nothing: the first request already sent the test, and its answer has no body.
+      route(templateRoutes.sendTestEmail, grants.sendTestEmail, {
+        replay: () => Promise.resolve(undefined),
+      }),
       // The monitoring routes stay unregistered until the audit log hides
       // `grants.monitoring.*` from everyone without `platform.audit.read` and
       // `grants.monitoring.disclose` and the subject access walk withholds it

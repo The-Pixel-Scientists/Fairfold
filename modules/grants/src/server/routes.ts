@@ -23,12 +23,18 @@ import { monitoringHandlers } from './monitoring/handlers.ts';
 import { noteHandlers } from './notes/handlers.ts';
 import { programmeSetUpHandlers } from './programme/handlers.ts';
 import { submissionHandlers } from './submissions/handlers.ts';
+import { templateHandlers, type TemplateDependencies } from './templates/test-send.ts';
+import { triageHandlers } from './triage/handlers.ts';
+import type { ViewDependencies } from './views/context.ts';
+import { viewHandlers } from './views/handlers.ts';
 
 export type { AssessmentDependencies } from './assessment/context.ts';
 export type { DecisionDependencies, MailSender } from './decisions/context.ts';
 export type { ExportDependencies } from './export/publisher.ts';
 export type { MessageDependencies } from './messages/context.ts';
 export type { NoteDependencies, NotesPlatform } from './notes/context.ts';
+export type { TemplateDependencies } from './templates/test-send.ts';
+export type { ViewDependencies } from './views/context.ts';
 export type { FormDependencies } from './forms/context.ts';
 export type { ConfigHistoryRow, GrantsContext, GrantsDependencies } from './programme/context.ts';
 
@@ -41,7 +47,9 @@ export function grantsHandlers(
     AssessmentDependencies &
     DecisionDependencies &
     ExportDependencies &
-    MessageDependencies,
+    MessageDependencies &
+    ViewDependencies &
+    TemplateDependencies,
 ) {
   return {
     ...programmeSetUpHandlers(deps),
@@ -52,6 +60,9 @@ export function grantsHandlers(
     ...monitoringHandlers(deps),
     ...noteHandlers(deps),
     ...messageHandlers(deps),
+    ...triageHandlers(deps),
+    ...viewHandlers(deps),
+    ...templateHandlers(deps),
     ...assessmentHandlers(deps),
     ...decisionHandlers(deps),
     ...exportHandlers(deps),
