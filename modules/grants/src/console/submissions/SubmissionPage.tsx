@@ -16,6 +16,8 @@ import { HistoryTab } from './detail/HistoryTab.tsx';
 import { Neighbours } from './detail/Neighbours.tsx';
 import { StagePath } from './detail/StagePath.tsx';
 import { loadSubmission } from './loaders.ts';
+import { MessagesPanel } from './messages/MessagesPanel.tsx';
+import { NotesPanel } from './notes/NotesPanel.tsx';
 import { submissionsPath } from './paths.ts';
 import { searchOf } from './query.ts';
 import { ReadPage } from './ReadPage.tsx';
@@ -80,6 +82,16 @@ function Detail({ submissionId }: { submissionId: string }) {
                   id: 'eligibility',
                   label: 'Eligibility',
                   content: <EligibilityTab submission={submission} />,
+                },
+                {
+                  id: 'notes',
+                  label: 'Notes',
+                  content: <NotesPanel submissionId={submission.id} />,
+                },
+                {
+                  id: 'messages',
+                  label: 'Messages',
+                  content: <MessagesPanel submissionId={submission.id} />,
                 },
                 {
                   id: 'history',
