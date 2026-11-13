@@ -607,6 +607,7 @@ describe('across tenants', () => {
     expect(await inB((trx) => grantsErasure.erase(trx, subjects))).toEqual({
       'grants.application': 0,
       'app.file': 0,
+      'grants.reminder_email': 0,
     });
     expect(await personRow(t.tenantA, person)).toMatchObject({ given_name: 'Ada' });
     expect(await personRow(t.tenantB, applicantB.person)).toMatchObject({ given_name: 'Ada' });
