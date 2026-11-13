@@ -28,8 +28,7 @@ export function SnapshotPanel({ snapshot, current, currentHref, timeZone }: Snap
     return (
       <Panel title="Organisation details as submitted">
         <p className="text-body text-muted">
-          No snapshot was taken for this application, so there are no details as submitted. The
-          organisation panel shows its record now.
+          Details as submitted were not recorded for this submission.
         </p>
       </Panel>
     );
