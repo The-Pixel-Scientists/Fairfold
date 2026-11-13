@@ -1,0 +1,121 @@
+{
+  "uid": "tps-jobs",
+  "title": "Jobs",
+  "description": "Job failures, queue depth and dead-lettered jobs for the worker.",
+  "tags": ["tps"],
+  "schemaVersion": 39,
+  "editable": false,
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "refresh": "1m",
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Job failures in 15 minutes, by queue",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (tps_queue) (increase(tps_job_failures_total[15m]))",
+          "legendFormat": "{{tps_queue}}"
+        },
+        {
+          "refId": "B",
+          "expr": "vector(5)",
+          "legendFormat": "Alert threshold"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Job failures in 15 minutes, by error code",
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (tps_error_code) (increase(tps_job_failures_total[15m]))",
+          "legendFormat": "{{tps_error_code}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Jobs waiting, by queue",
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max by (tps_queue) (tps_queue_depth)",
+          "legendFormat": "{{tps_queue}}"
+        },
+        {
+          "refId": "B",
+          "expr": "vector(500)",
+          "legendFormat": "Alert threshold"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Dead-lettered jobs, by queue",
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max by (tps_queue) (tps_queue_dead_letters)",
+          "legendFormat": "{{tps_queue}}"
+        }
+      ]
+    }
+  ]
+}
