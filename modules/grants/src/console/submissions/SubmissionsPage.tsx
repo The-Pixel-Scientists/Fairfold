@@ -26,6 +26,9 @@ import { loadProgrammes } from './loaders.ts';
 import { MoveDialog } from './MoveDialog.tsx';
 import type { Moved } from './MoveDialog.tsx';
 import { submissionPath, submissionsPath } from './paths.ts';
+import { LabelDialog } from './views/LabelDialog.tsx';
+import type { LabelMode } from './views/LabelDialog.tsx';
+import { LABELS_PATH } from './views/paths.ts';
 import { searchOf, withCursor, withFilter } from './query.ts';
 import { ReadPage } from './ReadPage.tsx';
 import { SubmissionTable } from './SubmissionTable.tsx';
@@ -76,6 +79,7 @@ function Results({
   const canChoose = canMove || canAssign;
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [moving, setMoving] = useState(false);
+  const [labelling, setLabelling] = useState<LabelMode | null>(null);
   const [notice, setNotice] = useState('');
   const summary = useRef<HTMLParagraphElement>(null);
   const status = useRef<HTMLParagraphElement>(null);
@@ -130,6 +134,18 @@ function Results({
               Move to stage
             </Button>
           )}
+          {canMove &&
+            (['add', 'remove'] as const).map((mode) => (
+              <Button
+                key={mode}
+                disabled={chosen.length === 0}
+                onClick={() => {
+                  setLabelling(mode);
+                }}
+              >
+                {mode === 'add' ? 'Add labels' : 'Remove labels'}
+              </Button>
+            ))}
           <AssignActions
             chosen={chosen}
             onDone={(message) => {
@@ -186,6 +202,19 @@ function Results({
           </Link>
         )}
       </nav>
+      <LabelDialog
+        open={labelling !== null && chosen.length > 0}
+        mode={labelling ?? 'add'}
+        onOpenChange={(open) => {
+          if (!open) setLabelling(null);
+        }}
+        submissionIds={chosen.map(({ id }) => id)}
+        onChanged={(message) => {
+          setNotice(message);
+          setSelected(new Set());
+          setLabelling(null);
+        }}
+      />
       <MoveDialog
         open={moving && chosen.length > 0}
         onOpenChange={setMoving}
@@ -204,6 +233,7 @@ function Submissions({ query }: { query: SubmissionQuery }) {
   const { state, reload } = useSubmissionPage(query);
   const options = useLoad(loadProgrammes);
   const canAssign = useCan('grants.reviews.assign');
+  const canManage = useCan('grants.programmes.manage');
   const [help, setHelp] = useState(false);
   const [turnedTo, setTurnedTo] = useState<string | null>(null);
   const arrived = useCallback(() => {
@@ -235,6 +265,11 @@ function Submissions({ query }: { query: SubmissionQuery }) {
                   Score spread
                 </Link>
               </>
+            )}
+            {canManage && (
+              <Link to={LABELS_PATH} className={buttonClassName()}>
+                Labels
+              </Link>
             )}
             <Button
               onClick={() => {

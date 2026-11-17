@@ -42,7 +42,11 @@ import {
   staffMessage,
 } from '../../../../packages/db/test/notes/fixtures.ts';
 import { addOrganisation, addPerson } from '../../../../packages/db/test/party/fixtures.ts';
-import { draftReminder, reviewReminder } from '../../../../packages/db/test/reminders/fixtures.ts';
+import {
+  addReminderTemplates,
+  draftReminder,
+  reviewReminder,
+} from '../../../../packages/db/test/reminders/fixtures.ts';
 import {
   addMember,
   asMigratorIn,
@@ -260,10 +264,10 @@ async function addFixture(): Promise<Fixture> {
       template_version_id: released.template,
     });
     const reminded = {
-      ...parts,
       application: released.application,
       assignment,
-      template: released.template,
+      person: parts.person,
+      ...(await addReminderTemplates(client, tenant, released.programme)),
     };
     const reminders = {
       draft: await insertRow(client, 'grants.reminder_email', draftReminder(tenant, reminded)),

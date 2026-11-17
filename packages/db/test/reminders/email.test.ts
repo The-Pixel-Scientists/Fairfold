@@ -67,7 +67,7 @@ describe(TABLE, { timeout: 30_000 }, () => {
       draft({ application_id: strangers.application }),
       review({ assignment_id: strangers.assignment }),
       draft({ recipient_person_id: strangers.person }),
-      draft({ template_version_id: strangers.template }),
+      draft({ template_version_id: strangers.draftTemplate }),
     ]) {
       expect(await asWorker(row)).toBe('23503');
     }
@@ -185,7 +185,7 @@ describe(TABLE, { timeout: 30_000 }, () => {
     for (const [column, value] of [
       ['application_id', other.application],
       ['recipient_person_id', other.person],
-      ['template_version_id', other.template],
+      ['template_version_id', other.draftTemplate],
       ['occurrence', 1],
     ] as const) {
       const code = await asMigratorIn(tenant.id, (client) =>

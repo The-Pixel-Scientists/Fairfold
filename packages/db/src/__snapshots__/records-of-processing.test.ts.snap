@@ -8271,6 +8271,14 @@ exports[`the shipped map > matches the committed register 1`] = `
         "sensitivity": "internal",
       },
       {
+        "column": "draft_template_kind",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
         "column": "draft_template_version_id",
         "perField": false,
         "retention": {
@@ -8304,6 +8312,14 @@ exports[`the shipped map > matches the committed register 1`] = `
       },
       {
         "column": "review_repeat_every_days",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "review_template_kind",
         "perField": false,
         "retention": {
           "kind": "tenant_lifetime",

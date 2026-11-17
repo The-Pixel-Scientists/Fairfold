@@ -38,6 +38,7 @@ export const SUBMITTED_PATH = '/applications/:applicationId/submitted';
 export const OUTCOME_PATH = '/applications/:applicationId/outcome';
 export const SENT_PATH = '/applications/:applicationId/sent';
 export const MONITORING_PATH = '/applications/:applicationId/monitoring';
+export const MESSAGES_PATH = '/applications/:applicationId/messages';
 
 /** The path of one organisation's page, from its id. */
 export function organisationPath(organisationId: string): string {
@@ -89,4 +90,9 @@ export function sentPath(applicationId: string): string {
 /** The optional equality monitoring step, after an application is sent. */
 export function monitoringPath(applicationId: string): string {
   return `${applicationPath(applicationId)}/monitoring`;
+}
+
+/** The messages between the applicant and the funder about one application. */
+export function messagesPath(applicationId: string): string {
+  return `${applicationPath(applicationId)}/messages`;
 }

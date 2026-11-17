@@ -45,8 +45,8 @@ describe(TABLE, { timeout: 30_000 }, () => {
     expect(await insertAsApi()).toBe('ok');
     for (const change of [
       { round_id: strangers.round },
-      { draft_template_version_id: strangers.template },
-      { review_template_version_id: strangers.template },
+      { draft_template_version_id: strangers.draftTemplate },
+      { review_template_version_id: strangers.reviewTemplate },
       { created_by: strangers.member },
       { updated_by: strangers.member },
     ]) {

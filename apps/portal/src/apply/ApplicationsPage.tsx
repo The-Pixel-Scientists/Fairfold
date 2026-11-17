@@ -23,6 +23,7 @@ import { ReadPage, homeCrumb } from '../party/parts.tsx';
 import { useRead } from '../party/useRead.ts';
 import { PROGRAMMES_PATH, applicationPath, outcomePath, submittedPath } from '../paths.ts';
 import { dateOf, deadlineOf, hasMoreTime } from './format.ts';
+import { MessagesLink } from './messagesLink.tsx';
 import { ApplyScreen, Block } from './parts.tsx';
 import { StatusTag } from './status.tsx';
 
@@ -224,9 +225,12 @@ function Card({ application, status, onWithdrawn }: CardProps) {
       </dl>
       <div className="flex flex-col gap-4 border-t border-divider pt-4">
         {notes[status] && <p className="max-w-prose text-body text-muted">{notes[status]}</p>}
-        {(action || canWithdraw(status)) && (
+        {(action || canWithdraw(status) || status !== 'in_progress') && (
           <div className="flex flex-col gap-3 sm:flex-row">
             {action}
+            {status !== 'in_progress' && (
+              <MessagesLink applicationId={application.id} of={nameOf(application)} />
+            )}
             {canWithdraw(status) && (
               <Withdraw application={application} onWithdrawn={onWithdrawn} />
             )}

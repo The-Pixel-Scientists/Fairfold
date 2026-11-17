@@ -28,6 +28,10 @@ import {
 } from '../../../../packages/db/test/notes/fixtures.ts';
 import { addOrganisation, addPerson } from '../../../../packages/db/test/party/fixtures.ts';
 import {
+  addReminderTemplates,
+  draftReminder,
+} from '../../../../packages/db/test/reminders/fixtures.ts';
+import {
   asMigratorIn,
   createTestTenant,
   insertRow,
@@ -77,6 +81,9 @@ interface Fixture {
   readonly notes: readonly string[];
   readonly otherNote: string;
   readonly messages: readonly string[];
+  /** A reminder to the person about their application, and one to the bystander. */
+  readonly reminder: string;
+  readonly otherReminder: string;
 }
 
 let db: ReturnType<typeof createDatabase<unknown>>;
@@ -153,6 +160,23 @@ async function addFixture(): Promise<Fixture> {
       await insertRow(client, 'app.message', staffMessage(tenant, thread, parts.member)),
       await insertRow(client, 'app.message', applicantMessage(tenant, thread, parts.person)),
     ];
+    const { rows: rounds } = await client.query<{ programme_id: string }>(
+      'SELECT programme_id FROM grants.round WHERE id = $1',
+      [parts.round],
+    );
+    const { draftTemplate } = await addReminderTemplates(
+      client,
+      tenant,
+      rounds[0]?.programme_id ?? '',
+    );
+    const remind = (application: string, person: string, occurrence: number) =>
+      insertRow(
+        client,
+        'grants.reminder_email',
+        draftReminder(tenant, { application, person, draftTemplate }, { occurrence }),
+      );
+    const reminder = await remind(applications[0] ?? '', parts.person, 7);
+    const otherReminder = await remind(other, bystander, 7);
     await addErasureRequest(client, tenant, parts.member, parts.person);
     return {
       tenant,
@@ -165,6 +189,8 @@ async function addFixture(): Promise<Fixture> {
       notes,
       otherNote,
       messages,
+      reminder,
+      otherReminder,
     };
   });
 }
@@ -190,6 +216,16 @@ const fileOf = (fixture: Fixture, id: string) =>
       [id],
     );
     return rows[0];
+  });
+
+/** A reminder's recipient and status, as the migrator reads them. */
+const recipientOf = (fixture: Fixture, id: string) =>
+  asMigratorIn(fixture.tenant.id, async (client) => {
+    const { rows } = await client.query<{ recipient: string | null; status: string }>(
+      'SELECT recipient_person_id AS recipient, status FROM grants.reminder_email WHERE id = $1',
+      [id],
+    );
+    return rows[0] as { recipient: string | null; status: string };
   });
 
 /** The body of each note and message in the tenant, by id. */
@@ -251,7 +287,9 @@ describe('grantsErasure', () => {
     expect(await inTenant(b, (tx) => grantsErasure.erase(tx, subjectsOf(a)))).toEqual({
       'grants.application': 0,
       'app.file': 0,
+      'grants.reminder_email': 0,
     });
+    expect((await recipientOf(a, a.reminder)).recipient).toBe(a.person);
     expect((await fileOf(a, a.file))?.['erased']).toBe(false);
     expect(await answersOf(a, a.applications[0] ?? '')).toEqual(ANSWERS);
     expect(await answersOf(b, b.applications[0] ?? '')).toEqual(ANSWERS);
@@ -267,6 +305,7 @@ describe('grantsErasure', () => {
       'app.note': 2,
       'app.message': 2,
       'grants.message_notification': 0,
+      'grants.reminder_email': 1,
     });
     expect(await answersOf(a, a.applications[0] ?? '')).toEqual({
       f_name: 'Hall roof',
@@ -304,6 +343,12 @@ describe('grantsErasure', () => {
     expect([...bodies.values()].join()).not.toContain(MESSAGE_TEXT);
   });
 
+  it('clears the recipient of the person’s reminders and keeps the rows, a bystander’s and tenant B’s', async () => {
+    expect(await recipientOf(a, a.reminder)).toEqual({ recipient: null, status: 'pending' });
+    expect((await recipientOf(a, a.otherReminder)).recipient).toBe(a.bystander);
+    expect((await recipientOf(b, b.reminder)).recipient).toBe(b.person);
+  });
+
   it('changes nothing the second time', async () => {
     expect(await inTenant(a, (tx) => grantsErasure.erase(tx, subjectsOf(a)))).toEqual({
       'grants.application': 0,
@@ -311,6 +356,7 @@ describe('grantsErasure', () => {
       'app.note': 0,
       'app.message': 0,
       'grants.message_notification': 0,
+      'grants.reminder_email': 0,
     });
   });
 });

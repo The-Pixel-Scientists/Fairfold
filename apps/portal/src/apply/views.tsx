@@ -12,6 +12,7 @@ import type { BreadcrumbItem } from '@pixel-scientists/ui';
 import { APPLICATIONS_PATH, applicationPath, outcomePath, submittedPath } from '../paths.ts';
 import { AssistedPanel, MonitoringOffer } from './afterSubmit.tsx';
 import type { Heading, Missing, View } from './parts.tsx';
+import { MessagesLink } from './messagesLink.tsx';
 import { StatusTag } from './status.tsx';
 
 export const loadingApplication: Heading = {
@@ -87,6 +88,7 @@ export function notDraft(application: Application): View {
           >
             See your application
           </Link>
+          <MessagesLink applicationId={application.id} />
         </div>
         <MonitoringOffer application={application} />
       </>
@@ -109,6 +111,7 @@ export function statusView(application: Application): View {
     body: (
       <div className="flex flex-col gap-3 sm:flex-row">
         <ReadOutcome application={application} />
+        <MessagesLink applicationId={application.id} />
         {applicationsLink}
       </div>
     ),

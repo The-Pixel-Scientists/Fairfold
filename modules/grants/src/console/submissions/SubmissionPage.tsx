@@ -8,6 +8,7 @@ import { AssignmentsPanel } from '../assessment/AssignmentsPanel.tsx';
 import { DecisionPanel } from '../decisions/DecisionPanel.tsx';
 import { formatMoment } from '../programme/format.ts';
 import { useParam } from '../programme/Page.tsx';
+import { ReminderHistory, loadSubmissionReminders } from '../reminders/ReminderHistory.tsx';
 import { AdjustmentsPanel } from './adjustments/AdjustmentsPanel.tsx';
 import { Aside } from './detail/Aside.tsx';
 import { ApplicationTab } from './detail/ApplicationTab.tsx';
@@ -16,6 +17,8 @@ import { HistoryTab } from './detail/HistoryTab.tsx';
 import { Neighbours } from './detail/Neighbours.tsx';
 import { StagePath } from './detail/StagePath.tsx';
 import { loadSubmission } from './loaders.ts';
+import { MessagesPanel } from './messages/MessagesPanel.tsx';
+import { NotesPanel } from './notes/NotesPanel.tsx';
 import { submissionsPath } from './paths.ts';
 import { searchOf } from './query.ts';
 import { ReadPage } from './ReadPage.tsx';
@@ -82,6 +85,16 @@ function Detail({ submissionId }: { submissionId: string }) {
                   content: <EligibilityTab submission={submission} />,
                 },
                 {
+                  id: 'notes',
+                  label: 'Notes',
+                  content: <NotesPanel submissionId={submission.id} />,
+                },
+                {
+                  id: 'messages',
+                  label: 'Messages',
+                  content: <MessagesPanel submissionId={submission.id} />,
+                },
+                {
                   id: 'history',
                   label: 'History',
                   content: (
@@ -97,6 +110,7 @@ function Detail({ submissionId }: { submissionId: string }) {
               <AssignmentsPanel submission={submission} />
               <DecisionPanel submission={submission} />
               <AdjustmentsPanel submission={submission} />
+              <ReminderHistory load={loadSubmissionReminders} id={submission.id} />
               <Aside submission={submission} />
             </div>
           </div>

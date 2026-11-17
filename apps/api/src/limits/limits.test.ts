@@ -215,6 +215,74 @@ describe('the limits', () => {
   });
 });
 
+describe('the search limit', () => {
+  const user = { app: 'console' as const, session: { userId: 'u1', app: 'console' } };
+  const searchKey = keyHash(KEY, 'search', 'console:u1').toString('hex');
+
+  /** A server whose one POST route has the search permission, as the search contract does. */
+  function searchServer(store: CounterStore, handler = vi.fn(() => ({}))) {
+    const server = createServer(createLogger({ level: 'silent' }));
+    const guarded = registerLimits(server, { store, key: KEY })((() =>
+      Promise.resolve(user)) as never);
+    server.route({
+      method: 'POST',
+      url: '/search',
+      config: { contract: { audience: 'console', permission: 'platform.search.use' } },
+      handler: async (request) => {
+        await guarded(request);
+        return handler();
+      },
+    });
+    return { server, handler };
+  }
+
+  it('refuses with 429 and Retry-After before the handler runs, and leaves other routes alone', async () => {
+    const store = fakeStore();
+    store.counts.set(`general:${searchKey}`, LIMITS.search.max);
+    const { server, handler } = searchServer(store);
+
+    const response = await server.inject({ method: 'POST', url: '/search' });
+
+    expect(response.statusCode).toBe(429);
+    expect(response.headers['retry-after']).toBe(String(RETRY_AFTER));
+    expect(handler).not.toHaveBeenCalled();
+    expect(
+      store.counts.get(`general:${keyHash(KEY, 'general_session', 'console:u1').toString('hex')}`),
+    ).toBe(1);
+  });
+
+  it('counts a user on one counter across two API instances', async () => {
+    const store = fakeStore(LIMITS.search.max - 2);
+    const first = searchServer(store).server;
+    const second = searchServer(store).server;
+
+    const codes = [
+      (await first.inject({ method: 'POST', url: '/search' })).statusCode,
+      (await second.inject({ method: 'POST', url: '/search' })).statusCode,
+      (await first.inject({ method: 'POST', url: '/search' })).statusCode,
+    ];
+
+    expect(codes).toEqual([200, 200, 429]);
+    expect(store.counts.get(`general:${searchKey}`)).toBe(LIMITS.search.max + 1);
+  });
+
+  it('answers 503 and runs no handler when the counter store fails', async () => {
+    const inner = fakeStore();
+    const store: CounterStore = {
+      count: (bucket, key, seconds) =>
+        key.toString('hex') === searchKey
+          ? Promise.reject(new Error('connection refused'))
+          : inner.count(bucket, key, seconds),
+    };
+    const { server, handler } = searchServer(store);
+
+    const response = await server.inject({ method: 'POST', url: '/search' });
+
+    expect(response.statusCode).toBe(503);
+    expect(handler).not.toHaveBeenCalled();
+  });
+});
+
 describe('a refused key', () => {
   it('causes no further counter calls within its window, and Retry-After counts down', async () => {
     let time = 1_000_000;

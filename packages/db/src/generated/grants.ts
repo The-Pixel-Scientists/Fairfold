@@ -288,11 +288,13 @@ export interface GrantsReminderSetting {
   draft_days_before_2: number | null;
   draft_days_before_3: number | null;
   draft_enabled: boolean;
+  draft_template_kind: Generated<string>;
   draft_template_version_id: string | null;
   id: Generated<string>;
   review_enabled: boolean;
   review_overdue_after_days: number;
   review_repeat_every_days: number;
+  review_template_kind: Generated<string>;
   review_template_version_id: string | null;
   round_id: string;
   tenant_id: string;

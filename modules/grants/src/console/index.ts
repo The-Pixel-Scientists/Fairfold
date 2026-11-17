@@ -14,6 +14,7 @@ import { lazy } from 'react';
 import { REVIEWS_PATH } from './assessment/paths.ts';
 import { NEW_PROGRAMME_PATH, PROGRAMMES_PATH } from './programme/paths.ts';
 import { SUBMISSIONS_PATH } from './submissions/paths.ts';
+import { LABELS_PATH } from './submissions/views/paths.ts';
 
 /** Only real ids are the addresses of programmes, rounds and stages, so `/programmes/new` and typing mistakes never reach them. */
 const ids: SearchSchema<Params> = {
@@ -99,6 +100,11 @@ export const grantsRoutes: readonly RouteDefinition[] = [
     path: SUBMISSIONS_PATH,
     title: 'Submissions',
     load: () => import('./submissions/SubmissionsPage.tsx'),
+  },
+  {
+    path: LABELS_PATH,
+    title: 'Labels',
+    load: () => import('./submissions/views/LabelsPage.tsx'),
   },
   {
     path: '/assisted-applications/:applicationId',

@@ -12,7 +12,10 @@ import { fanOutQueue, fileFanOutQueue } from './jobs/index.ts';
 import { auditPurgeQueue, retentionSweepQueue } from './jobs/retention.ts';
 
 export const schedules: readonly JobSchedule[] = [
-  defineSchedule(fanOutQueue, '0 * * * *', { target: 'platform.idempotency_purge' }),
+  defineSchedule(fanOutQueue, '0 * * * *', {
+    target: 'platform.idempotency_purge',
+    also: 'grants.reminder_scan',
+  }),
   defineSchedule(fileFanOutQueue, '0 2 * * *', { target: 'platform.file_scan' }),
   defineSchedule(auditPurgeQueue, '30 3 * * *', { target: retentionSweepQueue.name }),
 ];

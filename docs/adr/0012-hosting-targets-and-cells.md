@@ -129,7 +129,10 @@ deployment. Staging will show:
 
 - that Cloud SQL meets the list above, including the backup role's exemption;
 - which Cloud SQL certificate mode lets `verify-full` pass its host name check;
-- that the network and database come up from code alone.
+- that the network and database come up from code alone;
+- that the cell's logs, Cloud SQL's included, are stored in `europe-west2`.
+  Cloud Logging's `_Default` bucket is global unless the project's log
+  storage location is set before its first log is written.
 
 ## Consequences
 

@@ -1,0 +1,165 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Alert rules for one cell, in Prometheus rule format. Metric and label names
+# are the OpenTelemetry ones from apps/api/src/telemetry/instruments.ts, as a
+# Prometheus-compatible backend names them: dots become underscores, counters
+# end in _total and seconds in _seconds.
+#
+# Each alert names its runbook in docs/runbooks/. Labels are limited to
+# severity and the queue, route and limit names the API emits; annotations
+# are fixed text. Write `for` in whole minutes: the managed service's copy of
+# these rules converts it.
+#
+# Thresholds other than the 10-minute audit copy (ADR 0010) are not fixed by
+# any ADR. Each carries its reason, and changes go through review.
+
+groups:
+  - name: tps
+    rules:
+      # ADR 0010, "Audit": one older than 10 minutes raises an alert.
+      - alert: AuthAuditCopyPending
+        expr: max(tps_auth_audit_copy_oldest_pending_seconds) > 600
+        labels:
+          severity: critical
+        annotations:
+          summary: An auth audit copy has waited more than 10 minutes
+          description: >-
+            Sign-in and account events are missing from the audit log until
+            the copy is replayed. Run the audit-copy replay command as the
+            runbook sets out.
+          runbook: docs/runbooks/audit-copy.md
+
+      # Without the age, the alert above cannot fire. 15 minutes allows for
+      # a restart and a few missed collections.
+      - alert: AuthAuditCopyAgeUnreported
+        expr: absent(tps_auth_audit_copy_oldest_pending_seconds)
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: The age of pending auth audit copies is not being reported
+          description: >-
+            No alert can fire for a stuck audit copy while the age is missing.
+            Check that the API is running and can reach the Collector.
+          runbook: docs/runbooks/audit-copy.md
+
+      # ADR 0009: a dead-lettered job is re-sent by runbook, so every one
+      # needs a person.
+      - alert: DeadLetteredJob
+        expr: max by (tps_queue) (tps_queue_dead_letters) > 0
+        labels:
+          severity: critical
+        annotations:
+          summary: A job has been dead-lettered
+          description: >-
+            A job ran out of retries and will not run again by itself. Find
+            the cause, then re-send the job as the runbook sets out.
+          runbook: docs/runbooks/dead-letter.md
+
+      # Jobs retry with backoff, so one failure is routine. Five in 15
+      # minutes on one queue is a pattern.
+      - alert: JobFailuresHigh
+        expr: sum by (tps_queue) (increase(tps_job_failures_total[15m])) >= 5
+        labels:
+          severity: warning
+        annotations:
+          summary: Jobs on a queue are failing repeatedly
+          description: >-
+            At least 5 jobs on this queue failed in the last 15 minutes. Check
+            the worker logs for the error code and follow the runbook.
+          runbook: docs/runbooks/incident.md
+
+      # A funding round queues a few thousand jobs at most, which the worker
+      # clears in minutes. 500 waiting for 15 minutes means it is stuck.
+      - alert: QueueDepthHigh
+        expr: max by (tps_queue) (tps_queue_depth) > 500
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: Jobs are waiting on a queue for too long
+          description: >-
+            More than 500 jobs have waited on this queue for 15 minutes. Check
+            that the worker is running and not failing, then follow the
+            runbook.
+          runbook: docs/runbooks/incident.md
+
+      # More than 2% of requests failing for 10 minutes is beyond a single
+      # bad deploy step. At least 20 requests in 5 minutes are needed, so a
+      # quiet staging cell does not alert on one error.
+      - alert: ServerErrorsHigh
+        expr: >-
+          (
+            sum(rate(tps_http_server_errors_total{tps_problem_type="server_error"}[5m]))
+            / sum(rate(http_server_request_duration_seconds_count[5m]))
+          ) > 0.02
+          and sum(increase(http_server_request_duration_seconds_count[5m])) >= 20
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: More than 2% of requests are failing with a server error
+          description: >-
+            People cannot complete their work. Check the requests dashboard for
+            the routes affected and follow the runbook.
+          runbook: docs/runbooks/incident.md
+
+      # V1 target: p95 response under 500 ms.
+      - alert: LatencyHigh
+        expr: >-
+          histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket[5m])))
+          > 0.5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Responses are slower than the 500 ms target
+          description: >-
+            The 95th percentile response time has been over 500 ms for 10
+            minutes. Check the requests dashboard for slow routes and follow
+            the runbook.
+          runbook: docs/runbooks/incident.md
+
+      # ADR 0010 delays a client after 5 failures in 15 minutes and an IP
+      # after 50, so 50 across the cell in 15 minutes suggests guessing.
+      - alert: SignInFailuresHigh
+        expr: >-
+          sum(increase(tps_http_server_errors_total{http_route=~"/api/auth/tenants/:slug/(passkey-)?sign-in",tps_problem_type="unauthenticated"}[15m]))
+          > 50
+        labels:
+          severity: warning
+        annotations:
+          summary: Sign-in failures have risen sharply
+          description: >-
+            More than 50 sign-ins failed in the last 15 minutes. Check for an
+            attack on accounts and follow the runbook.
+          runbook: docs/runbooks/lockout.md
+
+      # A pending session is discarded after 5 wrong codes (ADR 0010); 20
+      # across the cell in 15 minutes suggests someone holds passwords and is
+      # guessing second factors.
+      - alert: MfaFailuresHigh
+        expr: sum(increase(tps_mfa_failures_total[15m])) > 20
+        labels:
+          severity: warning
+        annotations:
+          summary: Second-factor failures have risen sharply
+          description: >-
+            More than 20 second-factor checks failed in the last 15 minutes.
+            Check for accounts whose passwords may be known and follow the
+            runbook.
+          runbook: docs/runbooks/lockout.md
+
+      # Normal use rarely reaches a limit; 100 refusals of one limit in 15
+      # minutes is abuse or a limit set too low.
+      - alert: RateLimitHitsHigh
+        expr: sum by (tps_rate_limit) (increase(tps_rate_limit_hits_total[15m])) > 100
+        labels:
+          severity: warning
+        annotations:
+          summary: Requests are being refused by a rate limit
+          description: >-
+            More than 100 requests hit this limit in the last 15 minutes.
+            Check whether it is an attack or a limit set too low, and follow
+            the runbook.
+          runbook: docs/runbooks/incident.md

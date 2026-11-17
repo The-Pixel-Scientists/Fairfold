@@ -14,6 +14,7 @@ import {
   APPLICATION_PATH,
   CHECK_PATH,
   ELIGIBILITY_PATH,
+  MESSAGES_PATH,
   MONITORING_PATH,
   OUTCOME_PATH,
   PROGRAMMES_PATH,
@@ -114,5 +115,11 @@ export const applyRoutes: readonly RouteDefinition[] = [
     title: 'Equality monitoring',
     params: application,
     load: () => import('./MonitoringPage.tsx'),
+  },
+  {
+    path: MESSAGES_PATH,
+    title: 'Messages',
+    params: application,
+    load: () => import('./MessagesPage.tsx'),
   },
 ];

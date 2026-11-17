@@ -4,7 +4,12 @@
 // words for a refused request and the two session calls the provider needs.
 
 import { call, ProblemError } from '@pixel-scientists/domain/api';
-import type { CallInput, CallResult, JsonRouteContract } from '@pixel-scientists/domain/api';
+import type {
+  CallInput,
+  CallOptions,
+  CallResult,
+  JsonRouteContract,
+} from '@pixel-scientists/domain/api';
 import { getSession, signOut } from '@pixel-scientists/domain/auth';
 import type { Session } from '@pixel-scientists/domain/auth';
 
@@ -36,10 +41,12 @@ export function tooManyAttempts(seconds: number | null): string {
 export async function callApi<const C extends JsonRouteContract>(
   route: C,
   input: CallInput<C>,
+  options: Pick<CallOptions, 'idempotencyKey'> = {},
 ): Promise<CallResult<C>> {
   let wait: number | null = null;
   try {
     return await call(route, input, {
+      ...options,
       fetch: async (url, init) => {
         const response = await fetch(url, init);
         if (response.status === 429) wait = retryAfterSeconds(response.headers.get('retry-after'));

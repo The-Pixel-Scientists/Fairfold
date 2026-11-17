@@ -1,0 +1,78 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# promtool test rules infra/observability/alerts/tests/tps.rules.test.yaml
+
+rule_files:
+  - ../tps.rules.yaml
+
+evaluation_interval: 1s
+
+tests:
+  - name: The audit-copy alert fires after 10 minutes, not before
+    interval: 1s
+    input_series:
+      - series: tps_auth_audit_copy_oldest_pending_seconds{job="tps-api"}
+        values: 599 601
+    alert_rule_test:
+      - eval_time: 0s
+        alertname: AuthAuditCopyPending
+        exp_alerts: []
+      - eval_time: 1s
+        alertname: AuthAuditCopyPending
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              summary: An auth audit copy has waited more than 10 minutes
+              description: >-
+                Sign-in and account events are missing from the audit log
+                until the copy is replayed. Run the audit-copy replay command
+                as the runbook sets out.
+              runbook: docs/runbooks/audit-copy.md
+      - eval_time: 1s
+        alertname: AuthAuditCopyAgeUnreported
+        exp_alerts: []
+
+  - name: The audit-copy age going missing raises its own alert
+    interval: 1m
+    input_series:
+      - series: tps_queue_depth{job="tps-worker",tps_queue="platform.file_scan"}
+        values: 0x20
+    alert_rule_test:
+      - eval_time: 14m
+        alertname: AuthAuditCopyAgeUnreported
+        exp_alerts: []
+      - eval_time: 16m
+        alertname: AuthAuditCopyAgeUnreported
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: The age of pending auth audit copies is not being reported
+              description: >-
+                No alert can fire for a stuck audit copy while the age is
+                missing. Check that the API is running and can reach the
+                Collector.
+              runbook: docs/runbooks/audit-copy.md
+
+  - name: One dead-lettered job fires the dead-letter alert
+    interval: 1s
+    input_series:
+      - series: tps_queue_dead_letters{job="tps-worker",tps_queue="platform.file_scan"}
+        values: 0 1
+    alert_rule_test:
+      - eval_time: 0s
+        alertname: DeadLetteredJob
+        exp_alerts: []
+      - eval_time: 1s
+        alertname: DeadLetteredJob
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              tps_queue: platform.file_scan
+            exp_annotations:
+              summary: A job has been dead-lettered
+              description: >-
+                A job ran out of retries and will not run again by itself.
+                Find the cause, then re-send the job as the runbook sets out.
+              runbook: docs/runbooks/dead-letter.md

@@ -1,0 +1,44 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# OpenTelemetry Collector configuration for one cell. It uses only components
+# in the Collector's core distribution, so it loads in any build of it.
+#
+# The API and worker send OTLP over HTTP here (TPS_OTEL_ENDPOINT). Metrics go
+# on, as OTLP over HTTP, to the cell's own metrics backend at
+# TPS_COLLECTOR_METRICS_ENDPOINT: any backend that accepts OTLP, such as
+# Prometheus 3 with its OTLP receiver turned on. Traces are accepted and
+# dropped until the cell has a trace backend.
+#
+# The API and worker already limit every label to a closed list
+# (apps/api/src/telemetry/allowlist.ts), so nothing personal reaches this
+# Collector. Keep the metrics backend in the same jurisdiction as the cell
+# (ADR 0012).
+
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_percentage: 80
+    spike_limit_percentage: 20
+  batch: {}
+
+exporters:
+  otlphttp/metrics:
+    endpoint: ${env:TPS_COLLECTOR_METRICS_ENDPOINT}
+  nop: {}
+
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlphttp/metrics]
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter]
+      exporters: [nop]

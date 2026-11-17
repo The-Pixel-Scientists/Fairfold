@@ -1,0 +1,126 @@
+{
+  "uid": "tps-security",
+  "title": "Security events",
+  "description": "Sign-in failures, second-factor failures, rate-limit hits and the oldest pending auth audit copy.",
+  "tags": ["tps"],
+  "schemaVersion": 39,
+  "editable": false,
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "refresh": "1m",
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Sign-in failures in 15 minutes",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(tps_http_server_errors_total{http_route=~\"/api/auth/tenants/:slug/(passkey-)?sign-in\",tps_problem_type=\"unauthenticated\"}[15m]))",
+          "legendFormat": "Sign-in failures"
+        },
+        {
+          "refId": "B",
+          "expr": "vector(50)",
+          "legendFormat": "Alert threshold"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Second-factor failures in 15 minutes, by factor",
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (tps_mfa_factor) (increase(tps_mfa_failures_total[15m]))",
+          "legendFormat": "{{tps_mfa_factor}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Rate-limit hits in 15 minutes, by limit",
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (tps_rate_limit) (increase(tps_rate_limit_hits_total[15m]))",
+          "legendFormat": "{{tps_rate_limit}}"
+        },
+        {
+          "refId": "B",
+          "expr": "vector(100)",
+          "legendFormat": "Alert threshold"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Oldest pending auth audit copy",
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max(tps_auth_audit_copy_oldest_pending_seconds)",
+          "legendFormat": "Oldest pending copy"
+        },
+        {
+          "refId": "B",
+          "expr": "vector(600)",
+          "legendFormat": "Alert threshold"
+        }
+      ]
+    }
+  ]
+}

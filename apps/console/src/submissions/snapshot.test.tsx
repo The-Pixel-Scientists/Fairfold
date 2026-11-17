@@ -64,7 +64,9 @@ describe('organisation details as submitted', () => {
   it('says plainly that no snapshot was taken, as a message and not an error', () => {
     render(<SnapshotPanel snapshot={null} />);
 
-    expect(screen.getByText(/No snapshot was taken for this application/)).toBeTruthy();
+    expect(
+      screen.getByText('Details as submitted were not recorded for this submission.'),
+    ).toBeTruthy();
     expect(screen.queryByRole('alert')).toBeNull();
   });
 });
