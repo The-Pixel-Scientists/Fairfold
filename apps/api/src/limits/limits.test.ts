@@ -48,6 +48,8 @@ const unreachable: CounterStore = { count: () => Promise.reject(new Error('conne
 const tenants = {
   tenant: vi.fn(() => Promise.resolve(undefined)),
   logo: () => Promise.resolve(undefined),
+  rounds: () => Promise.resolve([]),
+  embedOrigins: () => Promise.resolve([]),
 } satisfies PublicTenants;
 
 let app: FastifyInstance | undefined;

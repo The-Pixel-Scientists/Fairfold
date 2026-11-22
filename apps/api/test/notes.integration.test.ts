@@ -280,6 +280,8 @@ describe('where notes are never returned', () => {
       publicTenants: {
         tenant: () => Promise.resolve(undefined),
         logo: () => Promise.resolve(undefined),
+        rounds: () => Promise.resolve([]),
+        embedOrigins: () => Promise.resolve([]),
       },
     });
     const noteRoutes = routes.filter(({ contract }) =>
