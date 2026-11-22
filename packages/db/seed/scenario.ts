@@ -335,6 +335,7 @@ async function writeProgramme(writer: Writer, programme: Programme): Promise<voi
       version: 1,
       subject,
       body,
+      purpose: 'transactional',
     });
   }
   for (const round of programme.rounds) {
