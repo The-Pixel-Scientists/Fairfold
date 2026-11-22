@@ -59,7 +59,13 @@ describe('hashPassword', () => {
 
 describe('the scenarios', () => {
   it('are the ones the seed command names, in order', () => {
-    expect([...SCENARIOS.keys()]).toEqual(['base', 'configured', 'applications', 'volume']);
+    expect([...SCENARIOS.keys()]).toEqual([
+      'base',
+      'configured',
+      'applications',
+      'volume',
+      'wave1',
+    ]);
   });
 
   it('give each tenant an administrator, a programme manager and two reviewers', () => {

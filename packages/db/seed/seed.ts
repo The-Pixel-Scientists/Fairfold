@@ -6,11 +6,11 @@
 //   pnpm db:seed [scenario]     this worktree's development database
 //   pnpm stack seed [scenario]  the stack's database
 //
-// Scenarios: base, configured (the default), applications and volume. Both
-// commands supply the settings (scripts/dev-env.ts and scripts/stack.ts).
-// guard.ts holds every check on where the seed may write; it connects as
-// migrator. Every account's password is TPS_SEED_PASSWORD, or the contents
-// of the file TPS_SEED_PASSWORD_FILE names; it is never printed.
+// Scenarios: base, configured (the default), applications, volume and
+// wave1. Both commands supply the settings (scripts/dev-env.ts and
+// scripts/stack.ts). guard.ts holds every check on where the seed may write;
+// it connects as migrator. Every account's password is TPS_SEED_PASSWORD, or
+// the contents of the file TPS_SEED_PASSWORD_FILE names; it is never printed.
 
 import pg from 'pg';
 
@@ -21,6 +21,7 @@ import { base } from './base.ts';
 import { writeVolume } from './bulk.ts';
 import { configured } from './configured.ts';
 import { checkConnection, checkTarget, readSeedPassword } from './guard.ts';
+import { wave1 } from './scenarios/wave1/index.ts';
 import {
   applicantEmailOf,
   applicationsOf,
@@ -58,6 +59,7 @@ export const SCENARIOS = new Map<string, Seed>([
   ['configured', tables(configured)],
   ['applications', tables(applications)],
   ['volume', volume],
+  ['wave1', wave1],
 ]);
 
 async function main(argv: readonly string[], env: Env): Promise<void> {
