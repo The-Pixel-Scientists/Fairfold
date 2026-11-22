@@ -1,0 +1,20 @@
+{
+  "company_number": "ZZ999001",
+  "company_name": "INVENTED TRADING LIMITED",
+  "company_status": "active",
+  "type": "ltd",
+  "date_of_creation": "2012-06-14",
+  "registered_office_address": {
+    "premises": "Unit 4",
+    "address_line_1": "2 Invented Road",
+    "address_line_2": "Exampleside",
+    "locality": "Testtown",
+    "postal_code": "ZZ2 2ZZ",
+    "country": "England"
+  },
+  "accounts": {
+    "overdue": false,
+    "last_accounts": { "made_up_to": "2025-06-30", "type": "micro-entity" }
+  },
+  "links": { "self": "https://example.invalid/never-followed" }
+}
