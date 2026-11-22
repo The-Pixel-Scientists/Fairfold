@@ -7,12 +7,17 @@ folder of roots, and each root takes an `environment` and a `cell`
 ([ADR 0012](../../docs/adr/0012-hosting-targets-and-cells.md)), so production
 reuses the staging code with its own state.
 
-| Path             | What it creates                                                                                |
-| ---------------- | ---------------------------------------------------------------------------------------------- |
-| `gcp/state/`     | The Cloud Storage bucket that holds the other roots' state                                     |
-| `gcp/network/`   | The VPC, the Cloud Run subnet, private services access, a deny-all ingress rule and Cloud NAT  |
-| `gcp/database/`  | Cloud SQL for PostgreSQL 16, private and encrypted only, its DNS name and the operators' group |
-| `modules/gcp-*/` | The Google Cloud modules those roots call                                                      |
+| Path              | What it creates                                                                                                               |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `gcp/state/`      | The Cloud Storage bucket that holds the other roots' state                                                                    |
+| `gcp/release/`    | The release registry and the release workflow's identity federation, publisher and deployer                                   |
+| `gcp/network/`    | The VPC, the Cloud Run subnet, private services access, a private zone for Google APIs, a deny-all ingress rule and Cloud NAT |
+| `gcp/database/`   | Cloud SQL for PostgreSQL 16, private and encrypted only, its DNS name and the operators' group                                |
+| `gcp/services/`   | The workloads on Cloud Run, the files bucket and their secrets                                                                |
+| `gcp/edge/`       | The external load balancer, its certificate and Cloud Armor's rate limits                                                     |
+| `gcp/monitoring/` | Dashboards, alert policies and the operators' alert channel                                                                   |
+| `gcp/backup/`     | The nightly off-site backup job and the Google archive                                                                        |
+| `modules/gcp-*/`  | The Google Cloud modules those roots call                                                                                     |
 
 Every resource is named `tps-<environment>-<cell>-…`, and every resource that
 takes labels carries `environment` and `cell`.
@@ -44,7 +49,11 @@ tofu -chdir=infra/terraform/gcp/state apply -state="$HOME/tps-state/$TF_VAR_envi
 
 The `bucket` output is the state bucket for the other roots.
 
-## Apply the network, then the database
+## Apply the release root, then the network, then the database
+
+The release root comes first, before the first tag: see
+[its README](gcp/release/README.md). The services, edge, monitoring and
+backup roots follow, in that order, each with its own README.
 
 Each root keeps its state in that bucket under its own prefix:
 
@@ -87,11 +96,11 @@ Run before every pull request that changes this folder:
 
 ```sh
 tofu -chdir=infra/terraform fmt -check -recursive
-for root in state network database; do
-  tofu -chdir=infra/terraform/gcp/$root init -backend=false
-  tofu -chdir=infra/terraform/gcp/$root validate
+for root in infra/terraform/gcp/*/; do
+  tofu -chdir="$root" init -backend=false -lockfile=readonly
+  tofu -chdir="$root" validate
+  if [ -d "${root}tests" ]; then tofu -chdir="$root" test; fi
 done
-tofu -chdir=infra/terraform/gcp/database test
 trivy config --severity HIGH,CRITICAL --exit-code 1 infra/terraform
 ```
 
