@@ -49,8 +49,10 @@ REVOKE EXECUTE ON FUNCTION app.current_tenant_id() FROM owner_forms_submit_publi
 REVOKE USAGE ON SCHEMA app FROM owner_forms_submit_public_response;
 
 DROP TABLE forms.respondent_token;
+DROP FUNCTION forms.refuse_erased_token();
 DROP FUNCTION forms.prepare_token();
 DROP TABLE forms.response;
+DROP FUNCTION forms.refuse_erased_answers();
 DROP FUNCTION forms.check_response_version();
 DROP FUNCTION forms.keep_response();
 DROP FUNCTION forms.answers_are_clean(jsonb);

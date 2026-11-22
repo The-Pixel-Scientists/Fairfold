@@ -323,9 +323,38 @@ CREATE TRIGGER keep_response BEFORE INSERT OR UPDATE ON forms.response
   FOR EACH ROW EXECUTE FUNCTION forms.keep_response();
 CREATE TRIGGER set_updated_at BEFORE UPDATE ON forms.response
   FOR EACH ROW EXECUTE FUNCTION app.set_updated_at();
-CREATE TRIGGER refuse_erased_party BEFORE INSERT ON forms.response
+CREATE TRIGGER refuse_erased_party BEFORE INSERT OR UPDATE OF respondent_person_id ON forms.response
   FOR EACH ROW WHEN (NEW.route = 'signed_in')
   EXECUTE FUNCTION party.refuse_erased_party('respondent_person_id');
+
+-- An erased respondent's answers are final (ADR 0027, "erased is final"):
+-- none is added or changed, whoever asks, though any may be cleared, as
+-- forms.erase_subject does. The hashes never change (keep_response, which
+-- fires first) and only an anonymous response, which names no party, has
+-- them.
+CREATE FUNCTION forms.refuse_erased_answers()
+  RETURNS trigger
+  LANGUAGE plpgsql
+  SECURITY INVOKER
+  SET search_path = pg_catalog, pg_temp
+AS $function$
+BEGIN
+  IF TG_OP = 'UPDATE'
+     AND NOT EXISTS (SELECT FROM pg_catalog.jsonb_each(NEW.answers) AS a(key, value)
+                      WHERE (OLD.answers -> a.key) IS DISTINCT FROM a.value) THEN
+    RETURN NEW;
+  END IF;
+  IF party.is_erased(NEW.tenant_id, NEW.respondent_person_id) THEN
+    RAISE EXCEPTION 'An erased party''s data never changes.'
+      USING ERRCODE = 'object_not_in_prerequisite_state';
+  END IF;
+  RETURN NEW;
+END
+$function$;
+CREATE TRIGGER refuse_erased_answers
+  BEFORE INSERT OR UPDATE OF answers, idempotency_key_hash, request_hash ON forms.response
+  FOR EACH ROW WHEN (NEW.route = 'signed_in')
+  EXECUTE FUNCTION forms.refuse_erased_answers();
 
 -- A response pins a version of its form (the foreign key) that is
 -- published for its route. It runs after the row-level security checks and
@@ -416,6 +445,36 @@ END
 $function$;
 CREATE TRIGGER prepare_token BEFORE INSERT OR UPDATE ON forms.respondent_token
   FOR EACH ROW EXECUTE FUNCTION forms.prepare_token();
+
+-- A token's hash is about its response's respondent, so none is written for
+-- an erased one (ADR 0027). Only a signed-in response names a party, and
+-- prepare_token refuses a token for one; the respondent is read only then,
+-- so the submit function's owner needs no right to it.
+CREATE FUNCTION forms.refuse_erased_token()
+  RETURNS trigger
+  LANGUAGE plpgsql
+  SECURITY INVOKER
+  SET search_path = pg_catalog, pg_temp
+AS $function$
+DECLARE
+  respondent uuid;
+BEGIN
+  PERFORM FROM forms.response r
+   WHERE r.tenant_id = NEW.tenant_id AND r.id = NEW.response_id AND r.route = 'signed_in';
+  IF FOUND THEN
+    SELECT r.respondent_person_id INTO respondent
+      FROM forms.response r WHERE r.tenant_id = NEW.tenant_id AND r.id = NEW.response_id;
+    IF party.is_erased(NEW.tenant_id, respondent) THEN
+      RAISE EXCEPTION 'An erased party''s data never changes.'
+        USING ERRCODE = 'object_not_in_prerequisite_state';
+    END IF;
+  END IF;
+  RETURN NEW;
+END
+$function$;
+CREATE TRIGGER refuse_erased_token
+  BEFORE INSERT OR UPDATE OF response_id, token_hash ON forms.respondent_token
+  FOR EACH ROW EXECUTE FUNCTION forms.refuse_erased_token();
 CREATE TRIGGER set_updated_at BEFORE UPDATE ON forms.respondent_token
   FOR EACH ROW EXECUTE FUNCTION app.set_updated_at();
 GRANT SELECT, UPDATE (revoked_at, revoked_by) ON forms.respondent_token TO app_api;

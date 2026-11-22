@@ -4,9 +4,10 @@
 // only for app_worker, only for a party already erased in the transaction's
 // tenant; it keeps only the answers the pinned version classifies public or
 // internal, deletes nothing, leaves anonymous responses alone and, called
-// again after a restore, clears the restored answers. An anonymous
-// response, found by its id or reference, is erased by app_api clearing its
-// answers and revoking its token, and the row stays.
+// again after a restore, clears the restored answers. Nothing then adds or
+// changes the erased person's answers, though they may be cleared. An
+// anonymous response, found by its id or reference, is erased by app_api
+// clearing its answers and revoking its token, and the row stays.
 
 import { beforeAll, describe, expect, it } from 'vitest';
 
@@ -122,6 +123,7 @@ describe('forms.erase_subject', { timeout: 60_000 }, () => {
   it('clears the restored answers again after a restore', async () => {
     await asMigratorIn(tenant.id, async (client) => {
       await client.query('ALTER TABLE forms.response DISABLE TRIGGER keep_response');
+      await client.query('ALTER TABLE forms.response DISABLE TRIGGER refuse_erased_answers');
       await client.query('UPDATE forms.response SET answers = $1 WHERE id = $2', [
         JSON.stringify(ANSWERS),
         submitted,
@@ -131,6 +133,7 @@ describe('forms.erase_subject', { timeout: 60_000 }, () => {
         special,
       ]);
       await client.query('ALTER TABLE forms.response ENABLE TRIGGER keep_response');
+      await client.query('ALTER TABLE forms.response ENABLE TRIGGER refuse_erased_answers');
     });
     expect((await clearForms()).row?.['counts']).toEqual({ 'forms.response': 2 });
     expect(await answers()).toEqual(cleared());
@@ -151,6 +154,24 @@ describe('forms.erase_subject', { timeout: 60_000 }, () => {
       }
     });
     expect(code).toBe('55000');
+  });
+
+  it("refuses new answers on the erased person's draft, but lets them be cleared", async () => {
+    const update = (value: object) =>
+      asRoleIn('app_api', tenant.id, async (client) => {
+        try {
+          await client.query(
+            'UPDATE forms.response SET answers = $1, updated_by = $2 WHERE id = $3',
+            [JSON.stringify(value), parts.member, special],
+          );
+          return 'ok';
+        } catch (error) {
+          return (error as { code?: string }).code;
+        }
+      });
+    expect(await update({ ...KEPT, f_health: true })).toBe('55000');
+    expect(await update({ ...KEPT, f_rating: 5 })).toBe('55000');
+    expect(await update({ f_rating: 4 })).toBe('ok');
   });
 });
 
