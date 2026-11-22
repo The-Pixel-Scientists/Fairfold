@@ -43,6 +43,7 @@ export {
   idempotencyKeyHeader,
   idempotencyKeySchema,
   methods,
+  oneClickUnsubscribeBodySchema,
   type Audience,
   type JsonRouteContract,
   type Method,
