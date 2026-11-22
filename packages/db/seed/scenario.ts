@@ -20,12 +20,9 @@ import {
   type Role,
   type SwitchableModuleId,
 } from '@pixel-scientists/domain/platform';
-import { configDiffSchemas } from '@pixel-scientists/domain/platform/settings';
-import type { Transaction } from 'kysely';
 import type pg from 'pg';
 
-import { insertAuditEvent } from '../src/audit.ts';
-import { kyselyOn } from '../src/database.ts';
+import { switchOnAsOperator } from './operator-switch.ts';
 
 /** Given name, family name and role. The address is given.family@<slug>.example. */
 export type StaffMember = readonly [givenName: string, familyName: string, role: Role];
@@ -195,7 +192,7 @@ export async function writeScenario(
   }
 }
 
-type Insert = (table: string, values: Readonly<Record<string, unknown>>) => Promise<string>;
+export type Insert = (table: string, values: Readonly<Record<string, unknown>>) => Promise<string>;
 
 /** Inserts through `client`, keeping each new row's id in `rows` under its table. */
 function inserter(client: pg.ClientBase, rows: Record<string, string[]>): Insert {
@@ -322,54 +319,6 @@ export async function writeTenant(
     await writeProgramme({ ...writer, manager, staff }, programme);
   }
   return { id: tenantId, slug: tenant.slug, rows };
-}
-
-/**
- * Switch on each of `tools` in the tenant set, as the operator's command does
- * when it makes a tenant (apps/api/src/operator/switch-on.ts): a row with the
- * operator as author, its first configuration version (rule 10) and a
- * switched_on event through the one audit insert (rule 4).
- */
-async function switchOnAsOperator(
-  client: pg.ClientBase,
-  insert: Insert,
-  tenantId: string,
-  tools: readonly SwitchableModuleId[],
-): Promise<void> {
-  // The caller's transaction, on this client, with the tenant set.
-  const trx = kyselyOn(client) as unknown as Transaction<unknown>;
-  const requestId = randomUUID();
-  const changes: unknown = configDiffSchemas['platform.module'].parse([
-    { field: 'enabled', from: false, to: true },
-  ]);
-  for (const module of tools) {
-    const id = await insert('app.tenant_module', {
-      tenant_id: tenantId,
-      module,
-      enabled: true,
-      updated_by_kind: 'operator',
-    });
-    await insert('app.config_version', {
-      tenant_id: tenantId,
-      entity_type: 'platform.module',
-      entity_id: id,
-      version: 1,
-      author_kind: 'operator',
-      diff: JSON.stringify({ changes }),
-    });
-    await insertAuditEvent(trx, {
-      requestId,
-      actorKind: 'operator',
-      actorId: null,
-      action: 'platform.module.switched_on',
-      entityType: 'platform.module',
-      entityId: id,
-      changes: {
-        'app.tenant_module.module': { after: module },
-        'app.tenant_module.enabled': { before: false, after: true },
-      },
-    });
-  }
 }
 
 /** The instant that a wall-clock time names in a time zone, as PostgreSQL reads it. */
