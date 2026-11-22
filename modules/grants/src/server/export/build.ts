@@ -4,7 +4,9 @@
 // one grant for each released award, built from its decision, round,
 // programme and the recipient's organisation summary, and checked against the
 // contract's schema before anything is sent. A file that fails the check is
-// never sent in part.
+// never sent in part. Only identifiers staff have verified are published, in
+// the identifier and the charity and company number fields alike; a recipient
+// with none is published under the funder's prefix and counted in the summary.
 
 import type { OrganisationSummary } from '@pixel-scientists/party/contracts';
 
@@ -54,7 +56,10 @@ export function buildExport(
     if (organisation === undefined || row.released_at === null || row.currency === null) {
       throw new ExportInvalid();
     }
-    const { recipient, verified } = recipientOrganization(publisher.identifierPrefix, organisation);
+    const { recipient, verified } = recipientOrganization(publisher.identifierPrefix, {
+      ...organisation,
+      identifiers: organisation.identifiers.filter((held) => held.verified),
+    });
     if (!verified)
       unverified.set(organisation.id, { id: organisation.id, name: organisation.name });
     const modified = Math.max(
