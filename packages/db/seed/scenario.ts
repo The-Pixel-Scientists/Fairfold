@@ -256,7 +256,8 @@ async function addAccount(
   return { membership, person };
 }
 
-async function writeTenant(
+/** Write one tenant's rows inside the caller's transaction, setting it as the tenant. */
+export async function writeTenant(
   client: pg.ClientBase,
   tenant: Tenant,
   password: string,
