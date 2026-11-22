@@ -29,7 +29,7 @@ export function FunderProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let current = true;
-    callApi(getPublicTenant, { params: { slug } }).then(
+    callApi(getPublicTenant, { params: { slug } }, { anonymous: true }).then(
       (tenant) => {
         if (!current) return;
         const { name, theme } = tenant;
