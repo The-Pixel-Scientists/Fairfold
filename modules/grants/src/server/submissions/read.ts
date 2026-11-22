@@ -13,8 +13,10 @@ import { projectedAnswers } from '@pixel-scientists/domain/api';
 import type { PersonName } from '@pixel-scientists/party/contracts';
 import {
   contactDetails,
+  organisationDetails,
   organisationSummaries,
   peopleByUserIds,
+  readOrganisationSnapshot,
 } from '@pixel-scientists/party/server';
 
 import {
@@ -207,6 +209,16 @@ async function peopleByMembership(
   return new Map(members.map((member) => [member.id, people.get(member.user_id)] as const));
 }
 
+/** Where staff read an organisation's record: the crm tool's page, or none while crm is off. */
+async function organisationHref(tx: Tx, organisationId: string): Promise<string | null> {
+  const crm = await submissionsDb(tx)
+    .selectFrom('app.tenant_module')
+    .select('enabled')
+    .where('module', '=', 'crm')
+    .executeTakeFirst();
+  return crm?.enabled === true ? `/crm/organisations/${organisationId}` : null;
+}
+
 /** One submission, or undefined where there is none, a draft's id included. */
 export async function readSubmission(tx: Tx, id: string): Promise<Submission | undefined> {
   const db = submissionsDb(tx);
@@ -220,6 +232,7 @@ export async function readSubmission(tx: Tx, id: string): Promise<Submission | u
       'a.updated_by',
       'a.submitted_by',
       'a.withdrawn_at',
+      'a.organisation_snapshot_id',
       'f.id as form_id',
       'f.version as form_version',
       'f.definition',
@@ -269,6 +282,13 @@ export async function readSubmission(tx: Tx, id: string): Promise<Submission | u
   const applicant = row.created_by === null ? undefined : people.get(row.created_by);
   const details = await contactDetails(tx, row.applicant_person_id);
   if (details === null) return undefined;
+  const current = await organisationDetails(tx, row.organisation_id);
+  if (current === null) return undefined;
+  // A snapshot is evidence: it is shown as it was taken, never merged with the record.
+  const snapshot =
+    row.organisation_snapshot_id === null
+      ? null
+      : await readOrganisationSnapshot({ tx }, row.organisation_snapshot_id);
 
   // Order is the order things happened: a withdrawn application never moves again.
   const history: SubmissionEvent[] = [
@@ -296,6 +316,8 @@ export async function readSubmission(tx: Tx, id: string): Promise<Submission | u
     form: { id: row.form_id, version: row.form_version, definition },
     answers: projectedAnswers(definition, await answersWithFiles(tx, id, row.answers), 'staff'),
     organisation,
+    organisationSnapshot: snapshot,
+    currentOrganisation: { ...current, href: await organisationHref(tx, row.organisation_id) },
     contact: {
       personId: row.applicant_person_id,
       givenName: details.givenName,

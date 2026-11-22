@@ -305,11 +305,17 @@ jobs:
           tar -xzf "$archive" trivy
       # A finding with no fixed package yet cannot be acted on, so it is left
       # out; one with a fix fails the build until the image is rebuilt on it.
+      # The backup image is not in the stack, so it is built here and its
+      # commands run once, and a release tag is never its first build.
       - name: Scan the release images
         if: matrix.shard == '1/3'
         run: |
           project=$(node scripts/dev-names.ts | jq --raw-output .stackProject)
-          for service in api console portal; do
+          docker build --quiet --file infra/docker/backup.Dockerfile --tag "${project}-backup:latest" .
+          for tool in pg_dump psql age aws; do
+            docker run --rm --entrypoint "/usr/local/bin/$tool" "${project}-backup:latest" --version
+          done
+          for service in api console portal backup; do
             "$RUNNER_TEMP/tools/trivy" image --quiet --cache-dir "$RUNNER_TEMP/trivy-cache" \
               --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 \
               "${project}-${service}:latest"

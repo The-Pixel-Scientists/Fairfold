@@ -101,6 +101,28 @@ export const party = {
     recorded_at: personal,
     recorded_by: personal,
   },
+  // That a person must not be contacted (ADR 0033). The one record erasure
+  // keeps as it is (ADR 0027): it holds ids, codes, times and a keyed hash
+  // of the address, no plain personal value, and is kept for the tenant's
+  // lifetime, never under a tenant retention policy, while the person row
+  // exists, so an erased person is never mailed again. The current-consent
+  // view's columns are classified as these and party.consent's. The reason
+  // is a fixed code, internal like auth.audit_event.reason: a personal
+  // column's name is censored from every log line, and refusal reasons are
+  // logged by that name.
+  'party.suppression': {
+    tenant_id: internal,
+    id: internal,
+    person_id: personal,
+    channel: personal,
+    purpose: personal,
+    reason: internal,
+    source: personal,
+    address_hash: personal,
+    hash_key_version: internal,
+    recorded_at: internal,
+    recorded_by: internal,
+  },
   // An organisation as submitted (ADR 0017), classified like the columns it
   // copies. It is kept with the application that references it: today that
   // is the tenant's lifetime, as for grants.application, until retention
@@ -150,6 +172,7 @@ export const partySubjects: SubjectPathRegistry = {
   'party.person': { kind: 'party', column: 'id' },
   'party.relationship': { kind: 'parties', columns: ['subject_id', 'object_id'] },
   'party.consent': { kind: 'party', column: 'person_id' },
+  'party.suppression': { kind: 'party', column: 'person_id' },
   'party.value_history': { kind: 'party', column: 'party_id' },
 };
 
@@ -181,6 +204,12 @@ export const partyProcessing: ProcessingRegistry<typeof party> = {
   },
   'party.relationship': record(people, ['other']),
   'party.consent': { ...record(people, ['other']), legalBasis: 'legal_obligation' },
+  // Kept to honour an objection to direct marketing (UK GDPR Article 21(3),
+  // PECR regulation 22); the address is kept only as its keyed hash.
+  'party.suppression': {
+    ...record(people, ['contact', 'other']),
+    legalBasis: 'legal_obligation',
+  },
   'party.organisation_snapshot': {
     ...record(['applicant_contact'], ['contact']),
     purpose: 'grant_applications',

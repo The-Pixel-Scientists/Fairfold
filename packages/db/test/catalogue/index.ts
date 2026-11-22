@@ -10,6 +10,7 @@ import { app } from './app.ts';
 import { assure } from './assure.ts';
 import { auth } from './auth.ts';
 import { crm } from './crm.ts';
+import { forms } from './forms.ts';
 import { grants } from './grants.ts';
 import { migrations } from './migrations.ts';
 import { party } from './party.ts';
@@ -61,6 +62,7 @@ const SCHEMAS: Readonly<Record<string, SchemaCatalogue>> = {
   pgboss,
   migrations,
   assure,
+  forms,
   privacy,
 };
 

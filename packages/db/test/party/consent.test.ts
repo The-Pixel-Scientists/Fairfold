@@ -2,7 +2,8 @@
 //
 // party.consent (migration 0005): isolation, append-only for app_api with
 // the time set by the database, a person at every row, and the checks on
-// each column.
+// each column. Since migration 0072 a missing recorder breaks a check
+// rather than NOT NULL, since only an unsubscribe has none.
 
 import { beforeAll, describe, expect, it } from 'vitest';
 
@@ -106,7 +107,7 @@ describe('party.consent', { timeout: 30_000 }, () => {
     ['refuses an unknown source', { source: 'import' }, '23514'],
     ['refuses an empty notice version', { privacy_notice_version: '' }, '23514'],
     ['refuses a notice version with a space', { privacy_notice_version: 'v 1' }, '23514'],
-    ['refuses no recorder', { recorded_by: null }, '23502'],
+    ['refuses no recorder', { recorded_by: null }, '23514'],
     ['refuses a recorder from another tenant', { recorded_by: '<stranger>' }, '23503'],
   ])('%s', async (_, change: Row, expected) => {
     await asRoleIn('app_api', tenant.id, async (client) => {

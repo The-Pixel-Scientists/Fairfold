@@ -65,6 +65,7 @@ export type SubmissionTables = {
     submitted_by: string | null;
     created_by: string | null;
     updated_by: string | null;
+    organisation_snapshot_id: string | null;
   };
   'grants.eligibility_result': {
     id: string;
@@ -84,6 +85,7 @@ export type SubmissionTables = {
     moved_by: string;
   };
   'app.membership': { id: string; user_id: string };
+  'app.tenant_module': { module: string; enabled: boolean };
 };
 
 /** The transaction typed to the tables the submission routes use. */

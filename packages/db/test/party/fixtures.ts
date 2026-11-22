@@ -14,6 +14,7 @@ export const PARTY_TABLES = [
   'party.person',
   'party.relationship',
   'party.consent',
+  'party.suppression',
 ] as const;
 
 /** Columns for a valid organisation row on party `id`. */

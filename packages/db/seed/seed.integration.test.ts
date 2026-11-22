@@ -223,7 +223,7 @@ describe('the configured scenario', { timeout: 60_000 }, () => {
             ORDER BY c.position`,
         ),
         templates: await query(
-          'SELECT outcome, version FROM grants.email_template_version ORDER BY outcome',
+          'SELECT outcome, version, purpose FROM grants.email_template_version ORDER BY outcome',
         ),
         theme: await query('SELECT brand_colour FROM app.tenant_theme'),
         forms: await query(
@@ -254,7 +254,11 @@ describe('the configured scenario', { timeout: 60_000 }, () => {
         { stage: 'Review', label: 'Approach', weight: 2, scale_min: 1, scale_max: 5 },
         { stage: 'Review', label: 'Value for money', weight: 1, scale_min: 1, scale_max: 5 },
       ],
-      templates: ['accepted', 'declined', 'waitlisted'].map((outcome) => ({ outcome, version: 1 })),
+      templates: ['accepted', 'declined', 'waitlisted'].map((outcome) => ({
+        outcome,
+        version: 1,
+        purpose: 'transactional',
+      })),
       theme: [],
       forms: [
         {

@@ -11,6 +11,7 @@ import { useParam } from '../programme/Page.tsx';
 import { ReminderHistory, loadSubmissionReminders } from '../reminders/ReminderHistory.tsx';
 import { AdjustmentsPanel } from './adjustments/AdjustmentsPanel.tsx';
 import { Aside } from './detail/Aside.tsx';
+import { SnapshotPanel } from './detail/SnapshotPanel.tsx';
 import { ApplicationTab } from './detail/ApplicationTab.tsx';
 import { EligibilityTab } from './detail/EligibilityTab.tsx';
 import { HistoryTab } from './detail/HistoryTab.tsx';
@@ -111,6 +112,17 @@ function Detail({ submissionId }: { submissionId: string }) {
               <DecisionPanel submission={submission} />
               <AdjustmentsPanel submission={submission} />
               <ReminderHistory load={loadSubmissionReminders} id={submission.id} />
+              {submission.organisationSnapshot !== undefined && (
+                <SnapshotPanel
+                  snapshot={submission.organisationSnapshot}
+                  {...(submission.currentOrganisation && {
+                    current: submission.currentOrganisation,
+                    ...(submission.currentOrganisation.href !== null && {
+                      currentHref: submission.currentOrganisation.href,
+                    }),
+                  })}
+                />
+              )}
               <Aside submission={submission} />
             </div>
           </div>

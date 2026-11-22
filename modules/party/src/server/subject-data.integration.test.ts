@@ -50,6 +50,25 @@ async function addFixture(): Promise<Fixture> {
       source: 'portal',
       recorded_by: await addMember(client, tenant),
     });
+    const staff = await addMember(client, tenant);
+    await insertRow(client, 'party.suppression', {
+      tenant_id: tenant.id,
+      person_id: person,
+      channel: 'email',
+      purpose: 'future_funding',
+      reason: 'staff_entry',
+      source: 'staff',
+      recorded_by: staff,
+    });
+    await insertRow(client, 'party.suppression', {
+      tenant_id: tenant.id,
+      person_id: person,
+      channel: 'email',
+      reason: 'bounced',
+      source: 'system',
+      address_hash: Buffer.alloc(32, 0xab),
+      hash_key_version: 1,
+    });
     const duplicate = await addPerson(client, tenant, { given_name: 'Augusta' });
     await insertRow(client, 'party.consent', {
       tenant_id: tenant.id,
@@ -141,6 +160,23 @@ describe('partySubjectData', { timeout: 30_000 }, () => {
       value: 'future_funding',
       sensitivity: 'personal',
     });
+  });
+
+  it("returns the person's suppressions, with an address hash as hex", async () => {
+    const rows = (await read(a.tenant, a.person))['party.suppression'] ?? [];
+    expect(rows).toHaveLength(2);
+    const staff = rows.find((row) => row['party.suppression.reason']?.value === 'staff_entry');
+    expect(staff?.['party.suppression.channel']).toEqual({
+      value: 'email',
+      sensitivity: 'personal',
+    });
+    expect(staff?.['party.suppression.reason']?.sensitivity).toBe('internal');
+    const bounce = rows.find((row) => row['party.suppression.reason']?.value === 'bounced');
+    expect(bounce?.['party.suppression.address_hash']).toEqual({
+      value: 'ab'.repeat(32),
+      sensitivity: 'personal',
+    });
+    expect(JSON.stringify(rows)).not.toContain('"type":"Buffer"');
   });
 
   it("returns a relationship from either end, and not another person's", async () => {

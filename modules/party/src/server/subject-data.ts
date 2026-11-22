@@ -94,6 +94,21 @@ export const subjectTables: Readonly<
       ),
     ],
   },
+  'party.suppression': {
+    subjectColumn: 'person_id',
+    columns: [
+      ...columns(
+        'internal',
+        'tenant_id',
+        'id',
+        'reason',
+        'hash_key_version',
+        'recorded_at',
+        'recorded_by',
+      ),
+      ...columns('personal', 'person_id', 'channel', 'purpose', 'source', 'address_hash'),
+    ],
+  },
   'party.value_history': {
     subjectColumn: 'party_id',
     columns: [
@@ -114,9 +129,10 @@ export const subjectTables: Readonly<
 
 type Tables = Record<string, Record<string, unknown>>;
 
-/** The cell for a stored value; a timestamp is its ISO text. */
+/** The cell for a stored value; a timestamp is its ISO text and a hash its hex. */
 function cellValue(value: unknown): Cell['value'] {
   if (value instanceof Date) return value.toISOString();
+  if (Buffer.isBuffer(value)) return value.toString('hex');
   // The driver reads these tables' other columns as strings, numbers, booleans or JSON.
   return (value ?? null) as Cell['value'];
 }

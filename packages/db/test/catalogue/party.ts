@@ -22,6 +22,8 @@ export const party: SchemaCatalogue = {
     ['party.erase_party(uuid, uuid)', ['app_worker']],
     // The guards on an erased party's data call it as the writing role.
     ['party.is_erased(uuid, uuid)', ['app_api', 'app_worker']],
+    // The public unsubscribe route alone calls it (ADR 0033).
+    ['party.record_unsubscribe(uuid, uuid, text, text, bytea, integer, uuid)', ['app_api']],
   ],
   definerFunctions: [
     [
@@ -106,6 +108,88 @@ export const party: SchemaCatalogue = {
           'UPDATE on column party.party.updated_at',
         ],
         policies: [],
+      },
+    ],
+    [
+      'party.record_unsubscribe(uuid, uuid, text, text, bytea, integer, uuid)',
+      {
+        owner: 'owner_party_record_unsubscribe',
+        // No tenant is set, so its policies are what admit it. The lock
+        // clause needs an UPDATE right, and the UPDATE policy admits no new
+        // row. Never INSERT on recorded_at, recorded_by, occurred_at,
+        // retain_until or actor_member_kind.
+        rights: [
+          'USAGE on schema app',
+          'USAGE on schema party',
+          'EXECUTE on function app.current_tenant_id()',
+          // The erased-party guards on consent and suppressions run as it.
+          'EXECUTE on function party.is_erased(uuid,uuid)',
+          ...columns('SELECT', 'app.tenant', ['id', 'status']),
+          ...columns('SELECT', 'party.person', ['tenant_id', 'id']),
+          ...columns('SELECT', 'party.party', ['tenant_id', 'id', 'kind', 'status']),
+          'UPDATE on column party.party.updated_at',
+          ...columns('SELECT', 'party.consent', [
+            'tenant_id',
+            'person_id',
+            'purpose',
+            'channel',
+            'state',
+            'privacy_notice_version',
+            'recorded_at',
+          ]),
+          ...columns('INSERT', 'party.consent', [
+            'tenant_id',
+            'id',
+            'person_id',
+            'purpose',
+            'channel',
+            'state',
+            'privacy_notice_version',
+            'source',
+          ]),
+          ...columns('SELECT', 'party.suppression', [
+            'tenant_id',
+            'person_id',
+            'channel',
+            'purpose',
+            'reason',
+            'address_hash',
+          ]),
+          ...columns('INSERT', 'party.suppression', [
+            'tenant_id',
+            'id',
+            'person_id',
+            'channel',
+            'purpose',
+            'reason',
+            'source',
+            'address_hash',
+            'hash_key_version',
+          ]),
+          ...columns('SELECT', 'app.retention_policy', ['tenant_id', 'policy', 'days']),
+          ...columns('INSERT', 'app.audit_event', [
+            'tenant_id',
+            'request_id',
+            'actor_kind',
+            'action',
+            'entity_type',
+            'entity_id',
+            'subject_party_id',
+            'changes',
+          ]),
+        ],
+        policies: [
+          'app.tenant policy record_unsubscribe_select',
+          'party.person policy record_unsubscribe_select',
+          'party.party policy record_unsubscribe_select',
+          'party.party policy record_unsubscribe_lock',
+          'party.consent policy record_unsubscribe_select',
+          'party.consent policy record_unsubscribe_insert',
+          'party.suppression policy record_unsubscribe_select',
+          'party.suppression policy record_unsubscribe_insert',
+          'app.retention_policy policy record_unsubscribe_select',
+          'app.audit_event policy record_unsubscribe_insert',
+        ],
       },
     ],
   ],

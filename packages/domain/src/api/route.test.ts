@@ -11,6 +11,7 @@ import {
   defineRoute,
   idempotencyHeadersSchema,
   idempotencyKeySchema,
+  oneClickUnsubscribeBodySchema,
   type RouteContract,
 } from './route.ts';
 
@@ -374,6 +375,72 @@ describe('checkRoute for SSO completions (ADR 0010)', () => {
     expect(checkRoute({ ...callback, method: 'POST', body: acs.body })).toContain(
       'The oidc_callback route is a GET.',
     );
+  });
+});
+
+describe('checkRoute for one-click unsubscribe (RFC 8058)', () => {
+  const unmarked = {
+    method: 'POST',
+    path: '/public/unsubscribe',
+    audience: 'public',
+    module: 'party',
+    summary: 'Stop messages for one purpose and channel',
+    permission: null,
+    scope: null,
+    query: z.strictObject({ token: z.string() }),
+    body: oneClickUnsubscribeBodySchema,
+    responses: { 200: z.strictObject({ outcome: z.string() }) },
+  } satisfies RouteContract;
+  const oneClick = { ...unmarked, oneClickUnsubscribe: true } satisfies RouteContract;
+
+  it('passes a public POST taking exactly List-Unsubscribe=One-Click', () => {
+    expect(checkRoute(oneClick)).toEqual([]);
+    expect(oneClickUnsubscribeBodySchema.parse({ 'List-Unsubscribe': 'One-Click' })).toEqual({
+      'List-Unsubscribe': 'One-Click',
+    });
+    for (const body of [
+      {},
+      { 'List-Unsubscribe': 'one-click' },
+      { 'List-Unsubscribe': 'One-Click', token: 'x' },
+    ]) {
+      expect(oneClickUnsubscribeBodySchema.safeParse(body).success, JSON.stringify(body)).toBe(
+        false,
+      );
+    }
+  });
+
+  it('refuses the marker on any other route', () => {
+    const body = 'A one-click unsubscribe takes exactly the form body List-Unsubscribe=One-Click.';
+    const where = 'Only a public POST route is a one-click unsubscribe.';
+    const bad: [RouteContract, string][] = [
+      [{ ...oneClick, method: 'PUT' }, where],
+      [{ ...oneClick, method: 'GET', body: undefined }, where],
+      [
+        {
+          ...valid,
+          method: 'POST',
+          body: oneClickUnsubscribeBodySchema,
+          oneClickUnsubscribe: true,
+        } as never,
+        where,
+      ],
+      [
+        { ...signOut, body: oneClickUnsubscribeBodySchema, oneClickUnsubscribe: true } as never,
+        where,
+      ],
+      [{ ...oneClick, body: undefined }, body],
+      [{ ...oneClick, body: z.strictObject({ 'List-Unsubscribe': z.literal('One-Click') }) }, body],
+      [{ ...oneClick, body: z.strictObject({ token: z.string() }) }, body],
+      [{ ...oneClick, oneClickUnsubscribe: false } as never, 'is true or left out'],
+      [{ ...oneClick, idempotent: true }, 'never idempotent'],
+    ];
+    for (const [route, problem] of bad) {
+      expect(checkRoute(route).join(' '), problem).toContain(problem);
+    }
+  });
+
+  it('refuses the one-click body on a route without the marker', () => {
+    expect(checkRoute(unmarked)).toContain('body has a key that is not a plain ASCII name.');
   });
 });
 

@@ -64,6 +64,7 @@ export function templateRow(tenant: TestTenant, programmeId: string, change: Row
     version: 1,
     subject: '{{programme_title}}: we are offering you a grant',
     body: 'Dear {{given_name}},\n\nWe are pleased to offer you {{award_amount}}.',
+    purpose: 'transactional',
     ...change,
   };
 }

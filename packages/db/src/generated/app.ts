@@ -84,6 +84,14 @@ export interface AppConfigVersion {
   version: number;
 }
 
+export interface AppEmbedOrigin {
+  created_at: Generated<Timestamp>;
+  created_by: string;
+  id: Generated<string>;
+  origin: string;
+  tenant_id: string;
+}
+
 export interface AppErasureLedger {
   audit_event_id: string;
   erased_at: Generated<Timestamp>;
@@ -345,6 +353,7 @@ export interface DB {
   'app.approval_request': AppApprovalRequest;
   'app.audit_event': AppAuditEvent;
   'app.config_version': AppConfigVersion;
+  'app.embed_origin': AppEmbedOrigin;
   'app.erasure_ledger': AppErasureLedger;
   'app.event_cursor': AppEventCursor;
   'app.event_outbox': AppEventOutbox;

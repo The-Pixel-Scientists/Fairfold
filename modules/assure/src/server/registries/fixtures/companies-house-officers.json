@@ -1,0 +1,12 @@
+{
+  "total_results": 3,
+  "items": [
+    {
+      "name": "TESTER, Invented One",
+      "officer_role": "director",
+      "date_of_birth": { "month": 1, "year": 1970 }
+    },
+    { "name": "TESTER, Invented Two", "officer_role": "secretary" },
+    { "name": "TESTER, Invented Three", "officer_role": "director", "resigned_on": "2020-01-31" }
+  ]
+}

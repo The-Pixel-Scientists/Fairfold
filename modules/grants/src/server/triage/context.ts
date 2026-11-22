@@ -11,7 +11,10 @@ import type { GrantsAuditAction } from '../../contracts/index.ts';
 import type { GrantsDependencies } from '../programme/context.ts';
 import type { Tx } from '../programme/tables.ts';
 
-export interface TriageDependencies extends Pick<GrantsDependencies, 'notFound' | 'refuse'> {
+export interface TriageDependencies extends Pick<
+  GrantsDependencies,
+  'notFound' | 'refuse' | 'recordConfig'
+> {
   /** The active members holding `permission`, read now in the request's tenant. */
   readonly membersWith: (tx: Tx, permission: Permission) => Promise<readonly string[]>;
 }

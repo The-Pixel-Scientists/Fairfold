@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import { apiBasePath } from '@pixel-scientists/domain/api';
+import { confirmUnsubscribe } from '@pixel-scientists/party/contracts';
+import fastify from 'fastify';
 import { describe, expect, it, vi } from 'vitest';
 
 import { captureLogs } from '../../test/support.ts';
@@ -137,5 +140,78 @@ describe('send', () => {
     for (const secret of ['ada@example.com', 'sign-in link', 'Hello, Ada', 'User unknown', 'Bad']) {
       expect(text).not.toContain(secret);
     }
+  });
+});
+
+describe('one-click unsubscribe', () => {
+  const token = 'A'.repeat(40);
+  const unsubscribe = { origin: 'https://portal.example.org', token };
+
+  it('passes one https link built from the origin and token to the transport', async () => {
+    const { sender, transport } = setup();
+
+    await expect(sender.send({ ...email, unsubscribe })).resolves.toEqual({ sent: true });
+    expect(transport.deliver).toHaveBeenCalledWith(
+      expect.objectContaining({
+        unsubscribeUrl: `https://portal.example.org/api/public/unsubscribe?token=${token}`,
+      }),
+    );
+  });
+
+  it('points at the path the API registers for the one-click POST', async () => {
+    const { sender, transport } = setup();
+    await sender.send({ ...email, unsubscribe });
+    const link = new URL(transport.deliver.mock.calls[0]?.[0].unsubscribeUrl ?? '');
+
+    expect(link.pathname).toBe(`${apiBasePath}${confirmUnsubscribe.path}`);
+    const app = fastify();
+    await app.register(
+      (scope, _options, done) => {
+        scope.post(confirmUnsubscribe.path, () => ({ reached: true }));
+        done();
+      },
+      { prefix: apiBasePath },
+    );
+    const response = await app.inject({ method: 'POST', url: `${link.pathname}${link.search}` });
+    expect(response.json()).toEqual({ reached: true });
+    await app.close();
+  });
+
+  it('adds no link to a message without one', async () => {
+    const { sender, transport } = setup();
+
+    await sender.send(email);
+    expect(transport.deliver.mock.calls[0]?.[0]).not.toHaveProperty('unsubscribeUrl');
+  });
+
+  it.each([
+    ['a token with a line break', { origin: unsubscribe.origin, token: `${token}\r\nBcc: x@y.z` }],
+    ['a token outside the character set', { origin: unsubscribe.origin, token: `${token}.` }],
+    ['a short token', { origin: unsubscribe.origin, token: 'abc' }],
+    ['an http origin', { origin: 'http://portal.example.org', token }],
+    ['an origin with a line break', { origin: 'https://portal.example.org\r\nBcc: x@y.z', token }],
+    ['an origin with a tab', { origin: 'https://portal.\texample.org', token }],
+    ['an origin with a path', { origin: 'https://portal.example.org/path', token }],
+    ['an origin with a trailing slash', { origin: 'https://portal.example.org/', token }],
+    ['an origin with credentials', { origin: 'https://user:pass@portal.example.org', token }],
+    ['an origin that is not a URL', { origin: 'portal.example.org', token }],
+  ])('refuses %s, and sends nothing', async (_name, value) => {
+    const { sender, transport, logs } = setup();
+
+    await expect(sender.send({ ...email, unsubscribe: value })).resolves.toEqual({
+      sent: false,
+      code: 'invalid_message',
+    });
+    expect(transport.deliver).not.toHaveBeenCalled();
+    expect(logs.text()).not.toContain(token);
+  });
+
+  it('still refuses a line break in the subject of a marketing message', async () => {
+    const { sender, transport } = setup();
+
+    await expect(
+      sender.send({ ...email, subject: 'Hi\r\nBcc: x@y.z', unsubscribe }),
+    ).resolves.toEqual({ sent: false, code: 'invalid_message' });
+    expect(transport.deliver).not.toHaveBeenCalled();
   });
 });

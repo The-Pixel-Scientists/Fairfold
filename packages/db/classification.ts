@@ -127,6 +127,7 @@ export const PROCESSING_PURPOSES = [
   'due_diligence',
   'sanctions_screening',
   'grant_monitoring',
+  'form_responses',
   'data_protection',
 ] as const;
 export type ProcessingPurpose = (typeof PROCESSING_PURPOSES)[number];
@@ -260,6 +261,7 @@ export const subjectPaths: SubjectPathRegistry = mergeSchemaMaps({
   crm: crmFile.crmSubjects,
   privacy: privacyFile.privacySubjects,
   impact: impactFile.impactSubjects,
+  forms: formsFile.formsSubjects,
 });
 
 /** A schema file's `<schema>Processing` export, which a file with no tables yet does not have. */

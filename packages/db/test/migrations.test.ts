@@ -124,8 +124,12 @@ describe('migrations', { timeout: 300_000 }, () => {
       // version has the operator as its author, and 0021's while a switch
       // names a wave 1 tool, which tenant creation, the operator's backfill
       // and their tests leave behind. Row-level security hides those rows
-      // from migrator, so TRUNCATE them too.
-      await sql`TRUNCATE app.tenant_module, app.config_version`.execute(trx);
+      // from migrator, so TRUNCATE them too. And 0079's down refuses while
+      // any forms table holds a row, which the forms tests leave behind; form
+      // versions refer to configuration versions, so they go in the same
+      // TRUNCATE.
+      await sql`TRUNCATE app.tenant_module, app.config_version, forms.form, forms.form_version,
+                         forms.response, forms.respondent_token`.execute(trx);
       // And 0033's down refuses while a party is erased, which the erasure
       // tests leave behind. Erased parties cannot be changed back, so empty
       // the party tables and every table that refers to them.
@@ -156,6 +160,10 @@ describe('migrations', { timeout: 300_000 }, () => {
       await sql`TRUNCATE impact.framework, impact.outcome, impact.indicator, impact.target,
                          impact.result, impact.result_evidence,
                          impact.learning_note`.execute(trx);
+      // And 0080's down refuses while any insight table holds a row, which
+      // the insight tests leave behind.
+      await sql`TRUNCATE insight.report_definition, insight.disclosure_rule,
+                         insight.publication_run`.execute(trx);
       // And 0089 to 0091's downs refuse while any privacy table holds a row,
       // which the privacy tests leave behind. Requests went with party.
       await sql`TRUNCATE privacy.breach, privacy.breach_assessment, privacy.processing_activity,
@@ -165,6 +173,13 @@ describe('migrations', { timeout: 300_000 }, () => {
       // template exists, which the reminder tests leave behind. Empty the
       // template versions and every table that refers to them.
       await sql`TRUNCATE grants.email_template_version CASCADE`.execute(trx);
+      // And 0053's down refuses while an assure job waits, which the assure
+      // tests leave behind with no worker to run them.
+      await sql`DELETE FROM pgboss.job WHERE name LIKE 'assure.%'`.execute(trx);
+      // And 0021's down refuses while a membership or an invitation holds a
+      // wave 1 role, which the impact, search and assure tests leave behind.
+      // Empty both and every table that refers to them.
+      await sql`TRUNCATE app.membership, app.invitation CASCADE`.execute(trx);
       // After the loop, before[i] is the schema with the first i migrations applied.
       const before = [await stableSnapshot(trx)];
       for (const { name, down } of [...migrations].reverse()) {

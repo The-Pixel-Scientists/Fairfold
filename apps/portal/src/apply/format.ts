@@ -16,7 +16,7 @@ const day = new Intl.DateTimeFormat('en-GB', {
 const LOCAL_TIME = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/;
 
 /** "5pm" on the hour, "5:30pm" otherwise. */
-function clock(hours: number, minutes: number): string {
+export function clock(hours: number, minutes: number): string {
   const hour = hours % 12 === 0 ? 12 : hours % 12;
   const past = minutes === 0 ? '' : `:${String(minutes).padStart(2, '0')}`;
   return `${String(hour)}${past}${hours < 12 ? 'am' : 'pm'}`;

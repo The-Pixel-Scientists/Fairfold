@@ -26,7 +26,9 @@ type TriageTables = {
     tenant_id: string;
     name: string;
     colour: LabelColour | null;
-    archived: boolean;
+    archived: Generated<boolean>;
+    created_by: string;
+    updated_by: string;
   };
   'grants.application_label': {
     tenant_id: string;

@@ -28,14 +28,26 @@ settings in its README. It connects to Cloud SQL at its private address as
 directory is a 2 GiB in-memory volume, gone when the instance ends; a larger
 dump needs a larger volume and memory limit, up to Cloud Run's 32 GiB.
 
-The image must put `pg_dump`, `psql`, `age` and the S3 client (`aws`) in
-`/usr/local/bin`, run as a non-root user, and have the repository at its
-working directory. Cloud Run has no read-only root file system; the job
-writes only to the scratch volume.
+The image is `infra/docker/backup.Dockerfile`, which the release workflow
+builds, scans, signs and verifies with the others. It puts `pg_dump` and
+`psql` (PostgreSQL 17's client, newer than the server as `pg_dump` must be),
+`age` and the AWS CLI (`aws`) in `/usr/local/bin`, runs as a non-root user,
+and has the job's code at its working directory. Cloud Run has no read-only
+root file system; the job writes only to the scratch volume.
+
+The release pipeline's deployer holds nothing on the job or its service
+account. It already changes and runs the migrate job, so the right to act as
+the backup account would let it run any image as that account and read the
+backup role's password. A release lists the backup image's digest in its
+summary instead, and an operator rolls it out
+([A new image](#a-new-image)).
 
 No other identity can read the backup role's password: the secret is
 granted to the job's service account alone, and no role in the project is
-granted on it.
+granted on it. The IAM policies on the job and on its service account are
+authoritative: the scheduler's account may run the job, no one holds any
+other role on either, and a binding added outside this root goes at the
+next apply.
 
 The scheduler is not retried, because a lost reply could start a second run
 beside the first. The job retries once itself, one run after the other; a
@@ -85,16 +97,13 @@ also still to come.
 - The roles script has created `backup_reader` and set its password.
 - The backup store exists, as `infra/backup/README.md` sets out, and you know
   the address ranges its endpoint resolves to.
-- The backup image is in a registry the project can pull from.
-- The network has a private DNS zone that sends Google API traffic to
-  `private.googleapis.com` (`199.36.153.8/30`). **No root creates this zone
-  yet.** The firewall here admits no other Google address, so without it
-  `storage.googleapis.com` resolves to public addresses, the job cannot read
-  the files bucket, and every night with a new file ends in `source_failed`.
-  Do not apply this root until the network root adds the zone, named
-  `tps-<environment>-<cell>-googleapis`, with `A` records for
-  `private.googleapis.com` and a `*.googleapis.com` `CNAME` to it, attached
-  to the VPC. The plan stops until a private zone of that name exists.
+- The release root is applied and a release tag has been built, so the
+  backup image is in the release repository.
+- The network root's private DNS zone `tps-<environment>-<cell>-googleapis`
+  sends Google API traffic to `private.googleapis.com` (`199.36.153.8/30`).
+  The firewall here admits no other Google address, so without it
+  `storage.googleapis.com` would resolve to public addresses and the job
+  could not read the files bucket. The plan stops until the zone exists.
 - You may create projects in the organisation and link the billing account.
 
 Inputs come from the environment, as for the other roots:
@@ -139,6 +148,19 @@ tofu -chdir=infra/terraform/gcp/backup apply -replace=google_storage_hmac_key.so
 
 To rotate the backup key, add the new recipients as a new version of
 `backup-recipients` and apply with the new `TF_VAR_key_id`.
+
+## A new image
+
+A release's step summary lists the backup image's digest, signed and
+verified with the others. With the inputs above, roll it out by applying
+with that digest:
+
+```sh
+export TF_VAR_image=<registry>/backup@sha256:<digest>
+tofu -chdir=infra/terraform/gcp/backup apply
+```
+
+The next night's run uses it. To roll back, apply with the previous digest.
 
 ## The alert
 

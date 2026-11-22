@@ -26,6 +26,10 @@ export const ADD_ORGANISATION_PATH = '/organisations/new';
 export const ORGANISATION_PATH = '/organisations/:organisationId';
 export const FUTURE_FUNDING_PATH = '/future-funding';
 
+export const OPEN_GRANTS_PATH = '/open-grants';
+export const OPEN_GRANT_PATH = '/open-grants/:roundId';
+export const FORM_RESPONSES_PATH = '/form-responses';
+
 export const PROGRAMMES_PATH = '/programmes';
 export const PROGRAMME_PATH = '/programmes/:roundId';
 export const START_APPLICATION_PATH = '/programmes/:roundId/start';
@@ -46,6 +50,11 @@ export function organisationPath(organisationId: string): string {
 }
 
 const segment = encodeURIComponent;
+
+/** The public page for one open round, from the round's id. */
+export function openGrantPath(roundId: string): string {
+  return `${OPEN_GRANTS_PATH}/${segment(roundId)}`;
+}
 
 /** The path of one programme's round, from the round's id. */
 export function programmePath(roundId: string): string {

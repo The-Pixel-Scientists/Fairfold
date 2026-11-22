@@ -1,21 +1,26 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
 # Releases are tagged, built once, signed and promoted unchanged (V1-PLAN).
-# Pushing a tag vX.Y.Z builds the api, console and portal images from the
-# tagged commit with the stack's Dockerfiles and build arguments, pushes them
-# to the release registry, scans each digest, signs it keyless and attaches
-# SPDX and CycloneDX SBOMs from Syft as attestations. Promotion verifies every
-# digest, runs the migrate job on the new API image and, only once it has
-# succeeded, rolls out api, worker, console and portal to the same digests.
+# Pushing a tag vX.Y.Z builds the api, console, portal and backup images from
+# the tagged commit, the first three with the stack's Dockerfiles and build
+# arguments, pushes them to the release registry, scans each digest, signs it
+# keyless and attaches SPDX and CycloneDX SBOMs from Syft as attestations.
+# Promotion verifies every digest, runs the migrate job on the new API image
+# and, only once it has succeeded, rolls out api, worker, console and portal
+# to the same digests. The backup job is not the pipeline's to change: its
+# account reads the backup role's password, so promotion lists the verified
+# backup digest and an operator applies it with the backup root
+# (infra/terraform/gcp/backup/).
 # Running this workflow by hand with a tag promotes that tag's signed images
 # again and builds nothing. Only Aaron pushes tags.
 #
 # No credential is stored. A job that reaches Google Cloud exchanges its
 # GitHub OIDC token through Workload Identity Federation for a short-lived
-# token of one service account: the publisher, in the `release` environment
-# (v*.*.* tags only), may push to the release repository and nothing else;
-# the deployer, in the `staging` environment (Aaron approves each run), may
-# read that repository, update and run the five workloads and act as their
+# token of one service account (infra/terraform/gcp/release/): the
+# publisher, in the `release` environment (v*.*.* tags only), may push to the
+# release repository and nothing else; the deployer, in the `staging`
+# environment (Aaron approves each run), may read that repository, change the
+# image of the five workloads above, run the migrate job and act as their
 # service accounts, and nothing else. Only the promote job knows about Cloud
 # Run, so another cell adds its own promote job and leaves build and signing
 # as they are.
@@ -93,6 +98,7 @@ jobs:
       api: ${{ steps.push.outputs.api }}
       console: ${{ steps.push.outputs.console }}
       portal: ${{ steps.push.outputs.portal }}
+      backup: ${{ steps.push.outputs.backup }}
     steps:
       - name: Check the tag
         run: |
@@ -141,13 +147,15 @@ jobs:
             --certificate-oidc-issuer "$GITHUB_OIDC_ISSUER"
           grep " ${archive}\$" "$checksums" | sha256sum --check --strict -
           tar -xzf "$archive" syft
-      # The same Dockerfiles and build arguments as infra/compose/compose.stack.yaml.
+      # The same Dockerfiles and build arguments as infra/compose/compose.stack.yaml,
+      # and the backup job's own.
       - name: Build the images
         run: |
           docker build --file infra/docker/api.Dockerfile --tag "$REGISTRY/api:$TAG" .
           for app in console portal; do
             docker build --file infra/docker/web.Dockerfile --build-arg "APP=$app" --tag "$REGISTRY/$app:$TAG" .
           done
+          docker build --file infra/docker/backup.Dockerfile --tag "$REGISTRY/backup:$TAG" .
       # The OIDC token's audience is the provider; STS exchanges it for a
       # federated token, which may only impersonate the job's service account.
       - name: Sign in to Google Cloud as the publisher
@@ -178,7 +186,7 @@ jobs:
       - name: Push the images and record their digests
         id: push
         run: |
-          for image in api console portal; do
+          for image in api console portal backup; do
             docker push --quiet "$REGISTRY/$image:$TAG"
             digest=$(docker inspect --format '{{json .RepoDigests}}' "$REGISTRY/$image:$TAG" \
               | jq --exit-status --raw-output --arg repo "$REGISTRY/$image" '.[] | select(startswith($repo + "@sha256:"))')
@@ -188,7 +196,9 @@ jobs:
       - name: Scan, sign and attest each digest
         env:
           SYFT_CHECK_FOR_APP_UPDATE: 'false'
-          IMAGES: ${{ steps.push.outputs.api }} ${{ steps.push.outputs.console }} ${{ steps.push.outputs.portal }}
+          IMAGES: >-
+            ${{ steps.push.outputs.api }} ${{ steps.push.outputs.console }}
+            ${{ steps.push.outputs.portal }} ${{ steps.push.outputs.backup }}
         run: |
           mkdir -p "$RUNNER_TEMP/sbom"
           for ref in $IMAGES; do
@@ -229,7 +239,9 @@ jobs:
       PROJECT: ${{ vars.TPS_GCP_PROJECT }}
       REGION: europe-west2
       NAME: tps-staging-uk
-      BUILT: ${{ needs.build.outputs.api }} ${{ needs.build.outputs.console }} ${{ needs.build.outputs.portal }}
+      BUILT: >-
+        ${{ needs.build.outputs.api }} ${{ needs.build.outputs.console }}
+        ${{ needs.build.outputs.portal }} ${{ needs.build.outputs.backup }}
     steps:
       - name: Check the tag
         run: |
@@ -254,7 +266,7 @@ jobs:
         run: |
           read -r -a images <<< "$BUILT"
           if [ "${#images[@]}" -eq 0 ]; then
-            for image in api console portal; do
+            for image in api console portal backup; do
               images+=("$REGISTRY/$image@$(docker buildx imagetools inspect "$REGISTRY/$image:$TAG" \
                 --format '{{json .Manifest}}' | jq --exit-status --raw-output .digest)")
             done
@@ -265,7 +277,7 @@ jobs:
               --certificate-oidc-issuer "$GITHUB_OIDC_ISSUER" "$ref" > /dev/null
           }
           for ref in "${images[@]}"; do
-            if [[ ! "$ref" =~ ^"$REGISTRY"/(api|console|portal)@sha256:[0-9a-f]{64}$ ]]; then
+            if [[ ! "$ref" =~ ^"$REGISTRY"/(api|console|portal|backup)@sha256:[0-9a-f]{64}$ ]]; then
               echo "$ref is not a release image by digest." >&2
               exit 1
             fi
@@ -279,7 +291,7 @@ jobs:
       # A revision that never becomes ready leaves the previous one serving.
       - name: Run the migrations, then roll out the services
         run: |
-          : "${API_IMAGE:?}" "${CONSOLE_IMAGE:?}" "${PORTAL_IMAGE:?}"
+          : "${API_IMAGE:?}" "${CONSOLE_IMAGE:?}" "${PORTAL_IMAGE:?}" "${BACKUP_IMAGE:?}"
           run=https://run.googleapis.com/v2
           base="$run/projects/$PROJECT/locations/$REGION"
           call() {
@@ -338,6 +350,9 @@ jobs:
             echo "| migrate, api, worker | \`$API_IMAGE\` |"
             echo "| console | \`$CONSOLE_IMAGE\` |"
             echo "| portal | \`$PORTAL_IMAGE\` |"
+            echo "| backup, not rolled out | \`$BACKUP_IMAGE\` |"
+            echo
+            echo "To roll out the backup job, apply the backup root with \`TF_VAR_image\` set to its digest."
           } >> "$GITHUB_STEP_SUMMARY"
 
   # Off until playwright.config.ts can take staging's addresses and staging

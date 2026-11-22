@@ -45,7 +45,7 @@ describe("the funder's name and look", () => {
     expect(screen.queryByRole('img')).toBeNull();
     expect(
       screen.getByText(
-        'Create an account with your email address. Then you can see which grants Northfield Foundation has open and start an application.',
+        'You can see which grants Northfield Foundation has open before you sign in. To apply, create an account with your email address.',
       ),
     ).toBeTruthy();
   });
@@ -101,9 +101,7 @@ describe("the funder's name and look", () => {
     expect(sheets()).toEqual([]);
     expect(document.documentElement.dataset['preset']).toBeUndefined();
     expect(screen.getByRole('link', { name: 'Create an account' })).toBeTruthy();
-    expect(
-      screen.getByText(/which grants the funder has open and start an application/),
-    ).toBeTruthy();
+    expect(screen.getByText(/which grants the funder has open before you sign in/)).toBeTruthy();
   });
 
   it('shows no look or name on the pages outside a funder', async () => {

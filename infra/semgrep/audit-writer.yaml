@@ -41,3 +41,7 @@ rules:
         # Seeds events that expired a month ago, which the writer cannot: it
         # stamps the current time.
         - /apps/api/src/worker/jobs/retention.integration.test.ts
+        # Seed the real audit rows the assure jobs and request contexts
+        # write, as a module cannot import the writer.
+        - /modules/assure/src/server/registries/registries.integration.test.ts
+        - /modules/assure/src/server/screening/screening.integration.test.ts
