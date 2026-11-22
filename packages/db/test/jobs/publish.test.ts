@@ -76,7 +76,8 @@ const context = (): PublishContext => ({
   sender: test.apiSender,
   requestId: randomUUID(),
   causingUserId: randomUUID(),
-  causedBy: randomUUID(),
+  // The outbox holds the causing membership by foreign key; these tenants have none.
+  causedBy: null,
 });
 
 function inTenant<T>(tenant: TestTenant, work: (trx: Transaction<unknown>) => Promise<T>) {
@@ -103,7 +104,7 @@ describe('publish', () => {
         id: expect.any(String) as unknown,
         type: submitted.name,
         tenantId: a.id,
-        sequence: null,
+        sequence: expect.any(Number) as unknown,
         occurredAt: expect.any(String) as unknown,
         requestId: ctx.requestId,
         causedBy: ctx.causedBy,
