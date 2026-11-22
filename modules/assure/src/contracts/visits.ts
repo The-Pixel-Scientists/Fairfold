@@ -6,8 +6,8 @@
 // first. Findings are free text about the organisation and may name people,
 // so they are personal.
 //
-// `assure.visits.manage` lists, records (`assure.visit.recorded`), reads and
-// changes (`assure.visit.updated`) visits.
+// `assure.visits.manage` lists, records (`assure.visit.recorded`), reads
+// (`assure.visit.viewed`) and changes (`assure.visit.updated`) visits.
 
 import { idSchema } from '@pixel-scientists/domain';
 import { defineRoute } from '@pixel-scientists/domain/api';

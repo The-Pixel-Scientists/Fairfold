@@ -10,9 +10,10 @@
 //
 // - `assure.checklists.manage` lists, reads, creates
 //   (`assure.checklist.created`) and publishes (`assure.checklist.published`).
-// - `assure.checklists.complete` reads and saves an application's answers
-//   (`assure.checklist_response.saved`), with the pinned version in full. A
-//   save naming another version than the one pinned answers 409.
+// - `assure.checklists.complete` reads (`assure.checklist_response.viewed`)
+//   and saves (`assure.checklist_response.saved`) an application's answers,
+//   with the pinned version in full. A save naming another version than the
+//   one pinned answers 409.
 
 import { idSchema } from '@pixel-scientists/domain';
 import { defineRoute } from '@pixel-scientists/domain/api';
