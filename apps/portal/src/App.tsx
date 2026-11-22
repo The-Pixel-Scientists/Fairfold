@@ -6,6 +6,7 @@ import type { PageDefinition, Params, RouteDefinition, SearchSchema } from '@pix
 import { Suspense, lazy, useMemo } from 'react';
 import type { ReactNode } from 'react';
 
+import { PREFERENCES_PATH, PreferencesPage } from '@pixel-scientists/party/portal';
 import { endSession, loadSession } from './api.ts';
 import { applyRoutes } from './apply/routes.ts';
 import AccountPage from './account/AccountPage.tsx';
@@ -56,6 +57,7 @@ import { grantsModule } from './shell/modules.ts';
 import { PortalShell } from './shell/PortalShell.tsx';
 import { productName } from './product.ts';
 import { TenantProvider, tenantSlugOf } from './tenant.ts';
+import { UnsubscribeApp, isUnsubscribePath } from './unsubscribe/index.tsx';
 
 /**
  * Pages outside any funder's address. The first segment of each path must be
@@ -127,7 +129,16 @@ const ownRoutes: readonly RouteDefinition[] = [
     component: OrganisationPage,
   },
   { path: FUTURE_FUNDING_PATH, title: 'Future funding', component: FutureFundingPage },
+  { path: PREFERENCES_PATH, title: 'How we contact you', component: PreferencesRoute },
 ];
+
+function PreferencesRoute() {
+  return (
+    <Screen kind="applicant">
+      <PreferencesPage />
+    </Screen>
+  );
+}
 
 /** The tools whose pages come and go with the session. */
 const tools = [toolRoutes(grantsModule, applyRoutes)];
@@ -222,6 +233,7 @@ export function App() {
       />
     );
   }
+  if (isUnsubscribePath(window.location.pathname, slug)) return <UnsubscribeApp slug={slug} />;
   return (
     <TenantProvider value={slug}>
       <FunderProvider>
