@@ -136,6 +136,12 @@ describe('migrations', { timeout: 300_000 }, () => {
       // And 0045's down refuses while a release email job waits, which the
       // decision tests leave behind with no worker to run them.
       await sql`DELETE FROM pgboss.job WHERE name LIKE 'grants.release_email%'`.execute(trx);
+      // And 0098's down refuses while an outbox relay job waits, which the
+      // outbox and publish tests leave behind.
+      await sql`DELETE FROM pgboss.job
+                 WHERE name IN ('platform.outbox_relay', 'platform.outbox_relay.dead',
+                                'platform.outbox_tenant', 'platform.outbox_tenant.dead',
+                                'outbox.probe', 'outbox.probe.dead')`.execute(trx);
       // And 0064's down refuses while a tenant has set an import period,
       // which the crm retention tests leave behind; row-level security hides
       // the settings from migrator.
