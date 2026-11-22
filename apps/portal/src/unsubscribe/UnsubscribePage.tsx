@@ -28,7 +28,7 @@ import { PageColumn } from '../PageColumn.tsx';
 import { useRead } from '../party/useRead.ts';
 import { whatStops } from './wording.ts';
 
-const NO_CREDENTIALS = { omitCredentials: true } as const;
+const NO_CREDENTIALS = { anonymous: true } as const;
 const REFUSED = 'This link has expired or is not valid';
 const FAILED = 'We could not load this page. Check that you are online, then try again.';
 

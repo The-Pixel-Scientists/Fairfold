@@ -91,7 +91,7 @@ export default function OpenGrantPage() {
   const slug = useTenantSlug();
   const { roundId = '' } = useParams();
   const readRound = useCallback(
-    () => callApi(getPublicRound, { params: { slug, roundId } }, { omitCredentials: true }),
+    () => callApi(getPublicRound, { params: { slug, roundId } }, { anonymous: true }),
     [slug, roundId],
   );
   const { read, retry } = useRead(readRound);
