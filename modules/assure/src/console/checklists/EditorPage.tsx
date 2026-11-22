@@ -51,16 +51,16 @@ interface ItemProps {
   item: DraftItem;
   index: number;
   count: number;
+  renewed: boolean;
   onChange: (item: DraftItem) => void;
   onMove: (to: number) => void;
   onRemove: () => void;
   error: (field: string) => string | undefined;
 }
 
-function Item({ item, index, count, onChange, onMove, onRemove, error }: ItemProps) {
+function Item({ item, index, count, renewed, onChange, onMove, onRemove, error }: ItemProps) {
   const number = index + 1;
   const at = `items.${String(index)}`;
-  const kindAtStart = useRef(item.kind);
   return (
     <li className="flex flex-col gap-3 rounded-lg border border-divider p-3">
       <h3 className="font-semibold text-ink">{`Item ${String(number)}`}</h3>
@@ -83,11 +83,7 @@ function Item({ item, index, count, onChange, onMove, onRemove, error }: ItemPro
           }}
         />
       </FormField>
-      <FormField
-        label="Answer kind"
-        id={`${at}.kind`}
-        hint={item.kind === kindAtStart.current ? undefined : KIND_WARNING}
-      >
+      <FormField label="Answer kind" id={`${at}.kind`} hint={renewed ? KIND_WARNING : undefined}>
         <Select
           value={item.kind}
           onChange={(event) => {
@@ -149,6 +145,7 @@ function Editor({ checklistId, base, version, onReload }: EditorProps) {
   const [confirming, setConfirming] = useState(false);
   const [published, setPublished] = useState<ChecklistVersion | null>(null);
   const [said, setSaid] = useState('');
+  const [renewed, setRenewed] = useState<ReadonlySet<string>>(new Set());
   const [conflict, setConflict] = useState<string | null>(null);
   const retryKey = useRef<string | undefined>(undefined);
   const moved = useRef<string | null>(null);
@@ -197,7 +194,10 @@ function Editor({ checklistId, base, version, onReload }: EditorProps) {
       const sent = (error as { idempotencyKey?: string | null }).idempotencyKey;
       retryKey.current = typeof sent === 'string' ? sent : undefined;
       setConfirming(false);
-      if (problem?.status === 409) setConflict(problem.detail);
+      if (problem?.status === 409) {
+        setConflict(problem.detail);
+        return;
+      }
       throw error;
     }
   });
@@ -282,8 +282,10 @@ function Editor({ checklistId, base, version, onReload }: EditorProps) {
                 item={item}
                 index={index}
                 count={draft.items.length}
+                renewed={renewed.has(item.id)}
                 error={form.errorFor}
                 onChange={(next) => {
+                  if (next.id !== item.id) setRenewed(new Set(renewed).add(next.id));
                   update(index, next);
                 }}
                 onMove={(to) => {

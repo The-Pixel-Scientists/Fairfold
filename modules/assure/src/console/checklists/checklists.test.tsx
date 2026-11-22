@@ -144,7 +144,7 @@ describe('checklist editor', () => {
       ),
     });
     open(`/assure/checklists/${CHECKLIST}`);
-    await user.type(await screen.findByLabelText('Description'), 'Updated');
+    await user.type(await screen.findByLabelText(/^Description/), 'Updated');
     await user.click(screen.getByRole('button', { name: 'Review and publish' }));
     await user.click(await screen.findByRole('button', { name: 'Publish new version' }));
     expect(await screen.findByText(/Someone else published a new version/)).toBeTruthy();
