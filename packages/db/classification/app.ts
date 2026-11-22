@@ -327,6 +327,15 @@ export const app = {
     created_by: internal,
     created_at: internal,
   },
+  // Embed settings (ADR 0035). The embed host reads the origins through
+  // app.embed_origins() to build frame-ancestors; they are not shown on a page.
+  'app.embed_origin': {
+    tenant_id: internal,
+    id: internal,
+    origin: internal,
+    created_by: internal,
+    created_at: internal,
+  },
 } satisfies ClassificationRegistry;
 
 /**
@@ -463,4 +472,5 @@ export const appProcessing: ProcessingRegistry<typeof app> = {
     dataCategories: ['other'],
   },
   'app.tag': setUp,
+  'app.embed_origin': setUp,
 };

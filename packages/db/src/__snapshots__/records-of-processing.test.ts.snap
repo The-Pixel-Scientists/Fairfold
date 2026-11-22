@@ -270,6 +270,62 @@ exports[`the shipped map > matches the committed register 1`] = `
     "article9Condition": null,
     "columns": [
       {
+        "column": "created_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "created_by",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "origin",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "tenant_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+    ],
+    "dataCategories": [],
+    "dataSubjects": [],
+    "highestSensitivity": "internal",
+    "legalBasis": "contract",
+    "processors": [
+      "hosting",
+      "backup",
+    ],
+    "purpose": "tenant_administration",
+    "subjectPath": null,
+    "table": "app.embed_origin",
+  },
+  {
+    "article9Condition": null,
+    "columns": [
+      {
         "column": "audit_event_id",
         "perField": false,
         "retention": {
