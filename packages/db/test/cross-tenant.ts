@@ -46,15 +46,31 @@ interface Fixtures {
 
 const DENIED = 'denied';
 
-export async function expectCrossTenantDenial(table: string, row: RowFactory): Promise<void> {
+/**
+ * Adds a factory's row some other way than as migrator, such as a table whose
+ * insert trigger checks the session's member, and returns its id.
+ */
+export type RowInserter = (tenant: TestTenant, row: Row) => Promise<string>;
+
+export async function expectCrossTenantDenial(
+  table: string,
+  row: RowFactory,
+  insert?: RowInserter,
+): Promise<void> {
   await withClient('migrator', async (migrator) => {
     // A tenant's row is the tenant itself for app.tenant, otherwise a new one.
-    const rowOf = async (tenant: TestTenant) =>
-      tenantColumn(table) === 'id'
-        ? tenant.id
-        : committedIn(migrator, tenant.id, async (client) =>
-            insertRow(client, table, await row(client, tenant)),
-          );
+    const rowOf = async (tenant: TestTenant) => {
+      if (tenantColumn(table) === 'id') return tenant.id;
+      if (insert) {
+        return insert(
+          tenant,
+          await committedIn(migrator, tenant.id, async (client) => row(client, tenant)),
+        );
+      }
+      return committedIn(migrator, tenant.id, async (client) =>
+        insertRow(client, table, await row(client, tenant)),
+      );
+    };
     const tenantA = await addTestTenant(migrator);
     const tenantB = await addTestTenant(migrator);
     const rowA = await rowOf(tenantA);
