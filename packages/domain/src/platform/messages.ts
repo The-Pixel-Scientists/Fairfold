@@ -100,6 +100,15 @@ export const messages = {
 
   // Team.
   chooseRole: 'Choose at least one role.',
+  enterTeamName: 'Enter a team name.',
+  teamNameTooLong: 'Enter a team name of 100 characters or fewer.',
+
+  // Emergency access.
+  chooseReason: 'Choose a reason from the list.',
+  breakGlassReasonText:
+    'Explain why you need access in 20 to 1,000 characters, without naming anyone.',
+  textHidden: 'Remove hidden characters from the text.',
+  chooseOutcome: 'Choose whether the access was justified.',
 
   // Retention and erasure.
   retentionDays: 'Enter a whole number of days from 1 to 36,500.',
