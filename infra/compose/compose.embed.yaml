@@ -1,0 +1,84 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# The embed host (ADR 0035), on top of compose.stack.yaml:
+#
+#   docker compose --file compose.stack.yaml --file compose.embed.yaml up
+#
+# Embeds are off unless this file is added. It adds one service, `embed`:
+# the portal's image, from the same Dockerfile and build argument, run as
+# the web server in embed mode, so there is no second image. The proxy
+# gains the embed host, with its own certificate, and sends its public
+# tenant routes to the API and everything else to `embed`
+# (infra/proxy/embed/).
+#
+# Networks, neither with a way out:
+# - `embed`: the proxy and the embed server, which no one else can reach.
+# - `web` (compose.stack.yaml): the embed server joins the proxy and the API,
+#   for the public route that lists a tenant's allowed origins. The API
+#   trusts forwarding headers from `web`'s addresses, so each lookup counts
+#   against the client the proxy named in X-Forwarded-For, not against the
+#   embed server: one client's made-up slugs cannot use up every tenant's
+#   lookups.
+#
+# embed.localhost is a separate site from console.localhost and
+# portal.localhost: each name under .localhost is its own site.
+
+services:
+  embed:
+    build:
+      context: ../..
+      dockerfile: infra/docker/web.Dockerfile
+      args: { APP: portal }
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    read_only: true
+    tmpfs: [/tmp]
+    command:
+      - node
+      - web-server.ts
+      - --root
+      - dist
+      - --host
+      - 0.0.0.0
+      - --port
+      - '8080'
+      - --api
+      - http://api:3000
+      - --embed
+      - https://embed.localhost:${TPS_STACK_EMBED_PORT:?Run pnpm stack}
+    networks: [embed, web]
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - --eval
+        - "fetch('http://127.0.0.1:8080/favicon.svg').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  proxy:
+    environment:
+      NGINX_ENVSUBST_TEMPLATE_DIR: /etc/nginx/proxy/templates-embed
+      TPS_PROXY_EMBED_HOST: embed.localhost
+      TPS_PROXY_EMBED_PORT: ${TPS_STACK_EMBED_PORT:?Run pnpm stack}
+    secrets:
+      - { source: embed_certificate, uid: '101', gid: '101', mode: 0400 }
+      - { source: embed_key, uid: '101', gid: '101', mode: 0400 }
+    networks: [embed]
+    ports:
+      - 127.0.0.1:${TPS_STACK_EMBED_PORT:?Run pnpm stack}:8443
+    depends_on:
+      embed:
+        condition: service_healthy
+
+secrets:
+  # The embed host's own certificate and key, for embed.localhost alone.
+  embed_certificate:
+    environment: TPS_STACK_EMBED_CERTIFICATE
+  embed_key:
+    environment: TPS_STACK_EMBED_KEY
+
+networks:
+  embed:
+    internal: true
