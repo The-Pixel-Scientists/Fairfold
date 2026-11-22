@@ -45,3 +45,8 @@ rules:
         # write, as a module cannot import the writer.
         - /modules/assure/src/server/registries/registries.integration.test.ts
         - /modules/assure/src/server/screening/screening.integration.test.ts
+        # The seed's copy of the operator switching a tenant's tools on. The
+        # writer imports the modules' servers, so packages/db cannot call it.
+        # The action is a fixed platform code with no subject, and the insert
+        # goes through insertAuditEvent(), which drops classified values.
+        - /packages/db/seed/operator-switch.ts
