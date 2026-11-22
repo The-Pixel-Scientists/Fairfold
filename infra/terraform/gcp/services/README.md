@@ -5,24 +5,32 @@ mount, each with its own service account
 ([ADR 0015](../../../../docs/adr/0015-opentofu.md),
 [ADR 0012](../../../../docs/adr/0012-hosting-targets-and-cells.md)).
 
-| Workload  | Runs as                                        | Database role                | Ingress                   |
-| --------- | ---------------------------------------------- | ---------------------------- | ------------------------- |
-| `api`     | Cloud Run service, API image                   | `app_api` and `app_auth`     | The load balancer only    |
-| `console` | Cloud Run service, web image                   | None                         | The load balancer only    |
-| `portal`  | Cloud Run service, web image                   | None                         | The load balancer only    |
-| `worker`  | Cloud Run worker pool, API image, one instance | `app_worker` and `app_queue` | None                      |
-| `migrate` | Cloud Run job, API image                       | `migrator`                   | None; an operator runs it |
+| Workload        | Runs as                                        | Database role                | Ingress                                           |
+| --------------- | ---------------------------------------------- | ---------------------------- | ------------------------------------------------- |
+| `api`           | Cloud Run service, API image                   | `app_api` and `app_auth`     | The load balancer only                            |
+| `console`       | Cloud Run service, web image                   | None                         | The load balancer only                            |
+| `portal`        | Cloud Run service, web image                   | None                         | The load balancer only                            |
+| `worker`        | Cloud Run worker pool, API image, one instance | `app_worker` and `app_queue` | None                                              |
+| `migrate`       | Cloud Run job, API image                       | `migrator`                   | None; an operator or the release pipeline runs it |
+| `tenant-create` | Cloud Run job, API image, as `operator`        | `app_worker`                 | None; an operator runs it                         |
 
 The worker is a worker pool because it opens no port, and a Cloud Run
 service must answer on one to start. Every workload sends all its traffic
 through the cell's VPC and reaches Cloud SQL at its private address with
 `TPS_DB_TLS=verify-full`. No service account holds a project-level role.
 
-No one may invoke the services yet, and they have no `run.app` address, so
-applying this root makes nothing reachable. The load balancer, with its
-Cloud Armor rules and the public invoker binding it needs
-([ADR 0030](../../../../docs/adr/0030-files-and-reverse-proxy.md)), comes
-with the first rollout.
+No one may invoke the services from this root, and they have no `run.app`
+address, so applying it makes nothing reachable. The
+[edge root](../edge/README.md) adds the load balancer, its Cloud Armor rules
+and the public invoker binding it needs
+([ADR 0030](../../../../docs/adr/0030-files-and-reverse-proxy.md)). The
+API's request timeout is 150 seconds, as the proxy's.
+
+The release pipeline's deployer, from the
+[release root](../release/README.md), may change the image of `api`,
+`console`, `portal`, `worker` and `migrate`, run `migrate`, and act as those
+five service accounts. It holds nothing on `tenant-create`. So the release
+root is applied before this one.
 
 ## Files
 
@@ -57,7 +65,7 @@ snapshot is the only second copy of a file.
 - The network and database roots are applied, and the roles script has run
   in managed mode (`TPS_DB_ADMIN_MODE=managed`), creating the database and
   setting each role's password.
-- The release images are in a registry the project can pull from.
+- The release root is applied, and the release images are in its repository.
 - A ClamAV service and an in-jurisdiction SMTP relay the cell can reach.
 
 Inputs come from the environment, as for the other roots. The objects are
@@ -71,6 +79,10 @@ export TF_VAR_api_trust_proxy=<the load balancer's addresses and Google's front-
 export TF_VAR_clamd='{ host = "<host>", port = 3310 }'
 export TF_VAR_smtp='{ host = "<host>", port = 587, tls = "starttls", user = "<user>", from = "<address>" }'
 ```
+
+Until the edge root exists, `TF_VAR_api_trust_proxy` is Google's front-end
+ranges alone, `35.191.0.0/16,130.211.0.0/22`; once it is applied, use its
+`api_trust_proxy` output and re-apply.
 
 ## Apply
 
@@ -113,6 +125,23 @@ gcloud run jobs execute tps-staging-uk-migrate --region=europe-west2 --wait
 Cloud Run sets `PORT` and variables starting `K_` or `CLOUD_RUN_` of its own.
 None starts `TPS_`, and none is a proxy variable, which the API and worker
 refuse ([ADR 0010](../../../../docs/adr/0010-authentication-security-rules.md)).
+
+## Create a tenant
+
+The `tenant-create` job runs `pnpm tenant:create`'s command
+([ADR 0019](../../../../docs/adr/0019-tenant-addresses-public-pages-and-theming.md))
+inside the cell, as `app_worker`, with the arguments you give it:
+
+```sh
+gcloud run jobs execute tps-staging-uk-tenant-create --region=europe-west2 --wait \
+  --args='--slug,harbour-trust,--name,Harbour Trust,--admin-email,admin@example.org'
+```
+
+`--args` splits on commas; for a name with a comma, start the value with
+`^;^` and separate with semicolons instead. The job is not retried, and the
+command's output is in the execution's log. It takes the API image when this
+root is applied, not at each promotion, so re-apply after copying a release's
+digests into `TF_VAR_images`.
 
 ## Rolling back
 
