@@ -111,11 +111,14 @@ async function expectDenialAs(role: LoginRole | SetRole, fixtures: Fixtures): Pr
     const tenant = client.escapeIdentifier(tenantColumn(table));
     const { rows } = await client.query<{
       select: boolean;
+      select_any: boolean;
       delete: boolean;
       update: string | null;
     }>(
-      // A role may read only some columns; the statements below read id.
+      // A role may read only some columns; the statements below read id,
+      // but for one that reads no column at all.
       `SELECT pg_catalog.has_column_privilege($1::regclass, 'id', 'SELECT') AS select,
+              pg_catalog.has_any_column_privilege($1::regclass, 'SELECT') AS select_any,
               pg_catalog.has_table_privilege($1::regclass, 'DELETE') AS delete,
               (SELECT a.attname FROM pg_catalog.pg_attribute a
                 WHERE a.attrelid = $1::regclass AND a.attnum > 0 AND NOT a.attisdropped
@@ -164,7 +167,9 @@ async function expectDenialAs(role: LoginRole | SetRole, fixtures: Fixtures): Pr
       expect(await run(blindDelete), `${role} deletes every row`).toBe(removed(rowsB));
 
       await client.query("SELECT pg_catalog.set_config('app.tenant_id', '', true)");
-      expect(await run(`SELECT 1 FROM ${quoted}`), `${role} reads, no tenant`).toBe(seen(0));
+      expect(await run(`SELECT 1 FROM ${quoted}`), `${role} reads, no tenant`).toBe(
+        can.select_any ? 0 : DENIED,
+      );
       expect(await run(blindUpdate, [rowB]), `${role} updates, no tenant`).toBe(changed(0));
       expect(await run(blindDelete), `${role} deletes, no tenant`).toBe(removed(0));
       expect(await run(insert.text, insert.values), `${role} adds, no tenant`).toBe(DENIED);
