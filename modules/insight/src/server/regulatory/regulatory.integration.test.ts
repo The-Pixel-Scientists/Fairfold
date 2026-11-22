@@ -247,6 +247,13 @@ beforeAll(async () => {
 }, 60_000);
 
 afterAll(async () => {
+  // Migration 0021's down refuses while a membership holds a wave 1 role, so
+  // the round trip in packages/db/test/migrations.test.ts needs these gone.
+  for (const who of [a, b]) {
+    await asMigratorIn(who.tenant.id, (client) =>
+      client.query("UPDATE app.membership SET roles = '{reviewer}' WHERE id = $1", [who.other]),
+    );
+  }
   await Promise.all([api.destroy(), worker.destroy()]);
 });
 
