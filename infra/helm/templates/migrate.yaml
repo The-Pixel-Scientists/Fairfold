@@ -1,0 +1,81 @@
+{{- /* SPDX-License-Identifier: AGPL-3.0-or-later */ -}}
+{{- $c := dict "root" . "component" "migrate" -}}
+{{- /*
+Before every install and upgrade, as compose.stack.yaml's migrate service:
+the roles script as the database admin, then every pending migration as
+migrator. A failure stops the rollout and leaves the Job to read. Its
+ServiceAccount and network policy are hooks too, made first, since a hook
+runs before the release's own objects exist.
+*/ -}}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: migrate
+  labels:
+    {{- include "tps.labels" $c | nindent 4 }}
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: '-10'
+    helm.sh/hook-delete-policy: before-hook-creation
+automountServiceAccountToken: false
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: migrate
+  labels:
+    {{- include "tps.labels" $c | nindent 4 }}
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: '0'
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        {{- include "tps.selector" $c | nindent 8 }}
+    spec:
+      {{- include "tps.pod" $c | nindent 6 }}
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: {{ include "tps.image" .Values.images.api }}
+          command: [node, packages/db/scripts/db.ts, prepare, up]
+          {{- include "tps.container" $c | nindent 10 }}
+          env:
+            {{- include "tps.databaseEnv" . | nindent 12 }}
+            - name: TPS_DB_ADMIN_MODE
+              value: {{ .Values.database.adminMode | quote }}
+            - name: TPS_DB_SUPERUSER
+              value: {{ .Values.database.adminUser | quote }}
+            - name: TPS_DB_SUPERUSER_PASSWORD_FILE
+              value: /run/secrets/database_admin_password
+            - name: TPS_DB_MIGRATOR_PASSWORD_FILE
+              value: /run/secrets/migrator_password
+            - name: TPS_DB_APP_API_PASSWORD_FILE
+              value: /run/secrets/app_api_password
+            - name: TPS_DB_APP_WORKER_PASSWORD_FILE
+              value: /run/secrets/app_worker_password
+            - name: TPS_DB_APP_AUTH_PASSWORD_FILE
+              value: /run/secrets/app_auth_password
+            - name: TPS_DB_APP_QUEUE_PASSWORD_FILE
+              value: /run/secrets/app_queue_password
+            - name: TPS_DB_BACKUP_READER_PASSWORD_FILE
+              value: /run/secrets/backup_reader_password
+          resources:
+            {{- toYaml .Values.migrate.resources | nindent 12 }}
+          volumeMounts:
+            {{- include "tps.mounts" $c | nindent 12 }}
+      volumes:
+        {{- include "tps.tmpVolume" $c | nindent 8 }}
+        {{- include "tps.caVolume" $c | nindent 8 }}
+        {{- $files := dict
+              "database_admin_password" "databaseAdminPassword"
+              "migrator_password" "migratorPassword"
+              "app_api_password" "appApiPassword"
+              "app_worker_password" "appWorkerPassword"
+              "app_auth_password" "appAuthPassword"
+              "app_queue_password" "appQueuePassword"
+              "backup_reader_password" "backupReaderPassword" }}
+        {{- include "tps.secretsVolume" (dict "root" . "files" $files) | nindent 8 }}
