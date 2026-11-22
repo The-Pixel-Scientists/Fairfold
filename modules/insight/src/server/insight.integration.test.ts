@@ -99,6 +99,7 @@ function request(who: Staff): { context: InsightContext; wrote: Recorded } {
       },
     },
     membership: { id: who.member },
+    requestId: randomUUID(),
   };
   return { context, wrote };
 }

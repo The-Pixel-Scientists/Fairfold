@@ -51,6 +51,8 @@ export interface InsightContext {
     ): Promise<void>;
   };
   readonly membership: { readonly id: string };
+  /** The request's id, which a job sent from it carries for log correlation. */
+  readonly requestId: string;
 }
 
 /**
