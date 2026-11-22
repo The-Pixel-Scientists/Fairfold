@@ -96,12 +96,17 @@ export type ClassificationRegistry = Readonly<
  *   a tenant through `party.person.user_id`.
  * - `unlinked`: the personal values belong to no known subject, for `reason`.
  *   Every column is kept for a fixed 12 months or less.
+ * - `none`: the table is about no identified person, for `reason`, though its
+ *   free text may name one. It is outside the party schema and has no foreign
+ *   key to it or to `auth.user`. Subject access, erasure and export skip it on
+ *   purpose.
  */
 export type SubjectPath =
   | { readonly kind: 'party' | 'account'; readonly column: string }
   | { readonly kind: 'parties'; readonly columns: readonly [string, string] }
   | { readonly kind: 'join'; readonly column: string; readonly table: string }
-  | { readonly kind: 'unlinked'; readonly reason: string };
+  | { readonly kind: 'unlinked'; readonly reason: string }
+  | { readonly kind: 'none'; readonly reason: string };
 
 /** Each table's subject path: `{ 'schema.table': path }`. */
 export type SubjectPathRegistry = Readonly<Record<string, SubjectPath>>;

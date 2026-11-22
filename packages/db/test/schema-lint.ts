@@ -30,7 +30,8 @@
 //   path (ADR 0027). A path's column exists and is a foreign key in the
 //   catalogue to what its kind names, and a join reaches a party or an
 //   account. An unlinked table keeps every column for a fixed 366 days or
-//   less.
+//   less. A table marked as about no person has a reason, is outside the
+//   party schema, and has no foreign key to it or to auth.user.
 // - Views use security_invoker. There are no materialized views or foreign
 //   tables.
 //
@@ -524,6 +525,8 @@ const TARGETS = {
   party: ['party.party', 'party.person', 'party.organisation'],
   account: ['auth.user'],
 } as const;
+/** Whether `table` holds parties or accounts, which a table about no person may not reference. */
+const holdsPeople = (table: string) => table.startsWith('party.') || table === 'auth.user';
 /** The longest an unlinked table may keep a value: 12 months. */
 const UNLINKED_MAX_DAYS = 366;
 
@@ -565,6 +568,17 @@ function subjectPathProblems(
       if (path.reason.trim() === '' || !fixed) {
         problems.push(
           `${table} has an unlinked subject path, so it needs a reason and every column kept for a fixed ${String(UNLINKED_MAX_DAYS)} days or less.`,
+        );
+      }
+    } else if (path.kind === 'none') {
+      const linked =
+        holdsPeople(table) ||
+        constraints.some(
+          (key) => key.kind === 'f' && key.table === table && holdsPeople(key.referenced ?? ''),
+        );
+      if (path.reason.trim() === '' || linked) {
+        problems.push(
+          `${table} is marked as about no person in its subject path, so it needs a reason and no foreign key to the party schema or auth.user.`,
         );
       }
     } else if (path.kind === 'parties') {
