@@ -7,10 +7,13 @@ import type { Draft } from './draft.ts';
 
 const item = (label: string, id: string) => ({ ...newItem(), id, label });
 
+const constitution = item('Has a constitution', 'a');
+const policy = item('Has a safeguarding policy', 'b');
+
 const base: Draft = {
   name: 'Governance checks',
   description: '',
-  items: [item('Has a constitution', 'a'), item('Has a safeguarding policy', 'b')],
+  items: [constitution, policy],
 };
 
 describe('what publishing changes', () => {
@@ -19,13 +22,13 @@ describe('what publishing changes', () => {
   });
 
   it('lists added, changed and removed items and a reorder in words', () => {
-    const [first, second] = base.items;
+    const [first, second] = [constitution, policy];
     const draft: Draft = {
       ...base,
       items: [
-        { ...second!, label: 'Has a safeguarding policy in date' },
+        { ...second, label: 'Has a safeguarding policy in date' },
         item('Has insurance', 'c'),
-        first!,
+        first,
       ],
     };
     expect(changes(base, draft)).toEqual([
@@ -33,17 +36,17 @@ describe('what publishing changes', () => {
       'Added: Has insurance (Yes or no).',
       'The order of the items changes.',
     ]);
-    expect(changes(base, { ...base, items: [first!] })).toEqual([
+    expect(changes(base, { ...base, items: [first] })).toEqual([
       'Removed: Has a safeguarding policy.',
     ]);
   });
 
   it('treats a new answer kind as a new question', () => {
-    const first = base.items[0]!;
+    const first = constitution;
     const changed = withKind(first, 'date');
     expect(changed.id).not.toBe(first.id);
     expect(withKind(first, first.kind)).toBe(first);
-    expect(changes(base, { ...base, items: [changed, base.items[1]!] })).toEqual([
+    expect(changes(base, { ...base, items: [changed, policy] })).toEqual([
       'Added: Has a constitution (Date).',
       'Removed: Has a constitution.',
     ]);

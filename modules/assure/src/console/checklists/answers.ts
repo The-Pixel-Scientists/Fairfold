@@ -25,7 +25,7 @@ export function toBody({ version }: ChecklistResponse, values: Values): Checklis
   for (const { id, kind } of version.items) {
     const held = values[id];
     if (kind === 'file') {
-      if (Array.isArray(held) && held.length > 0) answers[id] = { kind, fileIds: [...held] };
+      if (Array.isArray(held) && held.length > 0) answers[id] = { kind, fileIds: held.map(String) };
       continue;
     }
     const text = typeof held === 'string' ? held.trim() : '';
