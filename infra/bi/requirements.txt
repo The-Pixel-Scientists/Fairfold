@@ -1,0 +1,29 @@
+# What the BI image adds to or raises in the Superset release image
+# (ADR 0039, ADR 0002). Installed with --require-hashes --no-deps, so every
+# dependency is listed here and every file each version publishes is hashed:
+# - psycopg2-binary, the PostgreSQL driver for the metadata and warehouse
+#   connections;
+# - Authlib, which Flask-AppBuilder's OIDC sign-in needs, and joserfc, which
+#   Authlib uses to check ID token signatures (Authlib's other dependency,
+#   cryptography, is the release image's; Superset holds it below 47);
+# - certifi, urllib3, PyJWT and pyasn1, raised above the release image's
+#   versions, which have advisories on the sign-in and TLS path to the
+#   identity provider.
+psycopg2-binary==2.9.13 \
+    --hash=sha256:ADD-EVERY-FILE-HASH-BEFORE-MERGING
+Authlib==1.9.9 \
+    --hash=sha256:ADD-EVERY-FILE-HASH-BEFORE-MERGING
+joserfc==1.7.7 \
+    --hash=sha256:06979cfbab78bc802f14c0358f32969826cc26720e13cb38926ffdc86bc0cb2c \
+    --hash=sha256:471d0fd12a5a0d1c0942de280f39efe6f597878315033270b504d4d006d25510
+certifi==2026.10.19 \
+    --hash=sha256:035c1e85572b141bf1c3a3eff0e33a8eb74917522f2559075ff8d2fea780a1ae \
+    --hash=sha256:42d35340cc5b9ba78e818ddbff0c5b1c2b779de448a340fd1b989f5fa8670e1b
+urllib3==2.8.0 \
+    --hash=sha256:0cf3cae568d36aa9576b28dfb35f11328f1cb974ca7647d9475ebb86c75ac6e3 \
+    --hash=sha256:63bf2ead4c879426ebf22ef2a781eeb4aa3b4ae798a0435506f8687fd5bb9b63
+PyJWT==2.15.1 \
+    --hash=sha256:42d59d631f7768a1028a64c7ff581a9bf7519804daf91fc5b6c56e30eec5e193 \
+    --hash=sha256:4f259e80cdfb6b3fc18a7de51fd1ef9ec79652f25019bae68975ca2468a34df8
+pyasn1==0.6.5 \
+    --hash=sha256:ADD-EVERY-FILE-HASH-BEFORE-MERGING
