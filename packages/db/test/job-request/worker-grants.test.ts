@@ -198,6 +198,21 @@ const RELEASE_EMAIL_RIGHTS = [
   ].map((column) => `SELECT on column grants.adjustment.${column}`),
   'SELECT on column grants.assignment.reviewer_membership_id',
   'EXECUTE on function grants.erase_reminders(uuid)',
+  // The consent check and bounces in the sender, and subject access
+  // (migration 0072).
+  'SELECT on party.suppression',
+  'SELECT on party.current_consent',
+  ...[
+    'tenant_id',
+    'person_id',
+    'channel',
+    'purpose',
+    'reason',
+    'source',
+    'address_hash',
+    'hash_key_version',
+    'recorded_by',
+  ].map((column) => `INSERT on column party.suppression.${column}`),
 ];
 
 /** A released decision, with its applicant as a contact for its organisation. */
