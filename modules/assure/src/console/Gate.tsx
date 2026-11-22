@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { NotFoundPage, useCan, useParams, useSession } from '@pixel-scientists/ui';
+import { NotFoundPage, hasPermission, useParams, useSession } from '@pixel-scientists/ui';
 import type { ReactNode } from 'react';
 
 /** A parameter of the page's address. The route has checked that it is an id. */
@@ -14,7 +14,7 @@ function toolsOn(session: object): readonly unknown[] {
 }
 
 /**
- * The pages for a member who holds `permission`, while assure is on for the
+ * The pages for a member who holds any of the `permission`s, while assure is on for the
  * funder. Anyone else gets the page for an address that is not there, and
  * the page makes no request.
  */
@@ -22,11 +22,13 @@ export function Gate({
   permission,
   children,
 }: {
-  permission: 'assure.lookup.read' | 'assure.screening.read';
+  permission: string | readonly string[];
   children: ReactNode;
 }) {
   const { state } = useSession();
-  const can = useCan(permission);
-  const on = state.status === 'ready' && toolsOn(state.session).includes('assure');
+  const ready = state.status === 'ready';
+  const held = [permission].flat();
+  const can = ready && held.some((name) => hasPermission(state.session, name));
+  const on = ready && toolsOn(state.session).includes('assure');
   return can && on ? <div className="flex flex-col gap-stack">{children}</div> : <NotFoundPage />;
 }
