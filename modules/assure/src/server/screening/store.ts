@@ -35,6 +35,11 @@ export const PAGE_SIZE = 50;
  * parameter. An exception to ADR 0016's no-raw-SQL rule until packages/db
  * provides a trigram helper; replace this constant at its one use, in
  * candidatesQuery().
+ *
+ * Accepted on review, 22 November 2026: the fragment is this fixed text with
+ * no parameters and nothing from a request reaches it, the name it compares
+ * is bound through eb.val(), and it is used once. Nothing here can be
+ * injected. The exception ends when the helper exists; do not copy it.
  */
 const TRIGRAM_OPERATOR = {
   expressionType: undefined,
