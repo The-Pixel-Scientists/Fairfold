@@ -16,7 +16,7 @@
 import { attempt, type AuditChanges } from '@pixel-scientists/db';
 import { idSchema } from '@pixel-scientists/domain';
 import { permissionsFor } from '@pixel-scientists/domain/platform';
-import { readOrganisationSnapshot } from '@pixel-scientists/party/server';
+import { readOrganisationSnapshotNames } from '@pixel-scientists/party/server';
 
 import { boardPackRequestSchema, EXPORT_READ_PERMISSION } from '../../contracts/index.ts';
 import type { Tx } from '../programme/tables.ts';
@@ -122,10 +122,13 @@ export function makeBoardPack(deps: BoardPackJobDependencies) {
     const made = await attempt(tx, async () => {
       const organisations = new Map<string, string>();
       if (showsOrganisation(requester)) {
+        const names = await readOrganisationSnapshotNames(
+          { tx },
+          applications.flatMap(({ snapshotId }) => (snapshotId === null ? [] : [snapshotId])),
+        );
         for (const { id, snapshotId } of applications) {
-          const snapshot =
-            snapshotId === null ? null : await readOrganisationSnapshot({ tx }, snapshotId);
-          if (snapshot !== null) organisations.set(id, snapshot.name);
+          const name = snapshotId === null ? undefined : names.get(snapshotId);
+          if (name !== undefined) organisations.set(id, name);
         }
       }
       const timeZone = await deps.tenantTimeZone(tx, await tenantOf(tx));
