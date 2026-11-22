@@ -38,14 +38,19 @@ export const app: SchemaCatalogue = {
     ['app.destroy_subject_key(uuid)', ['app_worker']],
     // A restore's one-off worker process, in restore mode alone (ADR 0011).
     ['app.reapply_erasure_ledger()', ['app_worker']],
-    // A join table's triggers link and release a file (ADR 0030).
-    ['app.link_file(uuid)', ['app_api']],
+    // A join table's triggers link and release a file (ADR 0030); the
+    // worker links a signed file and its evidence (ADR 0040).
+    ['app.link_file(uuid)', ['app_api', 'app_worker']],
     ['app.release_file(uuid)', ['app_api']],
     // The file sweep and file erasure (ADR 0030).
     ['app.delete_swept_file(uuid)', ['app_worker']],
     ['app.erase_file(uuid, uuid)', ['app_worker']],
     // The erasure job clears a subject's notes and messages (ADR 0027).
     ['app.erase_subject_notes(uuid)', ['app_worker']],
+    // The signature callback route, with no tenant set (ADR 0040).
+    ['app.resolve_signature_callback(bytea)', ['app_api']],
+    // The erasure job erases a subject's signature documents (ADR 0027).
+    ['app.erase_subject_documents(uuid)', ['app_worker']],
   ],
   definerFunctions: [
     [
@@ -379,6 +384,49 @@ export const app: SchemaCatalogue = {
           ...['recipient_person_id', 'status', 'error_code'].map(
             (column) => `UPDATE on column grants.message_notification.${column}`,
           ),
+        ],
+        policies: [],
+      },
+    ],
+    [
+      'app.resolve_signature_callback(bytea)',
+      {
+        owner: 'owner_app_resolve_signature_callback',
+        rights: [
+          'USAGE on schema app',
+          ...['id', 'status'].map((column) => `SELECT on column app.tenant.${column}`),
+          ...['tenant_id', 'id', 'status', 'callback_reference_hash', 'callback_key_version'].map(
+            (column) => `SELECT on column app.signature_connection.${column}`,
+          ),
+        ],
+        policies: [
+          'app.tenant policy resolve_signature_callback_select',
+          'app.signature_connection policy resolve_signature_callback_select',
+        ],
+      },
+    ],
+    [
+      'app.erase_subject_documents(uuid)',
+      {
+        owner: 'owner_app_erase_documents',
+        // Never DELETE, nor any column of a request or signer but the links it follows.
+        rights: [
+          'USAGE on schema app',
+          'USAGE on schema party',
+          'EXECUTE on function app.current_tenant_id()',
+          ...['tenant_id', 'id', 'status'].map(
+            (column) => `SELECT on column party.party.${column}`,
+          ),
+          ...['tenant_id', 'signature_request_id', 'person_id'].map(
+            (column) => `SELECT on column app.signature_signer.${column}`,
+          ),
+          ...['tenant_id', 'signature_request_id', 'file_id'].map(
+            (column) => `SELECT on column app.signature_request_file.${column}`,
+          ),
+          ...['tenant_id', 'id', 'erased_at'].map(
+            (column) => `SELECT on column app.file.${column}`,
+          ),
+          'UPDATE on column app.file.erased_at',
         ],
         policies: [],
       },

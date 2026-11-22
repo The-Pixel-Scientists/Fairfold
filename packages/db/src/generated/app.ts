@@ -68,6 +68,20 @@ export interface AppConfigVersion {
   version: number;
 }
 
+export interface AppDocumentTemplateVersion {
+  audience: string;
+  body: Json;
+  created_at: Generated<Timestamp>;
+  created_by: string;
+  id: Generated<string>;
+  kind: string;
+  merge_fields: string[];
+  template_id: string;
+  tenant_id: string;
+  title: string;
+  version: number;
+}
+
 export interface AppErasureLedger {
   audit_event_id: string;
   erased_at: Generated<Timestamp>;
@@ -229,6 +243,56 @@ export interface AppRetentionPolicy {
   updated_by: string;
 }
 
+export interface AppSignatureConnection {
+  account_id: string;
+  api_token: Buffer;
+  api_token_key_version: number;
+  callback_key_version: number;
+  callback_reference_hash: Buffer;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  provider: string;
+  status: Generated<string>;
+  tenant_id: string;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface AppSignatureRequest {
+  connection_id: string;
+  created_at: Generated<Timestamp>;
+  created_by: string;
+  error_code: string | null;
+  expires_at: Timestamp;
+  id: Generated<string>;
+  provider_reference: string | null;
+  sent_sha256: Buffer;
+  status: Generated<string>;
+  template_version_id: string | null;
+  tenant_id: string;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface AppSignatureRequestFile {
+  created_at: Generated<Timestamp>;
+  file_id: string;
+  id: Generated<string>;
+  role: string;
+  signature_request_id: string;
+  tenant_id: string;
+}
+
+export interface AppSignatureSigner {
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  person_id: string;
+  signature_request_id: string;
+  signed_at: Timestamp | null;
+  signing_order: number;
+  status: Generated<string>;
+  tenant_id: string;
+  updated_at: Generated<Timestamp>;
+}
+
 export interface AppSubjectKey {
   created_at: Generated<Timestamp>;
   destroyed_at: Timestamp | null;
@@ -309,6 +373,7 @@ export interface DB {
   'app.audit_event': AppAuditEvent;
   'app.break_glass': AppBreakGlass;
   'app.config_version': AppConfigVersion;
+  'app.document_template_version': AppDocumentTemplateVersion;
   'app.erasure_ledger': AppErasureLedger;
   'app.file': AppFile;
   'app.idempotency_key': AppIdempotencyKey;
@@ -323,6 +388,10 @@ export interface DB {
   'app.request_limit': AppRequestLimit;
   'app.restore_mode': AppRestoreMode;
   'app.retention_policy': AppRetentionPolicy;
+  'app.signature_connection': AppSignatureConnection;
+  'app.signature_request': AppSignatureRequest;
+  'app.signature_request_file': AppSignatureRequestFile;
+  'app.signature_signer': AppSignatureSigner;
   'app.subject_key': AppSubjectKey;
   'app.tag': AppTag;
   'app.team': AppTeam;
