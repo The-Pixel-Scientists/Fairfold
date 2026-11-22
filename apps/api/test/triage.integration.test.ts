@@ -7,13 +7,13 @@
 
 import { randomUUID } from 'node:crypto';
 
-import { triageMessages, type AppliedLabels } from '@pixel-scientists/grants/contracts';
+import { triageMessages, type AppliedLabels, type Label } from '@pixel-scientists/grants/contracts';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { asMigratorIn } from '../../../packages/db/test/tenants.ts';
 import { startMessagesApi, type MessagesApi } from './messages-api.ts';
 import { switchModule } from './modules-on.ts';
-import { answer, type Problem } from './programme-api.ts';
+import { answer, storedVersions, type Problem } from './programme-api.ts';
 import { addMember, type Member } from './settings-api.ts';
 import { expectLooksMissing } from './support.ts';
 
@@ -307,5 +307,144 @@ describe('labels on submissions', () => {
     expect((await t.send(t.grace, 'GET', '/console/labels')).statusCode).toBe(403);
     const other = await answer<AppliedLabels>(t.send(t.managerB, 'GET', '/console/labels'));
     expect(other.labels.map((item) => item.id)).not.toContain(label.id);
+  });
+});
+
+describe('the label set', () => {
+  const create = (body: object, member: Member = t.managerA, key?: string) =>
+    t.send(member, 'POST', '/console/labels', body, 'console', null, key);
+  const rename = (id: string, body: object, member: Member = t.managerA) =>
+    t.send(member, 'PUT', `/console/labels/${id}`, body);
+  const archive = (id: string, member: Member = t.managerA) =>
+    t.send(member, 'POST', `/console/labels/${id}/archive`);
+  const unique = () => `Synthetic ${randomUUID().slice(0, 8)}`;
+  const versionsOf = (id: string, tenant = t.tenantA) => storedVersions(tenant, 'grants.label', id);
+
+  it('creates, renames and archives a label, each as a configuration version and an event without the name', async () => {
+    const name = unique();
+    const made = await answer<Label>(create({ name, colour: 'info' }), 201);
+    expect(made).toMatchObject({ name, colour: 'info', archived: false });
+    const [row] = await t.rows<{ created_by: string; updated_by: string }>(
+      'SELECT created_by, updated_by FROM grants.label WHERE id = $1',
+      [made.id],
+    );
+    expect(row).toEqual({
+      created_by: t.managerA.membershipId,
+      updated_by: t.managerA.membershipId,
+    });
+
+    const renamed = `${name} (renamed)`;
+    expect(await answer<Label>(rename(made.id, { name: renamed, colour: 'danger' }))).toEqual({
+      id: made.id,
+      name: renamed,
+      colour: 'danger',
+      archived: false,
+    });
+    expect(await answer<Label>(archive(made.id))).toMatchObject({ name: renamed, archived: true });
+
+    const versions = await versionsOf(made.id);
+    expect(versions.map((version) => version.version)).toEqual([1, 2, 3]);
+    expect(versions.every((version) => version.author_id === t.managerA.membershipId)).toBe(true);
+    expect(JSON.stringify(versions[2]?.diff)).toContain('archived');
+
+    for (const [action, changes] of [
+      ['grants.label.created', { 'grants.label.name': {} }],
+      ['grants.label.updated', { 'grants.label.name': {} }],
+      ['grants.label.archived', { 'grants.label.archived': { before: false, after: true } }],
+    ] as const) {
+      const [event] = await eventsOf(action, made.id);
+      expect(event).toMatchObject({ actor_id: t.managerA.membershipId, subject_party_id: null });
+      expect(event?.changes, action).toMatchObject(changes);
+      expect(JSON.stringify(event?.changes), action).not.toContain(name);
+    }
+    expect(await eventsOf('grants.label.updated', made.id)).toHaveLength(1);
+  });
+
+  it('writes nothing for a rename that changes nothing, and for archiving twice', async () => {
+    const { id, name } = await answer<Label>(create({ name: unique() }), 201);
+    expect(await answer<Label>(rename(id, { name, colour: null }))).toMatchObject({ name });
+    await answer(archive(id));
+    await answer(archive(id));
+
+    expect((await versionsOf(id)).map((version) => version.version)).toEqual([1, 2]);
+    expect(await eventsOf('grants.label.updated', id)).toHaveLength(0);
+    expect(await eventsOf('grants.label.archived', id)).toHaveLength(1);
+  });
+
+  it('refuses a name already used in any case, without echoing it, on create and rename', async () => {
+    const name = unique();
+    const first = await answer<Label>(create({ name }), 201);
+    const other = await answer<Label>(create({ name: unique() }), 201);
+
+    const duplicate = await create({ name: name.toUpperCase() });
+    expect(duplicate.statusCode).toBe(409);
+    expect(duplicate.json<Problem>().detail).toBe(triageMessages.labelTaken);
+    expect(duplicate.body).not.toContain(name);
+    const clash = await rename(other.id, { name: name.toLowerCase() });
+    expect(clash.statusCode).toBe(409);
+    expect(clash.body).not.toContain(name);
+
+    expect(await versionsOf(other.id)).toHaveLength(1);
+    // Another tenant may use the same name.
+    await answer(create({ name }, t.managerB), 201);
+    expect(first.name).toBe(name);
+  });
+
+  it('makes one label for a repeated idempotency key', async () => {
+    const key = randomUUID();
+    const name = unique();
+    const first = await answer<Label>(create({ name }, t.managerA, key), 201);
+    const again = await answer<Label>(create({ name }, t.managerA, key), 201);
+
+    expect(again).toEqual(first);
+    expect(await versionsOf(first.id)).toHaveLength(1);
+    expect(await eventsOf('grants.label.created', first.id)).toHaveLength(1);
+  });
+
+  it('refuses unknown keys, colours and names that are blank or too long', async () => {
+    for (const body of [
+      {},
+      { name: '   ' },
+      { name: 'x'.repeat(41) },
+      { name: unique(), colour: '#ff0000' },
+      { name: unique(), tenantId: t.tenantB.id },
+    ]) {
+      expect((await create(body)).statusCode, JSON.stringify(body)).toBe(400);
+    }
+  });
+
+  it('refuses members without grants.programmes.manage and answers another tenant�s label as missing', async () => {
+    const { id } = await answer<Label>(create({ name: unique() }), 201);
+    for (const member of [t.grace, t.adminA]) {
+      expect((await create({ name: unique() }, member)).statusCode, 'create').toBe(403);
+      expect((await rename(id, { name: unique() }, member)).statusCode, 'rename').toBe(403);
+      expect((await archive(id, member)).statusCode, 'archive').toBe(403);
+    }
+    expectLooksMissing(
+      await rename(id, { name: unique() }, t.managerB),
+      await rename(randomUUID(), { name: unique() }),
+    );
+    expectLooksMissing(await archive(id, t.managerB), await archive(randomUUID()));
+    expect(await versionsOf(id)).toHaveLength(1);
+    expect(await versionsOf(id, t.tenantB)).toEqual([]);
+
+    await switchModule(t.tenantA, 'grants', false);
+    try {
+      expect((await create({ name: unique() })).statusCode).toBe(404);
+      expect((await archive(id)).statusCode).toBe(404);
+    } finally {
+      await switchModule(t.tenantA, 'grants');
+    }
+  });
+
+  it('keeps an archived label on its applications and refuses it for new ones', async () => {
+    const { id: applicationId } = await t.submitted();
+    const label = await answer<Label>(create({ name: unique() }), 201);
+    await answer(labels(applicationId, { add: [label.id] }));
+    await answer(archive(label.id));
+
+    expect(await labelsOn(applicationId)).toEqual([label.id]);
+    const { id: other } = await t.submitted();
+    expect((await labels(other, { add: [label.id] })).statusCode).toBe(409);
   });
 });
