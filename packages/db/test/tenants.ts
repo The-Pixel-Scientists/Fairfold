@@ -49,6 +49,11 @@ export async function committedIn<T>(
   }
 }
 
+/** Set the tenant for the rest of the open transaction on `client`; '' clears it. */
+export function setTestTenant(client: pg.ClientBase, tenant: string): Promise<unknown> {
+  return client.query("SELECT pg_catalog.set_config('app.tenant_id', $1, true)", [tenant]);
+}
+
 /** committedIn() on a new migrator connection. */
 export function asMigratorIn<T>(
   tenant: string,
