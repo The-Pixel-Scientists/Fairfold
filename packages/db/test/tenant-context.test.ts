@@ -10,11 +10,15 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDatabase, internalsOf } from '../src/database.ts';
 import {
   TenantLeakError,
+  trustedJobRequest,
+  trustedSessionUser,
   trustedTenantId,
   withTenant,
+  type MemberSource,
   type TenantId,
 } from '../src/tenant-context.ts';
 import { databaseSettings } from './connect.ts';
+import { asMigratorIn, createTestTenant, createTestUser, insertRow } from './tenants.ts';
 
 const tenantA = trustedTenantId('7d0f3f5e-0c1b-4a57-9d43-6c2b1f0a9e01');
 const tenantB = trustedTenantId('7d0f3f5e-0c1b-4a57-9d43-6c2b1f0a9e02');
@@ -135,11 +139,11 @@ describe('withTenant', () => {
     });
     await expect(refused).rejects.toBeInstanceOf(TenantLeakError);
     await expect(refused).rejects.toThrow(
-      'The database connection already has a tenant set. Refusing to use it.',
+      'The database connection already has a tenant or member set. Refusing to use it.',
     );
 
     expect(ran).toBe(false);
-    expect(logged).toContain('A tenant was already set on a pooled database connection.');
+    expect(logged).toContain('A tenant or member was already set on a pooled database connection.');
     expectNoTenant(await sessionState(db));
   });
 
@@ -275,5 +279,144 @@ describe('trustedTenantId', () => {
     ['a uuid with SQL after it', "7d0f3f5e-0c1b-4a57-9d43-6c2b1f0a9e01'; RESET ALL; --"],
   ])('refuses %s', (_, value) => {
     expect(() => trustedTenantId(value)).toThrow('A tenant id must be a uuid in lower case.');
+  });
+});
+
+describe('withTenant with a member', { timeout: 30_000 }, () => {
+  let db: Kysely<unknown>;
+  let tenant: TenantId;
+  let otherTenant: TenantId;
+  let user: string;
+  let membership: string;
+  let suspendedUser: string;
+  let suspended: string;
+  let strangerUser: string;
+  let request: string;
+  let suspendedRequest: string;
+  let strangerRequest: string;
+
+  /** Add an account as a member with `status`, and return both ids. */
+  const addAccount = async (inTenant: TenantId, status = 'active') => {
+    const account = await createTestUser();
+    const member = await asMigratorIn(inTenant, (client) =>
+      insertRow(client, 'app.membership', {
+        tenant_id: inTenant,
+        user_id: account,
+        roles: ['tenant_admin'],
+        status,
+      }),
+    );
+    return { account, member };
+  };
+
+  const addRequest = (inTenant: TenantId, requestedBy: string) =>
+    asMigratorIn(inTenant, (client) =>
+      insertRow(client, 'app.job_request', {
+        tenant_id: inTenant,
+        kind: 'audit_log_export',
+        requested_by: requestedBy,
+        permission: 'platform.audit.export',
+        filters: {},
+        field_ids: ['app.audit_event.action'],
+        output_sensitivity: 'internal',
+        request_id: '00000000-0000-4000-8000-000000000001',
+      }),
+    );
+
+  /** What withTenant() handed `work`, and the setting and tenant it saw. */
+  const run = (member?: MemberSource, on = db, inTenant = tenant) =>
+    withTenant(
+      on,
+      inTenant,
+      async (trx, given) => {
+        const { rows } = await sql<{ setting: string | null }>`
+          SELECT pg_catalog.current_setting('app.membership_id', true) AS setting
+        `.execute(trx);
+        return { given, setting: rows[0]?.setting ?? null };
+      },
+      member,
+    );
+
+  beforeAll(async () => {
+    db = createDatabase(databaseSettings('app_api', 1));
+    tenant = trustedTenantId((await createTestTenant()).id);
+    otherTenant = trustedTenantId((await createTestTenant()).id);
+    ({ account: user, member: membership } = await addAccount(tenant));
+    ({ account: suspendedUser, member: suspended } = await addAccount(tenant, 'suspended'));
+    const stranger = await addAccount(otherTenant);
+    strangerUser = stranger.account;
+    request = await addRequest(tenant, membership);
+    suspendedRequest = await addRequest(tenant, suspended);
+    strangerRequest = await addRequest(otherTenant, stranger.member);
+  }, 60_000);
+
+  afterAll(async () => {
+    await db.destroy();
+  });
+
+  it("sets the session user's active membership, and clears it afterwards", async () => {
+    expect(await run(trustedSessionUser(user))).toEqual({ given: membership, setting: membership });
+    const { rows } = await sql<{ setting: string | null }>`
+      SELECT pg_catalog.current_setting('app.membership_id', true) AS setting
+    `.execute(db);
+    expect(rows[0]?.setting ?? '').toBe('');
+  });
+
+  it('sets no member without a source, or for a suspended member or another tenant', async () => {
+    for (const member of [
+      undefined,
+      trustedSessionUser(suspendedUser),
+      trustedSessionUser(strangerUser),
+      trustedSessionUser('00000000-0000-4000-8000-000000000000'),
+    ]) {
+      const seen = await run(member);
+      expect(seen.given).toBeNull();
+      expect(seen.setting ?? '').toBe('');
+    }
+  });
+
+  it("sets a job request's requester while active, in the job's tenant only", async () => {
+    const worker = createDatabase(databaseSettings('app_worker', 1));
+    try {
+      expect(await run(trustedJobRequest(request), worker)).toEqual({
+        given: membership,
+        setting: membership,
+      });
+      for (const member of [
+        trustedJobRequest(suspendedRequest),
+        trustedJobRequest(strangerRequest),
+      ]) {
+        expect((await run(member, worker)).given).toBeNull();
+      }
+      // A scheduled job names no request, so it runs with no member.
+      expect((await run(undefined, worker)).given).toBeNull();
+    } finally {
+      await worker.destroy();
+    }
+  });
+
+  it('refuses a connection that already has a member, and clears it', async () => {
+    const client = await internalsOf(db).pool.connect();
+    try {
+      await client.query("SELECT pg_catalog.set_config('app.membership_id', $1, false)", [
+        membership,
+      ]);
+    } finally {
+      client.release();
+    }
+    await expect(run(trustedSessionUser(user))).rejects.toBeInstanceOf(TenantLeakError);
+    const after = await run();
+    expect(after.given).toBeNull();
+    expect(after.setting ?? '').toBe('');
+  });
+
+  it.each([
+    ['a session user', trustedSessionUser],
+    ['a job request', trustedJobRequest],
+  ])('refuses %s that is not a uuid in lower case', (_, make) => {
+    expect(() => make('7D0F3F5E-0C1B-4A57-9D43-6C2B1F0A9E01')).toThrow(
+      'must be a uuid in lower case.',
+    );
+    expect(() => make("x'; RESET ALL; --")).toThrow('must be a uuid in lower case.');
   });
 });
