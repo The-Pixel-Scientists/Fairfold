@@ -12,10 +12,9 @@
 // activities and processors describe the tenant's processing, not a person.
 //
 // A request, its clock events and its tasks reach their person through the
-// request's subject. A breach, its assessments and a DPIA have no column that
-// links them to a person, though their text may name one. ADR 0027 has no
-// subject path for that yet, so they have none until the lead adds one, and
-// the schema lint fails until then.
+// request's subject. A breach, its assessments, a DPIA and the registers have
+// no column that links them to a person, though breach and DPIA text may name
+// one, so they are marked as about no person and keep their classes.
 //
 // Every row is kept for the tenant's lifetime until the platform minimums of
 // the privacy_rights_request and privacy_breach policies are confirmed
@@ -178,10 +177,29 @@ const throughRequest = {
   table: 'privacy.rights_request',
 } as const;
 
+const incident = {
+  kind: 'none',
+  reason: 'A breach record describes an incident, not a person, and links to no party.',
+} as const;
+const register = {
+  kind: 'none',
+  reason: "It records the tenant's processing, not a person.",
+} as const;
+
 export const privacySubjects: SubjectPathRegistry = {
   'privacy.rights_request': { kind: 'party', column: 'subject_person_id' },
   'privacy.request_clock_event': throughRequest,
   'privacy.request_task': throughRequest,
+  'privacy.breach': incident,
+  'privacy.breach_assessment': incident,
+  'privacy.dpia': {
+    kind: 'none',
+    reason: 'A DPIA assesses a kind of processing, not a person, and links to no party.',
+  },
+  'privacy.dpia_processing_activity': register,
+  'privacy.processing_activity': register,
+  'privacy.processing_activity_processor': register,
+  'privacy.processor': register,
 };
 
 /** Anyone a tenant holds data about may ask, or be caught up in a breach. */

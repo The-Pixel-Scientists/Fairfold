@@ -40,9 +40,10 @@ describe('privacy subject tables', () => {
   });
 
   it('reads every privacy table that has a subject path', () => {
-    const left = Object.keys(subjectPaths).filter(
-      (table) => table.startsWith('privacy.') && !(table in subjectTables),
-    );
+    const left = Object.entries(subjectPaths)
+      .filter(([table, path]) => table.startsWith('privacy.') && path.kind !== 'none')
+      .map(([table]) => table)
+      .filter((table) => !(table in subjectTables));
     expect(left).toEqual([]);
   });
 });

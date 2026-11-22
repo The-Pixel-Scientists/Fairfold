@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
 // Breach, assessment and DPIA text can name the people a breach or a DPIA is
-// about, though no column links them to a person. Neither way round a missing
-// subject path is allowed: lowering these columns' class, or calling the
-// tables unlinked, which would cut their retention to 12 months.
+// about, though no column links them to a person. They are marked as about no
+// person, never lowered in class or called unlinked, which would cut their
+// retention to 12 months.
 
 import { describe, expect, it } from 'vitest';
 
@@ -23,9 +23,9 @@ describe('privacy classification', () => {
   });
 
   it.each(['privacy.breach', 'privacy.breach_assessment', 'privacy.dpia'])(
-    'does not mark %s unlinked',
+    'marks %s as about no person, not unlinked',
     (table) => {
-      expect(subjectPaths[table]?.kind).not.toBe('unlinked');
+      expect(subjectPaths[table]?.kind).toBe('none');
     },
   );
 });

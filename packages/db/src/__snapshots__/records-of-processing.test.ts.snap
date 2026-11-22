@@ -12812,7 +12812,10 @@ exports[`the shipped map > matches the committed register 1`] = `
       "backup",
     ],
     "purpose": "data_protection",
-    "subjectPath": null,
+    "subjectPath": {
+      "kind": "none",
+      "reason": "A breach record describes an incident, not a person, and links to no party.",
+    },
     "table": "privacy.breach",
   },
   {
@@ -12907,7 +12910,10 @@ exports[`the shipped map > matches the committed register 1`] = `
       "backup",
     ],
     "purpose": "data_protection",
-    "subjectPath": null,
+    "subjectPath": {
+      "kind": "none",
+      "reason": "A breach record describes an incident, not a person, and links to no party.",
+    },
     "table": "privacy.breach_assessment",
   },
   {
@@ -13042,7 +13048,10 @@ exports[`the shipped map > matches the committed register 1`] = `
       "backup",
     ],
     "purpose": "data_protection",
-    "subjectPath": null,
+    "subjectPath": {
+      "kind": "none",
+      "reason": "A DPIA assesses a kind of processing, not a person, and links to no party.",
+    },
     "table": "privacy.dpia",
   },
   {
@@ -13106,7 +13115,10 @@ exports[`the shipped map > matches the committed register 1`] = `
       "backup",
     ],
     "purpose": "data_protection",
-    "subjectPath": null,
+    "subjectPath": {
+      "kind": "none",
+      "reason": "It records the tenant's processing, not a person.",
+    },
     "table": "privacy.dpia_processing_activity",
   },
   {
@@ -13258,7 +13270,10 @@ exports[`the shipped map > matches the committed register 1`] = `
       "backup",
     ],
     "purpose": "data_protection",
-    "subjectPath": null,
+    "subjectPath": {
+      "kind": "none",
+      "reason": "It records the tenant's processing, not a person.",
+    },
     "table": "privacy.processing_activity",
   },
   {
@@ -13322,7 +13337,10 @@ exports[`the shipped map > matches the committed register 1`] = `
       "backup",
     ],
     "purpose": "data_protection",
-    "subjectPath": null,
+    "subjectPath": {
+      "kind": "none",
+      "reason": "It records the tenant's processing, not a person.",
+    },
     "table": "privacy.processing_activity_processor",
   },
   {
@@ -13434,7 +13452,10 @@ exports[`the shipped map > matches the committed register 1`] = `
       "backup",
     ],
     "purpose": "data_protection",
-    "subjectPath": null,
+    "subjectPath": {
+      "kind": "none",
+      "reason": "It records the tenant's processing, not a person.",
+    },
     "table": "privacy.processor",
   },
   {
