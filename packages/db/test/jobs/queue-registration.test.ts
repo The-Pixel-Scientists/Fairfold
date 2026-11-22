@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// The platform's queues (migrations 0029, 0043, 0053, 0061 and 0063): each is registered
-// with its kind and a dead-letter queue <queue>.dead of the same kind, each can be
+// The platform's queues (migrations 0029, 0043, 0053, 0061, 0063 and 0089): each is
+// registered with its kind and a dead-letter queue <queue>.dead of the same kind, each can be
 // defined in code under its registered name, and no other queue is
 // registered but pg-boss's cron queue (migration 0036) and the job tests'
 // own.
@@ -37,6 +37,7 @@ const TENANT = [
   'assure.registry_refresh',
   'assure.screening',
   'crm.import_parse',
+  'privacy.deadline_reminder',
 ];
 const EVENTS = ['crm', 'assure'] as const;
 

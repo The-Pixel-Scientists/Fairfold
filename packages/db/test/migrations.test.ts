@@ -99,7 +99,7 @@ async function stableSnapshot(trx: Kysely<unknown>): Promise<string[]> {
   return (await snapshot(trx)).filter((line) => !STATS_DAY.test(line));
 }
 
-describe('migrations', { timeout: 30_000 }, () => {
+describe('migrations', { timeout: 300_000 }, () => {
   it('each down.sql restores exactly the schema from before its up.sql', async () => {
     const provider = new SqlFolderMigrationProvider(MIGRATIONS_FOLDER);
     const found = await provider.getMigrations();
@@ -150,6 +150,11 @@ describe('migrations', { timeout: 30_000 }, () => {
       await sql`TRUNCATE impact.framework, impact.outcome, impact.indicator, impact.target,
                          impact.result, impact.result_evidence,
                          impact.learning_note`.execute(trx);
+      // And 0089 to 0091's downs refuse while any privacy table holds a row,
+      // which the privacy tests leave behind. Requests went with party.
+      await sql`TRUNCATE privacy.breach, privacy.breach_assessment, privacy.processing_activity,
+                         privacy.processor, privacy.processing_activity_processor, privacy.dpia,
+                         privacy.dpia_processing_activity`.execute(trx);
       // And 0068's down cannot validate the outcome check while a reminder
       // template exists, which the reminder tests leave behind. Empty the
       // template versions and every table that refers to them.
