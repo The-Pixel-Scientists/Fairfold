@@ -214,13 +214,9 @@ password. Set up her authenticator app as "Ada", as in step 2.
    the programme. Each change above is listed, and **See what changed** shows
    the value before and after.
 
-**Note the round's address.** The round page's address ends in the round's id,
-such as `<console>/northfield/rounds/3f2c…`. Step 6 needs it.
-
 ### Step 6: the manager builds the form (Ada)
 
-The console has no link from the round page to the form yet, so go to it by
-address: `<console>/northfield/rounds/<round id>/form`.
+On the round page, under **Work on this round**, choose **Application form**.
 
 1. The page says **No form yet**. Choose **Create draft**.
 2. Choose **Add section**. Give it the title `About your organisation` and an
@@ -329,8 +325,8 @@ other made-up applicants (each needs its own email address), or use the
 
 ### Step 10: the manager sets up reviewers (Ada, then Owen)
 
-1. On **Submissions**, with the round filtered, choose **Reviewers**. (Or go to
-   `<console>/northfield/rounds/<round id>/reviewers`.)
+1. On **Submissions**, with the round filtered, choose **Reviewers**. (Or open
+   the round and choose **Reviewers** under **Work on this round**.)
 2. Tick **Owen Hughes** and **Priya Shah**, then **Add 2 reviewers**. They are in
    the pool.
 3. Back on **Submissions**, filter by stage **Review**, tick the applications,

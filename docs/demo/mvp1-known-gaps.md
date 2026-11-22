@@ -31,10 +31,6 @@ fix.
   Administrator role, and the seeded administrator has only the first. The
   route itself needs only the export permission. The demo gets round it by
   inviting a colleague who has both roles.
-- **The round page does not link to the application form.** The form builder
-  is reached by its address, `/rounds/<round id>/form`. The reviewers and score
-  spread pages are reached from Submissions, and the decisions page from a
-  submission.
 - **`pnpm tenant:create` does not reach the stack.** It works on the database
   that `pnpm dev` uses. The stack's database is on a network only its
   containers can reach, so a funder in the stack comes from `pnpm stack seed`.

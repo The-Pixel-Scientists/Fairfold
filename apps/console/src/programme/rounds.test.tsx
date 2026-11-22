@@ -245,6 +245,21 @@ describe('a round page', () => {
     );
   });
 
+  it('links to the form, submissions, reviewers, score spread and decisions of the round', async () => {
+    await open();
+
+    const work = await screen.findByRole('region', { name: 'Work on this round' });
+    const href = (name: string) => within(work).getByRole('link', { name }).getAttribute('href');
+    const at = `/northfield/rounds/${round.id}`;
+    expect(href('Application form')).toBe(`${at}/form`);
+    expect(href('Submissions')).toBe(
+      `/northfield/submissions?programmeId=${programme.id}&roundId=${round.id}`,
+    );
+    expect(href('Reviewers')).toBe(`${at}/reviewers`);
+    expect(href('Score spread')).toBe(`${at}/score-spread`);
+    expect(href('Decisions')).toBe(`${at}/decisions`);
+  });
+
   it('lists the stages with their rubrics and the way to edit each, from the keyboard', async () => {
     const user = userEvent.setup();
     await open();
