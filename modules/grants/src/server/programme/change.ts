@@ -14,9 +14,9 @@ import type { Tx } from './tables.ts';
  * contract's format. A handler calls it only for a change that happened.
  */
 export function recordConfig(
-  deps: GrantsDependencies,
+  deps: Pick<GrantsDependencies, 'recordConfig'>,
   tx: Tx,
-  context: GrantsContext,
+  context: Pick<GrantsContext, 'membership'>,
   entityType: GrantsConfigEntityType,
   entityId: string,
   diff: ConfigDiff,
