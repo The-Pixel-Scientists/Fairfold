@@ -51,6 +51,11 @@ const audit: FieldClassification = {
   sensitivity: 'internal',
   retention: { kind: 'tenant_policy', policy: 'audit', minimumDays: 365 },
 };
+/** 90 days from the event, a platform rule no tenant setting changes (ADR 0034). */
+const eventOutbox: FieldClassification = {
+  sensitivity: 'internal',
+  retention: { kind: 'fixed', days: 90, from: 'occurred_at' },
+};
 /** 7 years, the longest off-site tier (ADR 0011), never under a tenant's policy. */
 const erasureLedger: FieldClassification = {
   sensitivity: 'internal',
@@ -72,6 +77,7 @@ export const notKept: ReadonlySet<string> = new Set([
   'app.request_limit.key_hash',
   'app.audit_event.changes',
   'app.job_request.filters',
+  'app.event_outbox.payload',
   'app.subject_key.wrapped_key',
   'app.note.body',
   'app.message.body',
@@ -231,6 +237,33 @@ export const app = {
     name: internal,
     kind: internal,
     created_at: internal,
+  },
+  // Published events and each tenant's counter and consumer cursors (ADR
+  // 0034). Events hold ids, codes and times only, and erasure changes none:
+  // they expire on their 90-day rule. Counters and cursors are kept for the
+  // life of the tenant.
+  'app.event_outbox': {
+    tenant_id: eventOutbox,
+    id: eventOutbox,
+    sequence: eventOutbox,
+    type: eventOutbox,
+    payload: eventOutbox,
+    occurred_at: eventOutbox,
+    request_id: eventOutbox,
+    caused_by: eventOutbox,
+    retain_until: eventOutbox,
+  },
+  'app.event_sequence': {
+    tenant_id: internal,
+    id: internal,
+    last_sequence: internal,
+  },
+  'app.event_cursor': {
+    tenant_id: internal,
+    id: internal,
+    consumer: internal,
+    last_sequence: internal,
+    updated_at: internal,
   },
   // A job acting for a member (ADR 0009): kept 7 days from completion, as
   // its output is. Its filters may name the party a subject access request
@@ -427,6 +460,14 @@ const noteRecord: ProcessingEntry = {
   dataSubjects: [],
   dataCategories: [],
 };
+/** A job's platform record, holding no person's data. */
+const jobRecord: ProcessingEntry = {
+  purpose: 'background_jobs',
+  legalBasis: 'legitimate_interests',
+  processors: stored,
+  dataSubjects: [],
+  dataCategories: [],
+};
 const auditRow: ProcessingEntry = {
   purpose: 'audit',
   legalBasis: 'legitimate_interests',
@@ -486,13 +527,11 @@ export const appProcessing: ProcessingRegistry<typeof app> = {
     dataCategories: ['online_identifiers'],
   },
   'app.audit_event': auditRow,
-  'app.job_queue': {
-    purpose: 'background_jobs',
-    legalBasis: 'legitimate_interests',
-    processors: stored,
-    dataSubjects: [],
-    dataCategories: [],
-  },
+  'app.job_queue': jobRecord,
+  // Ids and codes only, with no subject path: they state none.
+  'app.event_outbox': jobRecord,
+  'app.event_sequence': jobRecord,
+  'app.event_cursor': jobRecord,
   'app.job_request': {
     purpose: 'background_jobs',
     legalBasis: 'legitimate_interests',

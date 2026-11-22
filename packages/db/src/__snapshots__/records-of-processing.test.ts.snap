@@ -644,6 +644,208 @@ exports[`the shipped map > matches the committed register 1`] = `
     "article9Condition": null,
     "columns": [
       {
+        "column": "consumer",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "last_sequence",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "tenant_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "updated_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+    ],
+    "dataCategories": [],
+    "dataSubjects": [],
+    "highestSensitivity": "internal",
+    "legalBasis": "legitimate_interests",
+    "processors": [
+      "hosting",
+      "backup",
+    ],
+    "purpose": "background_jobs",
+    "subjectPath": null,
+    "table": "app.event_cursor",
+  },
+  {
+    "article9Condition": null,
+    "columns": [
+      {
+        "column": "caused_by",
+        "perField": false,
+        "retention": {
+          "days": 90,
+          "from": "occurred_at",
+          "kind": "fixed",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "id",
+        "perField": false,
+        "retention": {
+          "days": 90,
+          "from": "occurred_at",
+          "kind": "fixed",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "occurred_at",
+        "perField": false,
+        "retention": {
+          "days": 90,
+          "from": "occurred_at",
+          "kind": "fixed",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "payload",
+        "perField": false,
+        "retention": {
+          "days": 90,
+          "from": "occurred_at",
+          "kind": "fixed",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "request_id",
+        "perField": false,
+        "retention": {
+          "days": 90,
+          "from": "occurred_at",
+          "kind": "fixed",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "retain_until",
+        "perField": false,
+        "retention": {
+          "days": 90,
+          "from": "occurred_at",
+          "kind": "fixed",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "sequence",
+        "perField": false,
+        "retention": {
+          "days": 90,
+          "from": "occurred_at",
+          "kind": "fixed",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "tenant_id",
+        "perField": false,
+        "retention": {
+          "days": 90,
+          "from": "occurred_at",
+          "kind": "fixed",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "type",
+        "perField": false,
+        "retention": {
+          "days": 90,
+          "from": "occurred_at",
+          "kind": "fixed",
+        },
+        "sensitivity": "internal",
+      },
+    ],
+    "dataCategories": [],
+    "dataSubjects": [],
+    "highestSensitivity": "internal",
+    "legalBasis": "legitimate_interests",
+    "processors": [
+      "hosting",
+      "backup",
+    ],
+    "purpose": "background_jobs",
+    "subjectPath": null,
+    "table": "app.event_outbox",
+  },
+  {
+    "article9Condition": null,
+    "columns": [
+      {
+        "column": "id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "last_sequence",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "tenant_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+    ],
+    "dataCategories": [],
+    "dataSubjects": [],
+    "highestSensitivity": "internal",
+    "legalBasis": "legitimate_interests",
+    "processors": [
+      "hosting",
+      "backup",
+    ],
+    "purpose": "background_jobs",
+    "subjectPath": null,
+    "table": "app.event_sequence",
+  },
+  {
+    "article9Condition": null,
+    "columns": [
+      {
         "column": "content_type",
         "perField": false,
         "retention": {

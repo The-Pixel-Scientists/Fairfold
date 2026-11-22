@@ -95,6 +95,32 @@ export interface AppErasureLedger {
   tenant_id: string;
 }
 
+export interface AppEventCursor {
+  consumer: string;
+  id: Generated<string>;
+  last_sequence: Int8;
+  tenant_id: string;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface AppEventOutbox {
+  caused_by: string | null;
+  id: string;
+  occurred_at: Timestamp;
+  payload: Json;
+  request_id: string;
+  retain_until: Timestamp;
+  sequence: Int8;
+  tenant_id: string;
+  type: string;
+}
+
+export interface AppEventSequence {
+  id: Generated<string>;
+  last_sequence: Int8;
+  tenant_id: string;
+}
+
 export interface AppFile {
   content_type: string;
   created_at: Generated<Timestamp>;
@@ -320,6 +346,9 @@ export interface DB {
   'app.audit_event': AppAuditEvent;
   'app.config_version': AppConfigVersion;
   'app.erasure_ledger': AppErasureLedger;
+  'app.event_cursor': AppEventCursor;
+  'app.event_outbox': AppEventOutbox;
+  'app.event_sequence': AppEventSequence;
   'app.file': AppFile;
   'app.idempotency_key': AppIdempotencyKey;
   'app.invitation': AppInvitation;
