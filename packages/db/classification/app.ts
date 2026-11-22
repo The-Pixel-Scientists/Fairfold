@@ -75,6 +75,14 @@ export const notKept: ReadonlySet<string> = new Set([
   'app.tag.label',
   'app.team.name',
   'app.break_glass.reason_text_ciphertext',
+  'app.document_template_version.title',
+  'app.document_template_version.merge_fields',
+  'app.document_template_version.body',
+  'app.signature_connection.account_id',
+  'app.signature_connection.api_token',
+  'app.signature_connection.callback_reference_hash',
+  'app.signature_request.provider_reference',
+  'app.signature_request.sent_sha256',
 ]);
 
 export const app = {
@@ -368,6 +376,77 @@ export const app = {
     expires_at: audit,
     retain_until: audit,
   },
+  // Document template versions (ADR 0040) are configuration, kept for the
+  // life of the tenant since documents pin them. A body holds the tenant's
+  // own wording and merge field ids, never an answer's value.
+  'app.document_template_version': {
+    tenant_id: internal,
+    id: internal,
+    template_id: internal,
+    version: internal,
+    kind: internal,
+    audience: internal,
+    title: internal,
+    merge_fields: internal,
+    body: internal,
+    created_by: internal,
+    created_at: internal,
+  },
+  // A tenant's provider account (ADR 0040): its token is sealed, and the
+  // callback reference is held only as its hash. Kept until it is closed.
+  'app.signature_connection': {
+    tenant_id: internal,
+    id: internal,
+    provider: internal,
+    account_id: internal,
+    api_token: internal,
+    api_token_key_version: internal,
+    callback_reference_hash: internal,
+    callback_key_version: internal,
+    status: internal,
+    created_at: internal,
+    updated_at: internal,
+  },
+  // Requests, signers and file links (ADR 0040) are kept as long as their
+  // files: a signed request's under the rule of the record that asked for
+  // it, any other 12 months after it closed (ADR 0047's audit floor), then
+  // purged with them. The files sent and signed and the evidence are
+  // personal through app.file, and are erased with the signer by
+  // app.erase_subject_documents() (ADR 0027) until the statutory retention
+  // ADR lets them outlive erasure. A provider reference is never exported.
+  'app.signature_request': {
+    tenant_id: internal,
+    id: internal,
+    connection_id: internal,
+    status: internal,
+    error_code: internal,
+    provider_reference: internal,
+    sent_sha256: internal,
+    template_version_id: internal,
+    expires_at: internal,
+    created_by: internal,
+    created_at: internal,
+    updated_at: internal,
+  },
+  'app.signature_signer': {
+    tenant_id: internal,
+    id: internal,
+    signature_request_id: internal,
+    person_id: personal,
+    signing_order: internal,
+    status: internal,
+    signed_at: internal,
+    created_at: internal,
+    updated_at: internal,
+  },
+  'app.signature_request_file': {
+    tenant_id: internal,
+    id: internal,
+    signature_request_id: internal,
+    role: internal,
+    file_id: internal,
+    created_at: internal,
+  },
 } satisfies ClassificationRegistry;
 
 /**
@@ -396,6 +475,7 @@ export const appSubjects: SubjectPathRegistry = {
   'app.note': { kind: 'join', column: 'author_id', table: 'app.membership' },
   'app.message': { kind: 'party', column: 'author_person_id' },
   'app.break_glass': { kind: 'join', column: 'membership_id', table: 'app.membership' },
+  'app.signature_signer': { kind: 'party', column: 'person_id' },
 };
 
 const stored = ['hosting', 'backup'] as const;
@@ -415,6 +495,14 @@ const noteRecord: ProcessingEntry = {
   purpose: 'grant_applications',
   legalBasis: 'contract',
   processors: stored,
+  dataSubjects: [],
+  dataCategories: [],
+};
+/** A signature request's working data (ADR 0040); invitations go through the email outbox. */
+const signatureRecord: ProcessingEntry = {
+  purpose: 'decisions',
+  legalBasis: 'contract',
+  processors: [...stored, 'email'],
   dataSubjects: [],
   dataCategories: [],
 };
@@ -514,4 +602,13 @@ export const appProcessing: ProcessingRegistry<typeof app> = {
     dataSubjects: ['staff_member'],
     dataCategories: ['other'],
   },
+  'app.document_template_version': setUp,
+  'app.signature_connection': setUp,
+  'app.signature_request': signatureRecord,
+  'app.signature_signer': {
+    ...signatureRecord,
+    dataSubjects: ['applicant', 'applicant_contact'],
+    dataCategories: ['identity'],
+  },
+  'app.signature_request_file': signatureRecord,
 };
