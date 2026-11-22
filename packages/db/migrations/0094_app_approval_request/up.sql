@@ -115,3 +115,9 @@ CREATE TRIGGER check_approval_request BEFORE INSERT ON app.approval_request
 
 GRANT SELECT, INSERT (tenant_id, definition_version_id, step_id, requested_by)
    ON app.approval_request TO app_api;
+-- The subject access export (ADR 0027) reads every classified column of a
+-- member's requests as app_worker, in the tenant set. SELECT only.
+GRANT SELECT (tenant_id, id, definition_version_id, definition_key, step_id, required_approvals,
+              status, requested_by, requested_at, due_at, closed_by, close_reason, closed_at,
+              updated_at, retain_until)
+   ON app.approval_request TO app_worker;

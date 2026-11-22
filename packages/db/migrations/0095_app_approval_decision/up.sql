@@ -131,3 +131,7 @@ CREATE CONSTRAINT TRIGGER check_rejection_closed AFTER INSERT ON app.approval_de
 
 GRANT SELECT, INSERT (tenant_id, request_id, decided_by, outcome, reason_code)
    ON app.approval_decision TO app_api;
+-- The subject access export (ADR 0027) reads every classified column of a
+-- member's decisions as app_worker, in the tenant set. SELECT only.
+GRANT SELECT (tenant_id, id, request_id, decided_by, outcome, reason_code, decided_at, retain_until)
+   ON app.approval_decision TO app_worker;
