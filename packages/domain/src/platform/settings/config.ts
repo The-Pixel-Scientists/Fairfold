@@ -16,9 +16,15 @@
 // as grants' set-up is: a field name, then the item's id and its field. A
 // diff holds configuration only, never personal data, so a filter is
 // recorded by its field and operator and never the value it matches.
+//
+// A document template's publish records its version, kind and audience, and
+// the merge field ids added or removed, never the body's text (ADR 0040).
 
 import { z } from 'zod';
 
+import { documentKinds, MAX_MERGE_FIELDS } from '../../documents/templates.ts';
+import { projectionAudiences } from '../../forms/audience.ts';
+import { fieldIdSchema } from '../../forms/definition.ts';
 import { logoTypes, presets } from '../theme.ts';
 import { fonts, tokenPaths } from '../theme-tokens.ts';
 import { embedOriginSchema } from './embed-origins.ts';
@@ -29,6 +35,7 @@ export const configEntityTypes = [
   'platform.module',
   'platform.retention',
   'platform.embed_origins',
+  'platform.document_template',
   'crm.segment',
   'assure.checklist',
   'forms.form',
@@ -99,6 +106,21 @@ export const configDiffSchemas = {
       ({ from, to }) => (from === null) !== (to === null),
     ),
   ]),
+  // The entity id is the template's; the first publish is from null.
+  'platform.document_template': z
+    .array(
+      z.discriminatedUnion('field', [
+        change('version', z.int().min(1).nullable()),
+        change('kind', z.enum(documentKinds).nullable()),
+        change('audience', z.enum(projectionAudiences).nullable()),
+        z.strictObject({
+          field: z.literal('mergeFields'),
+          added: z.array(fieldIdSchema).max(MAX_MERGE_FIELDS),
+          removed: z.array(fieldIdSchema).max(MAX_MERGE_FIELDS),
+        }),
+      ]),
+    )
+    .min(1),
   'crm.segment': pathChanges(new RegExp(`^(?:name|description|${FILTER})$`)),
   'assure.checklist': pathChanges(
     new RegExp(`^(?:name|description|items\\.${ITEM}\\.(?:label|help|kind|required|position))$`),

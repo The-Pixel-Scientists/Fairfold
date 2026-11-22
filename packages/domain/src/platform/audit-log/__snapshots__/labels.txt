@@ -28,6 +28,18 @@ platform.file.restored: File restored
 platform.file.deleted: File deleted
 platform.file_sweep.completed: File sweep completed
 platform.file_recheck.completed: File recheck completed
+platform.signature.requested: Signature requested
+platform.signature.sent: Signature sent
+platform.signature.viewed: Signature viewed
+platform.signature.signed: Signature signed
+platform.signature.declined: Signature declined
+platform.signature.expired: Signature expired
+platform.signature.cancelled: Signature cancelled
+platform.signature.failed: Signature failed
+platform.signature.callback_received: Signature callback received
+platform.signature_evidence.downloaded: Signature evidence downloaded
+platform.document.generated: Document generated
+platform.document_template.published: Document template published
 platform.retention_policy.changed: Retention policy changed
 platform.retention.applied: Retention applied
 platform.subject_access.requested: Subject access requested

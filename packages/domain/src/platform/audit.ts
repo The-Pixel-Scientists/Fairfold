@@ -97,6 +97,22 @@ export const platformAuditActions = defineAuditActions('platform', [
   'platform.file.deleted',
   'platform.file_sweep.completed',
   'platform.file_recheck.completed',
+  // Signature requests and generated documents (ADR 0040). Values are ids,
+  // statuses, codes and SHA-256 hashes only: never a signer's name, email or
+  // IP address, a file name or a callback reference. Downloading evidence is
+  // a sensitive read; a signed file's download is platform.file.downloaded.
+  'platform.signature.requested',
+  'platform.signature.sent',
+  'platform.signature.viewed',
+  'platform.signature.signed',
+  'platform.signature.declined',
+  'platform.signature.expired',
+  'platform.signature.cancelled',
+  'platform.signature.failed',
+  'platform.signature.callback_received',
+  'platform.signature_evidence.downloaded',
+  'platform.document.generated',
+  'platform.document_template.published',
   // Retention, subject access, erasure and the audit log itself (E3, ADR
   // 0027). Values are ids, codes, days and counts by table, never a personal
   // value; an event about a person carries them as its subject party id.
