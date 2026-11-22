@@ -1,0 +1,93 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# A starter dashboard (ADR 0039). An upgrade overwrites it: save a copy to
+# change it, and the copy is kept.
+dashboard_title: Awards by programme and period
+description: null
+css: ''
+slug: awards
+published: true
+certified_by: null
+certification_details: null
+uuid: fc54b376-7b17-42d0-b746-40427cc993b8
+version: 1.0.0
+position:
+  DASHBOARD_VERSION_KEY: v2
+  ROOT_ID:
+    type: ROOT
+    id: ROOT_ID
+    children: [GRID_ID]
+  GRID_ID:
+    type: GRID
+    id: GRID_ID
+    children: [ROW-as-of, ROW-chart, ROW-table]
+    parents: [ROOT_ID]
+  HEADER_ID:
+    type: HEADER
+    id: HEADER_ID
+    meta:
+      text: Awards by programme and period
+  ROW-as-of:
+    type: ROW
+    id: ROW-as-of
+    children: [CHART-as-of]
+    parents: [ROOT_ID, GRID_ID]
+    meta:
+      background: BACKGROUND_TRANSPARENT
+  CHART-as-of:
+    type: CHART
+    id: CHART-as-of
+    children: []
+    parents: [ROOT_ID, GRID_ID, ROW-as-of]
+    meta:
+      width: 12
+      height: 15
+      chartId: 0
+      uuid: 44140164-c2a7-499f-a7ac-7fa795d97268
+      sliceName: 'Data as of'
+  ROW-chart:
+    type: ROW
+    id: ROW-chart
+    children: [CHART-chart]
+    parents: [ROOT_ID, GRID_ID]
+    meta:
+      background: BACKGROUND_TRANSPARENT
+  CHART-chart:
+    type: CHART
+    id: CHART-chart
+    children: []
+    parents: [ROOT_ID, GRID_ID, ROW-chart]
+    meta:
+      width: 12
+      height: 50
+      chartId: 0
+      uuid: feb81dbd-5f52-4bf5-8409-b2b060ae447c
+      sliceName: 'Amount awarded by programme'
+  ROW-table:
+    type: ROW
+    id: ROW-table
+    children: [CHART-table]
+    parents: [ROOT_ID, GRID_ID]
+    meta:
+      background: BACKGROUND_TRANSPARENT
+  CHART-table:
+    type: CHART
+    id: CHART-table
+    children: []
+    parents: [ROOT_ID, GRID_ID, ROW-table]
+    meta:
+      width: 12
+      height: 50
+      chartId: 0
+      uuid: c3464b7c-199d-4066-b71a-4e1da88fb18b
+      sliceName: 'Awards by programme and period'
+metadata:
+  color_scheme: supersetColors
+  refresh_frequency: 0
+  expanded_slices: {}
+  label_colors: {}
+  timed_refresh_immune_slices: []
+  cross_filters_enabled: false
+  native_filter_configuration: []
+  chart_configuration: {}
+  default_filters: '{}'

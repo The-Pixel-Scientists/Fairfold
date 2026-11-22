@@ -149,6 +149,16 @@ describe('processingProblems', () => {
     ).toEqual(['t.a has no personal data and no path to a party, so must state none.']);
   });
 
+  it('names a table with no personal data, marked as about no person, that states categories', () => {
+    expect(
+      processingProblems(
+        { 't.a': { id: field('internal') } },
+        { 't.a': aboutPeople },
+        { 't.a': { kind: 'none', reason: 'A register of processing.' } },
+      ),
+    ).toEqual(['t.a has no personal data and no path to a party, so must state none.']);
+  });
+
   it('lets a table with internal columns state who it is about through its path', () => {
     expect(
       processingProblems(

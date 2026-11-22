@@ -6,6 +6,284 @@ exports[`the shipped map > matches the committed register 1`] = `
     "article9Condition": null,
     "columns": [
       {
+        "column": "decided_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_policy",
+          "minimumDays": 365,
+          "policy": "audit",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "decided_by",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_policy",
+          "minimumDays": 365,
+          "policy": "audit",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_policy",
+          "minimumDays": 365,
+          "policy": "audit",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "outcome",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_policy",
+          "minimumDays": 365,
+          "policy": "audit",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "reason_code",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_policy",
+          "minimumDays": 365,
+          "policy": "audit",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "request_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_policy",
+          "minimumDays": 365,
+          "policy": "audit",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "retain_until",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_policy",
+          "minimumDays": 365,
+          "policy": "audit",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "tenant_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_policy",
+          "minimumDays": 365,
+          "policy": "audit",
+        },
+        "sensitivity": "internal",
+      },
+    ],
+    "dataCategories": [
+      "identity",
+    ],
+    "dataSubjects": [
+      "staff_member",
+    ],
+    "highestSensitivity": "internal",
+    "legalBasis": "legitimate_interests",
+    "processors": [
+      "hosting",
+      "backup",
+    ],
+    "purpose": "audit",
+    "subjectPath": {
+      "column": "decided_by",
+      "kind": "join",
+      "table": "app.membership",
+    },
+    "table": "app.approval_decision",
+  },
+  {
+    "article9Condition": null,
+    "columns": [
+      {
+        "column": "close_reason",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_policy",
+          "minimumDays": 365,
+          "policy": "audit",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "closed_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_policy",
+          "minimumDays": 365,
+          "policy": "audit",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "closed_by",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_policy",
+          "minimumDays": 365,
+          "policy": "audit",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "definition_key",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_policy",
+          "minimumDays": 365,
+          "policy": "audit",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "definition_version_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_policy",
+          "minimumDays": 365,
+          "policy": "audit",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "due_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_policy",
+          "minimumDays": 365,
+          "policy": "audit",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_policy",
+          "minimumDays": 365,
+          "policy": "audit",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "requested_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_policy",
+          "minimumDays": 365,
+          "policy": "audit",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "requested_by",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_policy",
+          "minimumDays": 365,
+          "policy": "audit",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "required_approvals",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_policy",
+          "minimumDays": 365,
+          "policy": "audit",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "retain_until",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_policy",
+          "minimumDays": 365,
+          "policy": "audit",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "status",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_policy",
+          "minimumDays": 365,
+          "policy": "audit",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "step_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_policy",
+          "minimumDays": 365,
+          "policy": "audit",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "tenant_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_policy",
+          "minimumDays": 365,
+          "policy": "audit",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "updated_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_policy",
+          "minimumDays": 365,
+          "policy": "audit",
+        },
+        "sensitivity": "internal",
+      },
+    ],
+    "dataCategories": [
+      "identity",
+    ],
+    "dataSubjects": [
+      "staff_member",
+    ],
+    "highestSensitivity": "internal",
+    "legalBasis": "legitimate_interests",
+    "processors": [
+      "hosting",
+      "backup",
+    ],
+    "purpose": "audit",
+    "subjectPath": {
+      "column": "requested_by",
+      "kind": "join",
+      "table": "app.membership",
+    },
+    "table": "app.approval_request",
+  },
+  {
+    "article9Condition": null,
+    "columns": [
+      {
         "column": "action",
         "perField": false,
         "retention": {
@@ -417,6 +695,208 @@ exports[`the shipped map > matches the committed register 1`] = `
     "purpose": "audit",
     "subjectPath": null,
     "table": "app.erasure_ledger",
+  },
+  {
+    "article9Condition": null,
+    "columns": [
+      {
+        "column": "consumer",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "last_sequence",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "tenant_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "updated_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+    ],
+    "dataCategories": [],
+    "dataSubjects": [],
+    "highestSensitivity": "internal",
+    "legalBasis": "legitimate_interests",
+    "processors": [
+      "hosting",
+      "backup",
+    ],
+    "purpose": "background_jobs",
+    "subjectPath": null,
+    "table": "app.event_cursor",
+  },
+  {
+    "article9Condition": null,
+    "columns": [
+      {
+        "column": "caused_by",
+        "perField": false,
+        "retention": {
+          "days": 90,
+          "from": "occurred_at",
+          "kind": "fixed",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "id",
+        "perField": false,
+        "retention": {
+          "days": 90,
+          "from": "occurred_at",
+          "kind": "fixed",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "occurred_at",
+        "perField": false,
+        "retention": {
+          "days": 90,
+          "from": "occurred_at",
+          "kind": "fixed",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "payload",
+        "perField": false,
+        "retention": {
+          "days": 90,
+          "from": "occurred_at",
+          "kind": "fixed",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "request_id",
+        "perField": false,
+        "retention": {
+          "days": 90,
+          "from": "occurred_at",
+          "kind": "fixed",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "retain_until",
+        "perField": false,
+        "retention": {
+          "days": 90,
+          "from": "occurred_at",
+          "kind": "fixed",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "sequence",
+        "perField": false,
+        "retention": {
+          "days": 90,
+          "from": "occurred_at",
+          "kind": "fixed",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "tenant_id",
+        "perField": false,
+        "retention": {
+          "days": 90,
+          "from": "occurred_at",
+          "kind": "fixed",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "type",
+        "perField": false,
+        "retention": {
+          "days": 90,
+          "from": "occurred_at",
+          "kind": "fixed",
+        },
+        "sensitivity": "internal",
+      },
+    ],
+    "dataCategories": [],
+    "dataSubjects": [],
+    "highestSensitivity": "internal",
+    "legalBasis": "legitimate_interests",
+    "processors": [
+      "hosting",
+      "backup",
+    ],
+    "purpose": "background_jobs",
+    "subjectPath": null,
+    "table": "app.event_outbox",
+  },
+  {
+    "article9Condition": null,
+    "columns": [
+      {
+        "column": "id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "last_sequence",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "tenant_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+    ],
+    "dataCategories": [],
+    "dataSubjects": [],
+    "highestSensitivity": "internal",
+    "legalBasis": "legitimate_interests",
+    "processors": [
+      "hosting",
+      "backup",
+    ],
+    "purpose": "background_jobs",
+    "subjectPath": null,
+    "table": "app.event_sequence",
   },
   {
     "article9Condition": null,
@@ -2054,6 +2534,134 @@ exports[`the shipped map > matches the committed register 1`] = `
     "purpose": "tenant_administration",
     "subjectPath": null,
     "table": "app.tenant_theme",
+  },
+  {
+    "article9Condition": null,
+    "columns": [
+      {
+        "column": "created_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "created_by",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "key",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "tenant_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+    ],
+    "dataCategories": [],
+    "dataSubjects": [],
+    "highestSensitivity": "internal",
+    "legalBasis": "contract",
+    "processors": [
+      "hosting",
+      "backup",
+    ],
+    "purpose": "tenant_administration",
+    "subjectPath": null,
+    "table": "app.workflow_definition",
+  },
+  {
+    "article9Condition": null,
+    "columns": [
+      {
+        "column": "created_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "created_by",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "definition_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "document",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "tenant_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "version",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+    ],
+    "dataCategories": [],
+    "dataSubjects": [],
+    "highestSensitivity": "internal",
+    "legalBasis": "contract",
+    "processors": [
+      "hosting",
+      "backup",
+    ],
+    "purpose": "tenant_administration",
+    "subjectPath": null,
+    "table": "app.workflow_definition_version",
   },
   {
     "article9Condition": null,
@@ -13087,6 +13695,1249 @@ exports[`the shipped map > matches the committed register 1`] = `
     "purpose": "background_jobs",
     "subjectPath": null,
     "table": "pgboss.warning",
+  },
+  {
+    "article9Condition": "legal_claims",
+    "columns": [
+      {
+        "column": "approx_records",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "approx_subjects",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "became_aware_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "consequences",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "special_category",
+      },
+      {
+        "column": "created_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "data_categories",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "description",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "special_category",
+      },
+      {
+        "column": "discovered_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "ico_late_reason",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "ico_notified_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "ico_recorded_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "ico_recorded_by",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "ico_reference",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "personal",
+      },
+      {
+        "column": "id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "measures",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "personal",
+      },
+      {
+        "column": "recorded_by",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "subjects_notice_method",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "subjects_notified_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "subjects_recorded_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "subjects_recorded_by",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "tenant_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "updated_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "updated_by",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+    ],
+    "dataCategories": [
+      "other",
+    ],
+    "dataSubjects": [
+      "applicant",
+      "applicant_contact",
+      "staff_member",
+      "reviewer",
+    ],
+    "highestSensitivity": "special_category",
+    "legalBasis": "legal_obligation",
+    "processors": [
+      "hosting",
+      "backup",
+    ],
+    "purpose": "data_protection",
+    "subjectPath": {
+      "kind": "none",
+      "reason": "A breach record describes an incident, not a person, and links to no party.",
+    },
+    "table": "privacy.breach",
+  },
+  {
+    "article9Condition": "legal_claims",
+    "columns": [
+      {
+        "column": "assessed_by",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "breach_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "created_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "notify_ico",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "notify_subjects",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "rationale",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "special_category",
+      },
+      {
+        "column": "risk_level",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "tenant_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+    ],
+    "dataCategories": [
+      "other",
+    ],
+    "dataSubjects": [
+      "applicant",
+      "applicant_contact",
+      "staff_member",
+      "reviewer",
+    ],
+    "highestSensitivity": "special_category",
+    "legalBasis": "legal_obligation",
+    "processors": [
+      "hosting",
+      "backup",
+    ],
+    "purpose": "data_protection",
+    "subjectPath": {
+      "kind": "none",
+      "reason": "A breach record describes an incident, not a person, and links to no party.",
+    },
+    "table": "privacy.breach_assessment",
+  },
+  {
+    "article9Condition": "legal_claims",
+    "columns": [
+      {
+        "column": "created_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "created_by",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "dpo_advice",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "special_category",
+      },
+      {
+        "column": "id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "review_on",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "risks",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "personal",
+      },
+      {
+        "column": "screening",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "personal",
+      },
+      {
+        "column": "signed_off_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "signed_off_by",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "status",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "tenant_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "title",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "updated_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "updated_by",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+    ],
+    "dataCategories": [
+      "other",
+    ],
+    "dataSubjects": [
+      "applicant",
+      "applicant_contact",
+      "staff_member",
+      "reviewer",
+    ],
+    "highestSensitivity": "special_category",
+    "legalBasis": "legal_obligation",
+    "processors": [
+      "hosting",
+      "backup",
+    ],
+    "purpose": "data_protection",
+    "subjectPath": {
+      "kind": "none",
+      "reason": "A DPIA assesses a kind of processing, not a person, and links to no party.",
+    },
+    "table": "privacy.dpia",
+  },
+  {
+    "article9Condition": null,
+    "columns": [
+      {
+        "column": "created_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "created_by",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "dpia_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "processing_activity_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "tenant_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+    ],
+    "dataCategories": [],
+    "dataSubjects": [],
+    "highestSensitivity": "internal",
+    "legalBasis": "legal_obligation",
+    "processors": [
+      "hosting",
+      "backup",
+    ],
+    "purpose": "data_protection",
+    "subjectPath": {
+      "kind": "none",
+      "reason": "It records the tenant's processing, not a person.",
+    },
+    "table": "privacy.dpia_processing_activity",
+  },
+  {
+    "article9Condition": null,
+    "columns": [
+      {
+        "column": "archived_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "created_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "created_by",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "data_categories",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "legal_basis",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "name",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "purpose",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "recipients",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "retention",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "security_measures",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "special_category_condition",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "subject_categories",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "tenant_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "transfers_abroad",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "updated_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "updated_by",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+    ],
+    "dataCategories": [],
+    "dataSubjects": [],
+    "highestSensitivity": "internal",
+    "legalBasis": "legal_obligation",
+    "processors": [
+      "hosting",
+      "backup",
+    ],
+    "purpose": "data_protection",
+    "subjectPath": {
+      "kind": "none",
+      "reason": "It records the tenant's processing, not a person.",
+    },
+    "table": "privacy.processing_activity",
+  },
+  {
+    "article9Condition": null,
+    "columns": [
+      {
+        "column": "created_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "created_by",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "processing_activity_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "processor_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "tenant_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+    ],
+    "dataCategories": [],
+    "dataSubjects": [],
+    "highestSensitivity": "internal",
+    "legalBasis": "legal_obligation",
+    "processors": [
+      "hosting",
+      "backup",
+    ],
+    "purpose": "data_protection",
+    "subjectPath": {
+      "kind": "none",
+      "reason": "It records the tenant's processing, not a person.",
+    },
+    "table": "privacy.processing_activity_processor",
+  },
+  {
+    "article9Condition": null,
+    "columns": [
+      {
+        "column": "archived_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "contract_signed_on",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "country_code",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "created_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "created_by",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "name",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "service",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "tenant_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "transfer_safeguard",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "updated_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "updated_by",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+    ],
+    "dataCategories": [],
+    "dataSubjects": [],
+    "highestSensitivity": "internal",
+    "legalBasis": "legal_obligation",
+    "processors": [
+      "hosting",
+      "backup",
+    ],
+    "purpose": "data_protection",
+    "subjectPath": {
+      "kind": "none",
+      "reason": "It records the tenant's processing, not a person.",
+    },
+    "table": "privacy.processor",
+  },
+  {
+    "article9Condition": null,
+    "columns": [
+      {
+        "column": "created_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "kind",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "months",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "occurred_on",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "reason_code",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "recorded_by",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "request_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "tenant_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+    ],
+    "dataCategories": [
+      "other",
+    ],
+    "dataSubjects": [
+      "applicant",
+      "applicant_contact",
+      "staff_member",
+      "reviewer",
+    ],
+    "highestSensitivity": "internal",
+    "legalBasis": "legal_obligation",
+    "processors": [
+      "hosting",
+      "backup",
+    ],
+    "purpose": "data_protection",
+    "subjectPath": {
+      "column": "request_id",
+      "kind": "join",
+      "table": "privacy.rights_request",
+    },
+    "table": "privacy.request_clock_event",
+  },
+  {
+    "article9Condition": null,
+    "columns": [
+      {
+        "column": "assigned_to",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "completed_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "completed_by",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "created_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "created_by",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "due_on",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "module_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "request_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "tenant_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "title",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "personal",
+      },
+      {
+        "column": "updated_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "updated_by",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+    ],
+    "dataCategories": [
+      "other",
+    ],
+    "dataSubjects": [
+      "applicant",
+      "applicant_contact",
+      "staff_member",
+      "reviewer",
+    ],
+    "highestSensitivity": "personal",
+    "legalBasis": "legal_obligation",
+    "processors": [
+      "hosting",
+      "backup",
+    ],
+    "purpose": "data_protection",
+    "subjectPath": {
+      "column": "request_id",
+      "kind": "join",
+      "table": "privacy.rights_request",
+    },
+    "table": "privacy.request_task",
+  },
+  {
+    "article9Condition": "legal_claims",
+    "columns": [
+      {
+        "column": "channel",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "clock_state",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "created_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "created_by",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "due_on",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "erasure_job_request_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "export_job_request_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "identity_check",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "kind",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "received_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "received_on",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "subject_person_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "summary",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "special_category",
+      },
+      {
+        "column": "tenant_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "updated_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "updated_by",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+    ],
+    "dataCategories": [
+      "identity",
+      "other",
+    ],
+    "dataSubjects": [
+      "applicant",
+      "applicant_contact",
+      "staff_member",
+      "reviewer",
+    ],
+    "highestSensitivity": "special_category",
+    "legalBasis": "legal_obligation",
+    "processors": [
+      "hosting",
+      "backup",
+    ],
+    "purpose": "data_protection",
+    "subjectPath": {
+      "column": "subject_person_id",
+      "kind": "party",
+    },
+    "table": "privacy.rights_request",
   },
 ]
 `;

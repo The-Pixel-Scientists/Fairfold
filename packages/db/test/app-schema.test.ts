@@ -96,6 +96,8 @@ describe('the app schema', () => {
         // Anonymous form responses and erasing a subject's answers, migration 0079.
         'owner_forms_submit_public_response USAGE',
         'owner_forms_erase_subject USAGE',
+        // Erasing a subject's privacy data, migration 0092.
+        'owner_privacy_erase_subject USAGE',
       ].sort(),
     });
   });
@@ -151,6 +153,8 @@ describe('app.current_tenant_id()', () => {
         // Anonymous form responses and erasing a subject's answers, migration 0079.
         'owner_forms_submit_public_response',
         'owner_forms_erase_subject',
+        // Erasing a subject's privacy data, migration 0092.
+        'owner_privacy_erase_subject',
       ]
         .map((role) => `${role} EXECUTE`)
         .sort(),

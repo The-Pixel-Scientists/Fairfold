@@ -233,6 +233,7 @@ describe('subject paths (ADR 0027)', () => {
       'app.lint_none': { ...columns, note: field('personal') },
       'app.lint_unlinked': { ...columns, note: field('personal') },
       'app.lint_columns': { ...columns, party_id: field('internal'), user_id: field('internal') },
+      'app.lint_no_person': { ...columns, note: field('personal') },
     };
     const paths: SubjectPathRegistry = {
       ...subjectPaths,
@@ -244,6 +245,11 @@ describe('subject paths (ADR 0027)', () => {
       'app.lint_join': { kind: 'join', column: 'party_id', table: 'grants.application' },
       'app.lint_dead_end': { kind: 'join', column: 'id', table: 'app.lint_unlinked' },
       'app.lint_gone': { kind: 'party', column: 'id' },
+      'app.lint_no_person': { kind: 'none', reason: 'An incident, not a person.' },
+      'app.lint_no_reason': { kind: 'none', reason: ' ' },
+      'app.lint_names_party': { kind: 'none', reason: 'An incident, not a person.' },
+      'app.lint_names_account': { kind: 'none', reason: 'An incident, not a person.' },
+      'party.lint_party_table': { kind: 'none', reason: 'An incident, not a person.' },
     };
 
     const problems = await asMigratorRolledBack(async (client) => {
@@ -258,6 +264,13 @@ describe('subject paths (ADR 0027)', () => {
       }
       await client.query(`CREATE TABLE app.lint_dead_end (
         id uuid PRIMARY KEY REFERENCES app.lint_unlinked (id))`);
+      for (const table of ['app.lint_no_person', 'app.lint_no_reason', 'party.lint_party_table']) {
+        await client.query(`CREATE TABLE ${table} (id uuid PRIMARY KEY, tenant_id uuid)`);
+      }
+      await client.query(`CREATE TABLE app.lint_names_party (
+        id uuid PRIMARY KEY, party_id uuid REFERENCES party.organisation_snapshot (id))`);
+      await client.query(`CREATE TABLE app.lint_names_account (
+        id uuid PRIMARY KEY, user_id uuid REFERENCES auth."user" (id))`);
       return findSchemaProblems(client, registry, paths);
     });
 
@@ -273,6 +286,15 @@ describe('subject paths (ADR 0027)', () => {
         'app.lint_join has a subject path through party_id, which is not a foreign key to grants.application.',
         'app.lint_dead_end has a subject path that does not reach a party or an account.',
         'classification.ts gives a subject path for app.lint_gone, which does not exist.',
+        ...[
+          'app.lint_no_reason',
+          'app.lint_names_party',
+          'app.lint_names_account',
+          'party.lint_party_table',
+        ].map(
+          (table) =>
+            `${table} is marked as about no person in its subject path, so it needs a reason and no foreign key to the party schema or auth.user.`,
+        ),
       ].sort(),
     );
   });

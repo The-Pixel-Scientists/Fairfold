@@ -1,0 +1,144 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Every setting a cell needs. Nothing here is a working default: an empty
+# value is one the operator must set, and values.schema.json refuses an
+# install that leaves one out. The chart creates no Secret; `secrets` names
+# Secrets the operator has made.
+
+# The release images, by digest only (ADR 0001). api runs the API, the worker
+# and the migrate job; console and portal are the web images; edge is the
+# reverse proxy built from infra/proxy/.
+images:
+  api: { repository: '', digest: '' }
+  console: { repository: '', digest: '' }
+  portal: { repository: '', digest: '' }
+  edge: { repository: '', digest: '' }
+
+# Names of existing image pull Secrets, for a registry that needs a login.
+imagePullSecrets: []
+
+# The public host names the edge serves.
+hosts:
+  console: ''
+  portal: ''
+
+# A named service is reached through one of these network policy peers:
+#   { namespace: <namespace>, podLabels: { ... }, port: <pod port> }   in this cluster
+#   { cidr: <address>/32 or <address>/128, port: <port> }              one private address
+#   { public: true, port: <port> }                                     any public address
+# The port is the one the pods or server listen on, not a Service's port.
+
+# PostgreSQL 16 or later. Every connection uses TLS and checks the server's
+# certificate against the CA in the named ConfigMap.
+database:
+  host: ''
+  port: 5432
+  name: tps
+  # superuser for a server where the migrate job has a true superuser;
+  # managed for a managed service's admin role (packages/db/scripts/roles.ts).
+  adminMode: superuser
+  adminUser: ''
+  ca: { configMap: '', key: ca.crt }
+  networkPolicy: {}
+
+# S3-compatible storage (ADR 0047), with one key pair per purpose.
+storage:
+  endpoint: ''
+  region: ''
+  bucket: ''
+  accessKeyIds: { write: '', read: '', scanner: '', removal: '' }
+  networkPolicy: {}
+
+# The mail relay, over STARTTLS or TLS. A login is optional: set user and
+# secrets.smtpPassword together.
+smtp:
+  host: ''
+  port: 587
+  tls: starttls
+  from: ''
+  user: ''
+  networkPolicy: {}
+
+# clamd, with ADR 0047's limits.
+clamd:
+  host: ''
+  port: 3310
+  networkPolicy: {}
+
+# The cluster's DNS pods, the one destination every pod may reach.
+dns:
+  namespace: kube-system
+  podLabels: { k8s-app: kube-dns }
+
+# A ConfigMap of extra CA certificates Node.js trusts, such as a private mail
+# relay's. Leave configMap empty for none.
+extraCaCertificates: { configMap: '', key: ca.crt }
+
+# The version of secrets.subjectKek (ADR 0027).
+subjectKekVersion: 1
+
+# Existing Secrets, one value each under the key `value`, except edgeTls,
+# which is a kubernetes.io/tls Secret. Each pod mounts only its own.
+secrets:
+  # The superuser's password, or the managed admin's.
+  databaseAdminPassword: ''
+  migratorPassword: ''
+  appApiPassword: ''
+  appAuthPassword: ''
+  appWorkerPassword: ''
+  appQueuePassword: ''
+  backupReaderPassword: ''
+  authSecret: ''
+  requestLimitKey: ''
+  subjectKek: ''
+  storageWriteSecretKey: ''
+  storageReadSecretKey: ''
+  storageScannerSecretKey: ''
+  storageRemovalSecretKey: ''
+  smtpPassword: ''
+  edgeTls: ''
+
+api:
+  replicas: 1
+  # The pod address ranges the edge runs in. The API believes forwarding
+  # headers from these alone, and only the edge may reach it.
+  trustProxy: []
+  resources:
+    requests: { cpu: 250m, memory: 512Mi }
+    limits: { cpu: '1', memory: 1Gi }
+
+worker:
+  replicas: 1
+  resources:
+    requests: { cpu: 250m, memory: 512Mi }
+    limits: { cpu: '1', memory: 1Gi }
+
+console:
+  replicas: 1
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits: { cpu: 500m, memory: 256Mi }
+
+portal:
+  replicas: 1
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits: { cpu: 500m, memory: 256Mi }
+
+# The reverse proxy (ADR 0030): TLS, HSTS, compression, logs and rate limits.
+edge:
+  replicas: 1
+  hsts: max-age=63072000; includeSubDomains
+  # The port browsers reach the edge on, for redirects and the API's origins.
+  httpsPort: 443
+  service:
+    type: ClusterIP
+    annotations: {}
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits: { cpu: 500m, memory: 256Mi }
+
+migrate:
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { cpu: '1', memory: 512Mi }

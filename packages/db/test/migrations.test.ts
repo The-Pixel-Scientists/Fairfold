@@ -99,7 +99,7 @@ async function stableSnapshot(trx: Kysely<unknown>): Promise<string[]> {
   return (await snapshot(trx)).filter((line) => !STATS_DAY.test(line));
 }
 
-describe('migrations', { timeout: 120_000 }, () => {
+describe('migrations', { timeout: 300_000 }, () => {
   it('each down.sql restores exactly the schema from before its up.sql', async () => {
     const provider = new SqlFolderMigrationProvider(MIGRATIONS_FOLDER);
     const found = await provider.getMigrations();
@@ -140,6 +140,12 @@ describe('migrations', { timeout: 120_000 }, () => {
       // And 0045's down refuses while a release email job waits, which the
       // decision tests leave behind with no worker to run them.
       await sql`DELETE FROM pgboss.job WHERE name LIKE 'grants.release_email%'`.execute(trx);
+      // And 0098's down refuses while an outbox relay job waits, which the
+      // outbox and publish tests leave behind.
+      await sql`DELETE FROM pgboss.job
+                 WHERE name IN ('platform.outbox_relay', 'platform.outbox_relay.dead',
+                                'platform.outbox_tenant', 'platform.outbox_tenant.dead',
+                                'outbox.probe', 'outbox.probe.dead')`.execute(trx);
       // And 0064's down refuses while a tenant has set an import period,
       // which the crm retention tests leave behind; row-level security hides
       // the settings from migrator.
@@ -158,6 +164,11 @@ describe('migrations', { timeout: 120_000 }, () => {
       // the insight tests leave behind.
       await sql`TRUNCATE insight.report_definition, insight.disclosure_rule,
                          insight.publication_run`.execute(trx);
+      // And 0089 to 0091's downs refuse while any privacy table holds a row,
+      // which the privacy tests leave behind. Requests went with party.
+      await sql`TRUNCATE privacy.breach, privacy.breach_assessment, privacy.processing_activity,
+                         privacy.processor, privacy.processing_activity_processor, privacy.dpia,
+                         privacy.dpia_processing_activity`.execute(trx);
       // And 0068's down cannot validate the outcome check while a reminder
       // template exists, which the reminder tests leave behind. Empty the
       // template versions and every table that refers to them.

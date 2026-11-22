@@ -16,6 +16,7 @@ import { suiteName } from '@pixel-scientists/domain/platform';
 import manifest from '../package.json' with { type: 'json' };
 import type { AuthModule } from './context.ts';
 import type { InTenant } from './database.ts';
+import type { WorkflowService } from './platform/approvals/index.ts';
 import type { FileService, UploadGate } from './platform/files/index.ts';
 import { withTenantScope, type ScopeResolvers } from './policy/index.ts';
 import { registerLimits, type LimitOptions } from './limits/index.ts';
@@ -40,6 +41,8 @@ export interface AppOptions {
   inTenant?: InTenant;
   /** Stores and sends files for the handlers' `context.files`. Without it, they fail. */
   files?: FileService;
+  /** Binds the workflow service to the handlers' `context.workflow`. Without it, they fail. */
+  workflow?: WorkflowService;
   /** Reads sessions and serves the auth routes (S02-07). Without it, nobody is signed in. */
   auth?: AuthModule;
   /** The routes of every module, from their contracts. */
@@ -117,6 +120,7 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     readSession: limitSessions(options.auth?.readSession.bind(options.auth) ?? signedOut),
     inTenant: options.inTenant ?? noDatabase,
     files: options.files,
+    workflow: options.workflow,
     uploads: options.uploads,
     resolvers: withTenantScope(options.resolvers ?? {}),
   };

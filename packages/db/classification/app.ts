@@ -7,6 +7,9 @@
 // Audit events hold ids, codes and public or internal values only (ADR 0003,
 // D12), and are kept under the tenant's audit rule, at least 12 months; the
 // party an event is about is internal under the same rule (ADR 0027).
+// Workflow definitions last as long as the tenant, since requests pin them;
+// approval requests and decisions are audit evidence of ids, codes, counts
+// and times, kept under the audit rule (ADR 0038).
 
 import type {
   ClassificationRegistry,
@@ -48,6 +51,11 @@ const audit: FieldClassification = {
   sensitivity: 'internal',
   retention: { kind: 'tenant_policy', policy: 'audit', minimumDays: 365 },
 };
+/** 90 days from the event, a platform rule no tenant setting changes (ADR 0034). */
+const eventOutbox: FieldClassification = {
+  sensitivity: 'internal',
+  retention: { kind: 'fixed', days: 90, from: 'occurred_at' },
+};
 /** 7 years, the longest off-site tier (ADR 0011), never under a tenant's policy. */
 const erasureLedger: FieldClassification = {
   sensitivity: 'internal',
@@ -69,10 +77,12 @@ export const notKept: ReadonlySet<string> = new Set([
   'app.request_limit.key_hash',
   'app.audit_event.changes',
   'app.job_request.filters',
+  'app.event_outbox.payload',
   'app.subject_key.wrapped_key',
   'app.note.body',
   'app.message.body',
   'app.tag.label',
+  'app.workflow_definition_version.document',
 ]);
 
 export const app = {
@@ -228,6 +238,33 @@ export const app = {
     kind: internal,
     created_at: internal,
   },
+  // Published events and each tenant's counter and consumer cursors (ADR
+  // 0034). Events hold ids, codes and times only, and erasure changes none:
+  // they expire on their 90-day rule. Counters and cursors are kept for the
+  // life of the tenant.
+  'app.event_outbox': {
+    tenant_id: eventOutbox,
+    id: eventOutbox,
+    sequence: eventOutbox,
+    type: eventOutbox,
+    payload: eventOutbox,
+    occurred_at: eventOutbox,
+    request_id: eventOutbox,
+    caused_by: eventOutbox,
+    retain_until: eventOutbox,
+  },
+  'app.event_sequence': {
+    tenant_id: internal,
+    id: internal,
+    last_sequence: internal,
+  },
+  'app.event_cursor': {
+    tenant_id: internal,
+    id: internal,
+    consumer: internal,
+    last_sequence: internal,
+    updated_at: internal,
+  },
   // A job acting for a member (ADR 0009): kept 7 days from completion, as
   // its output is. Its filters may name the party a subject access request
   // is about. Its audit event keeps the id, requester and permission.
@@ -336,6 +373,49 @@ export const app = {
     created_by: internal,
     created_at: internal,
   },
+  'app.workflow_definition': {
+    tenant_id: internal,
+    id: internal,
+    key: internal,
+    created_at: internal,
+    created_by: internal,
+  },
+  'app.workflow_definition_version': {
+    tenant_id: internal,
+    id: internal,
+    definition_id: internal,
+    version: internal,
+    document: internal,
+    created_at: internal,
+    created_by: internal,
+  },
+  'app.approval_request': {
+    tenant_id: audit,
+    id: audit,
+    definition_version_id: audit,
+    definition_key: audit,
+    step_id: audit,
+    required_approvals: audit,
+    status: audit,
+    requested_by: audit,
+    requested_at: audit,
+    due_at: audit,
+    closed_by: audit,
+    close_reason: audit,
+    closed_at: audit,
+    updated_at: audit,
+    retain_until: audit,
+  },
+  'app.approval_decision': {
+    tenant_id: audit,
+    id: audit,
+    request_id: audit,
+    decided_by: audit,
+    outcome: audit,
+    reason_code: audit,
+    decided_at: audit,
+    retain_until: audit,
+  },
 } satisfies ClassificationRegistry;
 
 /**
@@ -363,6 +443,10 @@ export const appSubjects: SubjectPathRegistry = {
   // message names them directly.
   'app.note': { kind: 'join', column: 'author_id', table: 'app.membership' },
   'app.message': { kind: 'party', column: 'author_person_id' },
+  // An approval is about the member who asked or decided; its subject is
+  // reached through the module's link table.
+  'app.approval_request': { kind: 'join', column: 'requested_by', table: 'app.membership' },
+  'app.approval_decision': { kind: 'join', column: 'decided_by', table: 'app.membership' },
 };
 
 const stored = ['hosting', 'backup'] as const;
@@ -385,12 +469,29 @@ const noteRecord: ProcessingEntry = {
   dataSubjects: [],
   dataCategories: [],
 };
+/** A job's platform record, holding no person's data. */
+const jobRecord: ProcessingEntry = {
+  purpose: 'background_jobs',
+  legalBasis: 'legitimate_interests',
+  processors: stored,
+  dataSubjects: [],
+  dataCategories: [],
+};
 const auditRow: ProcessingEntry = {
   purpose: 'audit',
   legalBasis: 'legitimate_interests',
   processors: stored,
   dataSubjects: tenantPeople,
   dataCategories: ['other'],
+};
+
+/** Who asked for or decided an approval, kept as evidence of separation of duties. */
+const approval: ProcessingEntry = {
+  purpose: 'audit',
+  legalBasis: 'legitimate_interests',
+  processors: stored,
+  dataSubjects: ['staff_member'],
+  dataCategories: ['identity'],
 };
 
 export const appProcessing: ProcessingRegistry<typeof app> = {
@@ -435,13 +536,11 @@ export const appProcessing: ProcessingRegistry<typeof app> = {
     dataCategories: ['online_identifiers'],
   },
   'app.audit_event': auditRow,
-  'app.job_queue': {
-    purpose: 'background_jobs',
-    legalBasis: 'legitimate_interests',
-    processors: stored,
-    dataSubjects: [],
-    dataCategories: [],
-  },
+  'app.job_queue': jobRecord,
+  // Ids and codes only, with no subject path: they state none.
+  'app.event_outbox': jobRecord,
+  'app.event_sequence': jobRecord,
+  'app.event_cursor': jobRecord,
   'app.job_request': {
     purpose: 'background_jobs',
     legalBasis: 'legitimate_interests',
@@ -473,4 +572,8 @@ export const appProcessing: ProcessingRegistry<typeof app> = {
   },
   'app.tag': setUp,
   'app.embed_origin': setUp,
+  'app.workflow_definition': setUp,
+  'app.workflow_definition_version': setUp,
+  'app.approval_request': approval,
+  'app.approval_decision': approval,
 };

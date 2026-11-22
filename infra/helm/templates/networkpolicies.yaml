@@ -1,0 +1,198 @@
+{{- /* SPDX-License-Identifier: AGPL-3.0-or-later */ -}}
+{{- /*
+Default deny for every pod of the release, in and out, then one allow rule
+per need (ADR 0010: the API and worker reach only the services they name,
+and the API public addresses on 443 for its outbound dispatcher). Pods in
+this cluster are reached by selectors, an outside service by one address,
+and public addresses through `except` lists that leave out metadata,
+private, shared, loopback and reserved ranges. For IPv6 that means global
+unicast (2000::/3) only, which leaves out loopback, IPv4-mapped, NAT64,
+unique local (with fd00:ec2::254) and link-local addresses by
+construction, less Teredo, the documentation range and 6to4, which embed
+an IPv4 address or stand for one.
+*/ -}}
+{{- define "tps.peerTo" -}}
+- to:
+    {{- if .public }}
+    {{- include "tps.publicBlocks" . | nindent 4 }}
+    {{- else if .cidr }}
+    - ipBlock:
+        cidr: {{ .cidr }}
+    {{- else }}
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: {{ .namespace }}
+      podSelector:
+        matchLabels:
+          {{- toYaml .podLabels | nindent 10 }}
+    {{- end }}
+  ports:
+    - protocol: TCP
+      port: {{ .port }}
+{{- end }}
+{{- define "tps.publicBlocks" -}}
+- ipBlock:
+    cidr: 0.0.0.0/0
+    except:
+      - 0.0.0.0/8
+      - 10.0.0.0/8
+      - 100.64.0.0/10
+      - 127.0.0.0/8
+      - 169.254.0.0/16
+      - 172.16.0.0/12
+      - 192.0.0.0/24
+      - 192.168.0.0/16
+      - 198.18.0.0/15
+      - 240.0.0.0/4
+- ipBlock:
+    cidr: 2000::/3
+    except:
+      - 2001::/32
+      - 2001:db8::/32
+      - 2002::/16
+{{- end }}
+{{- define "tps.from" -}}
+- podSelector:
+    matchLabels:
+      {{- include "tps.selector" . | nindent 6 }}
+{{- end }}
+{{- define "tps.dns" -}}
+- to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: {{ .Values.dns.namespace }}
+      podSelector:
+        matchLabels:
+          {{- toYaml .Values.dns.podLabels | nindent 10 }}
+  ports:
+    - { protocol: UDP, port: 53 }
+    - { protocol: TCP, port: 53 }
+{{- end }}
+{{- $edge := dict "root" . "component" "edge" }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  labels:
+    {{- include "tps.labels" (dict "root" . "component" "network") | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: tps
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  policyTypes: [Ingress, Egress]
+---
+# A hook, so that it isolates the migrate job on the first install too.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: migrate
+  labels:
+    {{- include "tps.labels" (dict "root" . "component" "migrate") | nindent 4 }}
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: '-10'
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "tps.selector" (dict "root" . "component" "migrate") | nindent 6 }}
+  policyTypes: [Ingress, Egress]
+  egress:
+    {{- include "tps.dns" . | nindent 4 }}
+    {{- include "tps.peerTo" .Values.database.networkPolicy | nindent 4 }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: api
+  labels:
+    {{- include "tps.labels" (dict "root" . "component" "api") | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "tps.selector" (dict "root" . "component" "api") | nindent 6 }}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        {{- include "tps.from" $edge | nindent 8 }}
+      ports:
+        - { protocol: TCP, port: 3000 }
+  egress:
+    {{- include "tps.dns" . | nindent 4 }}
+    {{- include "tps.peerTo" .Values.database.networkPolicy | nindent 4 }}
+    {{- include "tps.peerTo" .Values.storage.networkPolicy | nindent 4 }}
+    {{- include "tps.peerTo" .Values.smtp.networkPolicy | nindent 4 }}
+    {{- include "tps.peerTo" .Values.clamd.networkPolicy | nindent 4 }}
+    # The outbound dispatcher: HTTPS to public addresses only.
+    {{- include "tps.peerTo" (dict "public" true "port" 443) | nindent 4 }}
+---
+# The worker: no ingress, and only the services it names (compose.stack.yaml).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: worker
+  labels:
+    {{- include "tps.labels" (dict "root" . "component" "worker") | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "tps.selector" (dict "root" . "component" "worker") | nindent 6 }}
+  policyTypes: [Ingress, Egress]
+  egress:
+    {{- include "tps.dns" . | nindent 4 }}
+    {{- include "tps.peerTo" .Values.database.networkPolicy | nindent 4 }}
+    {{- include "tps.peerTo" .Values.storage.networkPolicy | nindent 4 }}
+    {{- include "tps.peerTo" .Values.smtp.networkPolicy | nindent 4 }}
+    {{- include "tps.peerTo" .Values.clamd.networkPolicy | nindent 4 }}
+{{- range $app := list "console" "portal" }}
+---
+# Served to the edge alone; DNS is the only way out.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $app }}
+  labels:
+    {{- include "tps.labels" (dict "root" $ "component" $app) | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "tps.selector" (dict "root" $ "component" $app) | nindent 6 }}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        {{- include "tps.from" $edge | nindent 8 }}
+      ports:
+        - { protocol: TCP, port: 8080 }
+  egress:
+    {{- include "tps.dns" $ | nindent 4 }}
+{{- end }}
+---
+# The way in: from anywhere to the edge's two ports, and from the edge to
+# the API and the two web servers alone.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: edge
+  labels:
+    {{- include "tps.labels" $edge | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "tps.selector" $edge | nindent 6 }}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - ports:
+        - { protocol: TCP, port: 8080 }
+        - { protocol: TCP, port: 8443 }
+  egress:
+    {{- include "tps.dns" . | nindent 4 }}
+    - to:
+        {{- include "tps.from" (dict "root" . "component" "api") | nindent 8 }}
+      ports:
+        - { protocol: TCP, port: 3000 }
+    - to:
+        {{- include "tps.from" (dict "root" . "component" "console") | nindent 8 }}
+        {{- include "tps.from" (dict "root" . "component" "portal") | nindent 8 }}
+      ports:
+        - { protocol: TCP, port: 8080 }

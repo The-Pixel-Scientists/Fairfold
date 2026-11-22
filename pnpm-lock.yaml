@@ -648,6 +648,9 @@ importers:
 
   modules/privacy:
     dependencies:
+      '@pixel-scientists/db':
+        specifier: workspace:*
+        version: link:../../packages/db
       '@pixel-scientists/domain':
         specifier: workspace:*
         version: link:../../packages/domain
@@ -657,6 +660,16 @@ importers:
       zod:
         specifier: 4.6.7
         version: 4.6.7
+    devDependencies:
+      '@pixel-scientists/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
+      '@types/react':
+        specifier: 19.3.0
+        version: 19.3.0
+      react:
+        specifier: 19.3.1
+        version: 19.3.1
 
   packages/config:
     dependencies:

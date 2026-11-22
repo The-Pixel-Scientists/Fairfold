@@ -28,6 +28,7 @@ import {
 } from '@pixel-scientists/domain/platform/settings';
 import { teamRoutes } from '@pixel-scientists/domain/platform/team';
 import { getWarehouseSnapshot } from '@pixel-scientists/domain/warehouse';
+import { approvalRoutes } from '@pixel-scientists/domain/workflow';
 import {
   adjustmentRoutes,
   applicationRoutes,
@@ -77,6 +78,7 @@ describe('composeModules', () => {
       listAuditEvents,
       searchAuditEvents,
       searchTerm,
+      ...Object.values(approvalRoutes),
       ...Object.values(teamRoutes),
       getSettings,
       updateSettings,

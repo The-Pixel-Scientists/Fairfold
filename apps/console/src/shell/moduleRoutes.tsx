@@ -3,7 +3,7 @@
 import { modules } from '@pixel-scientists/domain/platform';
 import { EmptyState, NotFoundPage, PageHeading, useSession } from '@pixel-scientists/ui';
 import type { RouteDefinition } from '@pixel-scientists/ui';
-import { lazy, useEffect, useState } from 'react';
+import { lazy, useEffect } from 'react';
 
 import { consoleModules } from '../modules.ts';
 import type { ConsoleModule } from '../modules.ts';
@@ -39,13 +39,12 @@ function Hidden() {
 function pageFor(entry: ConsoleModule, load: NonNullable<ConsoleModule['load']>) {
   const item = moduleItem(entry);
   const label = modules[entry.id].label;
+  // Made once, not in the page: a page that suspends on its first render keeps no state, so a lazy component made there is never the one that resolves.
+  const Entry = lazy(async () => ({
+    default: (await load()).default ?? (() => <NoScreens label={label} />),
+  }));
   return function ModulePage() {
     const { state } = useSession();
-    const [Entry] = useState(() =>
-      lazy(async () => ({
-        default: (await load()).default ?? (() => <NoScreens label={label} />),
-      })),
-    );
     return state.status === 'ready' && visibleItems(state.session, [item]).length > 0 ? (
       <Entry />
     ) : (
@@ -58,15 +57,15 @@ function pageFor(entry: ConsoleModule, load: NonNullable<ConsoleModule['load']>)
 export function moduleRoutesFor(entries: readonly ConsoleModule[]): RouteDefinition[] {
   return entries.flatMap((entry) => {
     const { load } = entry;
-    return load === undefined
-      ? []
-      : [
-          {
-            path: entry.path,
-            title: modules[entry.id].label,
-            load: () => Promise.resolve({ default: pageFor(entry, load) }),
-          },
-        ];
+    if (load === undefined) return [];
+    const page = pageFor(entry, load);
+    return [
+      {
+        path: entry.path,
+        title: modules[entry.id].label,
+        load: () => Promise.resolve({ default: page }),
+      },
+    ];
   });
 }
 

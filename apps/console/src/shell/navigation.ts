@@ -5,6 +5,7 @@ import type { Permission, SwitchableModuleId } from '@pixel-scientists/domain/pl
 import { grantsNavigation } from '@pixel-scientists/grants/console';
 import { consoleModules } from '../modules.ts';
 import type { ConsoleModule } from '../modules.ts';
+import { APPROVALS_PATH } from '../platform/approvals/paths.ts';
 import { AUDIT_LOG_PATH } from '../platform/audit-log/paths.ts';
 import { DATA_PATH } from '../platform/data/paths.ts';
 import { TEAM_PATH } from '../platform/team/paths.ts';
@@ -45,6 +46,7 @@ function sectionItems(entry: ConsoleModule): NavigationItem[] {
 
 export const navigationItems: readonly NavigationItem[] = [
   ...consoleModules.flatMap(sectionItems),
+  { to: APPROVALS_PATH, label: 'Approvals', permission: 'platform.approvals.read' },
   { to: TEAM_PATH, label: 'Team', permission: 'platform.members.manage' },
   {
     to: DATA_PATH,

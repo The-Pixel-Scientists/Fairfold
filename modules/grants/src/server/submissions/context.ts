@@ -5,6 +5,7 @@
 // rule. The acting member comes from the session alone, never from a request.
 
 import type { AuditChanges } from '@pixel-scientists/db';
+import type { Permission } from '@pixel-scientists/domain/platform';
 
 import type { GrantsAuditAction } from '../../contracts/index.ts';
 import type { GrantsDependencies } from '../programme/context.ts';
@@ -24,7 +25,7 @@ export interface SubmissionContext {
     /** Records a sensitive read. */
     read(event: { readonly action: GrantsAuditAction; readonly entityId: string }): Promise<void>;
   };
-  readonly membership: { readonly id: string };
+  readonly membership: { readonly id: string; readonly permissions: ReadonlySet<Permission> };
 }
 
 export interface SubmissionArgs<I> {

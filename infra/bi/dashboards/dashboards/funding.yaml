@@ -1,0 +1,93 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# A starter dashboard (ADR 0039). An upgrade overwrites it: save a copy to
+# change it, and the copy is kept.
+dashboard_title: Funding by organisation type
+description: null
+css: ''
+slug: funding
+published: true
+certified_by: null
+certification_details: null
+uuid: af17a5af-f5d0-4966-b30f-ace5d5fe5923
+version: 1.0.0
+position:
+  DASHBOARD_VERSION_KEY: v2
+  ROOT_ID:
+    type: ROOT
+    id: ROOT_ID
+    children: [GRID_ID]
+  GRID_ID:
+    type: GRID
+    id: GRID_ID
+    children: [ROW-as-of, ROW-chart, ROW-table]
+    parents: [ROOT_ID]
+  HEADER_ID:
+    type: HEADER
+    id: HEADER_ID
+    meta:
+      text: Funding by organisation type
+  ROW-as-of:
+    type: ROW
+    id: ROW-as-of
+    children: [CHART-as-of]
+    parents: [ROOT_ID, GRID_ID]
+    meta:
+      background: BACKGROUND_TRANSPARENT
+  CHART-as-of:
+    type: CHART
+    id: CHART-as-of
+    children: []
+    parents: [ROOT_ID, GRID_ID, ROW-as-of]
+    meta:
+      width: 12
+      height: 15
+      chartId: 0
+      uuid: 44140164-c2a7-499f-a7ac-7fa795d97268
+      sliceName: 'Data as of'
+  ROW-chart:
+    type: ROW
+    id: ROW-chart
+    children: [CHART-chart]
+    parents: [ROOT_ID, GRID_ID]
+    meta:
+      background: BACKGROUND_TRANSPARENT
+  CHART-chart:
+    type: CHART
+    id: CHART-chart
+    children: []
+    parents: [ROOT_ID, GRID_ID, ROW-chart]
+    meta:
+      width: 12
+      height: 50
+      chartId: 0
+      uuid: 70e7333e-776c-44b4-a9db-6c78716805b9
+      sliceName: 'Amount awarded by organisation type'
+  ROW-table:
+    type: ROW
+    id: ROW-table
+    children: [CHART-table]
+    parents: [ROOT_ID, GRID_ID]
+    meta:
+      background: BACKGROUND_TRANSPARENT
+  CHART-table:
+    type: CHART
+    id: CHART-table
+    children: []
+    parents: [ROOT_ID, GRID_ID, ROW-table]
+    meta:
+      width: 12
+      height: 50
+      chartId: 0
+      uuid: 2fe15cf2-5606-4354-b8e1-1130ace51e70
+      sliceName: 'Funding by organisation type'
+metadata:
+  color_scheme: supersetColors
+  refresh_frequency: 0
+  expanded_slices: {}
+  label_colors: {}
+  timed_refresh_immune_slices: []
+  cross_filters_enabled: false
+  native_filter_configuration: []
+  chart_configuration: {}
+  default_filters: '{}'

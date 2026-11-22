@@ -31,6 +31,7 @@ platform.erasure.failed: Erasure failed
 platform.subject_key.destroyed: Subject key destroyed
 platform.audit_event.purged: Audit event purged
 platform.audit_log.exported: Audit log exported
+platform.event_cursor.rewound: Event cursor rewound
 platform.auth.account_created: Account created
 platform.auth.sign_in_succeeded: Sign-in succeeded
 platform.auth.sign_in_failed: Sign-in failed

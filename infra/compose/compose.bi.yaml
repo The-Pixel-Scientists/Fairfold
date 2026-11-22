@@ -1,0 +1,204 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# The optional BI service for one tenant (ADR 0039), as an overlay. Nothing
+# in compose.stack.yaml or compose.dev.yaml depends on it, and nothing here
+# depends on them, so the stack runs the same without it. Turn it on with:
+#
+#   docker compose -f infra/compose/compose.stack.yaml -f infra/compose/compose.bi.yaml up
+#
+# infra/bi/README.md lists the settings it needs and how to load a snapshot.
+#
+# Services:
+# - bi-postgres: the BI PostgreSQL server, a separate server from the
+#   application's, holding this tenant's warehouse and Superset metadata
+#   databases.
+# - bi-provision: creates or updates the tenant's two databases and three
+#   roles (infra/bi/provision.sql), then stops.
+# - bi-init: Superset's migrations and roles, and the starter dashboards
+#   (infra/bi/init.sh), then stops. Run it again after each load.
+# - bi: Superset, signing in through the tenant's OIDC provider only.
+# - bi-load (profile `load`): loads a snapshot with infra/bi/load.sh.
+#
+# Networks:
+# - `bi`: every service above, with no way out. It joins nothing of the
+#   stack's, so no BI container has a route to the application's PostgreSQL
+#   (`database`), files, scanner, mail or web networks.
+# - `bi-edge`: Superset alone. It publishes the tool on 127.0.0.1 for the
+#   operator's reverse proxy, and is its way out to the identity provider.
+#   As for the stack's API (compose.stack.yaml, "Outbound requests"), Compose
+#   cannot yet limit that way out to public addresses on 443; Superset makes
+#   outbound requests only to the configured provider, and no role in it can
+#   add a database connection or an alert that would reach elsewhere.
+#
+# Every secret comes from the operator's environment, and Compose copies each
+# one only into the containers that use it, as a file under /run/secrets.
+
+x-bi-hardening: &bi-hardening
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+
+# The stack's PostgreSQL image, by the same digest.
+x-bi-postgres-image: &bi-postgres-image postgres:16.15-bookworm@sha256:efedf3595f1d6f415c08568ba171029bf54052e754cc9f030e3f2412b21f3d67
+
+x-bi-tenant: &bi-tenant
+  TPS_BI_TENANT: ${TPS_BI_TENANT:?Set TPS_BI_TENANT to the tenant's BI key}
+  TPS_BI_DB_HOST: bi-postgres
+  TPS_BI_DB_PORT: '5432'
+  # `bi` is internal, so no other machine can reach it.
+  TPS_BI_DB_SSLMODE: disable
+
+# psql, in the BI PostgreSQL image, reaching bi-postgres over `bi`.
+x-bi-client: &bi-client
+  image: *bi-postgres-image
+  <<: *bi-hardening
+  user: postgres
+  volumes:
+    - ../bi:/bi:ro
+  networks: [bi]
+  depends_on:
+    bi-postgres:
+      condition: service_healthy
+
+x-bi-superset-environment: &bi-superset-environment
+  <<: *bi-tenant
+  TPS_BI_METADATA_PASSWORD_FILE: /run/secrets/bi_superset_password
+  TPS_BI_SECRET_KEY_FILE: /run/secrets/bi_secret_key
+  TPS_BI_OIDC_ISSUER: ${TPS_BI_OIDC_ISSUER:?Set TPS_BI_OIDC_ISSUER to the identity provider's issuer URL}
+  TPS_BI_OIDC_CLIENT_ID: ${TPS_BI_OIDC_CLIENT_ID:?Set TPS_BI_OIDC_CLIENT_ID}
+  TPS_BI_OIDC_CLIENT_SECRET_FILE: /run/secrets/bi_oidc_client_secret
+  TPS_BI_OIDC_GROUPS_CLAIM: ${TPS_BI_OIDC_GROUPS_CLAIM:-groups}
+  TPS_BI_ADMIN_GROUP: ${TPS_BI_ADMIN_GROUP:?Set TPS_BI_ADMIN_GROUP to the group of BI admins}
+  TPS_BI_VIEWER_GROUP: ${TPS_BI_VIEWER_GROUP:?Set TPS_BI_VIEWER_GROUP to the group of BI viewers}
+
+# The BI image (infra/bi/Dockerfile), built under one name, so bi-init and bi
+# always run the same image.
+x-bi-image: &bi-image
+  image: tps-bi:local
+  build: ../bi
+  pull_policy: build
+
+# For the superset user of the BI image.
+x-bi-superset-secret: &bi-superset-secret
+  uid: '1000'
+  gid: '1000'
+  mode: 0400
+
+x-bi-postgres-secret: &bi-postgres-secret
+  uid: '999'
+  gid: '999'
+  mode: 0400
+
+services:
+  bi-postgres:
+    image: *bi-postgres-image
+    <<: *bi-hardening
+    user: postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD_FILE: /run/secrets/bi_postgres_password
+    secrets:
+      - { source: bi_postgres_password, <<: *bi-postgres-secret }
+    volumes:
+      - bi-postgres-data:/var/lib/postgresql/data
+    networks: [bi]
+    healthcheck:
+      test: [CMD, pg_isready, --username=postgres, --dbname=postgres]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  bi-provision:
+    <<: *bi-client
+    command: [bash, /bi/provision.sh]
+    environment:
+      TPS_BI_TENANT: ${TPS_BI_TENANT:?Set TPS_BI_TENANT to the tenant's BI key}
+      PGHOST: bi-postgres
+      PGUSER: postgres
+      PGSSLMODE: disable
+      TPS_BI_ADMIN_PASSWORD_FILE: /run/secrets/bi_postgres_password
+      TPS_BI_OWNER_PASSWORD_FILE: /run/secrets/bi_owner_password
+      TPS_BI_READER_PASSWORD_FILE: /run/secrets/bi_reader_password
+      TPS_BI_SUPERSET_PASSWORD_FILE: /run/secrets/bi_superset_password
+    secrets:
+      - { source: bi_postgres_password, <<: *bi-postgres-secret }
+      - { source: bi_owner_password, <<: *bi-postgres-secret }
+      - { source: bi_reader_password, <<: *bi-postgres-secret }
+      - { source: bi_superset_password, <<: *bi-postgres-secret }
+
+  # docker compose ... run --rm --no-TTY bi-load - < <snapshot file>
+  bi-load:
+    <<: *bi-client
+    profiles: [load]
+    entrypoint: [bash, /bi/load.sh]
+    environment:
+      TPS_BI_TENANT: ${TPS_BI_TENANT:?Set TPS_BI_TENANT to the tenant's BI key}
+      TPS_BI_TENANT_ID: ${TPS_BI_TENANT_ID:-}
+      PGHOST: bi-postgres
+      PGSSLMODE: disable
+      TPS_BI_OWNER_PASSWORD_FILE: /run/secrets/bi_owner_password
+    secrets:
+      - { source: bi_owner_password, <<: *bi-postgres-secret }
+
+  bi-init:
+    <<: [*bi-image, *bi-hardening]
+    command: [/app/bi/init.sh]
+    environment:
+      <<: *bi-superset-environment
+      TPS_BI_WAREHOUSE_PASSWORD_FILE: /run/secrets/bi_reader_password
+    secrets:
+      - { source: bi_superset_password, <<: *bi-superset-secret }
+      - { source: bi_reader_password, <<: *bi-superset-secret }
+      - { source: bi_secret_key, <<: *bi-superset-secret }
+      - { source: bi_oidc_client_secret, <<: *bi-superset-secret }
+    networks: [bi]
+    depends_on:
+      bi-provision:
+        condition: service_completed_successfully
+
+  bi:
+    <<: [*bi-image, *bi-hardening]
+    environment: *bi-superset-environment
+    # The reader's password stays with bi-init: Superset keeps the
+    # connection's password in its metadata, encrypted with its secret key.
+    secrets:
+      - { source: bi_superset_password, <<: *bi-superset-secret }
+      - { source: bi_secret_key, <<: *bi-superset-secret }
+      - { source: bi_oidc_client_secret, <<: *bi-superset-secret }
+    networks: [bi, bi-edge]
+    ports:
+      - 127.0.0.1:${TPS_BI_PORT:?Set TPS_BI_PORT to the port on 127.0.0.1 for the reverse proxy}:8088
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8088/health', timeout=4)"
+      interval: 5s
+      timeout: 5s
+      start_period: 2m
+      retries: 30
+    depends_on:
+      bi-init:
+        condition: service_completed_successfully
+
+secrets:
+  bi_postgres_password:
+    environment: TPS_BI_POSTGRES_PASSWORD
+  bi_owner_password:
+    environment: TPS_BI_OWNER_PASSWORD
+  bi_reader_password:
+    environment: TPS_BI_READER_PASSWORD
+  bi_superset_password:
+    environment: TPS_BI_SUPERSET_PASSWORD
+  bi_secret_key:
+    environment: TPS_BI_SECRET_KEY
+  bi_oidc_client_secret:
+    environment: TPS_BI_OIDC_CLIENT_SECRET
+
+volumes:
+  bi-postgres-data:
+
+networks:
+  bi:
+    internal: true
+  bi-edge:

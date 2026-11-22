@@ -1,0 +1,15 @@
+// infra/bi/test.sh's checks, which run on Node.js with its built-in type stripping.
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "../../node_modules/.cache/tsc/infra-bi",
+    "tsBuildInfoFile": "../../node_modules/.cache/tsc/infra-bi/tsconfig.tsbuildinfo",
+    "types": ["node"]
+  },
+  "include": ["*.ts"],
+  "references": [
+    { "path": "../../packages/domain" },
+    { "path": "../../packages/db" },
+    { "path": "../../apps/api" }
+  ]
+}

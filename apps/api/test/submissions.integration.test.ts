@@ -417,6 +417,42 @@ describe('moving submissions to a stage', () => {
     expect(await events(t.tenantA, 'grants.application.stage_changed')).toHaveLength(audited);
   });
 
+  it('moves none of three valid submissions when a fourth is withdrawn', async () => {
+    const { open, review } = await aRound();
+    const valid = [await submitted(open), await submitted(open), await submitted(open)];
+    const gone = await submitted(open);
+    await answer(t.send(t.ann, 'POST', t.path(gone, '/withdraw')));
+    const audited = (await events(t.tenantA, 'grants.application.stage_changed')).length;
+
+    const refused = await move(review.id, [...valid, gone]);
+    expect(refused.statusCode).toBe(409);
+    expect(refused.json<Problem>().errors?.map(({ field }) => field)).toEqual([
+      'body.submissionIds.3',
+    ]);
+    for (const id of valid) expect(await stageOf(id)).not.toBe(review.id);
+    expect(await events(t.tenantA, 'grants.application.stage_changed')).toHaveLength(audited);
+  });
+
+  it('writes one transition per move when two moves of a submission run together', async () => {
+    const { open, review } = await aRound();
+    const decision = (await t.stagesOf(open.round.id))[2];
+    if (decision === undefined) throw new Error('The round has no decision stage.');
+    const id = await submitted(open);
+
+    const both = await Promise.all([move(review.id, [id]), move(decision.id, [id])]);
+    expect(both.map((response) => response.statusCode)).toEqual([200, 200]);
+    const moves = await t.rows<{ from: string; to: string }>(
+      `SELECT from_stage_id AS from, to_stage_id AS to FROM grants.stage_transition
+        WHERE application_id = $1 AND from_stage_id IS NOT NULL`,
+      [id],
+    );
+    // One move follows the other: the second starts where the first ended.
+    expect(moves).toHaveLength(2);
+    const [x, y] = moves as [(typeof moves)[0], (typeof moves)[0]];
+    expect(x.to === y.from || y.to === x.from).toBe(true);
+    expect(await stageOf(id)).toBe(x.to === y.from ? y.to : x.to);
+  });
+
   it('answers 404 for another tenant’s stage and changes nothing of theirs', async () => {
     const { open, review } = await aRound();
     const id = await submitted(open);

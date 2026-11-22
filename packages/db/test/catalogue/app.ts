@@ -48,6 +48,8 @@ export const app: SchemaCatalogue = {
     ['app.erase_file(uuid, uuid)', ['app_worker']],
     // The erasure job clears a subject's notes and messages (ADR 0027).
     ['app.erase_subject_notes(uuid)', ['app_worker']],
+    // The approval triggers' acting member, from the verified session (ADR 0038).
+    ['app.session_actor()', ['app_api']],
   ],
   definerFunctions: [
     [
