@@ -57,6 +57,8 @@ describe('the app schema', () => {
         'migrator USAGE',
         // pg_dump reads every schema (database-privileges.sql).
         'backup_reader USAGE',
+        // app.embed_origins(), migration 0070.
+        'owner_app_embed_origins USAGE',
         // The functions of migration 0006 read or write tables in app.
         'owner_app_create_tenant USAGE',
         'owner_app_public_tenant USAGE',
@@ -87,6 +89,8 @@ describe('the app schema', () => {
         'owner_grants_erase_reminders USAGE',
         // Erasing a subject's crm data, migration 0063.
         'owner_crm_erase_subject USAGE',
+        // grants.public_open_rounds(), migration 0071.
+        'owner_grants_public_open_rounds USAGE',
       ].sort(),
     });
   });
