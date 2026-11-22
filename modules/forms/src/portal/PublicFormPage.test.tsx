@@ -297,7 +297,7 @@ describe('sending the answers', () => {
     setUp(() => {
       throw new ProblemError(409, idempotencyProblems.reused.detail, {
         type: idempotencyProblems.reused.type,
-        idempotencyKey: '0b7c4a1e-5d2f-4c8e-9a3b-6f1d2e4c8a90',
+        idempotencyKey: '0b7c4a1e-5d2f-4c8e-9a3b-6f1d2e4c8a90', // gitleaks:allow
       });
     });
     await toReview(user);
@@ -315,7 +315,7 @@ describe('sending the answers', () => {
       attempts += 1;
       if (attempts === 1) {
         throw new ProblemError(0, 'No connection.', {
-          idempotencyKey: '0b7c4a1e-5d2f-4c8e-9a3b-6f1d2e4c8a90',
+          idempotencyKey: '0b7c4a1e-5d2f-4c8e-9a3b-6f1d2e4c8a90', // gitleaks:allow
         });
       }
       return receipt;

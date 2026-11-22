@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { publicFormProblems } from '../contracts/index.ts';
 import { failureOf, fieldProblemsOf, retryKeyOf, wordsFor } from './problems.ts';
 
-const KEY = '0b7c4a1e-5d2f-4c8e-9a3b-6f1d2e4c8a90';
+const KEY = '0b7c4a1e-5d2f-4c8e-9a3b-6f1d2e4c8a90'; // gitleaks:allow
 
 describe('failureOf', () => {
   it('tells a changed form from a key problem, which is typed', () => {
