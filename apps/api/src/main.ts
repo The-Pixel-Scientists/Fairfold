@@ -16,6 +16,11 @@ import { recordBreachSetting } from './breach-setting.ts';
 import { ConfigError, loadConfig, type Config } from './config.ts';
 import { openDatabase } from './database.ts';
 import {
+  approvalKinds,
+  createWorkflowService,
+  publishApprovalDecided,
+} from './platform/approvals/index.ts';
+import {
   createFileService,
   createScannerStorage,
   createStorage,
@@ -126,6 +131,7 @@ async function main(): Promise<void> {
         createStorage(fileSettings.storage, pinnedFetch(fileSettings.storage.endpoint)),
         createScannerStorage(fileSettings.storage, pinnedFetch(fileSettings.storage.endpoint)),
       ),
+      workflow: createWorkflowService(approvalKinds, publishApprovalDecided(jobs)),
       auth,
       ...composeModules({
         publicTenants: database.publicTenants,
