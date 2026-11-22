@@ -20,7 +20,12 @@ export {
   peopleByUserIds,
   personIdForUser,
 } from './people.ts';
-export { organisationName, organisationSummaries } from './organisations.ts';
+export {
+  organisationDetails,
+  organisationName,
+  organisationSummaries,
+  type OrganisationDetails,
+} from './organisations.ts';
 export {
   partyHandlers,
   partyResolvers,

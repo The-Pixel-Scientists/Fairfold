@@ -16,6 +16,7 @@ import {
   type OrganisationInput,
   type OrganisationPage,
   type OrganisationQuery,
+  type OrganisationSnapshot,
   type OrganisationSummary,
   type PortalOrganisation,
 } from '../contracts/index.ts';
@@ -308,6 +309,44 @@ export async function consoleOrganisation(
       givenName: contact.given_name,
       familyName: contact.family_name,
       email: contact.email,
+    })),
+  };
+}
+
+/** The details a snapshot holds, which is what an organisation's record is compared with. */
+export type OrganisationDetails = Pick<
+  OrganisationSnapshot,
+  'name' | 'legalForm' | 'registeredAddress' | 'website' | 'identifiers'
+>;
+
+/** An organisation's record now, as a snapshot would hold it; null if there is no such organisation. */
+export async function organisationDetails(
+  tx: Tx,
+  organisationId: string,
+): Promise<OrganisationDetails | null> {
+  const db = partyDb(tx);
+  const row = await db
+    .selectFrom('party.organisation')
+    .select(ORGANISATION_COLUMNS)
+    .where('id', '=', organisationId)
+    .executeTakeFirst();
+  if (row === undefined) return null;
+  const identifiers = await db
+    .selectFrom('party.organisation_identifier')
+    .select(['scheme', 'identifier', 'verified_at'])
+    .where('organisation_id', '=', organisationId)
+    .orderBy('scheme')
+    .orderBy('identifier')
+    .execute();
+  return {
+    name: row.name,
+    legalForm: row.legal_form,
+    registeredAddress: address(row),
+    website: row.website,
+    identifiers: identifiers.map((item) => ({
+      scheme: item.scheme,
+      identifier: item.identifier,
+      verifiedAt: item.verified_at?.toISOString() ?? null,
     })),
   };
 }
