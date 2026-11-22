@@ -109,3 +109,17 @@ export async function readOrganisationSnapshot(
     takenAt: row.taken_at.toISOString(),
   });
 }
+
+/** The names of the caller's snapshots, by snapshot id; an id that is not there is left out. Reads two columns only. */
+export async function readOrganisationSnapshotNames(
+  { tx }: Pick<SnapshotContext, 'tx'>,
+  snapshotIds: readonly Id[],
+): Promise<Map<Id, string>> {
+  if (snapshotIds.length === 0) return new Map();
+  const rows = await snapshotsDb(tx)
+    .selectFrom(table)
+    .select(['id', 'name'])
+    .where('id', 'in', snapshotIds)
+    .execute();
+  return new Map(rows.map((row) => [row.id, row.name]));
+}

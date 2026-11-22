@@ -21,6 +21,7 @@ import {
 } from '../../../../packages/db/test/tenants.ts';
 import {
   readOrganisationSnapshot,
+  readOrganisationSnapshotNames,
   takeOrganisationSnapshot,
   type SnapshotContext,
 } from './index.ts';
@@ -154,5 +155,23 @@ describe('readOrganisationSnapshot', () => {
     const unknown = await inTenant(b, (context) => readOrganisationSnapshot(context, randomUUID()));
     expect(foreign.result).toBeNull();
     expect(unknown.result).toBeNull();
+  });
+});
+
+describe('readOrganisationSnapshotNames', () => {
+  it('answers the names of the caller’s snapshots in one read, and none from another tenant', async () => {
+    const { result: id } = await inTenant(a, (context) =>
+      takeOrganisationSnapshot(context, a.organisation),
+    );
+    const unknown = randomUUID();
+
+    const own = await inTenant(a, (context) =>
+      readOrganisationSnapshotNames(context, [id, unknown]),
+    );
+    const foreign = await inTenant(b, (context) => readOrganisationSnapshotNames(context, [id]));
+    const none = await inTenant(a, (context) => readOrganisationSnapshotNames(context, []));
+    expect([...own.result]).toEqual([[id, 'Recognisable Trust']]);
+    expect(foreign.result.size).toBe(0);
+    expect(none.result.size).toBe(0);
   });
 });

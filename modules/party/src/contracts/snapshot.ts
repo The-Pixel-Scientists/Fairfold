@@ -44,4 +44,6 @@ export interface OrganisationSnapshots<Ctx> {
   takeOrganisationSnapshot(ctx: Ctx, organisationId: Id): Promise<Id>;
   /** Null for an id not in the tenant. */
   readOrganisationSnapshot(ctx: Ctx, snapshotId: Id): Promise<OrganisationSnapshot | null>;
+  /** Each snapshot's name by id, from one read of two columns. An id not in the tenant is left out. */
+  readOrganisationSnapshotNames(ctx: Ctx, snapshotIds: readonly Id[]): Promise<Map<Id, string>>;
 }
