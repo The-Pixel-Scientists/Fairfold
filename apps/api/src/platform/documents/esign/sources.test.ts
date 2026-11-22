@@ -31,12 +31,12 @@ describe('the callback handler', () => {
       'app.file',
       'withTenant',
       'inTenant',
-      'set_config',
       'current_tenant',
       'sql`',
     ]) {
       expect(callback, forbidden).not.toContain(forbidden);
     }
+    expect(callback).not.toMatch(/set_config/);
   });
 
   it('is the only file that calls it, and no other file looks a tenant up from a reference', () => {

@@ -11,7 +11,7 @@ import { randomBytes } from 'node:crypto';
 import { createDatabase } from '@pixel-scientists/db';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
-import { databaseSettings } from '../../../../../../packages/db/test/connect.ts';
+import { connectionSettings } from '../../../../../../packages/db/test/connect.ts';
 import { connectionRow } from '../../../../../../packages/db/test/documents/fixtures.ts';
 import {
   asMigratorIn,
@@ -69,7 +69,16 @@ async function addFunder(change: 'active' | 'closed' | 'suspended' = 'active'): 
 }
 
 beforeAll(async () => {
-  api = createDatabase<unknown>(databaseSettings('app_api', 2));
+  const settings = connectionSettings('app_api');
+  api = createDatabase<unknown>({
+    host: settings.host,
+    port: settings.port,
+    database: settings.database,
+    role: 'app_api',
+    password: settings.password,
+    maxConnections: 2,
+    applicationName: 'tps-db-tests',
+  });
   [a, b, closed, suspended] = [
     await addFunder(),
     await addFunder(),
