@@ -54,6 +54,7 @@ import type { PublicTenants, TenantTransaction } from './database.ts';
 import { queueReleaseEmail } from './decision-emails.ts';
 import { publishGrantsEvent } from './grant-events.ts';
 import { queueMessageNotification } from './message-notifications.ts';
+import { inboxRoutes } from './platform/approvals/index.ts';
 import { listAuditEventsHandler, searchAuditEventsHandler } from './platform/audit-log/index.ts';
 import { insertConfigVersion, readConfigHistory } from './platform/config-versions.ts';
 import { erasureRoutes, type Contribution } from './platform/erasure/index.ts';
@@ -189,6 +190,7 @@ export function composeModules(deps: {
       route(listAuditEvents, listAuditEventsHandler),
       route(searchAuditEvents, searchAuditEventsHandler),
       route(searchTerm, searchHandler()),
+      ...inboxRoutes,
       ...teamRoutes(deps.auth ?? noAuth),
       ...settingsRoutes,
       ...retentionRoutes,
