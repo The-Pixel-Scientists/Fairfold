@@ -12,7 +12,18 @@
     "./portal": "./src/portal/index.ts"
   },
   "dependencies": {
+    "@pixel-scientists/db": "workspace:*",
     "@pixel-scientists/domain": "workspace:*",
     "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@pixel-scientists/ui": "workspace:*",
+    "@testing-library/dom": "10.4.2",
+    "@testing-library/react": "16.3.3",
+    "@testing-library/user-event": "14.6.8",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
   }
 }
