@@ -7,7 +7,7 @@ import { ESLint } from 'eslint';
 import tseslint from 'typescript-eslint';
 import { describe, expect, it } from 'vitest';
 
-import { MODULES, moduleBoundaries } from './eslint.config.js';
+import { MODULES, moduleBoundaries, toolBoundaries } from './eslint.config.js';
 
 const eslint = new ESLint({
   cwd: import.meta.dirname,
@@ -15,6 +15,7 @@ const eslint = new ESLint({
   overrideConfig: [
     { files: ['**/*.{ts,tsx}'], languageOptions: { parser: tseslint.parser } },
     ...moduleBoundaries,
+    ...toolBoundaries,
   ],
 });
 
@@ -174,6 +175,41 @@ describe('module boundaries', () => {
     ).resolves.toHaveLength(1);
     await expect(
       boundaryMessages(consoleScreen, "export * from '@pixel-scientists/party/server';"),
+    ).resolves.toHaveLength(1);
+  });
+});
+
+describe('the 360Giving converter boundary', () => {
+  const core = 'tools/360-converter/src/convert.ts';
+  const cli = 'tools/360-converter/src/cli.ts';
+
+  it.each([
+    [core, '@pixel-scientists/domain/jitless'],
+    [core, '@pixel-scientists/domain/platform'],
+    [core, '@pixel-scientists/grants/contracts'],
+    [core, './csv.ts'],
+    [cli, 'node:fs'],
+    [cli, './convert.ts'],
+    ['tools/360-converter/src/cli.test.ts', '../../../modules/grants/src/server/export/build.ts'],
+  ])('lets %s import %s', async (file, specifier) => {
+    await expect(boundaryMessages(file, `import '${specifier}';`)).resolves.toEqual([]);
+  });
+
+  it.each([
+    [core, 'node:fs'],
+    [core, 'zod'],
+    [cli, '@pixel-scientists/grants/server'],
+    [cli, '@pixel-scientists/db'],
+    [cli, '../../../modules/grants/src/server/export/build.ts'],
+    [cli, '../package.json'],
+    [cli, 'fs'],
+  ])('refuses %s importing %s', async (file, specifier) => {
+    await expect(boundaryMessages(file, `import '${specifier}';`)).resolves.toHaveLength(1);
+  });
+
+  it('refuses a dynamic import', async () => {
+    await expect(
+      boundaryMessages(core, "export const load = () => import('./csv.ts');"),
     ).resolves.toHaveLength(1);
   });
 });

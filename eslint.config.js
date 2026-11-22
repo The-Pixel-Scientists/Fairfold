@@ -233,6 +233,48 @@ export const moduleBoundaries = [
   },
 ];
 
+/** The 360Giving converter's source, and its core, which also runs in a browser. */
+const CONVERTER = 'tools/360-converter/src';
+const CONVERTER_CORE = ['convert.ts', 'csv.ts', 'messages.ts'].map(
+  (file) => `${CONVERTER}/${file}`,
+);
+const CONVERTER_IMPORTS = String.raw`@pixel-scientists/domain(?:/[a-z0-9-]+)*$|@pixel-scientists/[a-z0-9-]+/contracts$|\./[^/]+$`;
+
+/**
+ * What the converter may import: @pixel-scientists/domain, modules'
+ * contracts and its own files, never a module's server or the database
+ * package, and Node.js built-ins only outside its core. Imports are static,
+ * so each can be checked. Tests are exempt.
+ *
+ * @param {boolean} node whether Node.js built-ins are allowed
+ * @returns {import('eslint').Linter.RulesRecord}
+ */
+const converterImports = (node) => ({
+  'no-restricted-imports': [
+    'error',
+    {
+      patterns: [
+        {
+          regex: `^(?!${CONVERTER_IMPORTS}${node ? '|node:' : ''})`,
+          message: node
+            ? "The converter may import only @pixel-scientists/domain, modules' contracts, its own files and Node.js built-ins."
+            : "The converter's core runs in a browser too: it may import only @pixel-scientists/domain, modules' contracts and its own files.",
+        },
+      ],
+    },
+  ],
+  'no-restricted-syntax': [
+    'error',
+    { selector: 'ImportExpression', message: "Load the converter's modules with static imports." },
+  ],
+});
+
+/** @type {import('eslint').Linter.Config[]} */
+export const toolBoundaries = [
+  { files: [`${CONVERTER}/**/*.ts`], ignores: ['**/*.test.ts'], rules: converterImports(true) },
+  { files: CONVERTER_CORE, rules: converterImports(false) },
+];
+
 export default defineConfig(
   {
     ignores: [
@@ -288,6 +330,7 @@ export default defineConfig(
     },
   },
   moduleBoundaries,
+  toolBoundaries,
   {
     files: ['apps/*/e2e/**/*.ts'],
     rules: {
