@@ -207,3 +207,8 @@ GRANT SELECT,
       UPDATE (removed_by, updated_by)
    ON app.team_member TO app_api;
 GRANT SELECT ON app.break_glass TO app_api;
+-- The subject access export job reads a member's grants as app_worker (0044),
+-- every column but the sealed reason text, which it never opens.
+GRANT SELECT (tenant_id, id, membership_id, record_type, record_id, reason_code,
+              granted_at, expires_at, retain_until)
+   ON app.break_glass TO app_worker;
