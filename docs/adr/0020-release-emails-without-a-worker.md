@@ -1,6 +1,6 @@
 # ADR 0020: Release emails without a worker in MVP1
 
-- **Status:** proposed
+- **Status:** superseded: the worker now sends release emails, as [ADR 0009](0009-background-jobs.md) decided, and the API no longer sends them in the release request
 - **Date:** 2026-10-03
 - **Deciders:** Aaron Gardner
 
