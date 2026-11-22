@@ -6,7 +6,7 @@
 // session that sets no tenant, whose only input is an opaque token the
 // server verifies before it touches the database.
 
-import { defineRoute } from '@pixel-scientists/domain/api';
+import { defineRoute, oneClickUnsubscribeBodySchema } from '@pixel-scientists/domain/api';
 import { z } from 'zod';
 
 import { consentChangeSchema } from './inputs.ts';
@@ -92,16 +92,16 @@ export const getUnsubscribe = defineRoute({
 
 /**
  * Records one withdrawal and suppression for the token's person, purpose and
- * channel. Answers without a redirect. Takes no body for now: the platform
- * refuses a form body and a request from another origin, so a mail client's
- * RFC 8058 `List-Unsubscribe=One-Click` POST waits on a public route marker
- * in the domain route contract that allows exactly that body without an
- * origin.
+ * channel. Answers without a redirect. A mail client posts the RFC 8058 body
+ * `List-Unsubscribe=One-Click` from no origin of ours, so the route is a
+ * one-click unsubscribe: exempt from the Origin check, taking that body only.
  */
 export const confirmUnsubscribe = defineRoute({
   ...unsubscribe,
   method: 'POST',
   summary: 'Stop messages for one purpose and channel',
+  body: oneClickUnsubscribeBodySchema,
+  oneClickUnsubscribe: true,
   responses: { 200: unsubscribeResultSchema },
 });
 

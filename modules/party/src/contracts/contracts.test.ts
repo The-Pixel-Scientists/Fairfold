@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { checkRoute, type RouteContract } from '@pixel-scientists/domain/api';
+import {
+  checkRoute,
+  oneClickUnsubscribeBodySchema,
+  type RouteContract,
+} from '@pixel-scientists/domain/api';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
@@ -105,9 +109,16 @@ describe('portal responses', () => {
     }
     for (const route of Object.values(party.partyPublicRoutes) as RouteContract[]) {
       expect(route).toMatchObject({ audience: 'public', permission: null, scope: null });
-      expect(route.params ?? route.body).toBeUndefined();
+      expect(route.params).toBeUndefined();
       expect(keys(route.query as z.ZodType, 'input')).toEqual(['token']);
     }
+    expect((party.getUnsubscribe as RouteContract).body).toBeUndefined();
+  });
+
+  it('take only the one-click body on the unsubscribe POST, the one route exempt from Origin', () => {
+    const exempt = routes.filter((route) => Object.hasOwn(route, 'oneClickUnsubscribe'));
+    expect(exempt).toEqual([party.confirmUnsubscribe]);
+    expect(party.confirmUnsubscribe.body).toBe(oneClickUnsubscribeBodySchema);
   });
 
   it('are walked deeply enough to find a nested key', () => {
