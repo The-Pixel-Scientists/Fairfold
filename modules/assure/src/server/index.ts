@@ -8,7 +8,11 @@
 // serve subject access and erasure, and run whether or not a tenant has the
 // module on. `readRegistryKeys` and `createRegistryAdapters` build the
 // adapters at start-up, and `registersOff` names the registers a deployment
-// cannot reach.
+// cannot reach. `screeningHandlers` serves the screening and match routes,
+// `screeningJob` is the handler of the `assure.screening` queue (SCREENING_QUEUE),
+// `submissionSubscriber` of the event queue's submission events (wired
+// through defineEventHandler('assure', ...)) and
+// `sanctionsListRefresh` of the daily list download, all for apps/api alone.
 
 export {
   createRegistryAdapters,
@@ -27,5 +31,29 @@ export {
   type RegistryDependencies,
   type RegistryKeys,
 } from './registries/index.ts';
+export {
+  LIST_URL,
+  readListUrl,
+  sanctionsListRefresh,
+  SCREENING_QUEUE,
+  screeningHandlers,
+  screeningJob,
+  submissionSubscriber,
+  type Fetcher as ListFetcher,
+  type IngestDependencies,
+  type IngestFailureCode,
+  type IngestJob,
+  type MatchFound,
+  type PartyName,
+  type PartyReader,
+  type RunAuditEvent,
+  type ScreeningContext,
+  type ScreeningDependencies,
+  type ScreeningFailureCode,
+  type ScreeningJob,
+  type ScreeningRouteDependencies,
+  type SubmissionDependencies,
+  type SubmissionJob,
+} from './screening/index.ts';
 export { assureErasure } from './erasure.ts';
 export { assureSubjectData } from './subject-data.ts';
