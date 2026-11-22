@@ -52,6 +52,9 @@
     },
     {
       "path": "infra/proxy"
+    },
+    {
+      "path": "tools/cli"
     }
   ]
 }
