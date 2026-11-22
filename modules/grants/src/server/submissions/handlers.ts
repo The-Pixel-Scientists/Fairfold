@@ -17,6 +17,7 @@ import { adjustmentHandlers } from './adjustments.ts';
 import { assistedHandlers } from './assisted.ts';
 import type { SubmissionArgs, SubmissionDependencies } from './context.ts';
 import { readSubmission, readSubmissions } from './read.ts';
+import { mayMove, stageWorkflow } from './stage-workflow.ts';
 import { submissionsDb } from './tables.ts';
 
 const refusals = {
@@ -25,6 +26,7 @@ const refusals = {
   missing: 'This is not a submission. Remove it and try again.',
   withdrawn: 'This submission was withdrawn, so it cannot move. Remove it and try again.',
   otherRound: 'This submission is in another round. Move the submissions of one round at a time.',
+  refused: 'You cannot move this submission to that stage. Remove it and try again.',
 } as const;
 
 export function submissionHandlers(deps: SubmissionDependencies) {
@@ -66,6 +68,8 @@ export function submissionHandlers(deps: SubmissionDependencies) {
       .where('id', '=', stageId)
       .executeTakeFirst();
     if (stage === undefined) throw deps.notFound();
+    const workflow = await stageWorkflow(tx, stage.round_id);
+    if (workflow === undefined) throw deps.notFound();
 
     // Locked in id order, so a withdrawal or a second move waits its turn.
     const rows = await db
@@ -84,9 +88,12 @@ export function submissionHandlers(deps: SubmissionDependencies) {
           ? refusals.missing
           : row.status === 'withdrawn'
             ? refusals.withdrawn
-            : row.round_id === stage.round_id
-              ? undefined
-              : refusals.otherRound;
+            : row.round_id !== stage.round_id
+              ? refusals.otherRound
+              : row.stage_id === stageId ||
+                  mayMove(workflow, row.stage_id, stageId, context.membership)
+                ? undefined
+                : refusals.refused;
       return message === undefined ? [] : [{ field: `body.submissionIds.${index}`, message }];
     });
     if (problems.length > 0) throw deps.refuse(409, refusals.none, problems);
