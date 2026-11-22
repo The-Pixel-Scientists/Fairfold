@@ -98,10 +98,10 @@ function List({ first: page }: { first: Page }) {
   );
 }
 
-export default function VisitsPage() {
+function Screen() {
   const { state, retry } = useLoad(first);
   return (
-    <Gate permission="assure.visits.manage">
+    <>
       <PageHeader
         title="Visits"
         description="Monitoring visits, newest first."
@@ -114,6 +114,14 @@ export default function VisitsPage() {
       <WhenLoaded state={state} label="Loading visits" retry={retry}>
         {(page) => <List first={page} />}
       </WhenLoaded>
+    </>
+  );
+}
+
+export default function VisitsPage() {
+  return (
+    <Gate permission="assure.visits.manage">
+      <Screen />
     </Gate>
   );
 }

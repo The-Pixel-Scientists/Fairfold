@@ -66,10 +66,10 @@ function List({ rows }: { rows: Rows }) {
   );
 }
 
-export default function ChecklistsPage() {
+function Screen() {
   const { state, retry } = useLoad(loadChecklists);
   return (
-    <Gate permission="assure.checklists.manage">
+    <>
       <PageHeader
         title="Checklists"
         description="Due diligence checks, versioned. Publishing a change makes a new version and keeps every earlier answer."
@@ -82,6 +82,14 @@ export default function ChecklistsPage() {
       <WhenLoaded state={state} label="Loading checklists" retry={retry}>
         {({ checklists }) => <List rows={checklists} />}
       </WhenLoaded>
+    </>
+  );
+}
+
+export default function ChecklistsPage() {
+  return (
+    <Gate permission="assure.checklists.manage">
+      <Screen />
     </Gate>
   );
 }
