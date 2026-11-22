@@ -12,7 +12,7 @@ import { permissionsFor } from '@pixel-scientists/domain/platform';
 import { describe, expect, it } from 'vitest';
 
 import { classification, subjectPaths } from '../../../../packages/db/classification.ts';
-import { crmRoutes, segmentFields } from '../contracts/index.ts';
+import { crmRoutes, importRoutes, segmentFields } from '../contracts/index.ts';
 import * as server from './index.ts';
 import { subjectTables } from './subject-data.ts';
 
@@ -22,15 +22,10 @@ const handlers = server.crmHandlers({} as server.CrmDependencies);
 const notBuilt = [
   'reverseMerge',
   'dismissDuplicate',
-  'getTimeline',
-  'recordInteraction',
   'listExternalReferences',
   'addExternalReference',
   'removeExternalReference',
-  'startImport',
-  'getImport',
-  'listImportRows',
-  'confirmImport',
+  ...Object.keys(importRoutes),
 ];
 
 describe('crm routes', () => {
@@ -51,13 +46,48 @@ describe('crm routes', () => {
     expect(stepUp.sort()).toEqual(['confirmMerge', 'previewMerge']);
   });
 
-  it('has no job, handler list or timer for a merge to hide in', () => {
+  it('has no timer for a merge to hide in, and only the import and the two events as jobs', () => {
     expect(Object.keys(server).sort()).toEqual([
       'crmErasure',
       'crmHandlers',
+      'crmImportHandlers',
+      'crmImportParser',
       'crmRepoint',
       'crmSubjectData',
+      'crmTimelineEvents',
     ]);
+  });
+});
+
+describe('crm import routes', () => {
+  const handlers = server.crmImportHandlers(
+    {} as server.CrmDependencies,
+    {} as server.ImportDependencies,
+  );
+
+  it('answers every import route, and no other', () => {
+    expect(Object.keys(handlers).sort()).toEqual(Object.keys(importRoutes).sort());
+  });
+
+  it.each(Object.entries(importRoutes))(
+    '%s needs the import permission, which a reviewer does not hold',
+    (_name, route) => {
+      expect(route.permission).toBe('crm.imports.run');
+      expect(permissionsFor(['reviewer'], 'console')).not.toContain(route.permission);
+      expect(permissionsFor(['programme_manager'], 'console')).toContain(route.permission);
+    },
+  );
+
+  it('asks for step-up to start and to confirm, and for nothing to read', () => {
+    const stepUp = Object.entries(importRoutes)
+      .filter(([, route]) => 'stepUp' in route)
+      .map(([name]) => name);
+    expect(stepUp.sort()).toEqual(['confirmImport', 'startImport']);
+  });
+
+  it('is idempotent where it creates', () => {
+    expect(importRoutes.startImport.idempotent).toBe(true);
+    expect(importRoutes.confirmImport.idempotent).toBe(true);
   });
 });
 
