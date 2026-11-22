@@ -106,6 +106,20 @@ describe('the counters in app.request_limit', { timeout: 30_000 }, () => {
     expect(clear.rowCount).toBe(0);
   });
 
+  it('count a search in the search bucket, apart from a general count of the same key', async () => {
+    const [first, second] = [await instance(), await instance()];
+    const key = keyHash(KEY, 'search', `console:${newAddress()}`);
+    const { windowSeconds } = LIMITS.search;
+
+    const counts = [
+      (await first.database.requestLimits.count('search', key, windowSeconds)).count,
+      (await second.database.requestLimits.count('search', key, windowSeconds)).count,
+      (await first.database.requestLimits.count('general', key, windowSeconds)).count,
+    ];
+
+    expect(counts).toEqual([1, 2, 1]);
+  });
+
   it('are written with one upsert and no tenant on the connection', async () => {
     const recording = createDatabase<unknown>({
       host: settings.host,
