@@ -40,9 +40,40 @@ export const scopeRules = {
    * version, its opening time has passed and its closing time has not.
    */
   open_form: { module: 'forms', app: 'portal' },
+  /**
+   * A restrictable record that is not restricted, or is restricted and names
+   * the caller or one of their teams. On the record's own read routes, an
+   * unexpired break-glass grant counts too (ADR 0037).
+   */
+  reachable: { module: 'platform', app: 'console' },
+  /** A restrictable record assigned to the caller or one of their teams, and reachable without break-glass. */
+  caseload: { module: 'platform', app: 'console' },
 } as const satisfies Record<string, { module: ModuleId; app: App }>;
 
 export type ScopeRule = keyof typeof scopeRules;
+
+/** The rules that reach restrictable records. They narrow `tenant`, never widen any rule. */
+export const reachScopeRules = ['reachable', 'caseload'] as const satisfies readonly ScopeRule[];
+
+/**
+ * Record types a module lets be restricted, as `<module>.<record>` (ADR 0037).
+ * A route on one names it as `record` and uses a reach rule. None yet: the
+ * first comes with the tool that needs it.
+ */
+export const restrictableRecords = [] as const satisfies readonly `${ModuleId}.${string}`[];
+
+export type RestrictableRecord = (typeof restrictableRecords)[number];
+
+/** Why a record is restricted or its restriction lifted, for each module's restrict routes. */
+export const restrictionReasons = [
+  'safeguarding',
+  'legal',
+  'about_a_colleague',
+  'conflict_of_interest',
+  'other',
+] as const;
+
+export type RestrictionReason = (typeof restrictionReasons)[number];
 
 /**
  * Each permission works in one app, with the scope rules its routes may use.
@@ -108,6 +139,24 @@ export const permissions = {
     label: 'Approve or reject requests',
     scopes: ['tenant'],
     stepUp: true,
+  },
+  'platform.teams.manage': {
+    app: 'console',
+    label: 'Create teams and manage their members',
+    scopes: ['tenant'],
+    stepUp: true,
+  },
+  // Opening a grant is a change, so step-up applies although the name ends in "use".
+  'platform.break_glass.use': {
+    app: 'console',
+    label: 'Open a restricted record in an emergency, for one hour',
+    scopes: ['tenant'],
+    stepUp: true,
+  },
+  'platform.break_glass.review': {
+    app: 'console',
+    label: 'Review emergency access to restricted records',
+    scopes: ['tenant'],
   },
   'party.records.read': {
     app: 'console',

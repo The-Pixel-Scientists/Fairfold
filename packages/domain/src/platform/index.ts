@@ -9,9 +9,14 @@ export {
   apps,
   permissionSchema,
   permissions,
+  reachScopeRules,
+  restrictableRecords,
+  restrictionReasons,
   scopeRules,
   type App,
   type Permission,
+  type RestrictableRecord,
+  type RestrictionReason,
   type ScopeRule,
 } from './access.ts';
 export {

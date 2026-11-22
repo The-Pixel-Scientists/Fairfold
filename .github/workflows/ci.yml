@@ -215,7 +215,7 @@ jobs:
     # test fails.
     env:
       MANAGER_JOURNEYS: outcome-journey\.spec\.ts form-builder-journey\.spec\.ts forms-builder-table-file-journey\.spec\.ts submissions-files-journey\.spec\.ts
-      REVIEW_JOURNEYS: submissions-journey\.spec\.ts assessment-journey\.spec\.ts decisions-journey\.spec\.ts submission-notes-messages\.spec\.ts
+      REVIEW_JOURNEYS: submissions-journey\.spec\.ts assessment-journey\.spec\.ts decisions-journey\.spec\.ts submission-notes-messages\.spec\.ts export-actions\.spec\.ts
       PROGRAMME_JOURNEY: programme-journey\.spec\.ts
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -249,8 +249,10 @@ jobs:
       # more application, last. On the applications scenario, the submissions
       # journey moves five submissions to Review, which the assessment
       # journey's reviewer needs to have reviews not yet started, and the
-      # decisions journey follows them. The programme set-up journey starts
-      # from a manager with no programmes, so it runs on the base scenario.
+      # decisions journey follows them. The export actions, which read the
+      # submissions and change none, come last. The programme set-up journey
+      # starts from a manager with no programmes, so it runs on the base
+      # scenario.
       - name: Fill the stack with synthetic data and run the part's specs against it
         env:
           SCENARIO: ${{ matrix.scenario }}

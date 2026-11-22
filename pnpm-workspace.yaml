@@ -2,6 +2,7 @@ packages:
   - apps/*
   - modules/*
   - packages/*
+  - tools/*
 
 # Supply-chain settings (ADR 0001). Do not lower minimumReleaseAge. A security
 # fix that cannot wait goes in minimumReleaseAgeExclude as one exact version,

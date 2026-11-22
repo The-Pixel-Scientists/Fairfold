@@ -161,6 +161,11 @@ Delete the sections for tools you do not run.
   apply, submit, and see your outcome.
 - Key journeys for staff, in the console: set up a programme, build a form,
   triage submissions, assess, and record and release decisions.
+- Alternative routes: if you cannot use the online form, or you need more time,
+  you can ask the funder for more time, or for the funder to submit the
+  application for you. Contact [Contact for adjustments]. Read how this works in
+  the
+  [reasonable adjustments guide](../../modules/grants/docs/reasonable-adjustments.md).
 - Known issues: see the [grants entries](known-issues.md#grants).
 - Last tested: [Last tested]
 - Compliance status: [Compliance status]

@@ -35,6 +35,7 @@ export default defineConfig({
             'modules/*/src/server/**/*.test.ts',
             'apps/api/**/*.test.ts',
             'scripts/**/*.test.ts',
+            'tools/*/src/**/*.test.ts',
             'eslint.config.test.ts',
           ],
           exclude: [...exclude, '**/*.db.test.ts', '**/*.integration.test.ts'],
@@ -80,6 +81,7 @@ export default defineConfig({
             'packages/db/seed/**/*.integration.test.ts',
             'apps/api/**/*.integration.test.ts',
             'modules/*/src/**/*.integration.test.ts',
+            'tools/*/src/**/*.integration.test.ts',
           ],
           exclude,
           // Database tests share one database, so files run one at a time.

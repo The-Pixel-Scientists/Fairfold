@@ -11,6 +11,9 @@
 //            run this before migrating.
 //   up       As migrator: check the roles, then apply every pending migration.
 //   down     As migrator: check the roles, then roll back the last migration.
+//   status   As migrator, changing nothing: whether the connection uses TLS,
+//            the roles' check, pending migrations and whether the worker is
+//            connected. Exits 1 if any of them needs attention.
 //   drop     As the superuser: drop this worktree's database. Development
 //            only.
 //
@@ -21,6 +24,8 @@
 // `pnpm db:migrate`, `pnpm db:rollback` and `pnpm db:drop` supply them.
 // Test set-up can import the same steps.
 
+import { readFileSync } from 'node:fs';
+
 import { Kysely, PostgresDialect } from 'kysely';
 import pg from 'pg';
 
@@ -29,8 +34,12 @@ import {
   applyDatabasePrivileges,
   applyRoles,
   assertRoles,
+  findRoleProblems,
   LOGIN_ROLES,
+  readAdminMode,
+  readAdminRole,
   readRolePassword,
+  ROLES_SCRIPT_VERSION,
 } from './roles.ts';
 import {
   isLoopbackHost,
@@ -45,8 +54,8 @@ import {
 /** `pnpm db:drop` and `pnpm db:types` refuse any other database (ADR 0005). */
 const DEVELOPMENT_PREFIX = 'tps_';
 
-type Step = 'prepare' | 'up' | 'down' | 'drop';
-const STEPS: readonly Step[] = ['prepare', 'up', 'down', 'drop'];
+type Step = 'prepare' | 'up' | 'down' | 'drop' | 'status';
+const STEPS: readonly Step[] = ['prepare', 'up', 'down', 'drop', 'status'];
 
 function parseArguments(argv: readonly string[]): { steps: Step[]; test: boolean } {
   const steps: Step[] = [];
@@ -59,12 +68,31 @@ function parseArguments(argv: readonly string[]): { steps: Step[]; test: boolean
       steps.push(argument as Step);
     } else {
       throw new Error(
-        `Unknown argument ${argument}. Use prepare, up, down or drop, and optionally --test.`,
+        `Unknown argument ${argument}. Use prepare, up, down, drop or status, and optionally --test.`,
       );
     }
   }
-  if (steps.length === 0) throw new Error('Name at least one step: prepare, up, down or drop.');
+  if (steps.length === 0) {
+    throw new Error('Name at least one step: prepare, up, down, drop or status.');
+  }
   return { steps, test };
+}
+
+const descriptors = new Map<number, string>();
+
+/**
+ * Read a secret file. /dev/fd/N is read from descriptor N, once: the
+ * operator cli hands a typed admin password over a pipe there, so it never
+ * reaches a disk, and Linux cannot reopen by path the socket Node.js gives
+ * a child. prepare connects twice, so the value is kept for the second.
+ */
+export function readSecretFile(path: string): string {
+  const match = /^\/dev\/fd\/(\d+)$/.exec(path);
+  if (!match) return readFileSync(path, 'utf8');
+  const descriptor = Number(match[1]);
+  const value = descriptors.get(descriptor) ?? readFileSync(descriptor, 'utf8');
+  descriptors.set(descriptor, value);
+  return value;
 }
 
 async function withSuperuser<T>(
@@ -76,7 +104,7 @@ async function withSuperuser<T>(
     ...readServerConnection(env),
     database,
     user: readSetting(env, 'TPS_DB_SUPERUSER'),
-    password: readSecret(env, 'TPS_DB_SUPERUSER_PASSWORD'),
+    password: readSecret(env, 'TPS_DB_SUPERUSER_PASSWORD', readSecretFile),
     application_name: 'tps-db-scripts',
   });
   await client.connect();
@@ -106,8 +134,12 @@ export async function prepareDatabase(env: Env, database: string): Promise<void>
       );
     }
   });
-  await withSuperuser(env, database, (client) => applyDatabasePrivileges(client));
-  console.log(`Applied the roles script to ${database}.`);
+  const mode = readAdminMode(env);
+  await withSuperuser(env, database, (client) => applyDatabasePrivileges(client, mode));
+  console.log(
+    `Applied roles script version ${ROLES_SCRIPT_VERSION} to ${database}` +
+      (mode === 'managed' ? ', and every role matches it.' : '.'),
+  );
 }
 
 /**
@@ -144,12 +176,8 @@ export async function dropDatabase(env: Env, database: string): Promise<void> {
   console.log(`Dropped database ${database}.`);
 }
 
-export async function migrateDatabase(
-  env: Env,
-  database: string,
-  direction: 'up' | 'down',
-): Promise<void> {
-  const pool = new pg.Pool({
+function migratorPool(env: Env, database: string): pg.Pool {
+  return new pg.Pool({
     ...readServerConnection(env),
     database,
     user: 'migrator',
@@ -157,11 +185,19 @@ export async function migrateDatabase(
     application_name: 'tps-migrate',
     max: 1,
   });
+}
+
+export async function migrateDatabase(
+  env: Env,
+  database: string,
+  direction: 'up' | 'down',
+): Promise<void> {
+  const pool = migratorPool(env, database);
   const db = new Kysely<unknown>({ dialect: new PostgresDialect({ pool }) });
   try {
     const client = await pool.connect();
     try {
-      await assertRoles(client);
+      await assertRoles(client, readAdminRole(env));
     } finally {
       client.release();
     }
@@ -184,13 +220,74 @@ export async function migrateDatabase(
   }
 }
 
+/** The worker's pg-boss connections name themselves this (apps/api/src/worker.ts). */
+const WORKER_APPLICATION = 'tps-worker-queue';
+
+/**
+ * Report on the database as migrator, changing nothing and reading no
+ * tenant's data. Returns each line and whether everything is as it should be.
+ */
+export async function databaseStatus(
+  env: Env,
+  database: string,
+): Promise<{ lines: string[]; healthy: boolean }> {
+  const pool = migratorPool(env, database);
+  const db = new Kysely<unknown>({ dialect: new PostgresDialect({ pool }) });
+  try {
+    const client = await pool.connect();
+    let tls: boolean;
+    let problems: string[];
+    let workers: number;
+    try {
+      const ssl = await client.query<{ ssl: boolean }>(
+        'SELECT ssl FROM pg_catalog.pg_stat_ssl WHERE pid = pg_catalog.pg_backend_pid()',
+      );
+      tls = ssl.rows[0]?.ssl === true;
+      problems = await findRoleProblems(client, readAdminRole(env));
+      const activity = await client.query<{ count: number }>(
+        `SELECT count(*)::integer AS count FROM pg_catalog.pg_stat_activity
+          WHERE datname = pg_catalog.current_database() AND application_name = $1`,
+        [WORKER_APPLICATION],
+      );
+      workers = activity.rows[0]?.count ?? 0;
+    } finally {
+      client.release();
+    }
+    const pending = (await createMigrator(db).getMigrations())
+      .filter((migration) => migration.executedAt === undefined)
+      .map((migration) => migration.name);
+
+    const host = readSetting(env, 'TPS_DB_HOST');
+    const lines = [
+      `Database: connected to ${database} as migrator ${tls ? 'over TLS' : 'without TLS'}.`,
+      problems.length === 0
+        ? `Roles: match roles script version ${ROLES_SCRIPT_VERSION}.`
+        : `Roles: do not match roles script version ${ROLES_SCRIPT_VERSION}:`,
+      ...problems.map((problem) => `  - ${problem}`),
+      pending.length === 0
+        ? 'Migrations: none pending.'
+        : `Migrations: ${String(pending.length)} pending: ${pending.join(', ')}.`,
+      workers > 0 ? 'Worker: connected.' : 'Worker: not connected.',
+    ];
+    const healthy =
+      (tls || isLoopbackHost(host)) && problems.length === 0 && pending.length === 0 && workers > 0;
+    return { lines, healthy };
+  } finally {
+    await db.destroy();
+  }
+}
+
 async function main(argv: readonly string[], env: Env): Promise<void> {
   const { steps, test } = parseArguments(argv);
   const database = readDatabaseName(env, test ? 'TPS_TEST_DB_NAME' : 'TPS_DB_NAME');
   for (const step of steps) {
     if (step === 'prepare') await prepareDatabase(env, database);
     else if (step === 'drop') await dropDatabase(env, database);
-    else await migrateDatabase(env, database, step);
+    else if (step === 'status') {
+      const { lines, healthy } = await databaseStatus(env, database);
+      for (const line of lines) console.log(line);
+      if (!healthy) process.exitCode = 1;
+    } else await migrateDatabase(env, database, step);
   }
 }
 

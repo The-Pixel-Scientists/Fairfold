@@ -30,7 +30,7 @@ const row: AwardRow = {
 
 const organisation = (
   name: string,
-  identifiers: { scheme: IdentifierScheme; identifier: string }[] = [],
+  identifiers: { scheme: IdentifierScheme; identifier: string; verified?: boolean }[] = [],
 ) =>
   new Map([
     [
@@ -38,7 +38,7 @@ const organisation = (
       {
         id: organisationId,
         name,
-        identifiers: identifiers.map((held) => ({ ...held, verified: true })),
+        identifiers: identifiers.map((held) => ({ verified: true, ...held })),
       },
     ],
   ]);
@@ -87,6 +87,46 @@ describe('buildExport', () => {
     expect(summary.unverifiedRecipients).toEqual([
       { id: organisationId, name: 'Riverside Food Bank' },
     ]);
+  });
+
+  it('withholds an unverified identifier from the id and from both number fields', () => {
+    const { file, summary } = buildExport(
+      [row],
+      publisher,
+      organisation('Riverside Food Bank', [
+        { scheme: 'GB-CHC', identifier: '1234567', verified: false },
+        { scheme: 'GB-COH', identifier: '01234567', verified: false },
+      ]),
+      'Europe/London',
+    );
+
+    expect(file.grants[0]?.recipientOrganization).toEqual([
+      { id: `360G-northfield-${organisationId}`, name: 'Riverside Food Bank' },
+    ]);
+    expect(summary.unverifiedRecipients).toHaveLength(1);
+  });
+
+  it('publishes the first verified scheme when an earlier one is unverified', () => {
+    const { file, summary } = buildExport(
+      [row],
+      publisher,
+      organisation('Riverside Food Bank', [
+        { scheme: 'GB-CHC', identifier: '1234567', verified: false },
+        { scheme: 'GB-SC', identifier: 'SC123456', verified: true },
+        { scheme: 'GB-COH', identifier: '01234567', verified: true },
+      ]),
+      'Europe/London',
+    );
+
+    expect(file.grants[0]?.recipientOrganization).toEqual([
+      {
+        id: 'GB-SC-SC123456',
+        name: 'Riverside Food Bank',
+        charityNumber: 'SC123456',
+        companyNumber: '01234567',
+      },
+    ]);
+    expect(summary.unverifiedRecipients).toEqual([]);
   });
 
   it('keeps a hostile organisation name as text in the JSON', () => {

@@ -72,6 +72,16 @@ export const platformAuditActions = defineAuditActions('platform', [
   'platform.membership.suspended',
   'platform.membership.reinstated',
   'platform.membership.removed',
+  // Teams and emergency access to restricted records (ADR 0037). Values are
+  // ids and codes only: never a member's name, a reason's text or a
+  // record's content.
+  'platform.team.created',
+  'platform.team.renamed',
+  'platform.team.archived',
+  'platform.team_member.added',
+  'platform.team_member.removed',
+  'platform.break_glass.opened',
+  'platform.break_glass.reviewed',
   'platform.warehouse.exported',
   // A file stored clean, a file refused as infected or unchecked, and a staff
   // download (ADR 0047). Their values are ids, type, size and verdict, never
@@ -87,6 +97,22 @@ export const platformAuditActions = defineAuditActions('platform', [
   'platform.file.deleted',
   'platform.file_sweep.completed',
   'platform.file_recheck.completed',
+  // Signature requests and generated documents (ADR 0040). Values are ids,
+  // statuses, codes and SHA-256 hashes only: never a signer's name, email or
+  // IP address, a file name or a callback reference. Downloading evidence is
+  // a sensitive read; a signed file's download is platform.file.downloaded.
+  'platform.signature.requested',
+  'platform.signature.sent',
+  'platform.signature.viewed',
+  'platform.signature.signed',
+  'platform.signature.declined',
+  'platform.signature.expired',
+  'platform.signature.cancelled',
+  'platform.signature.failed',
+  'platform.signature.callback_received',
+  'platform.signature_evidence.downloaded',
+  'platform.document.generated',
+  'platform.document_template.published',
   // Retention, subject access, erasure and the audit log itself (E3, ADR
   // 0027). Values are ids, codes, days and counts by table, never a personal
   // value; an event about a person carries them as its subject party id.

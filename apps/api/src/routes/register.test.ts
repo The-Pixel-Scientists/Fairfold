@@ -615,6 +615,8 @@ describe('the policy before the transaction', () => {
       '/console/probes/platform-erasure-request',
       '/console/probes/platform-sso-manage',
       '/console/probes/platform-approvals-decide',
+      '/console/probes/platform-teams-manage',
+      '/console/probes/platform-break-glass-use',
       '/console/probes/grants-decisions-release',
       '/console/probes/grants-monitoring-disclose',
       '/console/probes/crm-records-export',

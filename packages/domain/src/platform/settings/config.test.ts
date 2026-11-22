@@ -24,6 +24,7 @@ describe('configuration entity types', () => {
       'platform.module',
       'platform.retention',
       'platform.embed_origins',
+      'platform.document_template',
       'crm.segment',
       'assure.checklist',
       'forms.form',
@@ -56,6 +57,11 @@ describe('configuration diffs', () => {
       'platform.module': [{ field: 'enabled', from: true, to: false }],
       'platform.retention': [{ field: 'days', from: 365, to: 730 }],
       'platform.embed_origins': [{ field: 'origin', from: null, to: 'https://www.example.org' }],
+      'platform.document_template': [
+        { field: 'version', from: 1, to: 2 },
+        { field: 'audience', from: 'staff', to: 'blind_reviewer' },
+        { field: 'mergeFields', added: ['f_budget'], removed: ['f_name'] },
+      ],
       'crm.segment': [
         { path: 'name', from: 'Donors', to: 'Regular donors' },
         { path: `filters.${ITEM}.operator`, from: null, to: 'equals' },
@@ -123,6 +129,15 @@ describe('configuration diffs', () => {
           { field: 'origin', from: null, to: 'https://a.example.org' },
           { field: 'origin', from: null, to: 'https://b.example.org' },
         ],
+      ],
+      'platform.document_template': [
+        [],
+        [{ field: 'version', from: 1, to: 0 }],
+        [{ field: 'body', from: null, to: 'Dear Jo Bloggs' }],
+        [{ field: 'title', from: 'Board pack', to: 'Board pack for Jo Bloggs' }],
+        [{ field: 'mergeFields', added: ['Jo Bloggs'], removed: [] }],
+        [{ field: 'mergeFields', added: ['f_budget'], removed: [], values: { f_budget: 1 } }],
+        [{ field: 'audience', from: 'staff', to: 'everyone' }],
       ],
       'crm.segment': [
         [],

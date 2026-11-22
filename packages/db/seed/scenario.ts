@@ -5,10 +5,10 @@
 // forced row-level security binds like any app role (ADR 0003), so it sets
 // each tenant in turn and writes that tenant's rows, all in one transaction.
 // Actor columns stay null, as for anything the system does, except where the
-// schema needs a member: the administrator switches the tenant's tools, the
-// programme manager publishes forms, moves applications on, fills reviewer
-// pools and records decisions, and applicants start, check and submit their
-// own.
+// schema needs a member: the administrator switches the tenant's tools
+// (unless the tenant lists them, when the operator does), the programme
+// manager publishes forms, moves applications on, fills reviewer pools and
+// records decisions, and applicants start, check and submit their own.
 
 import { argon2Sync, randomBytes, randomUUID } from 'node:crypto';
 
@@ -18,8 +18,11 @@ import {
   switchableModuleIds,
   type Preset,
   type Role,
+  type SwitchableModuleId,
 } from '@pixel-scientists/domain/platform';
 import type pg from 'pg';
+
+import { switchOnAsOperator } from './operator-switch.ts';
 
 /** Given name, family name and role. The address is given.family@<slug>.example. */
 export type StaffMember = readonly [givenName: string, familyName: string, role: Role];
@@ -120,6 +123,13 @@ export interface Tenant {
    */
   readonly theme?: { readonly brandColour: string; readonly preset: Preset };
   readonly programmes?: readonly Programme[];
+  /**
+   * The tools the operator switches on when it makes the tenant, each with
+   * its version and event; every other tool has no row, so it is off. With
+   * no list, the administrator has grants on and every other tool off, as
+   * development data with neither (S11-59).
+   */
+  readonly tools?: readonly SwitchableModuleId[];
 }
 
 export type Scenario = readonly Tenant[];
@@ -182,7 +192,7 @@ export async function writeScenario(
   }
 }
 
-type Insert = (table: string, values: Readonly<Record<string, unknown>>) => Promise<string>;
+export type Insert = (table: string, values: Readonly<Record<string, unknown>>) => Promise<string>;
 
 /** Inserts through `client`, keeping each new row's id in `rows` under its table. */
 function inserter(client: pg.ClientBase, rows: Record<string, string[]>): Insert {
@@ -256,7 +266,8 @@ async function addAccount(
   return { membership, person };
 }
 
-async function writeTenant(
+/** Write one tenant's rows inside the caller's transaction, setting it as the tenant. */
+export async function writeTenant(
   client: pg.ClientBase,
   tenant: Tenant,
   password: string,
@@ -280,17 +291,21 @@ async function writeTenant(
     if (granted.includes('platform.settings.manage')) settingsManager ??= membership;
     if (MANAGER.every((permission) => granted.includes(permission))) manager ??= membership;
   }
-  // No tool is on without its row (ADR 0024): grants on, every wave 1 tool off.
+  // No tool is on without its row (ADR 0024).
   if (settingsManager === undefined) {
     throw new Error(`${tenant.slug} needs a member who manages settings to switch its tools.`);
   }
-  for (const module of switchableModuleIds) {
-    await insert('app.tenant_module', {
-      tenant_id: tenantId,
-      module,
-      enabled: module === 'grants',
-      updated_by: settingsManager,
-    });
+  if (tenant.tools) {
+    await switchOnAsOperator(client, insert, tenantId, tenant.tools);
+  } else {
+    for (const module of switchableModuleIds) {
+      await insert('app.tenant_module', {
+        tenant_id: tenantId,
+        module,
+        enabled: module === 'grants',
+        updated_by: settingsManager,
+      });
+    }
   }
   if (tenant.theme) {
     await insert('app.tenant_theme', {

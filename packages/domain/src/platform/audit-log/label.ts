@@ -9,6 +9,7 @@ import { auditActionPattern } from '../audit.ts';
 
 /** Words written differently from their code. */
 const words: Readonly<Record<string, string>> = {
+  'break glass': 'emergency access',
   mfa: 'MFA',
   reencrypted: 're-encrypted',
   'sign in': 'sign-in',

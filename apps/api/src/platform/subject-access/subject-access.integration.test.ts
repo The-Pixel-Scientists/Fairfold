@@ -23,6 +23,7 @@ import {
   addParts,
   applicationRow,
 } from '../../../../../packages/db/test/grants/application-fixtures.ts';
+import { addRequest } from '../../../../../packages/db/test/documents/fixtures.ts';
 import { addOrganisation, addPerson } from '../../../../../packages/db/test/party/fixtures.ts';
 import {
   asMigratorIn,
@@ -31,12 +32,13 @@ import {
   insertRow,
   type TestTenant,
 } from '../../../../../packages/db/test/tenants.ts';
+import { documentsSubjectData } from '../documents/subject-data.ts';
 import { collectSubjectAccess } from './collect.ts';
 import { exportChunks, outputSensitivity } from './export-file.ts';
 
 const QUESTIONS = 49;
 const APPLICATIONS = 20;
-const contributions = [partySubjectData, grantsSubjectData];
+const contributions = [partySubjectData, grantsSubjectData, documentsSubjectData];
 
 const FORM = {
   sections: [
@@ -149,6 +151,7 @@ async function addFixture(): Promise<Fixture> {
     await audit(membership, null, bystander);
     await audit(staff, bystander, bystander);
     await addFile(client, tenant, membership);
+    await addRequest(client, tenant, parts.person);
     const invitation = await insertRow(client, 'app.invitation', {
       tenant_id: tenant.id,
       email: `${randomUUID()}@example.test`,
@@ -311,6 +314,19 @@ describe('collectSubjectAccess', { timeout: 60_000 }, () => {
     expect(JSON.stringify(auditEvents)).not.toContain('conflicted');
   });
 
+  it("keeps a signer's requests and signer rows beside the memberships of their portal account", async () => {
+    const { platform } = (await collect(a.tenant, a.person)).modules;
+    expect(platform?.['app.membership']).toHaveLength(1);
+    expect(platform?.['app.signature_signer']).toHaveLength(1);
+    expect(platform?.['app.signature_request']).toHaveLength(1);
+    expect(platform?.['app.signature_signer']?.[0]?.['app.signature_signer.person_id']?.value).toBe(
+      a.person,
+    );
+    const other = (await collect(b.tenant, a.person)).modules.platform;
+    expect(other?.['app.signature_signer']).toEqual([]);
+    expect(other?.['app.signature_request']).toEqual([]);
+  });
+
   it('adds the audit events about the person or their merged duplicate, or done by their memberships, by kind', async () => {
     const data = await collect(a.tenant, a.person);
     expect(data.auditEvents.map((event) => event.actor.kind).sort()).toEqual([
@@ -344,7 +360,7 @@ describe('collectSubjectAccess', { timeout: 60_000 }, () => {
     expect(data.auditEvents.filter((event) => event.entityId === a.bystander)).toHaveLength(1);
     const about = await collect(a.tenant, a.bystander);
     expect(about.auditEvents.map((event) => event.actor.kind)).toEqual(['staff']);
-    expect(about.modules.platform).toBeUndefined();
+    expect(about.modules.platform?.['app.membership']).toBeUndefined();
   });
 
   it("finds nothing of another tenant's person, in either direction", async () => {
@@ -354,7 +370,7 @@ describe('collectSubjectAccess', { timeout: 60_000 }, () => {
     ] as const) {
       const data = await collect(tenant, stranger);
       expect(data.auditEvents).toEqual([]);
-      expect(data.modules.platform).toBeUndefined();
+      expect(data.modules.platform?.['app.membership']).toBeUndefined();
       for (const tables of Object.values(data.modules)) {
         for (const rows of Object.values(tables)) expect(rows).toEqual([]);
       }

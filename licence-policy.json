@@ -1,5 +1,5 @@
 {
-  "$comment": "Licence policy for dependencies (ADR 0002, with CC-BY-3.0 added by ADR 0013), checked by `pnpm check:licences`. A licence in allowedPerPackage passes only with an exception naming one package version, with the reason, approver and date; exceptions are reviewed every quarter. A development-only exception fails the check if the package reaches the production dependency tree. CC-BY-3.0 and CC-BY-4.0 are for data files only, and CC-BY-3.0 only in development dependencies.",
+  "$comment": "Licence policy for dependencies (ADR 0002, with CC-BY-3.0 added by ADR 0013), checked by `pnpm check:licences`. A licence in allowedPerPackage passes only with an exception naming one package version, with the reason, approver and date; exceptions are reviewed every quarter. A development-only exception fails the check if the package reaches the production dependency tree. CC-BY-3.0 and CC-BY-4.0 are for data files only, and CC-BY-3.0 only in development dependencies. services lists the separate containers Compose runs (by image repository) and the CI tools that never ship; they are not linked, need an OSI-approved licence and are not held to the lists above, and scripts/licence-inventory.ts fails a release whose Compose files run an image not listed here.",
   "allowed": [
     "MIT",
     "MIT-0",
@@ -79,5 +79,22 @@
       "approver": "Aaron Gardner",
       "date": "2026-10-04"
     }
+  ],
+  "services": [
+    { "name": "ClamAV", "kind": "service", "image": "clamav/clamav", "licence": "GPL-2.0-only" },
+    { "name": "Mailpit", "kind": "service", "image": "axllent/mailpit", "licence": "MIT" },
+    { "name": "nginx", "kind": "service", "image": "nginx", "licence": "BSD-2-Clause" },
+    { "name": "PostgreSQL", "kind": "service", "image": "postgres", "licence": "PostgreSQL" },
+    {
+      "name": "SeaweedFS",
+      "kind": "service",
+      "image": "chrislusf/seaweedfs",
+      "licence": "Apache-2.0"
+    },
+    { "name": "cosign", "kind": "tool", "licence": "Apache-2.0" },
+    { "name": "gitleaks", "kind": "tool", "licence": "MIT" },
+    { "name": "Semgrep", "kind": "tool", "licence": "LGPL-2.1-only" },
+    { "name": "Syft", "kind": "tool", "licence": "Apache-2.0" },
+    { "name": "Trivy", "kind": "tool", "licence": "Apache-2.0" }
   ]
 }

@@ -5,3 +5,6 @@
 
 export const TEAM_PATH = '/team';
 export const INVITATION_PATH = '/invitation';
+
+export const TEAMS_PATH = '/teams';
+export const EMERGENCY_ACCESS_PATH = '/emergency-access';

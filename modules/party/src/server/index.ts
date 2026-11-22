@@ -49,6 +49,7 @@ export {
 export { partyMergeSet, partySubjectData } from './subject-data.ts';
 export {
   readOrganisationSnapshot,
+  readOrganisationSnapshotNames,
   takeOrganisationSnapshot,
   type SnapshotContext,
 } from './snapshot.ts';

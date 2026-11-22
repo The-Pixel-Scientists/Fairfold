@@ -5,6 +5,7 @@
 
 import type { JobHandler } from '@pixel-scientists/db/jobs';
 
+import { esignHandlers, type EsignJobDependencies } from '../../platform/documents/esign/index.ts';
 import type { FilesJobDependencies } from '../../platform/files/index.ts';
 import { defineFanOut, fanOutHandler } from './fan-out.ts';
 import { filesHandler } from './files.ts';
@@ -22,10 +23,11 @@ export const fanOutQueue = defineFanOut('platform.fan_out', [
 /** Migration 0043's daily fan-out, which sends each tenant its files job. */
 export const fileFanOutQueue = defineFanOut('platform.file_fan_out', ['platform.file_scan']);
 
-/** The file jobs run only where the worker has the file settings. */
+/** The file jobs run only where the worker has the file settings, and the signature jobs where it has a provider. */
 export function platformHandlers(
   logger: RunLogger,
   files?: FilesJobDependencies,
+  esign?: EsignJobDependencies,
 ): readonly JobHandler<unknown>[] {
   return [
     fanOutHandler(fanOutQueue, logger),
@@ -33,5 +35,6 @@ export function platformHandlers(
     auditPurgeHandler(logger),
     retentionSweepHandler(logger),
     ...(files === undefined ? [] : [fanOutHandler(fileFanOutQueue, logger), filesHandler(files)]),
+    ...(esign === undefined ? [] : esignHandlers(esign)),
   ];
 }

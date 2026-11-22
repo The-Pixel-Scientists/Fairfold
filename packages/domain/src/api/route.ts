@@ -13,7 +13,7 @@
 import { z } from 'zod';
 
 import { fileTypes } from '../files/types.ts';
-import type { Permission, ScopeRule } from '../platform/access.ts';
+import type { Permission, RestrictableRecord, ScopeRule } from '../platform/access.ts';
 import { moduleIds, type ModuleId } from '../platform/modules.ts';
 import { accessProblems, type AuthSession } from './access-rules.ts';
 import { isObject, keysOf, list, schemaNodes, toJsonSchema } from './json-schema.ts';
@@ -98,6 +98,8 @@ interface MemberRoute extends RouteBase {
   readonly audience: 'console' | 'portal';
   readonly permission: Permission;
   readonly scope: ScopeRule;
+  /** The restrictable record the route reaches, required with a reach rule (ADR 0037). */
+  readonly record?: RestrictableRecord;
   /** Needs re-authentication in the last 5 minutes (ADR 0010); required for changes under a step-up permission. */
   readonly stepUp?: boolean;
 }

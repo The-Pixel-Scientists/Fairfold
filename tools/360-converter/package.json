@@ -1,0 +1,19 @@
+{
+  "name": "@pixel-scientists/360-converter",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Turn a CSV of grants to organisations into a 360Giving JSON file",
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "bin": {
+    "360-converter": "./src/cli.ts"
+  },
+  "dependencies": {
+    "@pixel-scientists/domain": "workspace:*",
+    "@pixel-scientists/grants": "workspace:*",
+    "@pixel-scientists/party": "workspace:*"
+  },
+  "devDependencies": {
+    "zod": "4.6.7"
+  }
+}

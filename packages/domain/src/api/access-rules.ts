@@ -4,6 +4,8 @@
 //   - console and portal routes need a permission of their own module and
 //     app, a scope rule of that app which the permission uses, and
 //     `stepUp: true` for changes under a step-up permission;
+//   - a route on a restrictable record names it as `record` and uses a reach
+//     rule, and a reach rule always has its record (ADR 0037);
 //   - auth and public routes have neither, and auth routes belong to the
 //     platform module and state the session they need; an auth route that
 //     changes MFA, email, password or SSO settings needs step-up, which only
@@ -11,7 +13,14 @@
 // The fields are read as unknown: a cast or plain JavaScript can get past
 // the types.
 
-import { permissions, scopeRules, type Permission, type ScopeRule } from '../platform/access.ts';
+import {
+  permissions,
+  reachScopeRules,
+  restrictableRecords,
+  scopeRules,
+  type Permission,
+  type ScopeRule,
+} from '../platform/access.ts';
 
 /**
  * The session an `auth` route needs: none (one that is present is ignored),
@@ -29,12 +38,13 @@ interface AccessFields {
   readonly module: string;
   readonly permission?: unknown;
   readonly scope?: unknown;
+  readonly record?: unknown;
   readonly session?: unknown;
   readonly stepUp?: unknown;
 }
 
 export function accessProblems(route: AccessFields): string[] {
-  const { method, audience, module, permission, scope, session, stepUp } = route;
+  const { method, audience, module, permission, scope, record, session, stepUp } = route;
   const problems: string[] = [];
   if (audience === 'console' || audience === 'portal') {
     if (typeof permission !== 'string' || !Object.hasOwn(permissions, permission)) {
@@ -55,6 +65,7 @@ export function accessProblems(route: AccessFields): string[] {
     ) {
       problems.push(`The scope rule ${scope} is not one ${permission} uses in the ${audience}.`);
     }
+    problems.push(...recordProblems(scope, record));
     if (stepUp !== undefined && typeof stepUp !== 'boolean') {
       problems.push('stepUp is true or false.');
     }
@@ -64,8 +75,8 @@ export function accessProblems(route: AccessFields): string[] {
     if (session !== undefined) problems.push('Only auth routes state a session.');
     return problems;
   }
-  if (permission !== null || scope !== null) {
-    problems.push(`A ${audience} route has no permission or scope.`);
+  if (permission !== null || scope !== null || record !== undefined) {
+    problems.push(`A ${audience} route has no permission, scope or record.`);
   }
   if (stepUp !== undefined && audience !== 'auth') {
     problems.push('Only console, portal and auth routes can need step-up.');
@@ -82,6 +93,22 @@ export function accessProblems(route: AccessFields): string[] {
   }
   if (audience === 'public' && session !== undefined) {
     problems.push('Only auth routes state a session.');
+  }
+  return problems;
+}
+
+/** A restrictable record is reached only through a reach rule, and a reach rule only names one. */
+function recordProblems(scope: unknown, record: unknown): string[] {
+  const reach = (reachScopeRules as readonly unknown[]).includes(scope);
+  if (record === undefined) {
+    return reach ? [`The scope rule ${String(scope)} needs the record type it reaches.`] : [];
+  }
+  const problems: string[] = [];
+  if (!(restrictableRecords as readonly unknown[]).includes(record)) {
+    problems.push('The record type is not restrictable.');
+  }
+  if (!reach) {
+    problems.push(`A restrictable record is reached only through ${reachScopeRules.join(' or ')}.`);
   }
   return problems;
 }

@@ -95,8 +95,8 @@ You cannot reset another person's password or authenticator app. The team
 screens only change who belongs to the team and what roles they hold. If
 someone has lost their authenticator app, ask the operator.
 
-This guide does not yet cover the page where you manage your own password and
-authenticator app.
+To manage your own password and authenticator app, see
+[Account security](account-security.md).
 
 ## Every change is recorded
 

@@ -27,8 +27,8 @@ exported".
 
 The audit log can only be added to. The software cannot edit or delete an
 entry, and neither can an administrator. The one exception is built into the
-database: it may remove events that are past their retention date. Nothing
-runs that yet. See
+database: a nightly job removes events that are past their retention period,
+never below 12 months. See
 [Retention and subject access](retention-and-subject-access.md).
 
 ## Read an event

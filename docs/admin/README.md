@@ -12,6 +12,8 @@ You can:
 - set your funder's name, time zone, logo and colours;
 - switch modules on and off;
 - invite people to your team, change their roles, suspend them and remove them;
+- set up single sign-on for your staff;
+- set how long some data is kept, export a person's data and erase it;
 - save your 360Giving publisher details;
 - download your data and read the audit log.
 
@@ -37,27 +39,28 @@ looks after your servers.
 5. [Exports](exports.md): the 360Giving file and the warehouse snapshot.
 6. [Audit log](audit-log.md): who did what, and when.
 7. [Retention and subject access](retention-and-subject-access.md): how long
-   data is kept, and what to do when a person asks for theirs.
+   data is kept, subject access exports, and erasure.
 8. [Releasing decisions](releasing-decisions.md): tell applicants, and send
    emails again.
+9. [Account security](account-security.md): your own password, authenticator
+   app, backup codes and passkeys.
+10. [Single sign-on](single-sign-on.md): let staff sign in through your
+    organisation.
 
 ## What is not available yet
 
 Where the software does not do something yet, the guide says "not yet
 available". Search for that phrase to list every gap.
 
-These pages change when the matching screens arrive. The guide is updated when
-each one is released:
+These are coming. The guide is updated when each one is released:
 
 | Page | Changes when this arrives |
 | --- | --- |
-| [Team and roles](team-and-roles.md) | Account security (your own password and authenticator app), single sign-on, and teams with access to chosen records |
-| [Retention and subject access](retention-and-subject-access.md) | A retention setting, a subject access screen, and erasure |
+| [Team and roles](team-and-roles.md) | Teams with access to chosen records |
+| [Single sign-on](single-sign-on.md) | Enforced single sign-on, so staff at a domain cannot use a password |
+| [Account security](account-security.md) | A list of your signed-in sessions, to sign them out one by one |
 | [Audit log](audit-log.md) | Search by person and text, and export of the log |
 | [Exports](exports.md) | CSV export of a saved view, and board packs |
-
-The Settings area also has a **Single sign-on** page. This guide does not cover
-it yet.
 
 ## How the guide is written
 

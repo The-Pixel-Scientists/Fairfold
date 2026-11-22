@@ -21,13 +21,17 @@ export interface ScopeCheck {
   readonly userId: string;
   readonly membershipId: string;
   readonly input: ScopeInput;
+  /** The route's HTTP method and, for a reach rule, the restrictable record it names (ADR 0037). */
+  readonly method: string;
+  readonly record: string | undefined;
 }
 
 /**
  * Whether the caller may reach what the request addresses. False answers 404,
  * exactly as a record that does not exist does, so a caller learns nothing
- * about another person's records. A route that lists records applies its
- * filter in the handler and has nothing to refuse here.
+ * about another person's records. A route that lists records has nothing to
+ * refuse here: its handler adds the policy's shared list filter to its query
+ * (reachFilter() in reach.ts).
  */
 export type ScopeResolver = (check: ScopeCheck) => Promise<boolean>;
 

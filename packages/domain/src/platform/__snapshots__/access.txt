@@ -11,6 +11,9 @@ platform.erasure.request (console; tenant, step-up for changes)
 platform.sso.manage (console; tenant, step-up for changes)
 platform.approvals.read (console; tenant)
 platform.approvals.decide (console; tenant, step-up for changes)
+platform.teams.manage (console; tenant, step-up for changes)
+platform.break_glass.use (console; tenant, step-up for changes)
+platform.break_glass.review (console; tenant)
 party.records.read (console; tenant)
 party.records.manage (console; tenant)
 party.profile.manage (portal; own_person, own_organisation)
@@ -77,6 +80,8 @@ tenant_admin (console, "Administrator"):
   platform.subject_access.request
   platform.erasure.request
   platform.sso.manage
+  platform.teams.manage
+  platform.break_glass.review
   grants.data.export
   crm.records.export
   forms.responses.export

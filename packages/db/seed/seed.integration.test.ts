@@ -10,7 +10,8 @@
 // organisations and their applications, with each application's
 // eligibility check and stage history, the round's reviewer pool with its
 // assignments and scores, and two recorded decisions, neither released. A
-// database that has had a tenant is refused.
+// database that has had a tenant, or a role but migrator, is refused, and
+// what the seed prints holds neither the password nor its hash.
 
 import { randomBytes } from 'node:crypto';
 
@@ -19,6 +20,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { withClient } from '../test/connect.ts';
 import { asRoleIn, createTestTenant } from '../test/tenants.ts';
 import { applications } from './applications.ts';
+import { base } from './base.ts';
 import { communitySpacesForm, configured } from './configured.ts';
 import {
   applicantEmailOf,
@@ -27,7 +29,8 @@ import {
   type Scenario,
   type SeededTenant,
 } from './scenario.ts';
-import { checkNoTenants } from './seed.ts';
+import { checkConnection } from './guard.ts';
+import { tables } from './seed.ts';
 
 const PASSWORD = 'a long synthetic passphrase';
 
@@ -450,13 +453,46 @@ describe('the applications scenario', { timeout: 60_000 }, () => {
   });
 });
 
-describe('checkNoTenants', () => {
+describe('checkConnection', () => {
   it('refuses a database that has had a tenant', async () => {
     await createTestTenant();
     await withClient('migrator', async (client) => {
-      await expect(checkNoTenants(client, 'tps_w_test')).rejects.toThrow(
+      await expect(checkConnection(client, 'tps_w_test')).rejects.toThrow(
         'Refusing to seed tps_w_test: it already has tenants.',
       );
     });
+  });
+
+  it('refuses any role but migrator', async () => {
+    await withClient('app_worker', async (client) => {
+      await expect(checkConnection(client, 'tps_w_test')).rejects.toThrow(
+        'Refusing to seed tps_w_test: connect as migrator.',
+      );
+    });
+  });
+});
+
+describe('what the seed prints', { timeout: 120_000 }, () => {
+  it('lists the synthetic accounts, and never the password or a hash of it', async () => {
+    const scenario = unused(base);
+    const lines = await withClient('migrator', (client) => tables(scenario)(client, PASSWORD));
+    const emails = scenario.flatMap((tenant) =>
+      tenant.staff.map((member) => emailOf(tenant, member)),
+    );
+    const printed = lines.join(' ');
+    for (const email of emails) expect(printed).toContain(email);
+    const hashes = await withClient('migrator', async (client) => {
+      const { rows } = await client.query<{ password: string }>(
+        'SELECT a.password FROM auth.account a JOIN auth."user" u ON u.id = a.user_id WHERE u.email = ANY($1)',
+        [emails],
+      );
+      return rows.map(({ password }) => password);
+    });
+    expect(hashes).toHaveLength(emails.length);
+    expect(printed).not.toContain(PASSWORD);
+    for (const hash of hashes) {
+      expect(printed).not.toContain(hash);
+      expect(printed).not.toContain(hash.split('$').at(-1) ?? hash);
+    }
   });
 });

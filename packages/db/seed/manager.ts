@@ -22,7 +22,7 @@ import { permissionsFor } from '@pixel-scientists/domain/platform';
 
 import { base } from './base.ts';
 import { emailOf, MANAGER } from './scenario.ts';
-import { readSeedPassword } from './seed.ts';
+import { readSeedPassword } from './guard.ts';
 
 const SESSION_COOKIE = '__Host-tps_console_session';
 const STEP_MS = 30_000;

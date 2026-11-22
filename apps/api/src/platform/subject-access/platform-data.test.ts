@@ -60,6 +60,7 @@ describe('platform subject tables', () => {
       expect(Object.values(manifest).every((reason) => reason !== '')).toBe(true);
     }
     expect(withheldColumns).toHaveProperty(['app.job_request.filters']);
+    expect(excludedTables).toHaveProperty(['app.break_glass']);
   });
 
   it('withholds every audit event that names a reviewer, shows review progress or holds an unreleased outcome', () => {

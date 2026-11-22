@@ -7,7 +7,8 @@
 // tenant's rows. The score table and an assignment's updated_by are not
 // among them (rule 8); the reviewer is readable only for the reminder jobs
 // (migration 0061), and the export leaves it out. Audit event changes are
-// the export's to filter.
+// the export's to filter. The board pack job reads a snapshot's tenant,
+// id and name alone (migration 0107).
 // The cross-tenant tests of grants.decision, grants.decision_email,
 // grants.email_template_version, party.person, party.relationship and
 // app.audit_event run as every role with a grant, app_worker now included.
@@ -16,6 +17,7 @@ import { describe, expect, it } from 'vitest';
 
 import { withClient } from '../connect.ts';
 import { addReleased, type Released } from '../grants/decision-fixtures.ts';
+import { addSnapshot } from '../party-snapshot/fixtures.ts';
 import { heldRights } from '../privilege-lint.ts';
 import {
   asMigratorIn,
@@ -213,10 +215,16 @@ const RELEASE_EMAIL_RIGHTS = [
     'hash_key_version',
     'recorded_by',
   ].map((column) => `INSERT on column party.suppression.${column}`),
+  // The board pack job (migration 0107): the organisation as submitted.
+  ...['tenant_id', 'id', 'name'].map(
+    (column) => `SELECT on column party.organisation_snapshot.${column}`,
+  ),
 ];
 
-/** A released decision, with its applicant as a contact for its organisation. */
-async function addLinkedRelease(tenant: TestTenant): Promise<Released & { link: string }> {
+/** A released decision, with its applicant as a contact for its organisation, and a snapshot of it. */
+async function addLinkedRelease(
+  tenant: TestTenant,
+): Promise<Released & { link: string; snapshot: string }> {
   return asMigratorIn(tenant.id, async (client) => {
     const released = await addReleased(client, tenant);
     const link = await insertRow(client, 'party.relationship', {
@@ -227,7 +235,8 @@ async function addLinkedRelease(tenant: TestTenant): Promise<Released & { link: 
       object_id: released.parts.organisation,
       object_kind: 'organisation',
     });
-    return { ...released, link };
+    const snapshot = await addSnapshot(client, released.parts.organisation, released.parts.member);
+    return { ...released, link, snapshot };
   });
 }
 
@@ -269,6 +278,11 @@ describe("app_worker's release email and subject access rights", { timeout: 60_0
       expect(await linksOf('object_id', mine.parts.organisation)).toBe(1);
       expect(await linksOf('subject_id', theirs.parts.person)).toBe(0);
       expect(await linksOf('object_id', theirs.parts.organisation)).toBe(0);
+      const snapshotName = async (id: string) =>
+        (await client.query('SELECT name FROM party.organisation_snapshot WHERE id = $1', [id]))
+          .rowCount;
+      expect(await snapshotName(mine.snapshot)).toBe(1);
+      expect(await snapshotName(theirs.snapshot)).toBe(0);
       for (const table of ['app.tenant_module', 'party.organisation']) {
         const seen = await client.query(`SELECT FROM ${table} WHERE tenant_id = $1`, [other.id]);
         expect(seen.rowCount, table).toBe(0);
@@ -286,6 +300,8 @@ describe("app_worker's release email and subject access rights", { timeout: 60_0
         'UPDATE party.person SET family_name = family_name',
         'UPDATE app.membership SET status = status',
         'SELECT token_hash FROM app.invitation',
+        'SELECT address_postcode FROM party.organisation_snapshot',
+        'UPDATE party.organisation_snapshot SET name = name',
       ]) {
         expect(await outcome(client, statement), statement).toBe('42501');
       }

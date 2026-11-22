@@ -52,6 +52,12 @@
     },
     {
       "path": "infra/proxy"
+    },
+    {
+      "path": "tools/cli"
+    },
+    {
+      "path": "tools/360-converter"
     }
   ]
 }

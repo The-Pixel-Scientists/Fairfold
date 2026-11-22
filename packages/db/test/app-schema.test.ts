@@ -98,6 +98,9 @@ describe('the app schema', () => {
         'owner_forms_erase_subject USAGE',
         // Erasing a subject's privacy data, migration 0092.
         'owner_privacy_erase_subject USAGE',
+        // The signature callback lookup and document erasure, migrations 0105 and 0106.
+        'owner_app_resolve_signature_callback USAGE',
+        'owner_app_erase_documents USAGE',
       ].sort(),
     });
   });
@@ -155,6 +158,8 @@ describe('app.current_tenant_id()', () => {
         'owner_forms_erase_subject',
         // Erasing a subject's privacy data, migration 0092.
         'owner_privacy_erase_subject',
+        // Erasing a subject's signature documents, migration 0106.
+        'owner_app_erase_documents',
       ]
         .map((role) => `${role} EXECUTE`)
         .sort(),

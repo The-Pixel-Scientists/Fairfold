@@ -8,3 +8,12 @@ export {
   type ScopeResolver,
   type ScopeResolvers,
 } from './scopes.ts';
+export {
+  listRoutes,
+  reachDescriptor,
+  reachFilter,
+  reachFilterUsed,
+  reachResolvers,
+  type ReachDescriptor,
+  type ReachRule,
+} from './reach.ts';

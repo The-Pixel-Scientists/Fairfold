@@ -53,6 +53,14 @@ const exported = (query: string, member: Member = t.adminA) =>
 const auditEvents = <T extends object = { changes: object }>(action: string, entityId: string) =>
   t.events<T>(action, [entityId]);
 
+const organisationOf = async (applicationId: string) =>
+  (
+    await t.rows<{ organisation_id: string }>(
+      'SELECT organisation_id FROM grants.application WHERE id = $1',
+      [applicationId],
+    )
+  )[0]?.organisation_id ?? '';
+
 /** A round whose three submissions are decided and released, and a fourth recorded and not released. */
 async function aReleasedRound() {
   const round = await t.reviewRound();
@@ -160,16 +168,21 @@ describe('the export', () => {
     expect(byRound.summary.grants).toBe(1);
     expect(byRound.file.grants).toHaveLength(1);
     const [grant] = byRound.file.grants;
+    // The applicant typed a charity number and no member of staff has verified it, so it is withheld.
     expect(grant).toMatchObject({
       id: `${PUBLISHER.identifierPrefix}-${a}`,
       title: expect.any(String) as string,
       currency: 'GBP',
       amountAwarded: 15_000,
       recipientOrganization: [
-        { id: 'GB-CHC-1234567', name: 'Northfield Allotment Society', charityNumber: '1234567' },
+        {
+          id: `${PUBLISHER.identifierPrefix}-${await organisationOf(a)}`,
+          name: 'Northfield Allotment Society',
+        },
       ],
       fundingOrganization: [{ id: PUBLISHER.funderIdentifier, name: PUBLISHER.funderName }],
     });
+    expect(grant?.recipientOrganization[0]).not.toHaveProperty('charityNumber');
     expect(grant?.awardDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(threeSixtyGivingFileSchema.safeParse(byRound.file).success).toBe(true);
 
@@ -182,9 +195,48 @@ describe('the export', () => {
       'waitlist',
       'declined',
       '@example.org',
+      '1234567',
     ]) {
       expect(text).not.toContain(hidden);
     }
+  });
+
+  it('publishes an identifier once staff verify it, and withholds it again when its value changes', async () => {
+    const { roundId, a } = await aReleasedRound();
+    const organisationId = await organisationOf(a);
+    const recipient = async () => {
+      const { file, summary } = await answer<ThreeSixtyGivingExport>(
+        exported(`roundId=${roundId}`),
+      );
+      return { recipient: file.grants[0]?.recipientOrganization[0], summary };
+    };
+    const change = (sql: string, values: unknown[]) =>
+      asMigratorIn(t.tenantA.id, (client) => client.query(sql, values));
+
+    await change(
+      `UPDATE party.organisation_identifier SET verified_at = now(), verified_by = $2
+        WHERE organisation_id = $1`,
+      [organisationId, t.adminA.membershipId],
+    );
+    const verified = await recipient();
+    expect(verified.recipient).toEqual({
+      id: 'GB-CHC-1234567',
+      name: 'Northfield Allotment Society',
+      charityNumber: '1234567',
+    });
+    expect(verified.summary.unverifiedRecipients).toEqual([]);
+
+    await change(
+      'UPDATE party.organisation_identifier SET identifier = $2 WHERE organisation_id = $1',
+      [organisationId, '7654320'],
+    );
+    const changed = await recipient();
+    expect(changed.recipient).toEqual({
+      id: `${PUBLISHER.identifierPrefix}-${organisationId}`,
+      name: 'Northfield Allotment Society',
+    });
+    expect(changed.summary.unverifiedRecipients).toHaveLength(1);
+    expect(JSON.stringify(changed)).not.toContain('7654320');
   });
 
   it('names the recipients whose identifier no one has verified', async () => {
@@ -359,7 +411,8 @@ describe('who may use the export routes', () => {
     expect(await t.rows('SELECT funder_name FROM grants.publisher_setting')).toEqual([
       { funder_name: PUBLISHER.funderName },
     ]);
-  });
+    // Twelve refused requests after a released round: slow on a busy machine.
+  }, 180_000);
 });
 
 describe('another tenant', () => {

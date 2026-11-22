@@ -33,7 +33,9 @@ export async function collectSubjectAccess(
   ];
   const platform = userIds.length === 0 ? undefined : await platformData(tx, userIds);
   return {
-    modules: platform ? { ...modules, platform: platform.data } : modules,
+    modules: platform
+      ? { ...modules, platform: { ...modules.platform, ...platform.data } }
+      : modules,
     auditEvents: await subjectAuditEvents(tx, partyIds, platform?.membershipIds ?? []),
   };
 }

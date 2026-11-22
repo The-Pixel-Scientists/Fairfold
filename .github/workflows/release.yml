@@ -46,12 +46,17 @@
 #    an older tag first fails at the migrate step, because the migrator
 #    refuses a database that has run a migration the image does not hold,
 #    and leaves the job on the older image, which cannot roll back either.
+#
+# Pushing a tag cli-vX.Y.Z releases the cli alone (tools/cli/README.md): a
+# tarball of the tracked files it runs, from the tagged commit, signed
+# keyless, with SPDX and CycloneDX SBOMs from Syft attested to it, published
+# as a GitHub release. It builds no image and promotes nothing.
 
 name: Release
 
 on:
   push:
-    tags: ['v*.*.*']
+    tags: ['v*.*.*', 'cli-v*.*.*']
   workflow_dispatch:
     inputs:
       tag:
@@ -85,7 +90,7 @@ env:
 jobs:
   build:
     name: Build, scan, sign and attest the release images
-    if: github.event_name == 'push' && github.ref_type == 'tag'
+    if: github.event_name == 'push' && github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     environment: release
@@ -156,6 +161,17 @@ jobs:
             docker build --file infra/docker/web.Dockerfile --build-arg "APP=$app" --tag "$REGISTRY/$app:$TAG" .
           done
           docker build --file infra/docker/backup.Dockerfile --tag "$REGISTRY/backup:$TAG" .
+      # For the licence inventory, installed before any credential exists.
+      # No dependency runs an install script (pnpm-workspace.yaml).
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - name: Install the licence check's dependencies
+        run: |
+          npm install --global --ignore-scripts corepack@0.36.0
+          corepack enable
+          pnpm install --frozen-lockfile
       # The OIDC token's audience is the provider; STS exchanges it for a
       # federated token, which may only impersonate the job's service account.
       - name: Sign in to Google Cloud as the publisher
@@ -215,6 +231,14 @@ jobs:
             "$RUNNER_TEMP/tools/cosign-linux-amd64" attest --yes --type cyclonedx \
               --predicate "$RUNNER_TEMP/sbom/$name.cdx.json" "$ref"
           done
+      # The Gate 1 licence inventory (ADR 0002), from these SBOMs and the
+      # licence check of this commit, uploaded with them. A shipped package
+      # that fails the policy, or an exception past its review, fails the
+      # job, so nothing is promoted.
+      - name: Build the licence inventory
+        run: |
+          pnpm check:licences --summary "$RUNNER_TEMP/sbom/licences.json"
+          node scripts/licence-inventory.ts --sbom "$RUNNER_TEMP/sbom" --out "$RUNNER_TEMP/sbom"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-sbom
@@ -354,6 +378,90 @@ jobs:
             echo
             echo "To roll out the backup job, apply the backup root with \`TF_VAR_image\` set to its digest."
           } >> "$GITHUB_STEP_SUMMARY"
+
+  cli:
+    name: Build, sign and attest the cli
+    if: github.event_name == 'push' && github.ref_type == 'tag' && startsWith(github.ref_name, 'cli-v')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      # Publishes the GitHub release; no other write.
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check the tag against the cli's version
+        run: |
+          version=$(jq --exit-status --raw-output .version tools/cli/package.json)
+          if [ "$TAG" != "cli-v$version" ]; then
+            echo "A cli release tag is cli-v and the version in tools/cli/package.json, cli-v$version; '$TAG' is not." >&2
+            exit 1
+          fi
+          echo "NAME=tps-cli-$version" >> "$GITHUB_ENV"
+      - name: Install cosign
+        run: |
+          bash .github/scripts/fetch-tool.sh \
+            "https://github.com/sigstore/cosign/releases/download/v${COSIGN_VERSION}/cosign-linux-amd64" \
+            "$RUNNER_TEMP/tools"
+          chmod +x "$RUNNER_TEMP/tools/cosign-linux-amd64"
+      - name: Install Syft and verify its signed checksums
+        working-directory: ${{ runner.temp }}/tools
+        run: |
+          base="https://github.com/anchore/syft/releases/download/v${SYFT_VERSION}"
+          archive="syft_${SYFT_VERSION}_linux_amd64.tar.gz"
+          checksums="syft_${SYFT_VERSION}_checksums.txt"
+          bash "$GITHUB_WORKSPACE/.github/scripts/fetch-tool.sh" "${base}/${archive}" .
+          for file in "$checksums" "${checksums}.sig" "${checksums}.pem"; do
+            curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 --retry 3 \
+              --output "$file" "${base}/${file}"
+          done
+          ./cosign-linux-amd64 verify-blob "$checksums" \
+            --signature "${checksums}.sig" \
+            --certificate "${checksums}.pem" \
+            --certificate-identity "https://github.com/anchore/syft/.github/workflows/release.yaml@refs/heads/main" \
+            --certificate-oidc-issuer "$GITHUB_OIDC_ISSUER"
+          grep " ${archive}\$" "$checksums" | sha256sum --check --strict -
+          tar -xzf "$archive" syft
+      # Tracked files only: what the API image holds, and the cli. No local
+      # file can reach the archive, and the same commit makes the same bytes.
+      - name: Build the tarball
+        run: |
+          mkdir -p "$RUNNER_TEMP/dist"
+          git ls-files -z -- package.json pnpm-lock.yaml pnpm-workspace.yaml .node-version \
+            LICENSE NOTICE 'apps/*/package.json' 'packages/*/package.json' \
+            'modules/*/package.json' 'tools/*/package.json' apps/api/src \
+            packages/db/classification.ts packages/db/classification packages/db/migrations \
+            packages/db/scripts packages/db/src packages/domain/src 'modules/*/src/*' tools/cli \
+            | grep --null-data --invert-match '\.test\.ts$' \
+            | tar --create --null --files-from=- --sort=name --owner=0 --group=0 --numeric-owner \
+              --mtime="@$(git log -1 --format=%ct)" --transform="s,^,$NAME/," \
+            | gzip --no-name > "$RUNNER_TEMP/dist/$NAME.tar.gz"
+      - name: Sign the tarball and attest its SBOMs
+        working-directory: ${{ runner.temp }}/dist
+        env:
+          SYFT_CHECK_FOR_APP_UPDATE: 'false'
+        run: |
+          cosign="$RUNNER_TEMP/tools/cosign-linux-amd64"
+          mkdir "$RUNNER_TEMP/unpacked"
+          tar -xzf "$NAME.tar.gz" -C "$RUNNER_TEMP/unpacked"
+          "$RUNNER_TEMP/tools/syft" scan "dir:$RUNNER_TEMP/unpacked/$NAME" --quiet \
+            --output "spdx-json=$NAME.spdx.json" --output "cyclonedx-json=$NAME.cdx.json"
+          "$cosign" sign-blob --yes --bundle "$NAME.tar.gz.sigstore.json" "$NAME.tar.gz"
+          "$cosign" attest-blob --yes --type spdxjson --predicate "$NAME.spdx.json" \
+            --bundle "$NAME.spdx.sigstore.json" "$NAME.tar.gz"
+          "$cosign" attest-blob --yes --type cyclonedx --predicate "$NAME.cdx.json" \
+            --bundle "$NAME.cdx.sigstore.json" "$NAME.tar.gz"
+      - name: Publish the release
+        working-directory: ${{ runner.temp }}/dist
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag \
+            --title "cli ${TAG#cli-v}" \
+            --notes "Verify the tarball before you unpack it, as tools/cli/README.md shows." \
+            ./*
 
   # Off until playwright.config.ts can take staging's addresses and staging
   # has a mail catcher the journey can read (TPS_STAGING_E2E). Run from the

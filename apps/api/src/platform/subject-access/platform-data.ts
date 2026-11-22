@@ -31,12 +31,16 @@ export const ACCOUNT_COLUMN = 'user_id';
 /** Subject-path tables the platform leaves out of its tables, and why. */
 export const excludedTables: Readonly<Record<string, string>> = {
   'app.audit_event': 'Read as the export audit events, which name each actor by kind only.',
+  'app.break_glass':
+    "A grant names a restricted record, so under ADR 0037 it is held back with that record by the module's contribution, never exported through the platform.",
   'app.idempotency_key': 'A one-way digest of a request, which names no one.',
   'app.message':
     'A message belongs to an application, so the grants module reads it through the application.',
   'app.note':
     'A note is about an applicant, not its author, so a staff member does not receive it. The grants module reads it through the application.',
   'app.request_limit': 'A hashed client key with no account or tenant.',
+  'app.signature_signer':
+    'A signer is a person asked to sign, not a member, so the documents contribution reads it with its request.',
   'app.subject_key': 'Wrapped key material: a secret, not data about the person.',
 };
 

@@ -130,6 +130,10 @@ describe('migrations', { timeout: 300_000 }, () => {
       // TRUNCATE.
       await sql`TRUNCATE app.tenant_module, app.config_version, forms.form, forms.form_version,
                          forms.response, forms.respondent_token`.execute(trx);
+      // And 0021's while a membership holds a wave 1 role, which the wave 1
+      // seed's tests leave behind. Empty the memberships and every table
+      // that refers to them.
+      await sql`TRUNCATE app.membership CASCADE`.execute(trx);
       // And 0033's down refuses while a party is erased, which the erasure
       // tests leave behind. Erased parties cannot be changed back, so empty
       // the party tables and every table that refers to them.

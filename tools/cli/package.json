@@ -1,0 +1,16 @@
+{
+  "name": "@pixel-scientists/cli",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Install, set up and check a self-hosted deployment",
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "bin": {
+    "tps": "./src/main.ts"
+  },
+  "dependencies": {
+    "@pixel-scientists/api": "workspace:*",
+    "@pixel-scientists/db": "workspace:*",
+    "@pixel-scientists/domain": "workspace:*"
+  }
+}

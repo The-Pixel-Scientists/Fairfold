@@ -72,6 +72,19 @@ export interface AppAuditEvent {
   tenant_id: string;
 }
 
+export interface AppBreakGlass {
+  expires_at: Timestamp;
+  granted_at: Timestamp;
+  id: string;
+  membership_id: string;
+  reason_code: string;
+  reason_text_ciphertext: Buffer;
+  record_id: string;
+  record_type: string;
+  retain_until: Timestamp;
+  tenant_id: string;
+}
+
 export interface AppConfigVersion {
   author_id: string | null;
   author_kind: Generated<string>;
@@ -81,6 +94,20 @@ export interface AppConfigVersion {
   entity_type: string;
   id: Generated<string>;
   tenant_id: string;
+  version: number;
+}
+
+export interface AppDocumentTemplateVersion {
+  audience: string;
+  body: Json;
+  created_at: Generated<Timestamp>;
+  created_by: string;
+  id: Generated<string>;
+  kind: string;
+  merge_fields: string[];
+  template_id: string;
+  tenant_id: string;
+  title: string;
   version: number;
 }
 
@@ -279,6 +306,56 @@ export interface AppRetentionPolicy {
   updated_by: string;
 }
 
+export interface AppSignatureConnection {
+  account_id: string;
+  api_token: Buffer;
+  api_token_key_version: number;
+  callback_key_version: number;
+  callback_reference_hash: Buffer;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  provider: string;
+  status: Generated<string>;
+  tenant_id: string;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface AppSignatureRequest {
+  connection_id: string;
+  created_at: Generated<Timestamp>;
+  created_by: string;
+  error_code: string | null;
+  expires_at: Timestamp;
+  id: Generated<string>;
+  provider_reference: string | null;
+  sent_sha256: Buffer;
+  status: Generated<string>;
+  template_version_id: string | null;
+  tenant_id: string;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface AppSignatureRequestFile {
+  created_at: Generated<Timestamp>;
+  file_id: string;
+  id: Generated<string>;
+  role: string;
+  signature_request_id: string;
+  tenant_id: string;
+}
+
+export interface AppSignatureSigner {
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  person_id: string;
+  signature_request_id: string;
+  signed_at: Timestamp | null;
+  signing_order: number;
+  status: Generated<string>;
+  tenant_id: string;
+  updated_at: Generated<Timestamp>;
+}
+
 export interface AppSubjectKey {
   created_at: Generated<Timestamp>;
   destroyed_at: Timestamp | null;
@@ -295,6 +372,31 @@ export interface AppTag {
   id: Generated<string>;
   label: string;
   tenant_id: string;
+}
+
+export interface AppTeam {
+  archived_at: Timestamp | null;
+  archived_by: string | null;
+  created_at: Generated<Timestamp>;
+  created_by: string;
+  id: Generated<string>;
+  name: string;
+  tenant_id: string;
+  updated_at: Generated<Timestamp>;
+  updated_by: string;
+}
+
+export interface AppTeamMember {
+  created_at: Generated<Timestamp>;
+  created_by: string;
+  id: Generated<string>;
+  membership_id: string;
+  removed_at: Timestamp | null;
+  removed_by: string | null;
+  team_id: string;
+  tenant_id: string;
+  updated_at: Generated<Timestamp>;
+  updated_by: string;
 }
 
 export interface AppTenant {
@@ -352,7 +454,9 @@ export interface DB {
   'app.approval_decision': AppApprovalDecision;
   'app.approval_request': AppApprovalRequest;
   'app.audit_event': AppAuditEvent;
+  'app.break_glass': AppBreakGlass;
   'app.config_version': AppConfigVersion;
+  'app.document_template_version': AppDocumentTemplateVersion;
   'app.embed_origin': AppEmbedOrigin;
   'app.erasure_ledger': AppErasureLedger;
   'app.event_cursor': AppEventCursor;
@@ -371,8 +475,14 @@ export interface DB {
   'app.request_limit': AppRequestLimit;
   'app.restore_mode': AppRestoreMode;
   'app.retention_policy': AppRetentionPolicy;
+  'app.signature_connection': AppSignatureConnection;
+  'app.signature_request': AppSignatureRequest;
+  'app.signature_request_file': AppSignatureRequestFile;
+  'app.signature_signer': AppSignatureSigner;
   'app.subject_key': AppSubjectKey;
   'app.tag': AppTag;
+  'app.team': AppTeam;
+  'app.team_member': AppTeamMember;
   'app.tenant': AppTenant;
   'app.tenant_module': AppTenantModule;
   'app.tenant_theme': AppTenantTheme;
