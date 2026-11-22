@@ -134,3 +134,19 @@ describe('endSession', () => {
     await expect(endSession()).rejects.toMatchObject({ status: 500 });
   });
 });
+
+describe('callApi without a cookie', () => {
+  it('sends credentials: omit only when asked to', async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(new Response(JSON.stringify(applicantSession()), { status: 200 })),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await callApi(getSession, {}, { anonymous: true });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/auth/session',
+      expect.objectContaining({ credentials: 'omit', redirect: 'error' }),
+    );
+  });
+});

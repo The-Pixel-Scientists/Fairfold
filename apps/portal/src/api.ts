@@ -36,23 +36,23 @@ export function tooManyAttempts(seconds: number | null): string {
 
 /**
  * call() with the answer to a 429 in words: the API's `Retry-After` is turned
- * into how long to wait, which call() itself does not pass on.
+ * into how long to wait, which call() itself does not pass on. With
+ * `anonymous`, no cookie is sent: for pages anyone can open.
  */
 export async function callApi<const C extends JsonRouteContract>(
   route: C,
   input: CallInput<C>,
-  options: Pick<CallOptions, 'idempotencyKey'> & { omitCredentials?: boolean } = {},
+  {
+    anonymous = false,
+    ...options
+  }: Pick<CallOptions, 'idempotencyKey'> & { anonymous?: boolean } = {},
 ): Promise<CallResult<C>> {
-  const { omitCredentials = false, ...callOptions } = options;
   let wait: number | null = null;
   try {
     return await call(route, input, {
-      ...callOptions,
+      ...options,
       fetch: async (url, init) => {
-        const response = await fetch(
-          url,
-          omitCredentials ? { ...init, credentials: 'omit' } : init,
-        );
+        const response = await fetch(url, anonymous ? { ...init, credentials: 'omit' } : init);
         if (response.status === 429) wait = retryAfterSeconds(response.headers.get('retry-after'));
         return response;
       },
