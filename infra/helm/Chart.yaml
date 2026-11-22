@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# One release per cell (ADR 0012), in a namespace of its own: the proxy and
+# the web images reach the API as `api`, so every name in the chart is fixed.
+apiVersion: v2
+name: tps
+description: The API, background worker, console, portal and reverse proxy, from the signed release images
+type: application
+version: 0.1.0
+kubeVersion: '>=1.34.0-0'
