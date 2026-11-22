@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# The CI cluster: kind's own network plugin, which enforces NetworkPolicy
+# (test.sh proves it before trusting a denial), and containerd reading
+# registry hosts from certs.d, so localhost:5001 is the local registry
+# beside the cluster (kind's documented pattern).
+#
+# A worker node beside the control plane: kindnet does not police a pod's
+# traffic to the node it runs on, and the API server listens on the
+# control-plane node, so on one node the API pod could reach it whatever
+# the policy says. The control plane's taint keeps the chart's pods on the
+# worker, and test.sh checks they run there.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+  - role: control-plane
+  - role: worker
+containerdConfigPatches:
+  - |-
+    [plugins."io.containerd.grpc.v1.cri".registry]
+      config_path = "/etc/containerd/certs.d"

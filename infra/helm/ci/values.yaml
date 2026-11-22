@@ -1,0 +1,70 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# The CI install on kind (test.sh), against the services in fixtures.yaml.
+# test.sh makes every Secret and ConfigMap named here from values it
+# generates, and sets each image's digest to the one the local registry
+# reports; the zero digests are for rendering only.
+images:
+  api:
+    repository: localhost:5001/tps/api
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+  console:
+    repository: localhost:5001/tps/console
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+  portal:
+    repository: localhost:5001/tps/portal
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+  edge:
+    repository: localhost:5001/tps/edge
+    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+
+hosts:
+  console: console.tps.test
+  portal: portal.tps.test
+
+database:
+  host: postgres.tps-fixtures.svc.cluster.local
+  adminUser: postgres
+  ca: { configMap: tps-ci-ca, key: ca.crt }
+  networkPolicy: { namespace: tps-fixtures, podLabels: { app: postgres }, port: 5432 }
+
+storage:
+  endpoint: http://seaweedfs.tps-fixtures.svc.cluster.local:8333
+  region: us-east-1
+  bucket: tps-files
+  accessKeyIds: { write: tps-write, read: tps-read, scanner: tps-scanner, removal: tps-removal }
+  networkPolicy: { namespace: tps-fixtures, podLabels: { app: seaweedfs }, port: 8333 }
+
+smtp:
+  host: mailpit.tps-fixtures.svc.cluster.local
+  port: 1025
+  from: no-reply@tps.test
+  networkPolicy: { namespace: tps-fixtures, podLabels: { app: mailpit }, port: 1025 }
+
+clamd:
+  host: clamav.tps-fixtures.svc.cluster.local
+  networkPolicy: { namespace: tps-fixtures, podLabels: { app: clamav }, port: 3310 }
+
+# Mailpit's certificate is signed by the CI CA too.
+extraCaCertificates: { configMap: tps-ci-ca }
+
+secrets:
+  databaseAdminPassword: tps-database-admin-password
+  migratorPassword: tps-migrator-password
+  appApiPassword: tps-app-api-password
+  appAuthPassword: tps-app-auth-password
+  appWorkerPassword: tps-app-worker-password
+  appQueuePassword: tps-app-queue-password
+  backupReaderPassword: tps-backup-reader-password
+  authSecret: tps-auth-secret
+  requestLimitKey: tps-request-limit-key
+  subjectKek: tps-subject-kek
+  storageWriteSecretKey: tps-storage-write-secret-key
+  storageReadSecretKey: tps-storage-read-secret-key
+  storageScannerSecretKey: tps-storage-scanner-secret-key
+  storageRemovalSecretKey: tps-storage-removal-secret-key
+  edgeTls: tps-edge-tls
+
+api:
+  # kind's pod network, where the edge runs.
+  trustProxy: [10.244.0.0/16]
