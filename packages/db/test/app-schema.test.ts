@@ -91,6 +91,8 @@ describe('the app schema', () => {
         'owner_crm_erase_subject USAGE',
         // grants.public_open_rounds(), migration 0071.
         'owner_grants_public_open_rounds USAGE',
+        // Recording a one-click unsubscribe, migration 0073.
+        'owner_party_record_unsubscribe USAGE',
       ].sort(),
     });
   });
@@ -109,7 +111,7 @@ describe('app.current_tenant_id()', () => {
     ]);
   });
 
-  it('can be executed by the app roles, app_operator, migrator and the retention, erasure and file function owners only', async () => {
+  it('can be executed by the app roles, app_operator, migrator and the retention, erasure, file and unsubscribe function owners only', async () => {
     const acl = await withClient('app_api', (client) =>
       ownerAndGrants(client, FUNCTION_ACL, ['app.current_tenant_id()']),
     );
@@ -141,6 +143,8 @@ describe('app.current_tenant_id()', () => {
         'owner_grants_erase_reminders',
         // Erasing a subject's crm data, migration 0063.
         'owner_crm_erase_subject',
+        // Recording a one-click unsubscribe, migration 0073.
+        'owner_party_record_unsubscribe',
       ]
         .map((role) => `${role} EXECUTE`)
         .sort(),
