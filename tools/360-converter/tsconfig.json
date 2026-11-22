@@ -1,0 +1,17 @@
+// The converter, which runs on Node.js with built-in type stripping. Its core,
+// src/convert.ts, also runs in the browser, so it imports no Node.js module
+// (eslint.config.js).
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "node_modules/.cache/tsc",
+    "tsBuildInfoFile": "node_modules/.cache/tsc/tsconfig.tsbuildinfo",
+    "types": ["node"]
+  },
+  "include": ["src", "package.json"],
+  "references": [
+    { "path": "../../packages/domain" },
+    { "path": "../../modules/party/tsconfig.server.json" },
+    { "path": "../../modules/grants/tsconfig.server.json" }
+  ]
+}
