@@ -3,7 +3,8 @@
 import { checkRoute, projectedAnswersSchemas } from '@pixel-scientists/domain/api';
 import { describe, expect, it } from 'vitest';
 
-import { submissionPageSchema, submissionSchema } from './answers.ts';
+import { reviewSchema } from '../assessment/reviews.ts';
+import { currentOrganisationSchema, submissionPageSchema, submissionSchema } from './answers.ts';
 import { MAX_STAGE_MOVE } from './inputs.ts';
 import * as submissions from './routes.ts';
 
@@ -124,5 +125,58 @@ describe('submission responses', () => {
       nextCursor: null,
     });
     expect(page.submissions).toEqual([row]);
+  });
+});
+
+describe('details as submitted', () => {
+  const address = {
+    line1: '1 Mill Lane',
+    line2: null,
+    town: 'Northfield',
+    postcode: 'NF1 2AB',
+    countryCode: 'GB',
+  };
+  const record = {
+    name: 'Northfield Community Trust',
+    legalForm: 'charitable_incorporated_organisation',
+    registeredAddress: address,
+    website: null,
+    identifiers: [{ scheme: 'GB-CHC', identifier: '1234567', verifiedAt: null }],
+  };
+  const snapshot = {
+    ...record,
+    id: ID,
+    organisationId: ID,
+    takenBy: ID,
+    takenAt: '2027-02-21T10:00:00Z',
+  };
+  const { organisationSnapshot, currentOrganisation } = submissionSchema.shape;
+
+  it('carry the snapshot, or null for a submission from before snapshots', () => {
+    expect(organisationSnapshot.parse(snapshot)).toEqual(snapshot);
+    expect(organisationSnapshot.parse(null)).toBeNull();
+    expect(organisationSnapshot.safeParse({ ...snapshot, notes: 'x' }).success).toBe(false);
+  });
+
+  it('carry the current record with its console page, or none', () => {
+    const current = { ...record, href: `/crm/organisations/${ID}` };
+    expect(currentOrganisation.parse(current)).toEqual(current);
+    expect(currentOrganisationSchema.parse({ ...record, href: null }).href).toBeNull();
+    for (const href of [
+      'https://example.org/crm',
+      '//example.org/crm',
+      'javascript:alert(1)',
+      '/crm/../auth',
+      '/crm/organisations/',
+      `/crm/organisations/${ID}?tab=history`,
+      'crm/organisations',
+    ]) {
+      expect(currentOrganisationSchema.safeParse({ ...record, href }).success, href).toBe(false);
+    }
+  });
+
+  it('never reach a reviewer', () => {
+    expect(Object.keys(reviewSchema.shape)).not.toContain('organisationSnapshot');
+    expect(Object.keys(reviewSchema.shape)).not.toContain('currentOrganisation');
   });
 });
