@@ -23,6 +23,8 @@ export const app: SchemaCatalogue = {
     // Public tenant pages and sign-in, with no tenant set (ADR 0019).
     ['app.public_tenant(text)', ['app_api', 'app_auth']],
     ['app.public_tenant_logo(text)', ['app_api']],
+    // A tenant's allowed embedding origins by slug, with no tenant set (ADR 0035).
+    ['app.embed_origins(text)', ['app_api']],
     // The operator command alone (ADR 0019).
     ['app.create_tenant(text, text)', ['app_worker']],
     // The bounded purges of expired keys and counters (ADR 0028).
@@ -47,6 +49,8 @@ export const app: SchemaCatalogue = {
     ['app.erase_file(uuid, uuid)', ['app_worker']],
     // The erasure job clears a subject's notes and messages (ADR 0027).
     ['app.erase_subject_notes(uuid)', ['app_worker']],
+    // The approval triggers' acting member, from the verified session (ADR 0038).
+    ['app.session_actor()', ['app_api']],
     // The signature callback route, with no tenant set (ADR 0040).
     ['app.resolve_signature_callback(bytea)', ['app_api']],
     // The erasure job erases a subject's signature documents (ADR 0027).
@@ -87,6 +91,23 @@ export const app: SchemaCatalogue = {
           'app.tenant policy public_tenant_logo_select',
           'app.tenant_theme policy public_tenant_logo_select',
         ],
+      },
+    ],
+    [
+      'app.embed_origins(text)',
+      {
+        owner: 'owner_app_embed_origins',
+        rights: [
+          'USAGE on schema app',
+          ...['id', 'slug', 'status'].map((column) => `SELECT on column app.tenant.${column}`),
+          ...['tenant_id', 'module', 'enabled'].map(
+            (column) => `SELECT on column app.tenant_module.${column}`,
+          ),
+          ...['tenant_id', 'origin'].map((column) => `SELECT on column app.embed_origin.${column}`),
+        ],
+        policies: ['app.tenant', 'app.tenant_module', 'app.embed_origin'].map(
+          (table) => `${table} policy embed_origins_select`,
+        ),
       },
     ],
     [

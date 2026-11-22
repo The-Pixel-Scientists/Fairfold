@@ -4,6 +4,7 @@
 
 /* Tell Tailwind to read the portal's own components as well. */
 @source '.';
+@source '../../../modules/forms/src/portal';
 
 /*
  * The page shown when JavaScript is off (see index.html). Preflight resets

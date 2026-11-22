@@ -4,7 +4,10 @@
 # build, served by scripts/web-server.ts with the Content Security Policy and
 # a fresh nonce on each page. It forwards /api/ to the API at
 # http://api:3000, so the app reaches the API on its own origin; to use
-# another address, run it with the same command and another --api.
+# another address, run it with the same command and another --api. The
+# portal's image is also the embed host's (ADR 0035): the same command with
+# --embed <embed origin> serves its embed.html instead
+# (infra/compose/compose.embed.yaml).
 #
 #   docker build --file infra/docker/web.Dockerfile --build-arg APP=console .
 #
@@ -47,6 +50,7 @@ COPY --from=build /app/apps/${APP}/dist dist
 COPY --from=build /app/scripts/web-server.ts web-server.ts
 USER node
 EXPOSE 8080
+# The favicon is in every build and served in both modes.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD ["node", "--eval", "fetch('http://127.0.0.1:8080/').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+    CMD ["node", "--eval", "fetch('http://127.0.0.1:8080/favicon.svg').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
 CMD ["node", "web-server.ts", "--root", "dist", "--host", "0.0.0.0", "--port", "8080", "--api", "http://api:3000"]

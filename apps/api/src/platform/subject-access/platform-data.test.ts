@@ -33,8 +33,10 @@ describe('platform subject tables', () => {
     expect(Object.values(excludedTables).every((reason) => reason !== '')).toBe(true);
   });
 
-  it('reads the files, invitations and job requests through their memberships', () => {
+  it('reads the files, invitations, job requests and approvals through their memberships', () => {
     expect(membershipTables).toEqual({
+      'app.approval_decision': 'decided_by',
+      'app.approval_request': 'requested_by',
       'app.file': 'created_by',
       'app.invitation': 'accepted_membership_id',
       'app.job_request': 'requested_by',

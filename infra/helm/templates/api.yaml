@@ -1,0 +1,89 @@
+{{- /* SPDX-License-Identifier: AGPL-3.0-or-later */ -}}
+{{- $c := dict "root" . "component" "api" -}}
+{{- /* The API (ADR 0009: it only sends jobs; supervise and schedule stay off in code). */ -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  labels:
+    {{- include "tps.labels" $c | nindent 4 }}
+spec:
+  replicas: {{ .Values.api.replicas }}
+  selector:
+    matchLabels:
+      {{- include "tps.selector" $c | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "tps.selector" $c | nindent 8 }}
+    spec:
+      {{- include "tps.pod" $c | nindent 6 }}
+      containers:
+        - name: api
+          image: {{ include "tps.image" .Values.images.api }}
+          {{- include "tps.container" $c | nindent 10 }}
+          ports:
+            - name: http
+              containerPort: 3000
+          env:
+            {{- include "tps.databaseEnv" . | nindent 12 }}
+            {{- include "tps.servicesEnv" . | nindent 12 }}
+            - name: TPS_API_HOST
+              value: 0.0.0.0
+            - name: TPS_API_PORT
+              value: '3000'
+            # Only the edge may reach the API (networkpolicies.yaml).
+            - name: TPS_API_TRUST_PROXY
+              value: {{ join "," .Values.api.trustProxy | quote }}
+            - name: TPS_CONSOLE_ORIGIN
+              value: {{ include "tps.origin" (dict "root" . "host" .Values.hosts.console) | quote }}
+            - name: TPS_DB_APP_API_PASSWORD_FILE
+              value: /run/secrets/app_api_password
+            - name: TPS_DB_APP_AUTH_PASSWORD_FILE
+              value: /run/secrets/app_auth_password
+            - name: TPS_AUTH_SECRET_FILE
+              value: /run/secrets/auth_secret
+            - name: TPS_REQUEST_LIMIT_KEY_FILE
+              value: /run/secrets/request_limit_key
+          # The image's HEALTHCHECK: /health needs no database, /health/ready does.
+          readinessProbe:
+            httpGet: { path: /health/ready, port: http }
+            periodSeconds: 5
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+          resources:
+            {{- toYaml .Values.api.resources | nindent 12 }}
+          volumeMounts:
+            {{- include "tps.mounts" $c | nindent 12 }}
+      volumes:
+        {{- include "tps.tmpVolume" $c | nindent 8 }}
+        {{- include "tps.caVolume" $c | nindent 8 }}
+        {{- $files := dict
+              "app_api_password" "appApiPassword"
+              "app_auth_password" "appAuthPassword"
+              "auth_secret" "authSecret"
+              "request_limit_key" "requestLimitKey"
+              "subject_kek" "subjectKek"
+              "storage_write_secret_key" "storageWriteSecretKey"
+              "storage_read_secret_key" "storageReadSecretKey"
+              "storage_scanner_secret_key" "storageScannerSecretKey" }}
+        {{- if .Values.smtp.user }}{{ $_ := set $files "smtp_password" "smtpPassword" }}{{ end }}
+        {{- include "tps.secretsVolume" (dict "root" . "files" $files) | nindent 8 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api
+  labels:
+    {{- include "tps.labels" $c | nindent 4 }}
+spec:
+  selector:
+    {{- include "tps.selector" $c | nindent 4 }}
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http

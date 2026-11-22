@@ -1,0 +1,72 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# The embed host (ADR 0035), served only when one is configured
+# (infra/compose/compose.embed.yaml). Its pages come from the web server in
+# embed mode, which alone sets frame-ancestors; the public tenant routes
+# those pages call go straight to the API, and every other /api/ path is
+# refused here, so no console, portal, auth or probe route is reachable on
+# this host. No cookie passes either way: Cookie is removed from every
+# request and Set-Cookie from every answer, which ADR 0035 allows on this
+# host alone. Everything else is as on the app hosts (ADR 0030): TLS, HSTS,
+# refused path forms, body and rate limits, and logs.
+#
+#   TPS_PROXY_EMBED_HOST   the host name served, a separate site from the apps
+#   TPS_PROXY_EMBED_PORT   the HTTPS port it is reached on, for redirects
+
+upstream embed {
+  server embed:8080;
+}
+
+server {
+  listen 8080;
+  server_name ${TPS_PROXY_EMBED_HOST};
+  return 308 https://${TPS_PROXY_EMBED_HOST}:${TPS_PROXY_EMBED_PORT}$request_uri;
+}
+
+server {
+  listen 8443 ssl;
+  server_name ${TPS_PROXY_EMBED_HOST};
+  http2 on;
+  ssl_certificate /run/secrets/embed_certificate;
+  ssl_certificate_key /run/secrets/embed_key;
+
+  # No location sets either, so every one inherits them.
+  add_header Strict-Transport-Security $hsts always;
+  proxy_hide_header Set-Cookie;
+
+  limit_conn connections 64;
+  error_page 429 @limited;
+
+  if ($refused_path) {
+    return 400;
+  }
+
+  # The tenant's name, theme and logo (ADR 0019), and a public form, its
+  # challenge and its responses (ADR 0036). A later embed adds its own.
+  location ~ "^/api/public/tenants/[a-z][a-z0-9-]{2,39}(/theme\.css|/logo|/forms/[0-9A-Fa-f-]{36}(/challenge|/responses)?)?$" {
+    limit_req zone=api burst=100 nodelay;
+    client_max_body_size 1m;
+    include /etc/nginx/proxy/forward.conf;
+    proxy_set_header Cookie "";
+    proxy_pass http://api;
+  }
+
+  location /api/ {
+    return 404;
+  }
+
+  # Each page under a slug the embed server has not kept costs a lookup at
+  # the API, so pages are limited as the API routes are.
+  location / {
+    limit_req zone=api burst=100 nodelay;
+    include /etc/nginx/proxy/web.conf;
+    proxy_set_header Cookie "";
+    proxy_pass http://embed;
+  }
+
+  location @limited {
+    add_header Strict-Transport-Security $hsts always;
+    add_header Retry-After 2 always;
+    return 429;
+  }
+}

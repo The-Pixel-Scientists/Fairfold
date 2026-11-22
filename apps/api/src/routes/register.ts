@@ -39,6 +39,7 @@ import { z } from 'zod';
 
 import type { MemberContext, RequestContext, SessionRead } from '../context.ts';
 import type { InTenant, TenantTransaction } from '../database.ts';
+import type { WorkflowService } from '../platform/approvals/index.ts';
 import type { Admission, FileService, UploadGate } from '../platform/files/index.ts';
 import { ApiError, handleError, handleNotFound, PROBLEM_CONTENT_TYPE } from '../problems.ts';
 import { asMember, checkSession, type ScopeInput, type ScopeResolvers } from '../policy/index.ts';
@@ -139,6 +140,8 @@ export interface RouteDependencies {
   resolvers: ScopeResolvers;
   /** Binds the file service to a request as `context.files`. Without it, using it fails. */
   files?: FileService;
+  /** Binds the workflow service to a request as `context.workflow`. Without it, using it fails. */
+  workflow?: WorkflowService;
   /** Counts and limits raw uploads before their bodies are read. Without it, none is limited. */
   uploads?: UploadGate;
 }
@@ -165,6 +168,19 @@ const noFiles: FileService = () => ({
   store: () => Promise.reject(new Error('The API was built without file storage.')),
   send: () => Promise.reject(new Error('The API was built without file storage.')),
   deleteWithheld: () => Promise.reject(new Error('The API was built without file storage.')),
+});
+
+const withoutWorkflow = (): never => {
+  throw new Error('The API was built without the workflow service.');
+};
+
+const noWorkflow: WorkflowService = () => ({
+  request: withoutWorkflow,
+  decide: withoutWorkflow,
+  withdraw: withoutWorkflow,
+  state: withoutWorkflow,
+  read: withoutWorkflow,
+  list: withoutWorkflow,
 });
 
 /** Set on a route's config by registerRoutes() alone, so nothing else can pass for a contract route. */
@@ -438,7 +454,14 @@ export function registerRoutes(
                   caller.afterCommit(work);
                 },
               });
-              const member = { ...caller, files };
+              const workflow = (deps.workflow ?? noWorkflow)({
+                tx,
+                session: caller.session,
+                membership: caller.membership,
+                audit: caller.audit,
+                requestId: caller.requestId,
+              });
+              const member = { ...caller, files, workflow };
               const key = keys.get(request);
               if (key === undefined || replay === undefined) {
                 return handler({ tx, context: member, input });

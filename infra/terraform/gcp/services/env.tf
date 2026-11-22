@@ -51,6 +51,9 @@ locals {
       TPS_STORAGE_REMOVAL_ACCESS_KEY_ID = google_storage_hmac_key.files["removal"].access_id
     })
     migrate = local.database_env
+    operator = merge(local.database_env, local.smtp_env, {
+      TPS_CONSOLE_ORIGIN = var.console_origin
+    })
     console = {}
     portal  = {}
   }
@@ -76,9 +79,11 @@ locals {
   # sends /api/ to the API (ADR 0030).
   web_args = ["node", "web-server.ts", "--root", "dist", "--host", "0.0.0.0", "--port", "8080"]
 
+  # The API's request timeout is the proxy's, 150 seconds (ADR 0030); the
+  # web apps keep Cloud Run's default.
   services = {
-    api     = { image = var.images.api, port = 3000, memory = "1Gi", args = null }
-    console = { image = var.images.console, port = 8080, memory = "512Mi", args = local.web_args }
-    portal  = { image = var.images.portal, port = 8080, memory = "512Mi", args = local.web_args }
+    api     = { image = var.images.api, port = 3000, memory = "1Gi", args = null, timeout = "150s" }
+    console = { image = var.images.console, port = 8080, memory = "512Mi", args = local.web_args, timeout = null }
+    portal  = { image = var.images.portal, port = 8080, memory = "512Mi", args = local.web_args, timeout = null }
   }
 }

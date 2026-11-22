@@ -98,6 +98,23 @@ describe('delivery to a stub server', () => {
     expect(logs.text()).toBe('');
   });
 
+  it('sends the two one-click unsubscribe headers of a marketing message, and none otherwise', async () => {
+    const server = await stub();
+    const { sender } = setup(settings(server.port));
+    const token = 'B'.repeat(160);
+
+    await sender.send({ ...email, unsubscribe: { origin: 'https://portal.example.org', token } });
+    await sender.send(email);
+
+    const [marketing, service] = server.messages;
+    const unfolded = marketing?.data.replaceAll(/\r\n[ \t]+/g, ' ');
+    expect(unfolded).toContain(
+      `List-Unsubscribe: <https://portal.example.org/api/public/unsubscribe?token=${token}>\r\n`,
+    );
+    expect(unfolded).toContain('List-Unsubscribe-Post: List-Unsubscribe=One-Click\r\n');
+    expect(service?.data).not.toMatch(/List-Unsubscribe/i);
+  });
+
   it('never puts an end-of-data marker inside the body, even when it is tried', async () => {
     const server = await stub();
     const { sender } = setup(settings(server.port));

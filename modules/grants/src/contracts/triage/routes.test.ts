@@ -4,6 +4,7 @@ import { checkRoute } from '@pixel-scientists/domain/api';
 import { notesMessages } from '@pixel-scientists/domain/notes';
 import { describe, expect, it } from 'vitest';
 
+import { configVersionDiffSchema, grantsConfigEntityTypes } from '../programme/config.ts';
 import { programmeMessages } from '../programme/messages.ts';
 import { triageMessages } from './messages.ts';
 import * as triage from './routes.ts';
@@ -11,6 +12,7 @@ import {
   bulkLabelChangeInputSchema,
   bulkOwnerInputSchema,
   labelChangeInputSchema,
+  labelConfigEntityType,
   labelDiff,
   labelInputSchema,
   MAX_LABEL_CHANGES,
@@ -133,6 +135,18 @@ describe('the label set', () => {
     ]);
     expect(labelDiff(urgent, { ...urgent, archived: true })).toEqual([
       { path: 'archived', from: false, to: true },
+    ]);
+  });
+
+  it('versions each label as a grants configuration entity (rule 10)', () => {
+    expect(grantsConfigEntityTypes).toContain(labelConfigEntityType);
+    const renamed = labelDiff(
+      { name: 'Urgent', colour: null, archived: false },
+      { name: 'Urgent: budget', colour: 'danger', archived: false },
+    );
+    expect(configVersionDiffSchema.parse({ changes: renamed }).changes).toEqual([
+      { path: 'name', from: 'Urgent', to: 'Urgent: budget' },
+      { path: 'colour', from: null, to: 'danger' },
     ]);
   });
 });

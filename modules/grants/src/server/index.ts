@@ -47,6 +47,7 @@ export {
   type ReminderSendJob,
   type ReminderSendOutcome,
 } from './reminders/send.ts';
+export { sendTemplateEmail, type SendChecked, type TemplateEmail } from './email/index.ts';
 export { readApplicantContact, type ApplicantContact } from './applicant-contact.ts';
 export { grantsSubjectRules } from './audit.ts';
 // For a module that keeps a programme's id, such as impact: whether the tenant has the programme.

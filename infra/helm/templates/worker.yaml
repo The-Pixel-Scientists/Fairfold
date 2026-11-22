@@ -1,0 +1,57 @@
+{{- /* SPDX-License-Identifier: AGPL-3.0-or-later */ -}}
+{{- $c := dict "root" . "component" "worker" -}}
+{{- /*
+Background jobs (ADR 0009), from the API's image as app_worker, with
+pg-boss's own role. It opens no port, so it has no Service and no probe.
+*/ -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  labels:
+    {{- include "tps.labels" $c | nindent 4 }}
+spec:
+  replicas: {{ .Values.worker.replicas }}
+  selector:
+    matchLabels:
+      {{- include "tps.selector" $c | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "tps.selector" $c | nindent 8 }}
+    spec:
+      {{- include "tps.pod" $c | nindent 6 }}
+      containers:
+        - name: worker
+          image: {{ include "tps.image" .Values.images.api }}
+          command: [node, apps/api/src/worker.ts]
+          {{- include "tps.container" $c | nindent 10 }}
+          env:
+            {{- include "tps.databaseEnv" . | nindent 12 }}
+            {{- include "tps.servicesEnv" . | nindent 12 }}
+            - name: TPS_DB_APP_WORKER_PASSWORD_FILE
+              value: /run/secrets/app_worker_password
+            - name: TPS_DB_APP_QUEUE_PASSWORD_FILE
+              value: /run/secrets/app_queue_password
+            # Lists and deletes under clean/ and withheld/; the API never has it.
+            - name: TPS_STORAGE_REMOVAL_ACCESS_KEY_ID
+              value: {{ .Values.storage.accessKeyIds.removal | quote }}
+            - name: TPS_STORAGE_REMOVAL_SECRET_ACCESS_KEY_FILE
+              value: /run/secrets/storage_removal_secret_key
+          resources:
+            {{- toYaml .Values.worker.resources | nindent 12 }}
+          volumeMounts:
+            {{- include "tps.mounts" $c | nindent 12 }}
+      volumes:
+        {{- include "tps.tmpVolume" $c | nindent 8 }}
+        {{- include "tps.caVolume" $c | nindent 8 }}
+        {{- $files := dict
+              "app_worker_password" "appWorkerPassword"
+              "app_queue_password" "appQueuePassword"
+              "subject_kek" "subjectKek"
+              "storage_write_secret_key" "storageWriteSecretKey"
+              "storage_read_secret_key" "storageReadSecretKey"
+              "storage_scanner_secret_key" "storageScannerSecretKey"
+              "storage_removal_secret_key" "storageRemovalSecretKey" }}
+        {{- if .Values.smtp.user }}{{ $_ := set $files "smtp_password" "smtpPassword" }}{{ end }}
+        {{- include "tps.secretsVolume" (dict "root" . "files" $files) | nindent 8 }}

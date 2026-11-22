@@ -54,6 +54,7 @@ import type { PublicTenants, TenantTransaction } from './database.ts';
 import { queueReleaseEmail } from './decision-emails.ts';
 import { publishGrantsEvent } from './grant-events.ts';
 import { queueMessageNotification } from './message-notifications.ts';
+import { inboxRoutes } from './platform/approvals/index.ts';
 import { listAuditEventsHandler, searchAuditEventsHandler } from './platform/audit-log/index.ts';
 import { insertConfigVersion, readConfigHistory } from './platform/config-versions.ts';
 import { documentsErasure } from './platform/documents/erasure.ts';
@@ -194,6 +195,7 @@ export function composeModules(deps: {
       route(listAuditEvents, listAuditEventsHandler),
       route(searchAuditEvents, searchAuditEventsHandler),
       route(searchTerm, searchHandler()),
+      ...inboxRoutes,
       ...teamRoutes(deps.auth ?? noAuth),
       ...settingsRoutes,
       ...retentionRoutes,
@@ -342,6 +344,11 @@ export function composeModules(deps: {
       route(triageRoutes.changeLabels, grants.changeLabels),
       route(triageRoutes.changeLabelsInBulk, grants.changeLabelsInBulk),
       route(triageRoutes.listLabels, grants.listLabels),
+      route(triageRoutes.createLabel, grants.createLabel, {
+        replay: ({ tx, id }) => grants.replayLabel({ tx, id: created(id) }),
+      }),
+      route(triageRoutes.updateLabel, grants.updateLabel),
+      route(triageRoutes.archiveLabel, grants.archiveLabel),
       route(savedViewRoutes.listSavedViews, grants.listSavedViews),
       route(savedViewRoutes.getSavedView, grants.getSavedView),
       route(savedViewRoutes.createSavedView, grants.createSavedView, {

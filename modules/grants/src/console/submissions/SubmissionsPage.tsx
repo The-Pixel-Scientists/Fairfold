@@ -27,6 +27,8 @@ import { MoveDialog } from './MoveDialog.tsx';
 import type { Moved } from './MoveDialog.tsx';
 import { submissionPath, submissionsPath } from './paths.ts';
 import { LabelDialog } from './views/LabelDialog.tsx';
+import { OwnerDialog } from './views/OwnerDialog.tsx';
+import type { OwnerMode } from './views/OwnerDialog.tsx';
 import type { LabelMode } from './views/LabelDialog.tsx';
 import { LABELS_PATH } from './views/paths.ts';
 import { searchOf, withCursor, withFilter } from './query.ts';
@@ -80,6 +82,7 @@ function Results({
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [moving, setMoving] = useState(false);
   const [labelling, setLabelling] = useState<LabelMode | null>(null);
+  const [owning, setOwning] = useState<OwnerMode | null>(null);
   const [notice, setNotice] = useState('');
   const summary = useRef<HTMLParagraphElement>(null);
   const status = useRef<HTMLParagraphElement>(null);
@@ -134,6 +137,18 @@ function Results({
               Move to stage
             </Button>
           )}
+          {canMove &&
+            (['assign', 'clear'] as const).map((mode) => (
+              <Button
+                key={mode}
+                disabled={chosen.length === 0}
+                onClick={() => {
+                  setOwning(mode);
+                }}
+              >
+                {mode === 'assign' ? 'Assign owner' : 'Clear owner'}
+              </Button>
+            ))}
           {canMove &&
             (['add', 'remove'] as const).map((mode) => (
               <Button
@@ -213,6 +228,19 @@ function Results({
           setNotice(message);
           setSelected(new Set());
           setLabelling(null);
+        }}
+      />
+      <OwnerDialog
+        open={owning !== null && chosen.length > 0}
+        mode={owning ?? 'assign'}
+        onOpenChange={(open) => {
+          if (!open) setOwning(null);
+        }}
+        submissionIds={chosen.map(({ id }) => id)}
+        onChanged={(message) => {
+          setNotice(message);
+          setSelected(new Set());
+          setOwning(null);
         }}
       />
       <MoveDialog

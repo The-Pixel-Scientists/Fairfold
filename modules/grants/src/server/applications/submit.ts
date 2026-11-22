@@ -21,6 +21,7 @@ import type {
 } from '../../contracts/index.ts';
 import type { Tx } from '../programme/tables.ts';
 import { publishApplicationSubmitted } from '../events/index.ts';
+import { stageWorkflow } from '../submissions/stage-workflow.ts';
 import { closingTime } from './closing.ts';
 import type {
   ApplicationArgs,
@@ -113,14 +114,8 @@ export async function submitDraft(
   if (eligibility.status === 'incomplete') throw deps.refuse(400, refusals.notEligible);
 
   const db = applicationsDb(tx);
-  const first = await db
-    .selectFrom('grants.stage')
-    .select('id')
-    .where('round_id', '=', application.roundId)
-    .orderBy('position')
-    .limit(1)
-    .executeTakeFirst();
-  if (first === undefined) throw deps.notFound();
+  const workflow = await stageWorkflow(tx, application.roundId);
+  if (workflow === undefined) throw deps.notFound();
 
   const actor = context.membership.id;
   const submittedBy = route === 'assisted' ? actor : null;
@@ -136,7 +131,7 @@ export async function submitDraft(
       submission_route: route,
       submitted_by: submittedBy,
       organisation_snapshot_id: snapshotId,
-      stage_id: first.id,
+      stage_id: workflow.initial,
       submitted_late: late,
       updated_by: actor,
     })
@@ -150,7 +145,7 @@ export async function submitDraft(
       round_id: application.roundId,
       application_id: applicationId,
       from_stage_id: null,
-      to_stage_id: first.id,
+      to_stage_id: workflow.initial,
       moved_by: actor,
     }))
     .execute();
@@ -159,7 +154,7 @@ export async function submitDraft(
     entityId: applicationId,
     changes: {
       [column('status')]: { before: 'draft', after: 'submitted' },
-      [column('stage_id')]: { before: null, after: first.id },
+      [column('stage_id')]: { before: null, after: workflow.initial },
       [column('submitted_late')]: { before: false, after: late },
     },
   });

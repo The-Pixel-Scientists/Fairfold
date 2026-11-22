@@ -8,12 +8,16 @@ import {
   requestErasure,
 } from '@pixel-scientists/domain/platform/subject-access';
 import {
+  addEmbedOrigin,
   getLogo,
+  getPublicEmbedOrigins,
   getPublicTenant,
   getSettings,
   getTheme,
   getThemeCss,
+  listEmbedOrigins,
   listModules,
+  removeEmbedOrigin,
   removeLogo,
   removeThemeTokens,
   switchModule,
@@ -24,6 +28,7 @@ import {
 } from '@pixel-scientists/domain/platform/settings';
 import { teamRoutes } from '@pixel-scientists/domain/platform/team';
 import { getWarehouseSnapshot } from '@pixel-scientists/domain/warehouse';
+import { approvalRoutes } from '@pixel-scientists/domain/workflow';
 import {
   adjustmentRoutes,
   applicationRoutes,
@@ -34,6 +39,8 @@ import {
   decisionRoutes,
   exportRoutes,
   formRoutes,
+  getPublicRound,
+  listPublicRounds,
   messageRoutes,
   monitoringRoutes,
   noteRoutes,
@@ -59,6 +66,8 @@ import type { ModuleJob } from './worker/registry.ts';
 const publicTenants = {
   tenant: () => Promise.resolve(undefined),
   logo: () => Promise.resolve(undefined),
+  rounds: () => Promise.resolve([]),
+  embedOrigins: () => Promise.resolve([]),
 };
 
 describe('composeModules', () => {
@@ -69,6 +78,7 @@ describe('composeModules', () => {
       listAuditEvents,
       searchAuditEvents,
       searchTerm,
+      ...Object.values(approvalRoutes),
       ...Object.values(teamRoutes),
       getSettings,
       updateSettings,
@@ -80,6 +90,9 @@ describe('composeModules', () => {
       removeLogo,
       listModules,
       switchModule,
+      listEmbedOrigins,
+      addEmbedOrigin,
+      removeEmbedOrigin,
       ...Object.values(retentionRoutes),
       requestErasure,
       readErasureRequest,
@@ -87,6 +100,9 @@ describe('composeModules', () => {
       getPublicTenant,
       getThemeCss,
       getLogo,
+      listPublicRounds,
+      getPublicRound,
+      getPublicEmbedOrigins,
       ...Object.values(partyRoutes),
       ...Object.values(programmeRoutes),
       ...Object.values(formRoutes),
@@ -102,6 +118,9 @@ describe('composeModules', () => {
       triageRoutes.changeLabels,
       triageRoutes.changeLabelsInBulk,
       triageRoutes.listLabels,
+      triageRoutes.createLabel,
+      triageRoutes.updateLabel,
+      triageRoutes.archiveLabel,
       ...Object.values(savedViewRoutes),
       ...Object.values(templateRoutes),
       ...Object.values(assessmentRoutes),

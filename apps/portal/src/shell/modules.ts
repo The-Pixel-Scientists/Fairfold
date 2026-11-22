@@ -9,7 +9,7 @@ import type { SwitchableModuleId } from '@pixel-scientists/domain/platform';
 import { hasPermission } from '@pixel-scientists/ui';
 import type { SessionData } from '@pixel-scientists/ui';
 
-import { APPLICATIONS_PATH, PROFILE_PATH } from '../paths.ts';
+import { APPLICATIONS_PATH, FORM_RESPONSES_PATH, PROFILE_PATH } from '../paths.ts';
 
 export interface PortalModule {
   id: 'party' | SwitchableModuleId;
@@ -31,6 +31,14 @@ export const grantsModule: PortalModule = {
   load: () => import('@pixel-scientists/grants/portal'),
 };
 
+export const formsModule: PortalModule = {
+  id: 'forms',
+  label: 'Your forms',
+  description: 'Read the forms you have answered.',
+  path: FORM_RESPONSES_PATH,
+  load: () => import('@pixel-scientists/forms/portal'),
+};
+
 /** In the order the front door shows them, which never changes as tools are switched on. */
 export const portalModules: readonly PortalModule[] = [
   {
@@ -41,6 +49,7 @@ export const portalModules: readonly PortalModule[] = [
     load: () => import('@pixel-scientists/party/portal'),
   },
   grantsModule,
+  formsModule,
 ];
 
 /** The session as the server returns it: the tools switched on for the funder are ids only, and left out until the server reports them. */

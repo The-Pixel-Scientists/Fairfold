@@ -547,6 +547,8 @@ export {
   saveReminderSetting,
 } from './reminders/routes.ts';
 export {
+  consoleHrefSchema,
+  currentOrganisationSchema,
   eligibilityCheckSchema,
   memberRefSchema,
   stageMoveResultSchema,
@@ -555,6 +557,7 @@ export {
   submissionPageSchema,
   submissionSchema,
   submissionSummarySchema,
+  type CurrentOrganisation,
   type EligibilityCheck,
   type MemberRef,
   type StageMoveResult,

@@ -109,11 +109,30 @@ resource "google_cloud_run_v2_job" "backup" {
   depends_on = [google_secret_manager_secret_iam_member.job]
 }
 
-resource "google_cloud_run_v2_job_iam_member" "trigger" {
-  name     = google_cloud_run_v2_job.backup.name
-  location = google_cloud_run_v2_job.backup.location
-  role     = "roles/run.invoker"
-  member   = google_service_account.trigger.member
+# Both policies are authoritative, so a binding added anywhere else goes at
+# the next apply. The trigger may run the job and holds nothing more; no one
+# else holds a role on the job or on its service account, since whoever could
+# change the job or act as that account could read backup_reader's password
+# (ADR 0011). So the release deployer gets nothing here, and an operator
+# rolls out a new image by applying this root.
+data "google_iam_policy" "job" {
+  binding {
+    role    = "roles/run.invoker"
+    members = [google_service_account.trigger.member]
+  }
+}
+
+resource "google_cloud_run_v2_job_iam_policy" "job" {
+  name        = google_cloud_run_v2_job.backup.name
+  location    = google_cloud_run_v2_job.backup.location
+  policy_data = data.google_iam_policy.job.policy_data
+}
+
+data "google_iam_policy" "none" {}
+
+resource "google_service_account_iam_policy" "job" {
+  service_account_id = google_service_account.job.name
+  policy_data        = data.google_iam_policy.none.policy_data
 }
 
 # Dates are worked out in UTC (infra/backup/README.md), so the schedule is
@@ -140,5 +159,5 @@ resource "google_cloud_scheduler_job" "backup" {
     }
   }
 
-  depends_on = [google_project_service.api, google_cloud_run_v2_job_iam_member.trigger]
+  depends_on = [google_project_service.api, google_cloud_run_v2_job_iam_policy.job]
 }

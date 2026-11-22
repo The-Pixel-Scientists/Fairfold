@@ -1,0 +1,58 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Every submitted or withdrawn application, with its round, programme and
+# status. A decision shows only once released, as the warehouse holds it.
+table_name: applications
+schema: warehouse
+description: Submitted and withdrawn applications, with released decisions only.
+sql: |-
+  SELECT p.title AS programme,
+         r.title AS round,
+         CASE
+           WHEN a.status = 'withdrawn' THEN 'Withdrawn'
+           WHEN a.outcome = 'accepted' THEN 'Accepted'
+           WHEN a.outcome = 'waitlisted' THEN 'Waitlisted'
+           WHEN a.outcome = 'declined' THEN 'Declined'
+           ELSE 'No decision released'
+         END AS status,
+         a.submitted_late AS submitted_late
+    FROM warehouse.grants_application AS a
+    JOIN warehouse.grants_round AS r ON r.id = a.round_id
+    JOIN warehouse.programme AS p ON p.id = r.programme_id
+main_dttm_col: null
+filter_select_enabled: true
+uuid: 40ad4d25-fc43-4bb8-b5e7-81feeab35391
+database_uuid: 7abde56f-93f9-4e34-b8b0-b8781f25df49
+version: 1.0.0
+metrics:
+  - metric_name: applications
+    verbose_name: Applications
+    metric_type: count
+    expression: COUNT(*)
+    d3format: ',d'
+  - metric_name: submitted_late
+    verbose_name: Submitted late
+    metric_type: sum
+    expression: SUM(CASE WHEN submitted_late THEN 1 ELSE 0 END)
+    d3format: ',d'
+columns:
+  - column_name: programme
+    verbose_name: Programme
+    type: TEXT
+    groupby: true
+    filterable: true
+  - column_name: round
+    verbose_name: Round
+    type: TEXT
+    groupby: true
+    filterable: true
+  - column_name: status
+    verbose_name: Status
+    type: TEXT
+    groupby: true
+    filterable: true
+  - column_name: submitted_late
+    verbose_name: Submitted late
+    type: BOOLEAN
+    groupby: true
+    filterable: true

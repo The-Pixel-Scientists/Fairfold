@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+slice_name: Applications by programme, round and status
+description: The same numbers as the chart, as a table.
+viz_type: table
+params:
+  viz_type: table
+  query_mode: aggregate
+  groupby: [programme, round, status]
+  metrics: [applications, submitted_late]
+  adhoc_filters: []
+  row_limit: 10000
+  server_page_length: 25
+  include_search: true
+  show_cell_bars: false
+  color_pn: false
+query_context: null
+cache_timeout: null
+uuid: 3b3ef31e-24df-40fb-808b-c2072b3ecf21
+version: 1.0.0
+dataset_uuid: 40ad4d25-fc43-4bb8-b5e7-81feeab35391

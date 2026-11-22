@@ -8,8 +8,15 @@ mock_provider "google" {
   # IAM members are validated even when mocked, so a random string won't do.
   mock_resource "google_service_account" {
     defaults = {
+      name   = "projects/tps-test/serviceAccounts/x@tps-test.iam.gserviceaccount.com"
       email  = "x@tps-test.iam.gserviceaccount.com"
       member = "serviceAccount:x@tps-test.iam.gserviceaccount.com"
+    }
+  }
+
+  mock_data "google_service_account" {
+    defaults = {
+      email = "tps-staging-uk-deployer@tps-test.iam.gserviceaccount.com"
     }
   }
 
@@ -56,6 +63,7 @@ run "workloads_are_private_and_route_through_the_vpc" {
       [for service in google_cloud_run_v2_service.service : service.template[0].vpc_access[0].egress == "ALL_TRAFFIC"],
       [google_cloud_run_v2_worker_pool.worker.template[0].vpc_access[0].egress == "ALL_TRAFFIC"],
       [google_cloud_run_v2_job.migrate.template[0].template[0].vpc_access[0].egress == "ALL_TRAFFIC"],
+      [google_cloud_run_v2_job.tenant_create.template[0].template[0].vpc_access[0].egress == "ALL_TRAFFIC"],
     ))
     error_message = "Every workload must send all its traffic through the VPC."
   }
@@ -64,9 +72,14 @@ run "workloads_are_private_and_route_through_the_vpc" {
     condition     = google_cloud_run_v2_worker_pool.worker.scaling[0].manual_instance_count == 1
     error_message = "The worker must always run one instance."
   }
+
+  assert {
+    condition     = google_cloud_run_v2_service.service["api"].template[0].timeout == "150s"
+    error_message = "The API's request timeout must be the proxy's, 150 seconds (ADR 0030)."
+  }
 }
 
-run "only_the_api_worker_and_migrate_job_read_secrets" {
+run "secrets_stay_with_the_workloads_that_use_them" {
   assert {
     condition = alltrue([
       for key in keys(google_secret_manager_secret_iam_member.reader) :
@@ -86,6 +99,35 @@ run "only_the_api_worker_and_migrate_job_read_secrets" {
   assert {
     condition     = !contains(keys(google_secret_manager_secret_iam_member.reader), "storage-removal/api")
     error_message = "The API must never hold the removal key (ADR 0030)."
+  }
+
+  assert {
+    condition = toset([
+      for key in keys(google_secret_manager_secret_iam_member.reader) : key if endswith(key, "/operator")
+    ]) == toset(["db-app-worker-password/operator", "db-ca/operator", "smtp-password/operator"])
+    error_message = "The tenant-create job must read app_worker's password, the database CA and the mail password, and nothing else."
+  }
+}
+
+run "the_deployer_rolls_out_and_migrates_and_nothing_more" {
+  assert {
+    condition = (
+      keys(google_cloud_run_v2_service_iam_member.deployer) == keys(google_cloud_run_v2_service.service) &&
+      alltrue([for grant in google_cloud_run_v2_service_iam_member.deployer : grant.role == "projects/tps-test/roles/tps_staging_uk_deploy"])
+    )
+    error_message = "The deployer may only change the services' images."
+  }
+
+  assert {
+    condition = alltrue([
+      for grant in google_cloud_run_v2_job_iam_member.deployer : grant.name == google_cloud_run_v2_job.migrate.name
+    ])
+    error_message = "The only job the deployer may change or run is migrate, never tenant-create."
+  }
+
+  assert {
+    condition     = toset(keys(google_service_account_iam_member.deployer)) == toset(["api", "worker", "migrate", "console", "portal"])
+    error_message = "The deployer may act as the five deployed workloads, never as the tenant-create job's account."
   }
 }
 

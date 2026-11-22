@@ -1,0 +1,65 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Every released award with the type of organisation it went to, in the
+# words the apps use for each legal form (modules/party/src/contracts/lists.ts).
+table_name: funding
+schema: warehouse
+description: Released awards by the type of organisation funded.
+sql: |-
+  SELECT CASE o.legal_form
+           WHEN 'registered_charity' THEN 'Registered charity'
+           WHEN 'charitable_incorporated_organisation' THEN 'Charitable incorporated organisation (CIO)'
+           WHEN 'company_limited_by_guarantee' THEN 'Company limited by guarantee'
+           WHEN 'community_interest_company' THEN 'Community interest company (CIC)'
+           WHEN 'community_benefit_society' THEN 'Community benefit society'
+           WHEN 'unincorporated_group' THEN 'Unincorporated group or club'
+           WHEN 'public_body' THEN 'Public body'
+           ELSE 'Other'
+         END AS organisation_type,
+         c.organisation_id AS organisation_id,
+         c.currency AS currency,
+         c.amount_minor / 100.0 AS amount
+    FROM warehouse.commitment AS c
+    JOIN warehouse.organisation AS o ON o.id = c.organisation_id
+main_dttm_col: null
+filter_select_enabled: true
+uuid: d8da98fd-f9b7-472f-a2e4-880157f8a8d0
+database_uuid: 7abde56f-93f9-4e34-b8b0-b8781f25df49
+version: 1.0.0
+metrics:
+  - metric_name: organisations_funded
+    verbose_name: Organisations funded
+    metric_type: count_distinct
+    expression: COUNT(DISTINCT organisation_id)
+    d3format: ',d'
+  - metric_name: awards
+    verbose_name: Awards
+    metric_type: count
+    expression: COUNT(*)
+    d3format: ',d'
+  - metric_name: amount_awarded
+    verbose_name: Amount awarded
+    metric_type: sum
+    expression: SUM(amount)
+    d3format: ',.0f'
+columns:
+  - column_name: organisation_type
+    verbose_name: Organisation type
+    type: TEXT
+    groupby: true
+    filterable: true
+  - column_name: organisation_id
+    verbose_name: Organisation
+    type: UUID
+    groupby: false
+    filterable: false
+  - column_name: currency
+    verbose_name: Currency
+    type: TEXT
+    groupby: true
+    filterable: true
+  - column_name: amount
+    verbose_name: Amount
+    type: NUMERIC
+    groupby: false
+    filterable: false

@@ -6,7 +6,7 @@ import { Screen } from '../auth/Screen.tsx';
 import { useFunderName } from '../funder.tsx';
 import { standaloneLink } from '../links.ts';
 import { PageColumn, PageIntro } from '../PageColumn.tsx';
-import { HOW_APPLYING_WORKS_PATH, SIGN_IN_PATH, SIGN_UP_PATH } from '../paths.ts';
+import { HOW_APPLYING_WORKS_PATH, OPEN_GRANTS_PATH, SIGN_IN_PATH, SIGN_UP_PATH } from '../paths.ts';
 import { FrontDoor } from '../shell/FrontDoor.tsx';
 
 /** What someone who is not signed in sees first: two ways in, and what to expect. */
@@ -16,8 +16,8 @@ function Welcome() {
     <PageColumn>
       <PageIntro title="Apply for a grant">
         <p>
-          Create an account with your email address. Then you can see which grants {funder} has open
-          and start an application.
+          You can see which grants {funder} has open before you sign in. To apply, create an account
+          with your email address.
         </p>
         <p>Setting up takes a few minutes. You only need your email address.</p>
       </PageIntro>
@@ -29,7 +29,10 @@ function Welcome() {
           Sign in
         </Link>
       </div>
-      <div>
+      <div className="flex flex-col gap-3">
+        <Link to={OPEN_GRANTS_PATH} className={standaloneLink}>
+          See open grants
+        </Link>
         {/* Outside the funder's address, so the page loads afresh instead of going through its router. */}
         <a href={HOW_APPLYING_WORKS_PATH} className={standaloneLink}>
           Read how applying works

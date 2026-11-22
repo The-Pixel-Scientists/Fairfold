@@ -77,7 +77,7 @@ describe('app_operator', { timeout: 30_000 }, () => {
     });
   });
 
-  it('holds exactly the rights migrations 0040 and 0101 grant', async () => {
+  it('holds exactly the rights migrations 0040, 0098 and 0101 grant', async () => {
     const rights = await withClient('app_worker', async (client) =>
       (await heldRights(client, ['app_operator'])).map(
         ({ privilege, object }) => `${privilege} on ${object}`,
@@ -117,6 +117,11 @@ describe('app_operator', { timeout: 30_000 }, () => {
           'changes',
           'subject_party_id',
         ]),
+        // A replay moves a cursor back, to no earlier than the oldest event
+        // kept (migration 0098).
+        'SELECT on app.event_cursor',
+        ...columns('UPDATE', 'app.event_cursor', ['last_sequence', 'updated_at']),
+        ...columns('SELECT', 'app.event_outbox', ['sequence', 'retain_until']),
         // The signature connection commands (migration 0101).
         ...columns('SELECT', 'app.signature_connection', ['tenant_id', 'id', 'provider', 'status']),
         ...columns('INSERT', 'app.signature_connection', [

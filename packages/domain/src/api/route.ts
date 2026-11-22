@@ -126,6 +126,14 @@ interface PublicRoute extends RouteBase {
   readonly audience: 'public';
   readonly permission: null;
   readonly scope: null;
+  /**
+   * A one-click unsubscribe (RFC 8058): the POST a mail client sends to a
+   * message's `List-Unsubscribe` link, whose body is exactly
+   * `List-Unsubscribe=One-Click` (oneClickUnsubscribeBodySchema) as a form.
+   * The one public route exempt from the Origin check, as the SAML ACS is
+   * among auth routes.
+   */
+  readonly oneClickUnsubscribe?: true;
 }
 
 export type RouteContract = MemberRoute | AuthRoute | PublicRoute;
@@ -133,6 +141,11 @@ export type RouteContract = MemberRoute | AuthRoute | PublicRoute;
 export const ssoCompletions = ['oidc_callback', 'saml_acs', 'saml_completion'] as const;
 
 export type SsoCompletion = (typeof ssoCompletions)[number];
+
+/** The one body a one-click unsubscribe takes, and only such a route takes it. */
+export const oneClickUnsubscribeBodySchema = z.strictObject({
+  'List-Unsubscribe': z.literal('One-Click'),
+});
 
 /** The SAML ACS form fields, sorted: the IdP's response and our own opaque value. */
 const SAML_FORM = 'RelayState,SAMLResponse';
@@ -171,7 +184,12 @@ export function checkRoute(route: RouteContract): string[] {
   if ((route.method === 'GET' || route.method === 'DELETE') && route.body !== undefined) {
     problems.push(`A ${route.method} route takes no body.`);
   }
-  problems.push(...accessProblems(route), ...markerProblems(route), ...redirectProblems(route));
+  problems.push(
+    ...accessProblems(route),
+    ...markerProblems(route),
+    ...redirectProblems(route),
+    ...oneClickProblems(route),
+  );
 
   const pathParams = rest.filter((segment) => segment.startsWith(':')).map((s) => s.slice(1));
   problems.push(...paramProblems(pathParams, route.params));
@@ -187,7 +205,8 @@ export function checkRoute(route: RouteContract): string[] {
     if (route.method !== 'POST' || !isMember(route.audience)) {
       problems.push('Only a console or portal POST route takes a raw upload body.');
     }
-  } else if (body !== undefined) {
+  } else if (body !== undefined && !isOneClickBody(route)) {
+    // The one-click body's key is RFC 8058's, not a plain name; oneClickProblems() checks it.
     problems.push(...requestProblems(route.path, 'body', body), ...keyNameProblems('body', body));
   }
 
@@ -244,6 +263,35 @@ function redirectProblems(route: RouteContract): string[] {
   }
   if (acs && formFields(route.body) !== SAML_FORM) {
     problems.push('The SAML ACS body is a form of SAMLResponse and RelayState, both text.');
+  }
+  return problems;
+}
+
+function isOneClickBody(route: RouteContract): boolean {
+  return (
+    Object.hasOwn(route, 'oneClickUnsubscribe') && route.body === oneClickUnsubscribeBodySchema
+  );
+}
+
+/** A one-click unsubscribe is a public POST taking exactly its form body, with no idempotency key. */
+function oneClickProblems(route: RouteContract): string[] {
+  if (!Object.hasOwn(route, 'oneClickUnsubscribe')) return [];
+  const { oneClickUnsubscribe, idempotent } = route as {
+    oneClickUnsubscribe: unknown;
+    idempotent?: unknown;
+  };
+  const problems: string[] = [];
+  if (oneClickUnsubscribe !== true) problems.push('oneClickUnsubscribe is true or left out.');
+  if (route.audience !== 'public' || route.method !== 'POST') {
+    problems.push('Only a public POST route is a one-click unsubscribe.');
+  }
+  if (route.body !== oneClickUnsubscribeBodySchema) {
+    problems.push(
+      'A one-click unsubscribe takes exactly the form body List-Unsubscribe=One-Click.',
+    );
+  }
+  if (idempotent !== undefined) {
+    problems.push('A one-click unsubscribe is never idempotent: a mail client sends no key.');
   }
   return problems;
 }

@@ -17,6 +17,7 @@ import {
 } from '@pixel-scientists/domain/platform/settings';
 
 import { route, type Route } from '../../routes/register.ts';
+import { embedOriginRoutes } from './embed-origins/index.ts';
 import { LOGO_BODY_LIMIT_BYTES, removeLogoHandler, uploadLogoHandler } from './logo.ts';
 import { listModulesHandler, switchModuleHandler } from './modules.ts';
 import { getSettingsHandler, updateSettingsHandler } from './tenant.ts';
@@ -34,4 +35,5 @@ export const settingsRoutes: readonly Route[] = [
   route(removeLogo, removeLogoHandler),
   route(listModules, listModulesHandler),
   route(switchModule, switchModuleHandler),
+  ...embedOriginRoutes,
 ];

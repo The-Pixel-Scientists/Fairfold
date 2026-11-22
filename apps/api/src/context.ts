@@ -15,6 +15,7 @@ import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
 
 import type { AuditEvent } from './audit/writer.ts';
 import type { TenantTransaction } from './database.ts';
+import type { RequestWorkflow } from './platform/approvals/index.ts';
 import type { RequestFiles } from './platform/files/index.ts';
 
 /** Where the session stands on MFA, as in the session the apps read. */
@@ -119,9 +120,13 @@ export interface PolicyContext extends RequestContext {
   };
 }
 
-/** The context of a console or portal route: the policy's, and the file service bound to the request. */
+/**
+ * The context of a console or portal route: the policy's, and the file and
+ * workflow services bound to the request's transaction.
+ */
 export interface MemberContext extends PolicyContext {
   readonly files: RequestFiles;
+  readonly workflow: RequestWorkflow;
 }
 
 export interface SessionRead {

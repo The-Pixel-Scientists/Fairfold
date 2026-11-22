@@ -20,7 +20,12 @@ export {
   peopleByUserIds,
   personIdForUser,
 } from './people.ts';
-export { organisationName, organisationSummaries } from './organisations.ts';
+export {
+  organisationDetails,
+  organisationName,
+  organisationSummaries,
+  type OrganisationDetails,
+} from './organisations.ts';
 export {
   partyHandlers,
   partyResolvers,
@@ -28,6 +33,7 @@ export {
   type PartyDependencies,
 } from './handlers.ts';
 export { partyRecordHandlers, type PartyRecordDependencies } from './record-handlers.ts';
+export { emailRecipient, mayContact } from './contact/index.ts';
 export { createPartyMerges } from './merge.ts';
 export type { PartyRequest } from './request.ts';
 export { partyRepoint } from './repoint.ts';

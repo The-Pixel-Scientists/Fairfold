@@ -10,10 +10,12 @@ import { app } from './app.ts';
 import { assure } from './assure.ts';
 import { auth } from './auth.ts';
 import { crm } from './crm.ts';
+import { forms } from './forms.ts';
 import { grants } from './grants.ts';
 import { migrations } from './migrations.ts';
 import { party } from './party.ts';
 import { pgboss } from './pgboss.ts';
+import { privacy } from './privacy.ts';
 
 export { CURRENT_TENANT_ID_DEFINITION } from './app.ts';
 export { JOB_RIGHTS, SEND_COLUMNS } from './pgboss.ts';
@@ -60,6 +62,8 @@ const SCHEMAS: Readonly<Record<string, SchemaCatalogue>> = {
   pgboss,
   migrations,
   assure,
+  forms,
+  privacy,
 };
 
 /** Every schema's entries for `key`, checking that each names only its own schema. */

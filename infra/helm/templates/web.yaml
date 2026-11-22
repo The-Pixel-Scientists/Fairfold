@@ -1,0 +1,64 @@
+{{- /* SPDX-License-Identifier: AGPL-3.0-or-later */ -}}
+{{- /*
+The console and portal web servers (ADR 0022). They hold no secret and
+reach nothing but DNS: the edge sends /api/ straight to the API.
+*/ -}}
+{{- range $app := list "console" "portal" }}
+{{- $c := dict "root" $ "component" $app }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $app }}
+  labels:
+    {{- include "tps.labels" $c | nindent 4 }}
+spec:
+  replicas: {{ (index $.Values $app).replicas }}
+  selector:
+    matchLabels:
+      {{- include "tps.selector" $c | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "tps.selector" $c | nindent 8 }}
+    spec:
+      {{- include "tps.pod" $c | nindent 6 }}
+      containers:
+        - name: {{ $app }}
+          image: {{ include "tps.image" (index $.Values.images $app) }}
+          {{- include "tps.container" $c | nindent 10 }}
+          ports:
+            - name: http
+              containerPort: 8080
+          # The image's HEALTHCHECK.
+          readinessProbe:
+            httpGet: { path: /, port: http }
+            periodSeconds: 5
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet: { path: /, port: http }
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 5
+          resources:
+            {{- toYaml (index $.Values $app).resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        {{- include "tps.tmpVolume" $c | nindent 8 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $app }}
+  labels:
+    {{- include "tps.labels" $c | nindent 4 }}
+spec:
+  selector:
+    {{- include "tps.selector" $c | nindent 4 }}
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+{{- end }}

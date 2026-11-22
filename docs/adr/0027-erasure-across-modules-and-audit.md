@@ -477,15 +477,30 @@ person's data back. So the guards and the engine lock the party row:
   - unlinked, with a stated reason, for personal values that belong to no
     known subject, such as rate-limit counters keyed by a typed identifier or
     an IP address. An unlinked table must have a fixed retention of 12
-    months or less.
+    months or less;
+  - two party columns, for a row about two parties at once, such as
+    `crm.merge_record`'s loser and survivor. Each is a path of the first
+    kind, and a reader follows both;
+  - none, with a stated reason, for a table about no identified person
+    whose free text may still name one, such as the privacy breach log, a
+    DPIA or the tenant's records of processing. The table must be outside
+    the party schema and have no foreign key to a party table or to
+    `auth.user`. It keeps its classes and retention: it is not unlinked, so
+    a breach description stays special category and is not cut to 12
+    months. Subject access, erasure and export skip it on purpose, since it
+    has no path to follow. Marking a table about a person as none is a
+    defect; the reason is there so review can judge it.
 - A path's column may be null on rows with no known subject, such as an auth
   event for an unknown identifier.
 - Subject access, erasure and export are generated from the map by walking
   these paths across modules. The schema lint fails for a table with a
   personal or special category column and no path, for a path naming a
   column that does not exist, for a join that is not a foreign key in the
-  catalogue, and for a table outside the party schema whose path reaches a
-  party without the erasure guard set out in "`erased` is final" (S11-55).
+  catalogue, for an unlinked table without a reason or with a column kept
+  longer than 12 months, for a none table without a reason, in the party
+  schema or with a foreign key to a party table or `auth.user`, and for a
+  table outside the party schema whose path reaches a party without the
+  erasure guard set out in "`erased` is final" (S11-55).
 
 ### Auth events
 

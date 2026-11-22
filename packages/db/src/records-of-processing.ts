@@ -112,7 +112,10 @@ export function processingProblems(
     if (fields.some(isPersonal)) {
       if (entry.dataSubjects.length === 0) problems.push(`${table} lists no data subject.`);
       if (entry.dataCategories.length === 0) problems.push(`${table} lists no data category.`);
-    } else if (stated && (paths[table] === undefined || paths[table].kind === 'unlinked')) {
+    } else if (
+      stated &&
+      !['party', 'parties', 'account', 'join'].includes(paths[table]?.kind ?? '')
+    ) {
       problems.push(`${table} has no personal data and no path to a party, so must state none.`);
     }
   }

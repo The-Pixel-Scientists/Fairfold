@@ -7,7 +7,9 @@
 //
 // The SMTP client itself is behind MailTransport (transport.ts).
 
+import { apiBasePath } from '@pixel-scientists/domain/api';
 import { emailSchema } from '@pixel-scientists/domain/auth';
+import { confirmUnsubscribe, unsubscribeTokenSchema } from '@pixel-scientists/party/contracts';
 import type { FastifyBaseLogger } from 'fastify';
 
 import { hasControlCharacter, type SmtpSettings } from '../config.ts';
@@ -31,6 +33,12 @@ export interface Email {
   to: string;
   subject: string;
   text: string;
+  /**
+   * Marketing only: adds the RFC 8058 one-click unsubscribe headers. The sender builds their
+   * values from a token of the strict character set and an https origin; no other header
+   * can be added.
+   */
+  unsubscribe?: { origin: string; token: string };
   /** Goes on the log line of a failure, so support can match it to the request. */
   requestId?: string;
 }
@@ -45,6 +53,8 @@ export interface MailMessage {
   to: string;
   subject: string;
   text: string;
+  /** The one https link of the List-Unsubscribe header; the transport adds both headers. */
+  unsubscribeUrl?: string;
 }
 
 /** Delivers one message, or throws the SMTP client's error. */
@@ -100,6 +110,24 @@ function isSafeBody(text: string): boolean {
   return !hasControlCharacter(text.replaceAll('\n', '').replaceAll('\t', ''));
 }
 
+/**
+ * The unsubscribe link, on the API's path: a mail provider POSTs to it, and the edge sends only
+ * `/api/` to the API. Undefined if the origin is not a bare https origin or the token is not valid.
+ */
+function unsubscribeUrl(unsubscribe: NonNullable<Email['unsubscribe']>): string | undefined {
+  const { origin, token } = unsubscribe;
+  if (hasControlCharacter(origin) || !unsubscribeTokenSchema.safeParse(token).success) {
+    return undefined;
+  }
+  try {
+    const url = new URL(origin);
+    if (url.protocol !== 'https:' || url.origin !== origin) return undefined;
+    return `${origin}${apiBasePath}${confirmUnsubscribe.path}?token=${token}`;
+  } catch {
+    return undefined;
+  }
+}
+
 function isSendable(email: Email): boolean {
   return (
     !hasControlCharacter(email.to) &&
@@ -129,12 +157,15 @@ export function createSender(
       // Checked before connecting, on the raw values: emailSchema trims, and a
       // trailing line break must not pass as an address.
       if (!isSendable(email)) return fail('invalid_message');
+      const link = email.unsubscribe === undefined ? undefined : unsubscribeUrl(email.unsubscribe);
+      if (email.unsubscribe !== undefined && link === undefined) return fail('invalid_message');
       try {
         await transport.deliver({
           from: settings.from,
           to: email.to,
           subject: email.subject,
           text: email.text,
+          ...(link === undefined ? {} : { unsubscribeUrl: link }),
         });
         return { sent: true };
       } catch (error) {

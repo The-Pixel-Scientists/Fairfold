@@ -107,6 +107,8 @@ export const grants = {
     version: internal,
     subject: internal,
     body: internal,
+    // Service or marketing email (ADR 0033), kept with its version.
+    purpose: internal,
     created_at: internal,
     created_by: internal,
   },

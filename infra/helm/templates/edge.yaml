@@ -1,0 +1,115 @@
+{{- /* SPDX-License-Identifier: AGPL-3.0-or-later */ -}}
+{{- $c := dict "root" . "component" "edge" -}}
+{{- /*
+The reverse proxy (ADR 0030), from infra/proxy/ unchanged: TLS with the
+operator's certificate, HSTS, compression, logs without query strings or
+client addresses, rate limits per client address, and the one POST-only
+upload route. It is the API's only trusted hop. Its configuration names
+the upstreams api, console and portal, the Services of this release.
+*/ -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: edge
+  labels:
+    {{- include "tps.labels" $c | nindent 4 }}
+spec:
+  replicas: {{ .Values.edge.replicas }}
+  selector:
+    matchLabels:
+      {{- include "tps.selector" $c | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "tps.selector" $c | nindent 8 }}
+    spec:
+      {{- include "tps.pod" $c | nindent 6 }}
+      containers:
+        - name: edge
+          image: {{ include "tps.image" .Values.images.edge }}
+          {{- include "tps.container" $c | nindent 10 }}
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: https
+              containerPort: 8443
+          env:
+            - name: NGINX_ENVSUBST_TEMPLATE_DIR
+              value: /etc/nginx/proxy/templates
+            - name: NGINX_ENVSUBST_FILTER
+              value: ^TPS_PROXY_
+            - name: TPS_PROXY_CONSOLE_HOST
+              value: {{ .Values.hosts.console | quote }}
+            - name: TPS_PROXY_PORTAL_HOST
+              value: {{ .Values.hosts.portal | quote }}
+            - name: TPS_PROXY_CONSOLE_PORT
+              value: {{ .Values.edge.httpsPort | quote }}
+            - name: TPS_PROXY_PORTAL_PORT
+              value: {{ .Values.edge.httpsPort | quote }}
+            - name: TPS_PROXY_HSTS
+              value: {{ .Values.edge.hsts | quote }}
+          # The proxy answers its health check on loopback only.
+          readinessProbe:
+            exec:
+              command: [curl, --silent, --fail, --output, /dev/null, http://127.0.0.1:8081/]
+            periodSeconds: 5
+            timeoutSeconds: 5
+          livenessProbe:
+            exec:
+              command: [curl, --silent, --fail, --output, /dev/null, http://127.0.0.1:8081/]
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 5
+          resources:
+            {{- toYaml .Values.edge.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            # Where the image's entrypoint writes the filled-in host names.
+            - name: conf
+              mountPath: /etc/nginx/conf.d
+            - name: secrets
+              mountPath: /run/secrets
+              readOnly: true
+      volumes:
+        {{- include "tps.tmpVolume" $c | nindent 8 }}
+        - name: conf
+          emptyDir:
+            sizeLimit: 1Mi
+        - name: secrets
+          projected:
+            defaultMode: 288
+            sources:
+              - secret:
+                  name: {{ .Values.secrets.edgeTls }}
+                  items:
+                    - key: tls.crt
+                      path: proxy_certificate
+                    - key: tls.key
+                      path: proxy_key
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: edge
+  labels:
+    {{- include "tps.labels" $c | nindent 4 }}
+  {{- with .Values.edge.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.edge.service.type }}
+  {{- if ne .Values.edge.service.type "ClusterIP" }}
+  # The edge limits requests by client address, so it must see the client's.
+  externalTrafficPolicy: Local
+  {{- end }}
+  selector:
+    {{- include "tps.selector" $c | nindent 4 }}
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+    - name: https
+      port: 443
+      targetPort: https
