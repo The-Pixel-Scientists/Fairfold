@@ -117,7 +117,7 @@ describe('team names', () => {
     expect(teams.teamNameSchema.parse('x'.repeat(100))).toBe('x'.repeat(100));
     expect(firstMessage('   ')).toBe(messages.enterTeamName);
     expect(firstMessage('x'.repeat(101))).toBe(messages.teamNameTooLong);
-    for (const name of ['North\nteam', 'North‮team', 'North\u0000team']) {
+    for (const name of ['North\nteam', 'North\u202eteam', 'North\u0000team']) {
       expect(firstMessage(name), JSON.stringify(name)).toBe(messages.tenantNameHidden);
     }
     expect(firstMessage('---')).toBe(messages.tenantNameVisible);

@@ -126,7 +126,7 @@ describe('break-glass reasons', () => {
     expect(textMessage('x'.repeat(19))).toBe(messages.breakGlassReasonText);
     expect(textMessage(`${'x'.repeat(19)}     `)).toBe(messages.breakGlassReasonText);
     expect(textMessage('x'.repeat(1001))).toBe(messages.breakGlassReasonText);
-    expect(textMessage(`${'x'.repeat(20)}‮`)).toBe(messages.textHidden);
+    expect(textMessage(`${'x'.repeat(20)}\u202e`)).toBe(messages.textHidden);
     expect(textMessage(`${'x'.repeat(20)}\u0000`)).toBe(messages.textHidden);
   });
 
