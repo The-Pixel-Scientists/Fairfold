@@ -56,6 +56,7 @@ import { publishGrantsEvent } from './grant-events.ts';
 import { queueMessageNotification } from './message-notifications.ts';
 import { listAuditEventsHandler, searchAuditEventsHandler } from './platform/audit-log/index.ts';
 import { insertConfigVersion, readConfigHistory } from './platform/config-versions.ts';
+import { documentsErasure } from './platform/documents/erasure.ts';
 import { erasureRoutes, type Contribution } from './platform/erasure/index.ts';
 import { membersWith } from './platform/members.ts';
 import { notesPlatform } from './platform/notes/index.ts';
@@ -73,7 +74,11 @@ import { route, type Route } from './routes/register.ts';
 import type { ModuleJob } from './worker/registry.ts';
 
 /** Every module's erasure contribution, one line each; the erasure job calls them all, whether or not a tenant has the module on. */
-export const erasureContributions: readonly Contribution[] = [partyErasure, grantsErasure];
+export const erasureContributions: readonly Contribution[] = [
+  partyErasure,
+  grantsErasure,
+  documentsErasure,
+];
 
 /** What the platform reads from a module's server entry point besides its routes. */
 export interface ModuleServer {

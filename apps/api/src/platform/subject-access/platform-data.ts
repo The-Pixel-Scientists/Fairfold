@@ -37,6 +37,8 @@ export const excludedTables: Readonly<Record<string, string>> = {
   'app.note':
     'A note is about an applicant, not its author, so a staff member does not receive it. The grants module reads it through the application.',
   'app.request_limit': 'A hashed client key with no account or tenant.',
+  'app.signature_signer':
+    'A signer is a person asked to sign, not a member, so the documents contribution reads it with its request.',
   'app.subject_key': 'Wrapped key material: a secret, not data about the person.',
 };
 
