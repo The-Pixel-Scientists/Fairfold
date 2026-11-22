@@ -1,0 +1,349 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "images",
+    "imagePullSecrets",
+    "hosts",
+    "database",
+    "storage",
+    "smtp",
+    "clamd",
+    "dns",
+    "extraCaCertificates",
+    "subjectKekVersion",
+    "secrets",
+    "api",
+    "worker",
+    "console",
+    "portal",
+    "edge",
+    "migrate"
+  ],
+  "definitions": {
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "digest"],
+      "properties": {
+        "repository": {
+          "description": "A registry host and path, with no tag.",
+          "type": "string",
+          "pattern": "^[a-z0-9]([a-z0-9.-]*[a-z0-9])?(:[0-9]{1,5})?(/[a-z0-9]+([._-][a-z0-9]+)*)+$"
+        },
+        "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+      }
+    },
+    "name": {
+      "type": "string",
+      "maxLength": 253,
+      "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+    },
+    "host": {
+      "type": "string",
+      "maxLength": 253,
+      "pattern": "^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$"
+    },
+    "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+    "labels": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": { "type": "string", "minLength": 1 }
+    },
+    "peer": {
+      "description": "How network policies reach a named service: pods in this cluster, one private address, or public addresses only.",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["namespace", "podLabels", "port"],
+          "properties": {
+            "namespace": { "$ref": "#/definitions/name" },
+            "podLabels": { "$ref": "#/definitions/labels" },
+            "port": { "$ref": "#/definitions/port" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["cidr", "port"],
+          "properties": {
+            "cidr": {
+              "description": "One address: /32 for IPv4, /128 for IPv6. Never a metadata address.",
+              "type": "string",
+              "anyOf": [
+                {
+                  "pattern": "^(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(\\.(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}/32$"
+                },
+                { "pattern": "^[0-9a-f:]*:[0-9a-f:]*/128$" }
+              ],
+              "not": { "pattern": "^(169\\.254\\.|fd00:ec2::254/)" }
+            },
+            "port": { "$ref": "#/definitions/port" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["public", "port"],
+          "properties": {
+            "public": { "const": true },
+            "port": { "$ref": "#/definitions/port" }
+          }
+        }
+      ]
+    },
+    "quantity": { "type": ["string", "number"], "pattern": "^[0-9]+(\\.[0-9]+)?(m|Ki|Mi|Gi)?$" },
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requests", "limits"],
+      "properties": {
+        "requests": { "$ref": "#/definitions/cpuAndMemory" },
+        "limits": { "$ref": "#/definitions/cpuAndMemory" }
+      }
+    },
+    "cpuAndMemory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cpu", "memory"],
+      "properties": {
+        "cpu": { "$ref": "#/definitions/quantity" },
+        "memory": { "$ref": "#/definitions/quantity" }
+      }
+    },
+    "replicas": { "type": "integer", "minimum": 1 },
+    "workload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["replicas", "resources"],
+      "properties": {
+        "replicas": { "$ref": "#/definitions/replicas" },
+        "resources": { "$ref": "#/definitions/resources" }
+      }
+    },
+    "configMapKey": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["configMap", "key"],
+      "properties": {
+        "configMap": { "$ref": "#/definitions/name" },
+        "key": { "type": "string", "pattern": "^[-._a-zA-Z0-9]+$" }
+      }
+    }
+  },
+  "properties": {
+    "images": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["api", "console", "portal", "edge"],
+      "properties": {
+        "api": { "$ref": "#/definitions/image" },
+        "console": { "$ref": "#/definitions/image" },
+        "portal": { "$ref": "#/definitions/image" },
+        "edge": { "$ref": "#/definitions/image" }
+      }
+    },
+    "imagePullSecrets": { "type": "array", "items": { "$ref": "#/definitions/name" } },
+    "hosts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["console", "portal"],
+      "properties": {
+        "console": { "$ref": "#/definitions/host" },
+        "portal": { "$ref": "#/definitions/host" }
+      }
+    },
+    "database": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["host", "port", "name", "adminMode", "adminUser", "ca", "networkPolicy"],
+      "properties": {
+        "host": { "$ref": "#/definitions/host" },
+        "port": { "$ref": "#/definitions/port" },
+        "name": { "type": "string", "pattern": "^[a-z_][a-z0-9_]{0,62}$" },
+        "adminMode": { "enum": ["superuser", "managed"] },
+        "adminUser": { "type": "string", "pattern": "^[a-z_][a-z0-9_]{0,62}$" },
+        "ca": { "$ref": "#/definitions/configMapKey" },
+        "networkPolicy": { "$ref": "#/definitions/peer" }
+      }
+    },
+    "storage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["endpoint", "region", "bucket", "accessKeyIds", "networkPolicy"],
+      "properties": {
+        "endpoint": {
+          "type": "string",
+          "pattern": "^https?://[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?(:[0-9]{1,5})?$"
+        },
+        "region": { "type": "string", "pattern": "^[a-z0-9-]{1,32}$" },
+        "bucket": { "type": "string", "pattern": "^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$" },
+        "accessKeyIds": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["write", "read", "scanner", "removal"],
+          "properties": {
+            "write": { "type": "string", "pattern": "^[A-Za-z0-9._-]{1,128}$" },
+            "read": { "type": "string", "pattern": "^[A-Za-z0-9._-]{1,128}$" },
+            "scanner": { "type": "string", "pattern": "^[A-Za-z0-9._-]{1,128}$" },
+            "removal": { "type": "string", "pattern": "^[A-Za-z0-9._-]{1,128}$" }
+          }
+        },
+        "networkPolicy": { "$ref": "#/definitions/peer" }
+      }
+    },
+    "smtp": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["host", "port", "tls", "from", "user", "networkPolicy"],
+      "properties": {
+        "host": { "$ref": "#/definitions/host" },
+        "port": { "$ref": "#/definitions/port" },
+        "tls": { "enum": ["starttls", "tls"] },
+        "from": { "type": "string", "pattern": "^[^\\s@]+@[^\\s@]+$" },
+        "user": { "type": "string", "maxLength": 256, "pattern": "^[^\\x00-\\x1f\\x7f]*$" },
+        "networkPolicy": { "$ref": "#/definitions/peer" }
+      }
+    },
+    "clamd": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["host", "port", "networkPolicy"],
+      "properties": {
+        "host": { "$ref": "#/definitions/host" },
+        "port": { "$ref": "#/definitions/port" },
+        "networkPolicy": { "$ref": "#/definitions/peer" }
+      }
+    },
+    "dns": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["namespace", "podLabels"],
+      "properties": {
+        "namespace": { "$ref": "#/definitions/name" },
+        "podLabels": { "$ref": "#/definitions/labels" }
+      }
+    },
+    "extraCaCertificates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["configMap", "key"],
+      "properties": {
+        "configMap": {
+          "anyOf": [{ "const": "" }, { "$ref": "#/definitions/name" }]
+        },
+        "key": { "type": "string", "pattern": "^[-._a-zA-Z0-9]+$" }
+      }
+    },
+    "subjectKekVersion": { "type": "integer", "minimum": 1 },
+    "secrets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "databaseAdminPassword",
+        "migratorPassword",
+        "appApiPassword",
+        "appAuthPassword",
+        "appWorkerPassword",
+        "appQueuePassword",
+        "backupReaderPassword",
+        "authSecret",
+        "requestLimitKey",
+        "subjectKek",
+        "storageWriteSecretKey",
+        "storageReadSecretKey",
+        "storageScannerSecretKey",
+        "storageRemovalSecretKey",
+        "smtpPassword",
+        "edgeTls"
+      ],
+      "properties": {
+        "databaseAdminPassword": { "$ref": "#/definitions/name" },
+        "migratorPassword": { "$ref": "#/definitions/name" },
+        "appApiPassword": { "$ref": "#/definitions/name" },
+        "appAuthPassword": { "$ref": "#/definitions/name" },
+        "appWorkerPassword": { "$ref": "#/definitions/name" },
+        "appQueuePassword": { "$ref": "#/definitions/name" },
+        "backupReaderPassword": { "$ref": "#/definitions/name" },
+        "authSecret": { "$ref": "#/definitions/name" },
+        "requestLimitKey": { "$ref": "#/definitions/name" },
+        "subjectKek": { "$ref": "#/definitions/name" },
+        "storageWriteSecretKey": { "$ref": "#/definitions/name" },
+        "storageReadSecretKey": { "$ref": "#/definitions/name" },
+        "storageScannerSecretKey": { "$ref": "#/definitions/name" },
+        "storageRemovalSecretKey": { "$ref": "#/definitions/name" },
+        "smtpPassword": { "anyOf": [{ "const": "" }, { "$ref": "#/definitions/name" }] },
+        "edgeTls": { "$ref": "#/definitions/name" }
+      }
+    },
+    "api": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["replicas", "trustProxy", "resources"],
+      "properties": {
+        "replicas": { "$ref": "#/definitions/replicas" },
+        "trustProxy": {
+          "description": "The edge's pod address ranges. A range of every address is refused.",
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "items": {
+            "type": "string",
+            "anyOf": [
+              {
+                "pattern": "^([0-9]{1,3}\\.){3}[0-9]{1,3}/([1-9]|[12][0-9]|3[0-2])$"
+              },
+              { "pattern": "^[0-9a-f:]*:[0-9a-f:]*/([1-9]|[1-9][0-9]|1[01][0-9]|12[0-8])$" }
+            ]
+          }
+        },
+        "resources": { "$ref": "#/definitions/resources" }
+      }
+    },
+    "worker": { "$ref": "#/definitions/workload" },
+    "console": { "$ref": "#/definitions/workload" },
+    "portal": { "$ref": "#/definitions/workload" },
+    "edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["replicas", "hsts", "httpsPort", "service", "resources"],
+      "properties": {
+        "replicas": { "$ref": "#/definitions/replicas" },
+        "hsts": {
+          "type": "string",
+          "pattern": "^(max-age=[0-9]+(; includeSubDomains)?(; preload)?)?$"
+        },
+        "httpsPort": { "$ref": "#/definitions/port" },
+        "service": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "annotations"],
+          "properties": {
+            "type": { "enum": ["ClusterIP", "NodePort", "LoadBalancer"] },
+            "annotations": { "type": "object", "additionalProperties": { "type": "string" } }
+          }
+        },
+        "resources": { "$ref": "#/definitions/resources" }
+      }
+    },
+    "migrate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["resources"],
+      "properties": { "resources": { "$ref": "#/definitions/resources" } }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "smtp": { "properties": { "user": { "const": "" } } } } },
+      "then": {
+        "properties": { "secrets": { "properties": { "smtpPassword": { "const": "" } } } }
+      },
+      "else": {
+        "properties": { "secrets": { "properties": { "smtpPassword": { "minLength": 1 } } } }
+      }
+    }
+  ]
+}
