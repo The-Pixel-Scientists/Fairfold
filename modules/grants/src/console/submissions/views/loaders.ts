@@ -10,6 +10,8 @@ import {
   changeLabelsInBulk,
   createLabel,
   listLabels,
+  listMentionableMembers,
+  setOwners,
   updateLabel,
 } from '../../../contracts/index.ts';
 import type { LabelColour } from '../../../contracts/index.ts';
@@ -32,3 +34,11 @@ export const editLabel = (labelId: string, name: string, colour: LabelColour) =>
   call(updateLabel, { params: { labelId }, body: { name, colour } });
 
 export const archiveOne = (labelId: string) => call(archiveLabel, { params: { labelId } });
+
+/** The members the server says may own this submission: those who can read applications. Never built in the browser. */
+export const loadOwners = (submissionId: string) =>
+  call(listMentionableMembers, { params: { submissionId } });
+
+/** `ownerId` null clears the owner. The acting member comes from the session. */
+export const changeOwnerOf = (submissionIds: readonly string[], ownerId: string | null) =>
+  call(setOwners, { body: { submissionIds: [...submissionIds], ownerId } });
