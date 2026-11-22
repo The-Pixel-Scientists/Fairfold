@@ -22,6 +22,7 @@ import SignInPage from './auth/SignInPage.tsx';
 import { SSO_FAILED_PATH, SSO_SIGNING_IN_PATH } from './auth/sign-in/paths.ts';
 import { SsoFailedPage, SsoSigningInPage } from './auth/sign-in/SsoLandingPages.tsx';
 import SignUpPage from './auth/SignUpPage.tsx';
+import { APPROVALS_PATH } from './platform/approvals/paths.ts';
 import { AUDIT_LOG_PATH } from './platform/audit-log/paths.ts';
 import { DATA_PATH } from './platform/data/paths.ts';
 import { RETENTION_PATH } from './platform/retention/paths.ts';
@@ -60,6 +61,16 @@ export const tenantRoutes: readonly RouteDefinition[] = [
       path: ACCOUNT_SECURITY_PATH,
       title: 'Account security',
       load: () => import('./account/security/SecurityPage.tsx'),
+    },
+    {
+      path: APPROVALS_PATH,
+      title: 'Approvals',
+      load: () => import('./platform/approvals/InboxPage.tsx'),
+    },
+    {
+      path: `${APPROVALS_PATH}/:requestId`,
+      title: 'Approval request',
+      load: () => import('./platform/approvals/RequestPage.tsx'),
     },
     {
       path: AUDIT_LOG_PATH,
