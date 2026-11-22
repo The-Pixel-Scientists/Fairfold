@@ -124,8 +124,12 @@ describe('migrations', { timeout: 120_000 }, () => {
       // version has the operator as its author, and 0021's while a switch
       // names a wave 1 tool, which tenant creation, the operator's backfill
       // and their tests leave behind. Row-level security hides those rows
-      // from migrator, so TRUNCATE them too.
-      await sql`TRUNCATE app.tenant_module, app.config_version`.execute(trx);
+      // from migrator, so TRUNCATE them too. And 0079's down refuses while
+      // any forms table holds a row, which the forms tests leave behind; form
+      // versions refer to configuration versions, so they go in the same
+      // TRUNCATE.
+      await sql`TRUNCATE app.tenant_module, app.config_version, forms.form, forms.form_version,
+                         forms.response, forms.respondent_token`.execute(trx);
       // And 0033's down refuses while a party is erased, which the erasure
       // tests leave behind. Erased parties cannot be changed back, so empty
       // the party tables and every table that refers to them.
