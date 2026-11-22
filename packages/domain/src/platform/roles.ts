@@ -2,7 +2,8 @@
 //
 // Roles are bundles of permissions, held here as data (ADR 0016). A
 // membership stores role names; code turns them into permissions with
-// permissionsFor() and never checks a role name itself.
+// permissionsFor() and never checks a role name itself. Teams (ADR 0037)
+// give reach to records, never a permission.
 
 import { z } from 'zod';
 
@@ -23,6 +24,8 @@ export const roles = {
       'platform.subject_access.request',
       'platform.erasure.request',
       'platform.sso.manage',
+      'platform.teams.manage',
+      'platform.break_glass.review',
       'grants.data.export',
       'crm.records.export',
       'forms.responses.export',
@@ -114,6 +117,9 @@ export const roles = {
       'impact.frameworks.read',
     ],
   },
+  // No role holds platform.break_glass.use yet. ADR 0037's "Safeguarding
+  // lead" role joins here in the same change that adds it to the database's
+  // membership and invitation role checks; tenant_admin never holds it.
   applicant: {
     label: 'Applicant',
     app: 'portal',

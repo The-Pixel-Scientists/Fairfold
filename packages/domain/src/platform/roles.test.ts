@@ -32,9 +32,9 @@ describe('role map', () => {
     }
   });
 
-  it('grants every permission to some role', () => {
-    const granted = new Set(roleIds.flatMap((id) => roles[id].permissions));
-    expect(permissionIds.filter((p) => !granted.has(p))).toEqual([]);
+  it('grants every permission to some role, except emergency access until its role is in the database', () => {
+    const granted = new Set<Permission>(roleIds.flatMap((id) => roles[id].permissions));
+    expect(permissionIds.filter((p) => !granted.has(p))).toEqual(['platform.break_glass.use']);
   });
 
   it('give equality monitoring answers only to the data protection lead, who holds nothing else (ADR 0032)', () => {
@@ -61,6 +61,14 @@ describe('role map', () => {
     }
   });
 
+  it('leave managing teams and reviewing emergency access to administrators, and opening it to no role yet (ADR 0037)', () => {
+    const holders = (permission: Permission) =>
+      roleIds.filter((id) => (roles[id].permissions as readonly Permission[]).includes(permission));
+    expect(holders('platform.teams.manage')).toEqual(['tenant_admin']);
+    expect(holders('platform.break_glass.use')).toEqual([]);
+    expect(holders('platform.break_glass.review')).toEqual(['tenant_admin']);
+  });
+
   it('let every console role search, except the data protection lead', () => {
     for (const id of roleIds) {
       const role = roles[id];
@@ -84,6 +92,11 @@ describe('permissionsFor', () => {
       'forms.responses.submit',
     ]);
     expect(permissionsFor(['applicant'], 'console')).toEqual([]);
+  });
+
+  it('reads roles alone, so being in a team gives no permission (ADR 0037)', () => {
+    expect(permissionsFor.length).toBe(2);
+    expect(permissionsFor(['reviewer'], 'console')).toEqual([...roles.reviewer.permissions]);
   });
 
   it('gives nothing for names that are not roles', () => {

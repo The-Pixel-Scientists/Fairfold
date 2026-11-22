@@ -74,6 +74,32 @@ describe('accessProblems for console and portal routes', () => {
   });
 });
 
+describe('accessProblems for restrictable records (ADR 0037)', () => {
+  it('needs the record type with a reach rule', () => {
+    for (const scope of ['reachable', 'caseload']) {
+      expect(problemsWith({ scope })).toContain(
+        `The scope rule ${scope} needs the record type it reaches.`,
+      );
+    }
+  });
+
+  it('reaches a restrictable record only through a reach rule, and only one a module declares', () => {
+    expect(problemsWith({ record: 'cases.case' })).toEqual([
+      'The record type is not restrictable.',
+      'A restrictable record is reached only through reachable or caseload.',
+    ]);
+    expect(problemsWith({ record: 'toString' })).toContain('The record type is not restrictable.');
+  });
+
+  it('gives auth and public routes no record', () => {
+    expect(problemsWith({ record: 'cases.case' }, auth)).not.toEqual([]);
+    const publicRoute = { audience: 'public', session: undefined, record: 'cases.case' };
+    expect(problemsWith(publicRoute, auth)).toEqual([
+      'A public route has no permission, scope or record.',
+    ]);
+  });
+});
+
 describe('accessProblems for auth and public routes', () => {
   it('passes each session an auth route can need', () => {
     for (const session of authSessions) expect(problemsWith({ session }, auth)).toEqual([]);
