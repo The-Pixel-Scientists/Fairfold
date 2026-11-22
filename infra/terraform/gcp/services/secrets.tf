@@ -13,14 +13,14 @@ locals {
   secrets = {
     db-app-api-password    = { env = "TPS_DB_APP_API_PASSWORD_FILE", readers = ["api"] }
     db-app-auth-password   = { env = "TPS_DB_APP_AUTH_PASSWORD_FILE", readers = ["api"] }
-    db-app-worker-password = { env = "TPS_DB_APP_WORKER_PASSWORD_FILE", readers = ["worker"] }
+    db-app-worker-password = { env = "TPS_DB_APP_WORKER_PASSWORD_FILE", readers = ["worker", "operator"] }
     db-app-queue-password  = { env = "TPS_DB_APP_QUEUE_PASSWORD_FILE", readers = ["worker"] }
     db-migrator-password   = { env = "TPS_DB_MIGRATOR_PASSWORD_FILE", readers = ["migrate"] }
-    db-ca                  = { env = "TPS_DB_TLS_CA_FILE", readers = ["api", "worker", "migrate"] }
+    db-ca                  = { env = "TPS_DB_TLS_CA_FILE", readers = ["api", "worker", "migrate", "operator"] }
     auth-secret            = { env = "TPS_AUTH_SECRET_FILE", readers = ["api"] }
     request-limit-key      = { env = "TPS_REQUEST_LIMIT_KEY_FILE", readers = ["api"] }
     subject-kek            = { env = "TPS_SUBJECT_KEK_FILE", readers = ["api", "worker"] }
-    smtp-password          = { env = "TPS_SMTP_PASSWORD_FILE", readers = ["api", "worker"] }
+    smtp-password          = { env = "TPS_SMTP_PASSWORD_FILE", readers = ["api", "worker", "operator"] }
     storage-write          = { env = "TPS_STORAGE_WRITE_SECRET_ACCESS_KEY_FILE", readers = ["api", "worker"] }
     storage-read           = { env = "TPS_STORAGE_READ_SECRET_ACCESS_KEY_FILE", readers = ["api", "worker"] }
     storage-scanner        = { env = "TPS_STORAGE_SCANNER_SECRET_ACCESS_KEY_FILE", readers = ["api", "worker"] }

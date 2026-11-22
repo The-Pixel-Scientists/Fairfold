@@ -8,7 +8,7 @@
 # Cloud SQL role is needed.
 
 locals {
-  workloads = ["api", "worker", "migrate", "console", "portal"]
+  workloads = ["api", "worker", "migrate", "operator", "console", "portal"]
 }
 
 resource "google_service_account" "workload" {

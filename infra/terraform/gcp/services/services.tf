@@ -3,9 +3,9 @@
 # api, console and portal, from the release images by digest, each as its own
 # service account, with all their traffic leaving through the cell's VPC.
 # They take traffic only from the load balancer (ADR 0030) and have no
-# run.app address. No one is granted run.invoker yet: the load balancer, and
-# the public invoker binding it needs, come with the first rollout, so
-# applying this root makes nothing reachable.
+# run.app address. No one is granted run.invoker here: the edge root adds the
+# load balancer and the public invoker binding it needs, so applying this
+# root makes nothing reachable.
 
 resource "google_cloud_run_v2_service" "service" {
   for_each = local.services
@@ -17,6 +17,7 @@ resource "google_cloud_run_v2_service" "service" {
 
   template {
     service_account = google_service_account.workload[each.key].email
+    timeout         = each.value.timeout
 
     scaling {
       max_instance_count = 4
