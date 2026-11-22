@@ -166,6 +166,8 @@ export async function asMember<T>(
       userId: session.userId,
       membershipId: membership.id,
       input,
+      method: route.method,
+      record: route.record,
     });
     if (!inScope) throw refuse(404, 'out_of_scope');
 
