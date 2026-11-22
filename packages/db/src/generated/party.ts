@@ -30,10 +30,20 @@ export interface PartyConsent {
   privacy_notice_version: string;
   purpose: string;
   recorded_at: Generated<Timestamp>;
-  recorded_by: string;
+  recorded_by: string | null;
   source: string;
   state: string;
   tenant_id: string;
+}
+
+export interface PartyCurrentConsent {
+  channel: string | null;
+  person_id: string | null;
+  purpose: string | null;
+  recorded_at: Timestamp | null;
+  state: string | null;
+  suppressed: boolean | null;
+  tenant_id: string | null;
 }
 
 export interface PartyOrganisation {
@@ -131,6 +141,20 @@ export interface PartyRelationship {
   updated_by: string | null;
 }
 
+export interface PartySuppression {
+  address_hash: Buffer | null;
+  channel: string;
+  hash_key_version: number | null;
+  id: Generated<string>;
+  person_id: string;
+  purpose: string | null;
+  reason: string;
+  recorded_at: Generated<Timestamp>;
+  recorded_by: string | null;
+  source: string;
+  tenant_id: string;
+}
+
 export interface PartyValueHistory {
   changed_at: Generated<Timestamp>;
   changed_by: string | null;
@@ -145,11 +169,13 @@ export interface PartyValueHistory {
 
 export interface DB {
   'party.consent': PartyConsent;
+  'party.current_consent': PartyCurrentConsent;
   'party.organisation': PartyOrganisation;
   'party.organisation_identifier': PartyOrganisationIdentifier;
   'party.organisation_snapshot': PartyOrganisationSnapshot;
   'party.party': PartyParty;
   'party.person': PartyPerson;
   'party.relationship': PartyRelationship;
+  'party.suppression': PartySuppression;
   'party.value_history': PartyValueHistory;
 }
