@@ -202,6 +202,8 @@ beforeAll(async () => {
 }, 60_000);
 
 afterAll(async () => {
+  await stopJobSender(apiSender);
+  await stopJobSender(workerSender);
   await withClient('migrator', async (client) => {
     for (const [, revoke] of STAND_IN_GRANTS) await client.query(revoke);
     await client.query('DELETE FROM pgboss.job WHERE name = $1 AND data ->> $2 = ANY($3)', [
@@ -210,8 +212,6 @@ afterAll(async () => {
       [a, b, off].map(({ tenant }) => tenant.id),
     ]);
   });
-  await stopJobSender(apiSender);
-  await stopJobSender(workerSender);
   await api.destroy();
   await worker.destroy();
 });
