@@ -100,6 +100,9 @@ export const platformAuditActions = defineAuditActions('platform', [
   'platform.subject_key.destroyed',
   'platform.audit_event.purged',
   'platform.audit_log.exported',
+  // An operator rewinding a consumer's event cursor to replay events (ADR 0034).
+  // Values are the consumer code and the sequence range, never an event payload.
+  'platform.event_cursor.rewound',
   // A tenant's copy of an auth event (ADR 0010), whose entity id is the auth event's id.
   // Accepting an invitation is one of them: `platform.auth.invitation_accepted`.
   ...authEventCodes.map((code) => `platform.auth.${code}` as const),
