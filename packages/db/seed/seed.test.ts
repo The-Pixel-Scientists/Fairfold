@@ -1,7 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// The seed's guard and password, and the scenarios' data, without a
-// database. seed.integration.test.ts writes the scenarios.
+// The seed command's output on every refusal, which never holds the
+// password, and the scenarios' data, without a database. guard.test.ts
+// checks the guard and the password, and seed.integration.test.ts writes
+// the scenarios.
+
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
 import {
   checkEligibility,
@@ -22,66 +27,24 @@ import { applications } from './applications.ts';
 import { base } from './base.ts';
 import { communitySpacesForm, configured } from './configured.ts';
 import { applicantEmailOf, applicationsOf, emailOf, hashPassword } from './scenario.ts';
-import { checkTarget, readSeedPassword } from './seed.ts';
+import { SCENARIOS } from './seed.ts';
 
-describe('checkTarget', () => {
-  const env = {
-    TPS_DEV: '1',
-    TPS_DB_HOST: '127.0.0.1',
-    TPS_DB_NAME: 'tps_w',
-    TPS_DEV_DATABASES: 'tps_w,tps_w_test',
-  };
+const development = {
+  TPS_DEV: '1',
+  TPS_DB_HOST: '127.0.0.1',
+  TPS_DB_PORT: '5432',
+  TPS_DB_NAME: 'tps_w',
+  TPS_DEV_DATABASES: 'tps_w,tps_w_test',
+};
 
-  it("allows this worktree's development database and the stack's", () => {
-    expect(checkTarget(env)).toBe('tps_w');
-    expect(checkTarget({ ...env, TPS_DB_HOST: '::1' })).toBe('tps_w');
-    expect(checkTarget({ ...env, TPS_DB_NAME: 'tps', TPS_DEV_DATABASES: 'tps' })).toBe('tps');
-  });
-
-  it('refuses outside development', () => {
-    expect(() => checkTarget({ ...env, TPS_DEV: undefined })).toThrow(
-      'Refusing to seed tps_w: the seed runs only in development (TPS_DEV=1).',
-    );
-  });
-
-  it('refuses a server on another machine', () => {
-    for (const host of ['db.example.org', '10.0.0.5', '192.0.2.1']) {
-      expect(() => checkTarget({ ...env, TPS_DB_HOST: host })).toThrow(
-        `Refusing to seed a database on ${host}: the seed runs only against a server on this machine.`,
-      );
-    }
-  });
-
-  it("refuses another worktree's database, or any when the list is empty", () => {
-    for (const other of [
-      { TPS_DB_NAME: 'tps_other' },
-      { TPS_DEV_DATABASES: '' },
-      { TPS_DEV_DATABASES: undefined },
-    ]) {
-      expect(() => checkTarget({ ...env, ...other })).toThrow("it is not this worktree's");
-    }
-  });
-
-  it("refuses this worktree's test database", () => {
-    expect(() => checkTarget({ ...env, TPS_DB_NAME: 'tps_w_test' })).toThrow(
-      'Refusing to seed tps_w_test: it is a test database.',
-    );
-  });
-});
-
-describe('readSeedPassword', () => {
-  it('takes a password the API would accept, without ever showing it', () => {
-    expect(readSeedPassword({ TPS_SEED_PASSWORD: 'a long synthetic passphrase' })).toBe(
-      'a long synthetic passphrase',
-    );
-    for (const password of ['too short', 'x'.repeat(257)]) {
-      expect(() => readSeedPassword({ TPS_SEED_PASSWORD: password })).toThrow(
-        'The seed password must be 12 to 256 characters.',
-      );
-    }
-    expect(() => readSeedPassword({})).toThrow('Set TPS_SEED_PASSWORD or TPS_SEED_PASSWORD_FILE.');
-  });
-});
+/** Settings that name staging's database (guard.test.ts reads its name from the services root). */
+const staging = {
+  TPS_SEED_MODE: 'staging',
+  TPS_DB_HOST: '192.0.2.10',
+  TPS_DB_PORT: '5432',
+  TPS_DB_NAME: 'tps',
+  TPS_DB_TLS: 'verify-full',
+};
 
 describe('hashPassword', () => {
   it('writes the PHC form auth.account accepts, with a new salt each time', () => {
@@ -95,6 +58,10 @@ describe('hashPassword', () => {
 });
 
 describe('the scenarios', () => {
+  it('are the ones the seed command names, in order', () => {
+    expect([...SCENARIOS.keys()]).toEqual(['base', 'configured', 'applications', 'volume']);
+  });
+
   it('give each tenant an administrator, a programme manager and two reviewers', () => {
     expect(base.map(({ slug, name }) => [slug, name])).toEqual([
       ['northfield', 'Northfield Community Trust'],
@@ -275,5 +242,39 @@ describe('the applications scenario', () => {
     expect(new Set(emails).size).toBe(emails.length);
     for (const email of emails)
       expect(email).toMatch(/^[a-z]+\.[a-z]+@applicants\.northfield\.example$/);
+  });
+});
+
+describe('the seed command', { timeout: 600_000 }, () => {
+  const script = fileURLToPath(new URL('./seed.ts', import.meta.url));
+  const secret = 'a seed password only this test knows';
+
+  /** Run the seed with only `env`, as a refusal must end: before any connection. */
+  function run(env: Record<string, string | undefined>, args: readonly string[] = []) {
+    const result = spawnSync(process.execPath, [script, ...args], {
+      env: { SystemRoot: process.env['SystemRoot'], TPS_SEED_PASSWORD: secret, ...env },
+      encoding: 'utf8',
+      timeout: 120_000,
+    });
+    return { status: result.status, output: `${result.stdout}${result.stderr}` };
+  }
+
+  it('prints the failed check and never the password, on every refusal', () => {
+    const refusals: [Record<string, string | undefined>, string][] = [
+      [staging, 'the seed runs only in development'],
+      [{ ...development, TPS_DEV: undefined }, 'the seed runs only in development'],
+      [{ ...development, TPS_DB_HOST: '192.0.2.10' }, 'only against a server on this machine'],
+      [{ ...development, TPS_DB_NAME: staging.TPS_DB_NAME }, "not this worktree's"],
+      [{ ...development, TPS_SEED_PASSWORD: 'short' }, 'must be 12 to 256 characters'],
+      [development, 'Set TPS_DB_MIGRATOR_PASSWORD'],
+    ];
+    for (const [env, message] of refusals) {
+      const { status, output } = run(env);
+      expect(status, message).toBe(1);
+      expect(output).toContain(message);
+      expect(output).not.toContain(env['TPS_SEED_PASSWORD'] ?? secret);
+      if (env === staging) expect(output).not.toContain(staging.TPS_DB_HOST);
+    }
+    expect(run(development, ['nonsense']).output).toContain('Name one scenario');
   });
 });
