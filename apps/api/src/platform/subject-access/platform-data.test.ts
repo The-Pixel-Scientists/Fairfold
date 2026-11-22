@@ -33,9 +33,8 @@ describe('platform subject tables', () => {
     expect(Object.values(excludedTables).every((reason) => reason !== '')).toBe(true);
   });
 
-  it('reads the files, grants, invitations and job requests through their memberships', () => {
+  it('reads the files, invitations and job requests through their memberships', () => {
     expect(membershipTables).toEqual({
-      'app.break_glass': 'membership_id',
       'app.file': 'created_by',
       'app.invitation': 'accepted_membership_id',
       'app.job_request': 'requested_by',
@@ -59,7 +58,7 @@ describe('platform subject tables', () => {
       expect(Object.values(manifest).every((reason) => reason !== '')).toBe(true);
     }
     expect(withheldColumns).toHaveProperty(['app.job_request.filters']);
-    expect(withheldColumns).toHaveProperty(['app.break_glass.reason_text_ciphertext']);
+    expect(excludedTables).toHaveProperty(['app.break_glass']);
   });
 
   it('withholds every audit event that names a reviewer, shows review progress or holds an unreleased outcome', () => {

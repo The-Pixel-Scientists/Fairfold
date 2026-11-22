@@ -31,6 +31,8 @@ export const ACCOUNT_COLUMN = 'user_id';
 /** Subject-path tables the platform leaves out of its tables, and why. */
 export const excludedTables: Readonly<Record<string, string>> = {
   'app.audit_event': 'Read as the export audit events, which name each actor by kind only.',
+  'app.break_glass':
+    "A grant names a restricted record, so under ADR 0037 it is held back with that record by the module's contribution, never exported through the platform.",
   'app.idempotency_key': 'A one-way digest of a request, which names no one.',
   'app.message':
     'A message belongs to an application, so the grants module reads it through the application.',
@@ -53,8 +55,6 @@ export const membershipTables: Readonly<Record<string, string>> = Object.fromEnt
 
 /** Columns no export carries, each with why. */
 export const withheldColumns: Readonly<Record<string, string>> = {
-  'app.break_glass.reason_text_ciphertext':
-    'Sealed text the export cannot open, so the bytes mean nothing to the person.',
   'app.invitation.token_hash': 'A credential digest, not data about the person.',
   'app.job_request.filters':
     'It can name another person: the party a subject access request was made for.',
