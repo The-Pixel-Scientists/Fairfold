@@ -43,6 +43,19 @@ export interface AppAuditEvent {
   tenant_id: string;
 }
 
+export interface AppBreakGlass {
+  expires_at: Timestamp;
+  granted_at: Timestamp;
+  id: string;
+  membership_id: string;
+  reason_code: string;
+  reason_text_ciphertext: Buffer;
+  record_id: string;
+  record_type: string;
+  retain_until: Timestamp;
+  tenant_id: string;
+}
+
 export interface AppConfigVersion {
   author_id: string | null;
   author_kind: Generated<string>;
@@ -234,6 +247,31 @@ export interface AppTag {
   tenant_id: string;
 }
 
+export interface AppTeam {
+  archived_at: Timestamp | null;
+  archived_by: string | null;
+  created_at: Generated<Timestamp>;
+  created_by: string;
+  id: Generated<string>;
+  name: string;
+  tenant_id: string;
+  updated_at: Generated<Timestamp>;
+  updated_by: string;
+}
+
+export interface AppTeamMember {
+  created_at: Generated<Timestamp>;
+  created_by: string;
+  id: Generated<string>;
+  membership_id: string;
+  removed_at: Timestamp | null;
+  removed_by: string | null;
+  team_id: string;
+  tenant_id: string;
+  updated_at: Generated<Timestamp>;
+  updated_by: string;
+}
+
 export interface AppTenant {
   created_at: Generated<Timestamp>;
   fiscal_year_start_month: Generated<number>;
@@ -269,6 +307,7 @@ export interface AppTenantTheme {
 
 export interface DB {
   'app.audit_event': AppAuditEvent;
+  'app.break_glass': AppBreakGlass;
   'app.config_version': AppConfigVersion;
   'app.erasure_ledger': AppErasureLedger;
   'app.file': AppFile;
@@ -286,6 +325,8 @@ export interface DB {
   'app.retention_policy': AppRetentionPolicy;
   'app.subject_key': AppSubjectKey;
   'app.tag': AppTag;
+  'app.team': AppTeam;
+  'app.team_member': AppTeamMember;
   'app.tenant': AppTenant;
   'app.tenant_module': AppTenantModule;
   'app.tenant_theme': AppTenantTheme;

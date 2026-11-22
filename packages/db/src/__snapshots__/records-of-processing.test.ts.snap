@@ -182,6 +182,130 @@ exports[`the shipped map > matches the committed register 1`] = `
     "article9Condition": null,
     "columns": [
       {
+        "column": "expires_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_policy",
+          "minimumDays": 365,
+          "policy": "audit",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "granted_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_policy",
+          "minimumDays": 365,
+          "policy": "audit",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_policy",
+          "minimumDays": 365,
+          "policy": "audit",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "membership_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_policy",
+          "minimumDays": 365,
+          "policy": "audit",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "reason_code",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_policy",
+          "minimumDays": 365,
+          "policy": "audit",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "reason_text_ciphertext",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_policy",
+          "minimumDays": 365,
+          "policy": "audit",
+        },
+        "sensitivity": "personal",
+      },
+      {
+        "column": "record_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_policy",
+          "minimumDays": 365,
+          "policy": "audit",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "record_type",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_policy",
+          "minimumDays": 365,
+          "policy": "audit",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "retain_until",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_policy",
+          "minimumDays": 365,
+          "policy": "audit",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "tenant_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_policy",
+          "minimumDays": 365,
+          "policy": "audit",
+        },
+        "sensitivity": "internal",
+      },
+    ],
+    "dataCategories": [
+      "other",
+    ],
+    "dataSubjects": [
+      "staff_member",
+    ],
+    "highestSensitivity": "personal",
+    "legalBasis": "legitimate_interests",
+    "processors": [
+      "hosting",
+      "backup",
+    ],
+    "purpose": "audit",
+    "subjectPath": {
+      "column": "membership_id",
+      "kind": "join",
+      "table": "app.membership",
+    },
+    "table": "app.break_glass",
+  },
+  {
+    "article9Condition": null,
+    "columns": [
+      {
         "column": "author_id",
         "perField": false,
         "retention": {
@@ -1758,6 +1882,190 @@ exports[`the shipped map > matches the committed register 1`] = `
     "purpose": "tenant_administration",
     "subjectPath": null,
     "table": "app.tag",
+  },
+  {
+    "article9Condition": null,
+    "columns": [
+      {
+        "column": "archived_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "archived_by",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "created_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "created_by",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "name",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "tenant_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "updated_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "updated_by",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+    ],
+    "dataCategories": [],
+    "dataSubjects": [],
+    "highestSensitivity": "internal",
+    "legalBasis": "contract",
+    "processors": [
+      "hosting",
+      "backup",
+    ],
+    "purpose": "tenant_administration",
+    "subjectPath": null,
+    "table": "app.team",
+  },
+  {
+    "article9Condition": null,
+    "columns": [
+      {
+        "column": "created_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "created_by",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "membership_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "removed_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "removed_by",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "team_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "tenant_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "updated_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "updated_by",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+    ],
+    "dataCategories": [],
+    "dataSubjects": [],
+    "highestSensitivity": "internal",
+    "legalBasis": "contract",
+    "processors": [
+      "hosting",
+      "backup",
+    ],
+    "purpose": "tenant_administration",
+    "subjectPath": null,
+    "table": "app.team_member",
   },
   {
     "article9Condition": null,

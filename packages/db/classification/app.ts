@@ -73,6 +73,8 @@ export const notKept: ReadonlySet<string> = new Set([
   'app.note.body',
   'app.message.body',
   'app.tag.label',
+  'app.team.name',
+  'app.break_glass.reason_text_ciphertext',
 ]);
 
 export const app = {
@@ -327,6 +329,45 @@ export const app = {
     created_by: internal,
     created_at: internal,
   },
+  // Teams and their members (ADR 0037): ids, a name that must not name a
+  // person, and times, kept until the tenant leaves. A break-glass grant is
+  // kept as long as the audit trail; its reason text is the member's own
+  // words, sealed under their subject key, so erasure shreds it.
+  'app.team': {
+    tenant_id: internal,
+    id: internal,
+    name: internal,
+    archived_at: internal,
+    archived_by: internal,
+    created_at: internal,
+    created_by: internal,
+    updated_at: internal,
+    updated_by: internal,
+  },
+  'app.team_member': {
+    tenant_id: internal,
+    id: internal,
+    team_id: internal,
+    membership_id: internal,
+    removed_at: internal,
+    removed_by: internal,
+    created_at: internal,
+    created_by: internal,
+    updated_at: internal,
+    updated_by: internal,
+  },
+  'app.break_glass': {
+    tenant_id: audit,
+    id: audit,
+    membership_id: audit,
+    record_type: audit,
+    record_id: audit,
+    reason_code: audit,
+    reason_text_ciphertext: { ...audit, sensitivity: 'personal' },
+    granted_at: audit,
+    expires_at: audit,
+    retain_until: audit,
+  },
 } satisfies ClassificationRegistry;
 
 /**
@@ -354,6 +395,7 @@ export const appSubjects: SubjectPathRegistry = {
   // message names them directly.
   'app.note': { kind: 'join', column: 'author_id', table: 'app.membership' },
   'app.message': { kind: 'party', column: 'author_person_id' },
+  'app.break_glass': { kind: 'join', column: 'membership_id', table: 'app.membership' },
 };
 
 const stored = ['hosting', 'backup'] as const;
@@ -463,4 +505,13 @@ export const appProcessing: ProcessingRegistry<typeof app> = {
     dataCategories: ['other'],
   },
   'app.tag': setUp,
+  'app.team': setUp,
+  'app.team_member': setUp,
+  'app.break_glass': {
+    purpose: 'audit',
+    legalBasis: 'legitimate_interests',
+    processors: stored,
+    dataSubjects: ['staff_member'],
+    dataCategories: ['other'],
+  },
 };
