@@ -4,7 +4,7 @@
 // apps/api/src/modules.ts alone, which registers the routes.
 // `grantsSubjectRules` is for the platform's audit writer alone. `grantsWarehouse`
 // feeds the warehouse snapshot. `grantsSubjectData` serves subject access.
-// `grantsErasure` serves erasure. `readApplicantContact` is for assure's duplicate flags. `monitoringCounts` serves insight's reports. `sendReleaseEmail` is for the worker's release email job alone. `sendMessageNotification` is for the worker's message notification job alone. `scanReminders` and `sendReminder` are for the worker's reminder jobs alone.
+// `grantsErasure` serves erasure. `readApplicantContact` is for assure's duplicate flags. `monitoringCounts` serves insight's reports. `sendReleaseEmail` is for the worker's release email job alone. `sendMessageNotification` is for the worker's message notification job alone. `scanReminders` and `sendReminder` are for the worker's reminder jobs alone. `boardPackRequestHandlers`, `replayBoardPack` and `makeBoardPack` serve the board pack routes and job (S12-78).
 
 export {
   grantsHandlers,
@@ -55,3 +55,11 @@ export { monitoringCounts, type MonitoringCounts } from './monitoring/aggregate.
 export { grantsWarehouse } from './warehouse.ts';
 export { grantsErasure } from './erasure.ts';
 export { grantsSubjectData } from './subject-data.ts';
+export { boardPackRequestHandlers, replayBoardPack } from './board-pack/request.ts';
+export { makeBoardPack, type BoardPackJob, type BoardPackOutcome } from './board-pack/job.ts';
+export type {
+  BoardPackDependencies,
+  BoardPackJobDependencies,
+  BoardPackRequest,
+} from './board-pack/context.ts';
+export type { BoardPackBlock, BoardPackModel } from './board-pack/sections.ts';
