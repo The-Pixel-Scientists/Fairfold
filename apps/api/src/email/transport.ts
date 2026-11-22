@@ -79,8 +79,17 @@ export function createSmtpTransport(
     async deliver(message: MailMessage): Promise<void> {
       try {
         // The envelope names the one recipient, whatever the headers hold.
+        const { unsubscribeUrl, ...content } = message;
         await transporter.sendMail({
-          ...message,
+          ...content,
+          ...(unsubscribeUrl === undefined
+            ? {}
+            : {
+                headers: {
+                  'List-Unsubscribe': `<${unsubscribeUrl}>`,
+                  'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+                },
+              }),
           envelope: { from: message.from, to: [message.to] },
         });
       } catch (error) {

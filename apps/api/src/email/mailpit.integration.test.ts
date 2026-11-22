@@ -5,7 +5,7 @@
 // API. The test is skipped when Mailpit is not running.
 
 import { execFileSync } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { isIP } from 'node:net';
 
 import { isLoopbackHost } from '@pixel-scientists/db';
@@ -114,5 +114,43 @@ describe.skipIf(smtp === undefined)('sending to Mailpit', () => {
     expect(message.Text.replaceAll('\r\n', '\n').trim()).toBe('Zoë ✓\nSecond line');
     expect(message.HTML).toBe('');
     expect(logs.text()).toBe('');
+  });
+
+  it('delivers the one-click unsubscribe headers of a marketing message, and none otherwise', async () => {
+    if (smtp === undefined) return;
+    const sender = createSender(
+      smtp,
+      createLogger({ level: 'info', destination: captureLogs().stream }),
+      createSmtpTransport(smtp),
+    );
+    const token = randomBytes(60).toString('base64url');
+    const headersOf = async (to: string) => {
+      const found = await mailpit<{ messages: { ID: string }[] }>(
+        `/search?query=${encodeURIComponent(`to:${to}`)}`,
+      );
+      expect(found.messages).toHaveLength(1);
+      const id = found.messages[0]?.ID ?? '';
+      created.push(id);
+      return mailpit<Record<string, string[]>>(`/message/${id}/headers`);
+    };
+    const marketingTo = `news-${randomUUID()}@example.com`;
+    const serviceTo = `service-${randomUUID()}@example.com`;
+
+    await sender.send({
+      to: marketingTo,
+      subject: 'News',
+      text: 'Hello',
+      unsubscribe: { origin: 'https://portal.example.org', token },
+    });
+    await sender.send({ to: serviceTo, subject: 'Service', text: 'Hello' });
+
+    const marketing = await headersOf(marketingTo);
+    expect(marketing['List-Unsubscribe']).toEqual([
+      `<https://portal.example.org/api/public/unsubscribe?token=${token}>`,
+    ]);
+    expect(marketing['List-Unsubscribe-Post']).toEqual(['List-Unsubscribe=One-Click']);
+    const service = await headersOf(serviceTo);
+    expect(service).not.toHaveProperty('List-Unsubscribe');
+    expect(service).not.toHaveProperty('List-Unsubscribe-Post');
   });
 });
