@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// The platform's queues (migrations 0029, 0043, 0053, 0061 and 0063): each is registered
+// The platform's queues (migrations 0029, 0043, 0053, 0061, 0063 and 0102): each is registered
 // with its kind and a dead-letter queue <queue>.dead of the same kind, each can be
 // defined in code under its registered name, and no other queue is
 // registered but pg-boss's cron queue (migration 0036) and the job tests'
@@ -30,6 +30,8 @@ const TENANT = [
   'platform.view_csv_export',
   'platform.audit_log_export',
   'platform.board_pack',
+  'platform.signature_send',
+  'platform.signature_refresh',
   'grants.release_email',
   'grants.message_notification',
   'grants.reminder_scan',
