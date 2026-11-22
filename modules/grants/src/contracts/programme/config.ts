@@ -3,9 +3,10 @@
 // What a programme set-up change records in `app.config_version`
 // (architecture rule 10). A programme's versions cover its own fields and
 // its email templates; a round's cover its own fields, its stages and their
-// rubrics, so each has one history. The entity id is the programme's or the
-// round's id. A diff lists each changed value by its path, with its old and
-// new values: `budget.amountMinor`, `stages.<stage id>.name`,
+// rubrics, so each has one history; a label's cover its name, colour and
+// archiving. The entity id is the programme's, the round's or the label's
+// id. A diff lists each changed value by its path, with its old and new
+// values: `budget.amountMinor`, `stages.<stage id>.name`,
 // `stages.<stage id>.criteria.<criterion id>.weight` or
 // `emailTemplates.accepted.subject`. Null stands for a value that was not
 // there, so an added stage's values go from null and a removed one's to null.
@@ -17,7 +18,11 @@ import { z } from 'zod';
 
 import { MAX_CRITERIA, MAX_STAGES } from './inputs.ts';
 
-export const grantsConfigEntityTypes = ['grants.programme', 'grants.round'] as const;
+export const grantsConfigEntityTypes = [
+  'grants.programme',
+  'grants.round',
+  'grants.label',
+] as const;
 
 export type GrantsConfigEntityType = (typeof grantsConfigEntityTypes)[number];
 
