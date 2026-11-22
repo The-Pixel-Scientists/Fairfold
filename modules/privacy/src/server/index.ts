@@ -11,10 +11,13 @@ import { breachHandlers } from './breaches/handlers.ts';
 import type { PrivacyDependencies } from './context.ts';
 import { dpiaHandlers } from './dpias/handlers.ts';
 import { clockHandlers } from './requests/clock.ts';
+import { processingHandlers } from './processing/handlers.ts';
 import { requestHandlers } from './requests/handlers.ts';
 import { taskHandlers } from './requests/tasks.ts';
+import { rightsHandlers } from './rights/handlers.ts';
 
 export type { PrivacyContext, PrivacyDependencies } from './context.ts';
+export type { RightsContext, SubjectRights } from './rights/subject-rights.ts';
 export { privacySubjectRules } from './audit.ts';
 export { privacyErasure } from './erasure.ts';
 
@@ -25,5 +28,7 @@ export function privacyHandlers(deps: PrivacyDependencies) {
     ...taskHandlers(deps),
     ...breachHandlers(deps),
     ...dpiaHandlers(deps),
+    ...rightsHandlers(deps),
+    ...processingHandlers(deps),
   };
 }
