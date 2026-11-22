@@ -28,7 +28,12 @@ import { RETENTION_PATH } from './platform/retention/paths.ts';
 import { SSO_PATH } from './platform/sso/paths.ts';
 import { SUBJECT_ACCESS_PATH } from './platform/subject-access/paths.ts';
 import { TenantLook } from './platform/settings/look.tsx';
-import { INVITATION_PATH, TEAM_PATH } from './platform/team/paths.ts';
+import {
+  EMERGENCY_ACCESS_PATH,
+  INVITATION_PATH,
+  TEAM_PATH,
+  TEAMS_PATH,
+} from './platform/team/paths.ts';
 import { productName, titleSuffix } from './product.ts';
 import { memberRoutes } from './shell/memberRoutes.tsx';
 import { moduleRoutes } from './shell/moduleRoutes.tsx';
@@ -104,6 +109,17 @@ export const tenantRoutes: readonly RouteDefinition[] = [
     },
     { path: DATA_PATH, title: 'Data', load: () => import('./platform/data/DataPage.tsx') },
     { path: TEAM_PATH, title: 'Team', load: () => import('./platform/team/TeamPage.tsx') },
+    { path: TEAMS_PATH, title: 'Teams', load: () => import('./platform/team/TeamsPage.tsx') },
+    {
+      path: `${TEAMS_PATH}/:teamId`,
+      title: 'Team',
+      load: () => import('./platform/team/TeamDetailPage.tsx'),
+    },
+    {
+      path: EMERGENCY_ACCESS_PATH,
+      title: 'Emergency access',
+      load: () => import('./platform/team/EmergencyAccessPage.tsx'),
+    },
   ]),
   // Outside the member screen: the person has an account but no membership until they accept.
   {
