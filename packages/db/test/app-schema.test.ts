@@ -87,6 +87,8 @@ describe('the app schema', () => {
         'owner_grants_erase_reminders USAGE',
         // Erasing a subject's crm data, migration 0063.
         'owner_crm_erase_subject USAGE',
+        // Erasing a subject's privacy data, migration 0092.
+        'owner_privacy_erase_subject USAGE',
       ].sort(),
     });
   });
@@ -137,6 +139,8 @@ describe('app.current_tenant_id()', () => {
         'owner_grants_erase_reminders',
         // Erasing a subject's crm data, migration 0063.
         'owner_crm_erase_subject',
+        // Erasing a subject's privacy data, migration 0092.
+        'owner_privacy_erase_subject',
       ]
         .map((role) => `${role} EXECUTE`)
         .sort(),
