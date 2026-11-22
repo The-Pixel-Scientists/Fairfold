@@ -13,6 +13,7 @@ import {
 import type { Transaction } from '@pixel-scientists/db';
 import type { z } from 'zod';
 
+import type { EsignJobDependencies } from '../platform/documents/esign/index.ts';
 import type { FilesJobDependencies } from '../platform/files/index.ts';
 import type { RunLogger } from './job-logger.ts';
 import { platformHandlers } from './jobs/index.ts';
@@ -27,9 +28,10 @@ export function handlerRegistry(
   logger: RunLogger,
   modules: readonly ModuleJob[],
   files?: FilesJobDependencies,
+  esign?: EsignJobDependencies,
 ): readonly JobHandler<unknown>[] {
   return [
-    ...platformHandlers(logger, files),
+    ...platformHandlers(logger, files, esign),
     ...modules.map(({ queue, handler }) =>
       defineHandler<unknown, z.ZodObject, 'tenant'>(queue, handler),
     ),
