@@ -6,6 +6,7 @@ import type { PageDefinition, Params, RouteDefinition, SearchSchema } from '@pix
 import { Suspense, lazy, useMemo } from 'react';
 import type { ReactNode } from 'react';
 
+import { PREFERENCES_PATH, PreferencesPage } from '@pixel-scientists/party/portal';
 import { endSession, loadSession } from './api.ts';
 import { applyRoutes } from './apply/routes.ts';
 import AccountPage from './account/AccountPage.tsx';
@@ -19,6 +20,8 @@ import { Screen } from './auth/Screen.tsx';
 import SignedOutPage from './auth/SignedOutPage.tsx';
 import SignInPage from './auth/SignInPage.tsx';
 import SignUpPage from './auth/SignUpPage.tsx';
+import OpenGrantPage from './browse/OpenGrantPage.tsx';
+import OpenGrantsPage from './browse/OpenGrantsPage.tsx';
 import { FunderProvider, useFunder } from './funder.tsx';
 import { PageColumn } from './PageColumn.tsx';
 import { pageLoadErrorPage } from './pages/PageLoadErrorPage.tsx';
@@ -38,6 +41,8 @@ import {
   FUTURE_FUNDING_PATH,
   HOME_PATH,
   HOW_APPLYING_WORKS_PATH,
+  OPEN_GRANTS_PATH,
+  OPEN_GRANT_PATH,
   ORGANISATIONS_PATH,
   ORGANISATION_PATH,
   PASSWORD_RESET_SENT_PATH,
@@ -52,6 +57,7 @@ import { grantsModule } from './shell/modules.ts';
 import { PortalShell } from './shell/PortalShell.tsx';
 import { productName } from './product.ts';
 import { TenantProvider, tenantSlugOf } from './tenant.ts';
+import { UnsubscribeApp, isUnsubscribePath } from './unsubscribe/index.tsx';
 
 /**
  * Pages outside any funder's address. The first segment of each path must be
@@ -78,6 +84,13 @@ const organisationParams: SearchSchema<Params> = {
       : { success: false, error: null },
 };
 
+const roundParams: SearchSchema<Params> = {
+  safeParse: (input) =>
+    idSchema.safeParse((input as Params)['roundId']).success
+      ? { success: true, data: input as Params }
+      : { success: false, error: null },
+};
+
 /**
  * Pages under `/<slug>/`, which the router sees without the slug. They are in
  * the main bundle, not loaded on demand, so a weak connection cannot stop an
@@ -85,6 +98,13 @@ const organisationParams: SearchSchema<Params> = {
  */
 const ownRoutes: readonly RouteDefinition[] = [
   { path: HOME_PATH, title: 'Apply for a grant', component: StartPage },
+  { path: OPEN_GRANTS_PATH, title: 'Open grants', component: OpenGrantsPage },
+  {
+    path: OPEN_GRANT_PATH,
+    title: 'Open grant',
+    params: roundParams,
+    component: OpenGrantPage,
+  },
   { path: SIGN_UP_PATH, title: 'Create your account', component: SignUpPage },
   { path: CHECK_EMAIL_PATH, title: 'Check your email', component: CheckEmailPage },
   { path: COMPLETE_SIGN_UP_PATH, title: 'Set your password', component: CompleteSignUpPage },
@@ -109,7 +129,16 @@ const ownRoutes: readonly RouteDefinition[] = [
     component: OrganisationPage,
   },
   { path: FUTURE_FUNDING_PATH, title: 'Future funding', component: FutureFundingPage },
+  { path: PREFERENCES_PATH, title: 'How we contact you', component: PreferencesRoute },
 ];
+
+function PreferencesRoute() {
+  return (
+    <Screen kind="applicant">
+      <PreferencesPage />
+    </Screen>
+  );
+}
 
 /** The tools whose pages come and go with the session. */
 const tools = [toolRoutes(grantsModule, applyRoutes)];
@@ -204,6 +233,7 @@ export function App() {
       />
     );
   }
+  if (isUnsubscribePath(window.location.pathname, slug)) return <UnsubscribeApp slug={slug} />;
   return (
     <TenantProvider value={slug}>
       <FunderProvider>

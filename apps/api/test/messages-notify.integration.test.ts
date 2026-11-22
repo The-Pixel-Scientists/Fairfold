@@ -129,6 +129,8 @@ describe('queueing the notification', () => {
       publicTenants: {
         tenant: () => Promise.resolve(undefined),
         logo: () => Promise.resolve(undefined),
+        rounds: () => Promise.resolve([]),
+        embedOrigins: () => Promise.resolve([]),
       },
       jobs: t.jobs,
     });

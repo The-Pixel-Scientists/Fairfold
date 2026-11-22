@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# What backup.Dockerfile may see: the job's code, the four database modules
+# it imports, and the manifests that make them ES modules. Everything else,
+# including .env files and node_modules, stays out.
+
+*
+!package.json
+!packages/db/package.json
+!infra/backup/src/
+!packages/db/scripts/roles.ts
+!packages/db/scripts/scram.ts
+!packages/db/scripts/settings.ts
+!packages/db/src/settings.ts
+**/*.test.ts
+infra/backup/src/testing.ts
+# Never secrets, wherever they sit.
+**/.env*
+**/*.pem
+**/*.key

@@ -621,6 +621,8 @@ describe('nothing erases without a request', () => {
       publicTenants: {
         tenant: () => Promise.resolve(undefined),
         logo: () => Promise.resolve(undefined),
+        rounds: () => Promise.resolve([]),
+        embedOrigins: () => Promise.resolve([]),
       },
     });
     const erasure = routes.filter(({ contract }) => contract.path.includes('erasure'));

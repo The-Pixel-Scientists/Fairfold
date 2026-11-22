@@ -7,16 +7,16 @@
 // refused again without a counter call, so a client that keeps trying stays
 // refused and costs the database nothing.
 //
-// `bucket` is the value of app.request_limit.bucket (migration 0017). The
-// buckets are public, probe and general, and the four upload counters
-// (ADR 0030); the limits that share one are told
-// apart by the name inside the key, so their counters never meet.
+// `bucket` is the value of app.request_limit.bucket (migrations 0017 and
+// 0069). The buckets are public, probe, general and search, and the four
+// upload counters (ADR 0030); the limits that share one are told apart by
+// the name inside the key, so their counters never meet.
 
 import { uploadBuckets, uploadLimits } from '@pixel-scientists/domain/files';
 
 import type { RateLimitName } from '../telemetry/index.ts';
 
-export const BUCKETS = ['public', 'probe', 'general', ...uploadBuckets] as const;
+export const BUCKETS = ['public', 'probe', 'general', 'search', ...uploadBuckets] as const;
 export type Bucket = (typeof BUCKETS)[number];
 
 export interface Limit {
@@ -39,9 +39,10 @@ const limits = {
   general_ip: { bucket: 'general', windowSeconds: 60, max: 1200, metric: 'api' },
   // 5 requests a second from one signed-in user: a screen makes about ten.
   general_session: { bucket: 'general', windowSeconds: 60, max: 300, metric: 'api' },
-  // A search runs a query for every provider and writes audit rows. A person
-  // typing with a pause between keys sends a few a second; 120 a minute stops a script.
-  search: { bucket: 'general', windowSeconds: 60, max: 120, metric: 'api' },
+  // A search runs a query for every provider and writes an audit row for each
+  // person it returns, up to 10. 30 a minute, one every two seconds, is a
+  // person typing with pauses; it caps one user at about 300 audit rows a minute.
+  search: { bucket: 'search', windowSeconds: 60, max: 30, metric: 'api' },
 } as const satisfies Record<string, Limit>;
 
 /** The four upload counters (ADR 0030); their limits are the domain's. */

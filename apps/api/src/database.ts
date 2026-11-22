@@ -18,6 +18,8 @@ import type { FastifyBaseLogger } from 'fastify';
 
 import type { Config } from './config.ts';
 import { counterStore, type CounterStore, type UploadCounters } from './limits/store.ts';
+import { readEmbedOrigins } from './public/embed-origins/read.ts';
+import { readOpenRounds, type OpenRoundRow } from './public/programmes/open-rounds.ts';
 
 /**
  * The transaction a request runs in, with its tenant set. A module types it to
@@ -32,17 +34,25 @@ export type InTenant = <T>(
 ) => Promise<T>;
 
 /**
- * An active tenant's public face and logo by slug, through ADR 0019's
- * functions. No tenant is set on the connection, and a suspended, unknown or
+ * What the public routes read by slug, through ADR 0019's and ADR 0035's
+ * functions: an active tenant's public face, logo, open rounds and embed
+ * origins. No tenant is set on the connection, and a suspended, unknown or
  * malformed slug gives nothing.
  */
 export interface PublicTenants {
   tenant(slug: string): Promise<PublicTenantRow | undefined>;
   logo(slug: string): Promise<{ logo: Buffer; logoType: LogoType } | undefined>;
+  rounds(slug: string): Promise<readonly OpenRoundRow[]>;
+  embedOrigins(slug: string): Promise<readonly string[]>;
 }
 
 export function publicTenantsOn(db: Kysely<unknown>): PublicTenants {
-  return { tenant: (slug) => publicTenant(db, slug), logo: (slug) => publicTenantLogo(db, slug) };
+  return {
+    tenant: (slug) => publicTenant(db, slug),
+    logo: (slug) => publicTenantLogo(db, slug),
+    rounds: (slug) => readOpenRounds(db, slug),
+    embedOrigins: (slug) => readEmbedOrigins(db, slug),
+  };
 }
 
 export interface ApiDatabase {

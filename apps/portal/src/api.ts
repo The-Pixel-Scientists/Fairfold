@@ -41,14 +41,18 @@ export function tooManyAttempts(seconds: number | null): string {
 export async function callApi<const C extends JsonRouteContract>(
   route: C,
   input: CallInput<C>,
-  options: Pick<CallOptions, 'idempotencyKey'> = {},
+  options: Pick<CallOptions, 'idempotencyKey'> & { omitCredentials?: boolean } = {},
 ): Promise<CallResult<C>> {
+  const { omitCredentials = false, ...callOptions } = options;
   let wait: number | null = null;
   try {
     return await call(route, input, {
-      ...options,
+      ...callOptions,
       fetch: async (url, init) => {
-        const response = await fetch(url, init);
+        const response = await fetch(
+          url,
+          omitCredentials ? { ...init, credentials: 'omit' } : init,
+        );
         if (response.status === 429) wait = retryAfterSeconds(response.headers.get('retry-after'));
         return response;
       },

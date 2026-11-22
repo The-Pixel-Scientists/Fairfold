@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
 # The cell's private network: one subnet for Cloud Run's direct VPC egress,
-# private services access for Cloud SQL, no inbound path, and one known
-# address for outbound calls.
+# private services access for Cloud SQL, Google APIs at their private
+# addresses, no inbound path, and one known address for outbound calls.
 
 resource "google_project_service" "api" {
   for_each = toset([
@@ -102,4 +102,37 @@ resource "google_compute_router_nat" "egress" {
     enable = true
     filter = "ERRORS_ONLY"
   }
+}
+
+# Google APIs resolve to private.googleapis.com inside the VPC, which Private
+# Google Access serves without leaving Google's network. The backup root's
+# egress rules admit no other Google address, and find this zone by name.
+resource "google_dns_managed_zone" "googleapis" {
+  name       = "${var.name}-googleapis"
+  dns_name   = "googleapis.com."
+  visibility = "private"
+
+  private_visibility_config {
+    networks {
+      network_url = google_compute_network.vpc.id
+    }
+  }
+
+  depends_on = [google_project_service.api]
+}
+
+resource "google_dns_record_set" "googleapis_private" {
+  managed_zone = google_dns_managed_zone.googleapis.name
+  name         = "private.googleapis.com."
+  type         = "A"
+  ttl          = 300
+  rrdatas      = ["199.36.153.8", "199.36.153.9", "199.36.153.10", "199.36.153.11"]
+}
+
+resource "google_dns_record_set" "googleapis_all" {
+  managed_zone = google_dns_managed_zone.googleapis.name
+  name         = "*.googleapis.com."
+  type         = "CNAME"
+  ttl          = 300
+  rrdatas      = [google_dns_record_set.googleapis_private.name]
 }

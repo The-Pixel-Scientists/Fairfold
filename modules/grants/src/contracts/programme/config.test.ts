@@ -68,6 +68,10 @@ describe('configuration entity types', () => {
     }
     expect(moduleIds).toContain('grants');
   });
+
+  it('are programmes, rounds and labels', () => {
+    expect(grantsConfigEntityTypes).toEqual(['grants.programme', 'grants.round', 'grants.label']);
+  });
 });
 
 describe('configDiff', () => {

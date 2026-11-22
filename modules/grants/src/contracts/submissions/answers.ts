@@ -9,6 +9,7 @@
 import { idSchema } from '@pixel-scientists/domain';
 import { projectedAnswersSchemas } from '@pixel-scientists/domain/api';
 import { fieldIdSchema, formDefinitionSchema } from '@pixel-scientists/domain/forms';
+import { organisationSnapshotSchema } from '@pixel-scientists/party/contracts';
 import { z } from 'zod';
 
 import {
@@ -71,6 +72,20 @@ export const eligibilityCheckSchema = z.object({
 
 export type EligibilityCheck = z.infer<typeof eligibilityCheckSchema>;
 
+/** A page in the console, within the funder's address: lower case segments only. */
+export const consoleHrefSchema = z.string().regex(/^(?:\/[a-z0-9-]+)+$/);
+
+/**
+ * The organisation's record now, to compare with the snapshot and never to
+ * merge into it, and the console page that shows it: null when no page
+ * does, as when the crm tool is off.
+ */
+export const currentOrganisationSchema = organisationSnapshotSchema
+  .pick({ name: true, legalForm: true, registeredAddress: true, website: true, identifiers: true })
+  .extend({ href: consoleHrefSchema.nullable() });
+
+export type CurrentOrganisation = z.infer<typeof currentOrganisationSchema>;
+
 /** Who did it, by their person record's name; null when it has none. */
 const bySchema = z.string().nullable();
 
@@ -101,6 +116,13 @@ export type SubmissionEvent = z.infer<typeof submissionEventSchema>;
  * it for the applicant, set exactly when `submissionRoute` is `assisted` and
  * absent until the server sends it (S12-15); the applicant is still the
  * organisation and its contact.
+ *
+ * Details as submitted (ADR 0017): `organisationSnapshot` is the
+ * organisation as it was at submission, null for a submission from before
+ * snapshots were taken, and `currentOrganisation` its record now. Both are
+ * absent until the server sends them (B11-03). The registered address is
+ * personal data. A reviewer never reads this answer: theirs is
+ * reviewSchema, which names no organisation.
  */
 export const submissionSchema = submissionSummarySchema.extend({
   form: z.object({ id: idSchema, version: z.int(), definition: formDefinitionSchema }),
@@ -120,6 +142,8 @@ export const submissionSchema = submissionSummarySchema.extend({
     email: z.string(),
   }),
   submittedBy: memberRefSchema.nullable().optional(),
+  organisationSnapshot: organisationSnapshotSchema.nullable().optional(),
+  currentOrganisation: currentOrganisationSchema.optional(),
   withdrawnAt: z.iso.datetime().nullable(),
   eligibilityChecks: z.array(eligibilityCheckSchema),
   history: z.array(submissionEventSchema),

@@ -68,9 +68,9 @@ describe('reviewer responses', () => {
     expect(reviews.reviewSchema.shape.answers).toBe(projectedAnswersSchemas.blind_reviewer);
   });
 
-  it('name no organisation, person, contact, other reviewer or decision', () => {
+  it('name no organisation or its details, person, contact, other reviewer or decision', () => {
     const forbidden =
-      /organi[sz]ation|person|contact|email|given|family|applicant|reviewer|membership|decision|outcome|award/i;
+      /organi[sz]ation|snapshot|address|website|identifier|person|contact|email|given|family|applicant|reviewer|membership|decision|outcome|award/i;
     expect(keysOf(reviews.reviewSchema)).toEqual(
       expect.arrayContaining(['applicationId', 'answers', 'criteria', 'criterionId', 'comment']),
     );

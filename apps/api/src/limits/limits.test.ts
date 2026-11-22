@@ -48,6 +48,8 @@ const unreachable: CounterStore = { count: () => Promise.reject(new Error('conne
 const tenants = {
   tenant: vi.fn(() => Promise.resolve(undefined)),
   logo: () => Promise.resolve(undefined),
+  rounds: () => Promise.resolve([]),
+  embedOrigins: () => Promise.resolve([]),
 } satisfies PublicTenants;
 
 let app: FastifyInstance | undefined;
@@ -238,7 +240,7 @@ describe('the search limit', () => {
 
   it('refuses with 429 and Retry-After before the handler runs, and leaves other routes alone', async () => {
     const store = fakeStore();
-    store.counts.set(`general:${searchKey}`, LIMITS.search.max);
+    store.counts.set(`search:${searchKey}`, LIMITS.search.max);
     const { server, handler } = searchServer(store);
 
     const response = await server.inject({ method: 'POST', url: '/search' });
@@ -263,7 +265,7 @@ describe('the search limit', () => {
     ];
 
     expect(codes).toEqual([200, 200, 429]);
-    expect(store.counts.get(`general:${searchKey}`)).toBe(LIMITS.search.max + 1);
+    expect(store.counts.get(`search:${searchKey}`)).toBe(LIMITS.search.max + 1);
   });
 
   it('answers 503 and runs no handler when the counter store fails', async () => {

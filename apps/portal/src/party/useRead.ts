@@ -7,7 +7,7 @@ export type Read<T> =
   | { status: 'loading' }
   | { status: 'ready'; data: T }
   /** `missing` when the API says the record is not there, or is not the person's. */
-  | { status: 'failed'; missing: boolean };
+  | { status: 'failed'; missing: boolean; limited: string | null };
 
 /**
  * Reads something from the API when the page opens, and again on `retry`.
@@ -29,6 +29,7 @@ export function useRead<T>(read: () => Promise<T>): { read: Read<T>; retry: () =
           setState({
             status: 'failed',
             missing: error instanceof ProblemError && error.status === 404,
+            limited: error instanceof ProblemError && error.status === 429 ? error.message : null,
           });
         }
       },

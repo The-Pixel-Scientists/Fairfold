@@ -1,0 +1,57 @@
+{
+  "publishedOn": "2026-11-16",
+  "designations": [
+    {
+      "id": "TST0001",
+      "kind": "individual",
+      "regime": "Invented regime one",
+      "designatedOn": "2024-03-01",
+      "names": [
+        { "type": "primary", "name": "Zorvan Quillbright" },
+        { "type": "alias", "name": "Zorvan Q. Brightquill" }
+      ],
+      "datesOfBirth": ["1970-02-03", "1971"],
+      "nationalities": ["Testland"],
+      "country": "Testland",
+      "unusedField": "dropped by the reader"
+    },
+    {
+      "id": "TST0002",
+      "kind": "individual",
+      "regime": "Invented regime one",
+      "designatedOn": "2023-07-15",
+      "names": [{ "type": "primary", "name": "Mirela Tavendish-Orr" }],
+      "datesOfBirth": ["1985-11"],
+      "nationalities": ["Testland", "Exampleland"]
+    },
+    {
+      "id": "TST0003",
+      "kind": "individual",
+      "regime": "Invented regime two",
+      "names": [{ "type": "primary", "name": "Ñandu Ołeksy Brandvik" }],
+      "datesOfBirth": []
+    },
+    {
+      "id": "TST0004",
+      "kind": "entity",
+      "regime": "Invented regime two",
+      "designatedOn": "2022-01-20",
+      "names": [
+        { "type": "primary", "name": "Northgate Invented Holdings Limited" },
+        { "type": "alias", "name": "NIH Trading" }
+      ]
+    },
+    {
+      "id": "TST0005",
+      "kind": "entity",
+      "regime": "Invented regime three",
+      "names": [{ "type": "primary", "name": "Brightwater Test Foundation" }]
+    },
+    {
+      "id": "TST0006",
+      "kind": "ship",
+      "regime": "Invented regime three",
+      "names": [{ "type": "primary", "name": "MV Invented Star" }]
+    }
+  ]
+}

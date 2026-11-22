@@ -183,6 +183,7 @@ export interface GrantsEmailTemplateVersion {
   id: Generated<string>;
   outcome: string;
   programme_id: string;
+  purpose: Generated<string>;
   subject: string;
   tenant_id: string;
   version: number;

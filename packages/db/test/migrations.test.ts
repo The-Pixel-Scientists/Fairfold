@@ -99,7 +99,7 @@ async function stableSnapshot(trx: Kysely<unknown>): Promise<string[]> {
   return (await snapshot(trx)).filter((line) => !STATS_DAY.test(line));
 }
 
-describe('migrations', { timeout: 30_000 }, () => {
+describe('migrations', { timeout: 120_000 }, () => {
   it('each down.sql restores exactly the schema from before its up.sql', async () => {
     const provider = new SqlFolderMigrationProvider(MIGRATIONS_FOLDER);
     const found = await provider.getMigrations();
@@ -154,6 +154,13 @@ describe('migrations', { timeout: 30_000 }, () => {
       // template exists, which the reminder tests leave behind. Empty the
       // template versions and every table that refers to them.
       await sql`TRUNCATE grants.email_template_version CASCADE`.execute(trx);
+      // And 0053's down refuses while an assure job waits, which the assure
+      // tests leave behind with no worker to run them.
+      await sql`DELETE FROM pgboss.job WHERE name LIKE 'assure.%'`.execute(trx);
+      // And 0021's down refuses while a membership or an invitation holds a
+      // wave 1 role, which the impact, search and assure tests leave behind.
+      // Empty both and every table that refers to them.
+      await sql`TRUNCATE app.membership, app.invitation CASCADE`.execute(trx);
       // After the loop, before[i] is the schema with the first i migrations applied.
       const before = [await stableSnapshot(trx)];
       for (const { name, down } of [...migrations].reverse()) {

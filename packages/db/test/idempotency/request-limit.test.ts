@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// app.request_limit (migrations 0017 and 0041): a store of hashed client
-// keys and counters with no tenant, which app_api may upsert but not
+// app.request_limit (migrations 0017, 0041 and 0069): a store of hashed
+// client keys and counters with no tenant, which app_api may upsert but not
 // delete, which app_worker sees only once expired, and whose expiry the
-// database sets. Upload byte counters need a bigint count (ADR 0030).
+// database sets. Upload byte counters need a bigint count (ADR 0030); the
+// console search counts in a bucket of its own (B11-02).
 
 import { randomBytes } from 'node:crypto';
 
@@ -73,6 +74,27 @@ describe('app.request_limit', { timeout: 30_000 }, () => {
     });
   });
 
+  it('keeps a search counter apart from a general one, and shares it across connections', async () => {
+    const hash = randomBytes(32);
+    const start = new Date();
+    const upsert = (bucket: string) =>
+      withClient('app_api', async (client) => {
+        const { rows } = await client.query<{ count: string }>(
+          `INSERT INTO app.request_limit (bucket, key_hash, window_start, count)
+           VALUES ($1, $2, $3, 1)
+           ON CONFLICT (bucket, key_hash, window_start)
+           DO UPDATE SET count = request_limit.count + 1
+           RETURNING count`,
+          [bucket, hash, start],
+        );
+        return rows[0]?.count;
+      });
+
+    expect(await upsert('search')).toBe('1');
+    expect(await upsert('search')).toBe('2');
+    expect(await upsert('general')).toBe('1');
+  });
+
   it.each<[string, Row, string]>([
     ['refuses a clear IPv4 address', { key_hash: Buffer.from([192, 0, 2, 1]) }, '23514'],
     ['refuses a clear identifier', { key_hash: Buffer.from('jo@example.test') }, '23514'],
@@ -81,6 +103,7 @@ describe('app.request_limit', { timeout: 30_000 }, () => {
     ['refuses a negative count', { count: -1 }, '23514'],
     ['accepts a 32-byte hash in a known bucket', { bucket: 'probe' }, 'ok'],
     ...[
+      'search',
       'upload_files_membership',
       'upload_bytes_membership',
       'upload_files_address',

@@ -7,9 +7,8 @@
 // A label set is tenant configuration (rule 10). Creating, renaming,
 // recolouring or archiving a label records a configuration version of
 // entity type `grants.label` (labelConfigEntityType), whose entity id is the
-// label's id, with labelDiff()'s changes by field path. That entity type is
-// not yet in the platform's closed list (`platform/settings/config.ts`), so
-// the server waits for it. Labels are archived, never deleted, so history
+// label's id, with labelDiff()'s changes by field path, written as grants'
+// set-up changes are. Labels are archived, never deleted, so history
 // keeps its meaning: an archived label stays on the applications that have
 // it, and the server refuses to apply it again (triageMessages.labelArchived).
 // Names are unique in the tenant in any case (triageMessages.labelTaken).
@@ -18,11 +17,11 @@ import { idSchema } from '@pixel-scientists/domain';
 import { tagLabelSchema } from '@pixel-scientists/domain/notes';
 import { z } from 'zod';
 
-import { configDiff, type ConfigDiff } from '../programme/config.ts';
+import { configDiff, type ConfigDiff, type GrantsConfigEntityType } from '../programme/config.ts';
 import { programmeMessages, says as programmeSays } from '../programme/messages.ts';
 import { says, triageMessages } from './messages.ts';
 
-export const labelConfigEntityType = 'grants.label';
+export const labelConfigEntityType = 'grants.label' satisfies GrantsConfigEntityType;
 
 /** The most submissions one bulk change takes, as a stage move does. */
 export const MAX_TRIAGE_SUBMISSIONS = 200;
