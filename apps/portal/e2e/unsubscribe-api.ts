@@ -3,7 +3,7 @@
 // What the unsubscribe specs share: a made-up token of the right length and
 // character set, and the keys the stub answers to.
 
-export const TOKEN = 'dGVzdC10b2tlbi1mb3Itc3ludGhldGljLWRhdGEtb25seS0wMDAx';
+export const TOKEN = 'dGVzdC10b2tlbi1mb3Itc3ludGhldGljLWRhdGEtb25seS0wMDAx'; // gitleaks:allow
 export const PATH = `/northfield/unsubscribe?token=${TOKEN}`;
 export const GET = 'GET /public/unsubscribe';
 export const POST = 'POST /public/unsubscribe';

@@ -10,7 +10,7 @@ import { whatStops } from './wording.ts';
 
 setUpPortalTests();
 
-const TOKEN = 'dGVzdC10b2tlbi1mb3Itc3ludGhldGljLWRhdGEtb25seS0wMDAx';
+const TOKEN = 'dGVzdC10b2tlbi1mb3Itc3ludGhldGljLWRhdGEtb25seS0wMDAx'; // gitleaks:allow
 const KEY = `/public/unsubscribe?token=${TOKEN}`;
 const GET = `GET ${KEY}`;
 const POST = `POST ${KEY}`;
