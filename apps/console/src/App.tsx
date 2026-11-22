@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import { assureConsoleRoutes } from '@pixel-scientists/assure/console';
 import { emailChangeLinkPath } from '@pixel-scientists/domain/auth';
 import { grantsRoutes } from '@pixel-scientists/grants/console';
 import { impactConsoleRoutes } from '@pixel-scientists/impact/console';
@@ -57,6 +58,7 @@ export const topLevelRoutes: readonly RouteDefinition[] = [
 export const tenantRoutes: readonly RouteDefinition[] = [
   ...memberRoutes([
     ...grantsRoutes,
+    ...assureConsoleRoutes,
     ...impactConsoleRoutes,
     {
       path: ACCOUNT_SECURITY_PATH,
