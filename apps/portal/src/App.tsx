@@ -19,6 +19,8 @@ import { Screen } from './auth/Screen.tsx';
 import SignedOutPage from './auth/SignedOutPage.tsx';
 import SignInPage from './auth/SignInPage.tsx';
 import SignUpPage from './auth/SignUpPage.tsx';
+import OpenGrantPage from './browse/OpenGrantPage.tsx';
+import OpenGrantsPage from './browse/OpenGrantsPage.tsx';
 import { FunderProvider, useFunder } from './funder.tsx';
 import { PageColumn } from './PageColumn.tsx';
 import { pageLoadErrorPage } from './pages/PageLoadErrorPage.tsx';
@@ -38,6 +40,8 @@ import {
   FUTURE_FUNDING_PATH,
   HOME_PATH,
   HOW_APPLYING_WORKS_PATH,
+  OPEN_GRANTS_PATH,
+  OPEN_GRANT_PATH,
   ORGANISATIONS_PATH,
   ORGANISATION_PATH,
   PASSWORD_RESET_SENT_PATH,
@@ -78,6 +82,13 @@ const organisationParams: SearchSchema<Params> = {
       : { success: false, error: null },
 };
 
+const roundParams: SearchSchema<Params> = {
+  safeParse: (input) =>
+    idSchema.safeParse((input as Params)['roundId']).success
+      ? { success: true, data: input as Params }
+      : { success: false, error: null },
+};
+
 /**
  * Pages under `/<slug>/`, which the router sees without the slug. They are in
  * the main bundle, not loaded on demand, so a weak connection cannot stop an
@@ -85,6 +96,13 @@ const organisationParams: SearchSchema<Params> = {
  */
 const ownRoutes: readonly RouteDefinition[] = [
   { path: HOME_PATH, title: 'Apply for a grant', component: StartPage },
+  { path: OPEN_GRANTS_PATH, title: 'Open grants', component: OpenGrantsPage },
+  {
+    path: OPEN_GRANT_PATH,
+    title: 'Open grant',
+    params: roundParams,
+    component: OpenGrantPage,
+  },
   { path: SIGN_UP_PATH, title: 'Create your account', component: SignUpPage },
   { path: CHECK_EMAIL_PATH, title: 'Check your email', component: CheckEmailPage },
   { path: COMPLETE_SIGN_UP_PATH, title: 'Set your password', component: CompleteSignUpPage },
