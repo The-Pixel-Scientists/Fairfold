@@ -16,6 +16,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { asMigratorIn } from '../../../packages/db/test/tenants.ts';
 import { complete, startApplicationsApi, type ApplicationsApi } from './applications-api.ts';
+import { switchModule } from './modules-on.ts';
 import { answer, type Method, type Problem } from './programme-api.ts';
 import { events, type Member } from './settings-api.ts';
 import { expectLooksMissing } from './support.ts';
@@ -260,6 +261,48 @@ describe('reading a submission', () => {
       entity_id: application.id,
       actor_id: t.managerA.membershipId,
     });
+  });
+
+  it('shows the organisation as submitted beside its record now, and links the record only while crm is on', async () => {
+    const { open } = await aRound();
+    const application = await ready(open);
+    await answer(t.submit(t.ann, application));
+    const organisationId = application.organisation.id;
+    await asMigratorIn(t.tenantA.id, (client) =>
+      client.query(
+        `UPDATE party.organisation SET name = 'Renamed Allotment Society', address_town = 'Southfield'
+          WHERE id = $1`,
+        [organisationId],
+      ),
+    );
+
+    const submission = await read(application.id);
+    expect(submission.organisationSnapshot).toMatchObject({
+      organisationId,
+      name: 'Northfield Allotment Society',
+      takenBy: t.ann.membershipId,
+      identifiers: [{ scheme: 'GB-CHC', identifier: '1234567', verifiedAt: null }],
+    });
+    expect(submission.currentOrganisation).toMatchObject({
+      name: 'Renamed Allotment Society',
+      registeredAddress: { town: 'Southfield' },
+      href: null,
+    });
+    expect(submission.organisation.name).toBe('Renamed Allotment Society');
+
+    await switchModule(t.tenantA, 'crm');
+    try {
+      expect((await read(application.id)).currentOrganisation?.href).toBe(
+        `/crm/organisations/${organisationId}`,
+      );
+      // Another tenant's crm switch changes nothing for this one.
+      await switchModule(t.tenantB, 'crm');
+      await switchModule(t.tenantA, 'crm', false);
+      expect((await read(application.id)).currentOrganisation?.href).toBeNull();
+    } finally {
+      await switchModule(t.tenantA, 'crm', false);
+      await switchModule(t.tenantB, 'crm', false);
+    }
   });
 
   it('never sends an aggregate-only answer, in the list, the submission or a move', async () => {
