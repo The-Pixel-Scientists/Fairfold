@@ -15,6 +15,18 @@ const ids: SearchSchema<Params> = {
       : { success: false, error: null },
 };
 
+/** The kind of record in a compare address is one of the two kinds. */
+const compareParams: SearchSchema<Params> = {
+  safeParse: (input) => {
+    const { kind, partyId, otherPartyId } = input as Params;
+    return (kind === 'organisation' || kind === 'person') &&
+      idSchema.safeParse(partyId).success &&
+      idSchema.safeParse(otherPartyId).success
+      ? { success: true, data: input as Params }
+      : { success: false, error: null };
+  },
+};
+
 export const crmConsoleRoutes: readonly RouteDefinition[] = [
   {
     path: '/crm/organisations/:organisationId',
@@ -27,6 +39,37 @@ export const crmConsoleRoutes: readonly RouteDefinition[] = [
     title: 'Person',
     params: ids,
     load: () => import('./PersonPage.tsx'),
+  },
+  {
+    path: '/crm/duplicates',
+    title: 'Possible duplicates',
+    load: () => import('./duplicates/DuplicatesPage.tsx'),
+  },
+  {
+    path: '/crm/duplicates/:kind/:partyId/:otherPartyId',
+    title: 'Compare records',
+    params: compareParams,
+    load: () => import('./duplicates/ComparePage.tsx'),
+  },
+  { path: '/crm/lists', title: 'Lists', load: () => import('./lists/ListsPage.tsx') },
+  {
+    path: '/crm/lists/:listId',
+    title: 'List members',
+    params: ids,
+    load: () => import('./lists/ListPage.tsx'),
+  },
+  { path: '/crm/segments', title: 'Segments', load: () => import('./lists/SegmentsPage.tsx') },
+  {
+    path: '/crm/segments/:segmentId',
+    title: 'Segment',
+    params: ids,
+    load: () => import('./lists/SegmentPage.tsx'),
+  },
+  {
+    path: '/crm/imports/:importId',
+    title: 'Import',
+    params: ids,
+    load: () => import('./import/ImportPage.tsx'),
   },
 ];
 
