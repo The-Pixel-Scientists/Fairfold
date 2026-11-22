@@ -115,6 +115,9 @@ export function SessionProvider({ load, signOut: endSession, children }: Session
   );
 }
 
+/** The longest wait a timer takes; a longer one fires at once. */
+const MAX_TIMER_MS = 2 ** 31 - 1;
+
 /**
  * The current time, kept fresh for a session that ends at `deadline`: it
  * changes when the warning is due and then every second, and calls `onExpire`
@@ -132,7 +135,7 @@ function useClock(deadline: number | null, onExpire: () => void): number {
       const remaining = end - Date.now();
       const wait =
         remaining > WARN_BEFORE_MS ? remaining - WARN_BEFORE_MS : Math.min(remaining, 1000);
-      timer = setTimeout(tick, Math.max(wait, 0));
+      timer = setTimeout(tick, Math.min(Math.max(wait, 0), MAX_TIMER_MS));
     }
 
     function tick() {

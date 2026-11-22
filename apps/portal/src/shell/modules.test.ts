@@ -18,14 +18,22 @@ describe('the portal sections', () => {
     expect(new Set(portalModules.map(({ id }) => id)).size).toBe(portalModules.length);
   });
 
-  it('start with party, then grants', () => {
-    expect(portalModules.map(({ id }) => id)).toEqual(['party', 'grants']);
+  it('start with party, then grants, then forms', () => {
+    expect(portalModules.map(({ id }) => id)).toEqual(['party', 'grants', 'forms']);
   });
 });
 
 describe('visibleSections', () => {
   it('shows a tool that is on and permitted', () => {
     expect(ids(applicantSession({ modules: ['grants'] }))).toEqual(['party', 'grants']);
+  });
+
+  it('shows forms only when it is on', () => {
+    expect(ids(applicantSession({ modules: ['grants', 'forms'] }))).toEqual([
+      'party',
+      'grants',
+      'forms',
+    ]);
   });
 
   it('hides a tool that is on but not permitted', () => {

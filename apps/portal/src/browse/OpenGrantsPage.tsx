@@ -60,7 +60,7 @@ function Round({ round }: { round: PublicRound }) {
 export default function OpenGrantsPage() {
   const slug = useTenantSlug();
   const readRounds = useCallback(
-    () => callApi(listPublicRounds, { params: { slug } }, { omitCredentials: true }),
+    () => callApi(listPublicRounds, { params: { slug } }, { anonymous: true }),
     [slug],
   );
   const { read, retry } = useRead(readRounds);

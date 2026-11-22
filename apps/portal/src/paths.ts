@@ -28,6 +28,7 @@ export const FUTURE_FUNDING_PATH = '/future-funding';
 
 export const OPEN_GRANTS_PATH = '/open-grants';
 export const OPEN_GRANT_PATH = '/open-grants/:roundId';
+export const FORM_RESPONSES_PATH = '/form-responses';
 
 export const PROGRAMMES_PATH = '/programmes';
 export const PROGRAMME_PATH = '/programmes/:roundId';

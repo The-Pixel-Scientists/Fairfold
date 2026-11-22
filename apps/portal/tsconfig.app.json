@@ -24,6 +24,9 @@
     },
     {
       "path": "../../modules/grants/tsconfig.web.json"
+    },
+    {
+      "path": "../../modules/forms/tsconfig.web.json"
     }
   ]
 }

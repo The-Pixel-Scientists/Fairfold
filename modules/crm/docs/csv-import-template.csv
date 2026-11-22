@@ -1,0 +1,4 @@
+name,legal_form,address_line1,town,postcode,address_line2,country_code,website,identifier_scheme,identifier
+Riverbank Community Garden,registered_charity,1 Example Lane,Exampleton,ZZ1 1ZZ,,GB,https://www.example.org,,
+Hilltop Reading Circle,unincorporated_group,2 Sample Road,Samplebury,ZZ2 2ZZ,Unit 4,GB,,,
+Brookside Makers Ltd,company_limited_by_guarantee,3 Specimen Street,Testford,ZZ3 3ZZ,,GB,https://makers.example.org,GB-COH,ZZ000001

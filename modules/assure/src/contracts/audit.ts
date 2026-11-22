@@ -5,8 +5,8 @@
 // counts. Never a name, identifier, answer or finding. Where the event is
 // about a person or organisation, its subject party id travels in the
 // audit context (ADR 0027), never as a value. The `viewed` codes are
-// sensitive reads by staff: a snapshot's officers, and a match with its
-// listed entry.
+// sensitive reads by staff: a snapshot's officers, a match with its listed
+// entry, a visit with its findings, and an application's checklist answers.
 
 import { defineAuditActions } from '@pixel-scientists/domain/platform';
 
@@ -23,8 +23,10 @@ export const assureAuditActions = defineAuditActions('assure', [
   'assure.checklist.created',
   'assure.checklist.published',
   'assure.checklist_response.saved',
+  'assure.checklist_response.viewed',
   'assure.visit.recorded',
   'assure.visit.updated',
+  'assure.visit.viewed',
 ]);
 
 export type AssureAuditAction = (typeof assureAuditActions)[number];

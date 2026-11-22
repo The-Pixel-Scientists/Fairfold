@@ -38,6 +38,8 @@ const apiProxy: Record<string, ProxyOptions> | undefined = apiOrigin
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   html: { cspNonce: 'TPS_CSP_NONCE' },
+  // The portal, and the embed entry that the embed origin serves (ADR 0035).
+  build: { rolldownOptions: { input: { main: 'index.html', embed: 'embed.html' } } },
   // scheme.js and the favicon, shared with the other app.
   publicDir: '../../packages/ui/src/public',
   server: { allowedHosts: ['.localhost'], proxy: apiProxy },

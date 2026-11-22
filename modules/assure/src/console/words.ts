@@ -3,7 +3,13 @@
 // Registers, matches, reasons and dates in the words the screens use. Nothing
 // here says a match is a sanction or a block: a member decides.
 
-import type { MatchOutcome, MatchReason, Registry } from '../contracts/index.ts';
+import type {
+  MatchOutcome,
+  MatchReason,
+  Registry,
+  duplicateSignals,
+  visitTypes,
+} from '../contracts/index.ts';
 
 export const registryWords = {
   charity_commission: 'Charity Commission',
@@ -121,3 +127,24 @@ export const percent = (similarity: number): string => `${String(Math.round(simi
 
 export const listOf = (values: readonly string[]): string =>
   values.length === 0 ? 'Not given' : values.join(', ');
+
+export const signalWords = {
+  shared_identifier: 'Shares a verified identifier with',
+  similar_name: 'Has a similar name to',
+  shared_contact_point: 'Shares a contact email or phone with',
+} as const satisfies Record<(typeof duplicateSignals)[number], string>;
+
+export const answerKindWords = {
+  yes_no: 'Yes or no',
+  date: 'Date',
+  short_text: 'Short text',
+  file: 'File',
+} as const;
+
+export const yesNoWords = { yes: 'Yes', no: 'No', not_applicable: 'Not applicable' } as const;
+
+export const visitTypeWords = {
+  in_person: 'In person',
+  video_call: 'Video call',
+  phone_call: 'Phone call',
+} as const satisfies Record<(typeof visitTypes)[number], string>;

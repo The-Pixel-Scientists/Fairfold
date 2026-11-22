@@ -9,6 +9,8 @@ import type { ReactNode } from 'react';
 import { PREFERENCES_PATH, PreferencesPage } from '@pixel-scientists/party/portal';
 import { endSession, loadSession } from './api.ts';
 import { applyRoutes } from './apply/routes.ts';
+import { PublicFormRouter, isPublicFormPath } from './embed/PublicFormRouter.tsx';
+import { formsRoutes } from './forms/routes.tsx';
 import AccountPage from './account/AccountPage.tsx';
 import EmailChangePage from './account/EmailChangePage.tsx';
 import CheckEmailPage from './auth/CheckEmailPage.tsx';
@@ -53,7 +55,7 @@ import {
   SIGN_UP_PATH,
 } from './paths.ts';
 import { routesFor, toolRoutes } from './shell/gate.tsx';
-import { grantsModule } from './shell/modules.ts';
+import { formsModule, grantsModule } from './shell/modules.ts';
 import { PortalShell } from './shell/PortalShell.tsx';
 import { productName } from './product.ts';
 import { TenantProvider, tenantSlugOf } from './tenant.ts';
@@ -141,7 +143,7 @@ function PreferencesRoute() {
 }
 
 /** The tools whose pages come and go with the session. */
-const tools = [toolRoutes(grantsModule, applyRoutes)];
+const tools = [toolRoutes(grantsModule, applyRoutes), toolRoutes(formsModule, formsRoutes)];
 
 function TenantNotFound() {
   return (
@@ -192,6 +194,10 @@ function FunderRouter({ slug }: { slug: string }) {
         {...sharedProps(slug)}
       />
     );
+  }
+  // A form anyone can answer reads no session and sets no cookie.
+  if (isPublicFormPath(slug, window.location.pathname)) {
+    return <PublicFormRouter slug={slug} embedded={false} layout={TopLayout} />;
   }
   return (
     <SessionProvider load={loadSession} signOut={endSession}>

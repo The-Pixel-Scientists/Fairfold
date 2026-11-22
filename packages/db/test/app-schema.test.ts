@@ -93,6 +93,9 @@ describe('the app schema', () => {
         'owner_grants_public_open_rounds USAGE',
         // Recording a one-click unsubscribe, migration 0073.
         'owner_party_record_unsubscribe USAGE',
+        // Anonymous form responses and erasing a subject's answers, migration 0079.
+        'owner_forms_submit_public_response USAGE',
+        'owner_forms_erase_subject USAGE',
       ].sort(),
     });
   });
@@ -145,6 +148,9 @@ describe('app.current_tenant_id()', () => {
         'owner_crm_erase_subject',
         // Recording a one-click unsubscribe, migration 0073.
         'owner_party_record_unsubscribe',
+        // Anonymous form responses and erasing a subject's answers, migration 0079.
+        'owner_forms_submit_public_response',
+        'owner_forms_erase_subject',
       ]
         .map((role) => `${role} EXECUTE`)
         .sort(),

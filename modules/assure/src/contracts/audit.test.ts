@@ -8,7 +8,7 @@ import { assureAuditActions } from './audit.ts';
 import { screeningMatchFound } from './events.ts';
 
 describe('assure audit actions', () => {
-  it('are defined, with sensitive reads for officers and matches', () => {
+  it('are defined, with sensitive reads for officers, matches, visits and answers', () => {
     for (const action of assureAuditActions) expect(isAuditAction(action)).toBe(true);
     expect(assureAuditActions).toEqual(
       expect.arrayContaining([
@@ -20,8 +20,10 @@ describe('assure audit actions', () => {
         'assure.duplicate_flag.dismissed',
         'assure.checklist.published',
         'assure.checklist_response.saved',
+        'assure.checklist_response.viewed',
         'assure.visit.recorded',
         'assure.visit.updated',
+        'assure.visit.viewed',
       ]),
     );
   });
