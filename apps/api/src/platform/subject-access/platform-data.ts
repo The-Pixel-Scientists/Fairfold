@@ -51,6 +51,8 @@ export const membershipTables: Readonly<Record<string, string>> = Object.fromEnt
 
 /** Columns no export carries, each with why. */
 export const withheldColumns: Readonly<Record<string, string>> = {
+  'app.break_glass.reason_text_ciphertext':
+    'Sealed text the export cannot open, so the bytes mean nothing to the person.',
   'app.invitation.token_hash': 'A credential digest, not data about the person.',
   'app.job_request.filters':
     'It can name another person: the party a subject access request was made for.',
