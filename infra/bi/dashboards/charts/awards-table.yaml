@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+slice_name: Awards by programme and period
+description: Released awards in each programme by financial year and quarter.
+viz_type: table
+params:
+  viz_type: table
+  query_mode: aggregate
+  groupby: [programme, period, currency]
+  metrics: [awards, amount_awarded]
+  adhoc_filters: []
+  row_limit: 10000
+  server_page_length: 25
+  include_search: true
+  show_cell_bars: false
+  color_pn: false
+query_context: null
+cache_timeout: null
+uuid: c3464b7c-199d-4066-b71a-4e1da88fb18b
+version: 1.0.0
+dataset_uuid: 6bb9a888-347b-4db9-a544-1f981e297c3e

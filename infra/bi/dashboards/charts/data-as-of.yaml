@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+slice_name: Data as of
+description: When the data on this dashboard was exported from the platform, and when it was loaded.
+viz_type: table
+params:
+  viz_type: table
+  query_mode: raw
+  all_columns: [data_as_of, loaded_at]
+  adhoc_filters: []
+  row_limit: 1
+  include_search: false
+  show_cell_bars: false
+query_context: null
+cache_timeout: null
+uuid: 44140164-c2a7-499f-a7ac-7fa795d97268
+version: 1.0.0
+dataset_uuid: 4a996369-90d4-49b5-b250-fccb343f4d49

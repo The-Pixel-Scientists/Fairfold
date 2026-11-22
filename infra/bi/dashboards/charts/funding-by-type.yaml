@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+slice_name: Amount awarded by organisation type
+description: The total of released awards to each type of organisation, by currency. Each bar shows its amount.
+viz_type: echarts_timeseries_bar
+params:
+  viz_type: echarts_timeseries_bar
+  x_axis: organisation_type
+  metrics: [amount_awarded]
+  groupby: [currency]
+  adhoc_filters: []
+  row_limit: 10000
+  orientation: horizontal
+  show_value: true
+  show_legend: true
+  legendOrientation: top
+  x_axis_title: Organisation type
+  y_axis_title: Amount awarded
+  y_axis_format: ',.0f'
+  color_scheme: supersetColors
+query_context: null
+cache_timeout: null
+uuid: 70e7333e-776c-44b4-a9db-6c78716805b9
+version: 1.0.0
+dataset_uuid: d8da98fd-f9b7-472f-a2e4-880157f8a8d0

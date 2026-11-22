@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+slice_name: Applications by round and status
+description: The number of applications in each round, by status. Each bar shows its count.
+viz_type: echarts_timeseries_bar
+params:
+  viz_type: echarts_timeseries_bar
+  x_axis: round
+  metrics: [applications]
+  groupby: [status]
+  adhoc_filters: []
+  row_limit: 10000
+  orientation: horizontal
+  stack: Stack
+  show_value: true
+  show_legend: true
+  legendOrientation: top
+  x_axis_title: Round
+  y_axis_title: Applications
+  y_axis_format: ',d'
+  color_scheme: supersetColors
+query_context: null
+cache_timeout: null
+uuid: c67422e6-9af6-42e9-8686-ac8c38e20cd5
+version: 1.0.0
+dataset_uuid: 40ad4d25-fc43-4bb8-b5e7-81feeab35391

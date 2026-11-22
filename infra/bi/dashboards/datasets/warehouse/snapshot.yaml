@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# When the loaded snapshot was made and loaded (load.sh), shown on every
+# starter dashboard so viewers know how old the data is.
+table_name: snapshot
+schema: warehouse
+description: When the data was exported and loaded.
+sql: |-
+  SELECT to_char(s.created_at AT TIME ZONE 'UTC', 'FMDD FMMonth YYYY, FMHH12:MIam') || ' UTC' AS data_as_of,
+         to_char(s.loaded_at AT TIME ZONE 'UTC', 'FMDD FMMonth YYYY, FMHH12:MIam') || ' UTC' AS loaded_at
+    FROM warehouse._snapshot AS s
+main_dttm_col: null
+filter_select_enabled: false
+uuid: 4a996369-90d4-49b5-b250-fccb343f4d49
+database_uuid: 7abde56f-93f9-4e34-b8b0-b8781f25df49
+version: 1.0.0
+metrics: []
+columns:
+  - column_name: data_as_of
+    verbose_name: Data as of
+    type: TEXT
+    groupby: false
+    filterable: false
+  - column_name: loaded_at
+    verbose_name: Loaded
+    type: TEXT
+    groupby: false
+    filterable: false

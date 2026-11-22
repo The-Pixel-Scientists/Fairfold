@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+slice_name: Funding by organisation type
+description: Organisations funded, awards and the amount awarded for each type of organisation.
+viz_type: table
+params:
+  viz_type: table
+  query_mode: aggregate
+  groupby: [organisation_type, currency]
+  metrics: [organisations_funded, awards, amount_awarded]
+  adhoc_filters: []
+  row_limit: 10000
+  server_page_length: 25
+  include_search: true
+  show_cell_bars: false
+  color_pn: false
+query_context: null
+cache_timeout: null
+uuid: 2fe15cf2-5606-4354-b8e1-1130ace51e70
+version: 1.0.0
+dataset_uuid: d8da98fd-f9b7-472f-a2e4-880157f8a8d0

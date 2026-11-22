@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+slice_name: Amount awarded by programme
+description: The total of released awards in each programme, by currency. Each bar shows its amount.
+viz_type: echarts_timeseries_bar
+params:
+  viz_type: echarts_timeseries_bar
+  x_axis: programme
+  metrics: [amount_awarded]
+  groupby: [currency]
+  adhoc_filters: []
+  row_limit: 10000
+  orientation: horizontal
+  show_value: true
+  show_legend: true
+  legendOrientation: top
+  x_axis_title: Programme
+  y_axis_title: Amount awarded
+  y_axis_format: ',.0f'
+  color_scheme: supersetColors
+query_context: null
+cache_timeout: null
+uuid: feb81dbd-5f52-4bf5-8409-b2b060ae447c
+version: 1.0.0
+dataset_uuid: 6bb9a888-347b-4db9-a544-1f981e297c3e

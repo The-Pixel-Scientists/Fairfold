@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# What the starter dashboards in this bundle target (ADR 0039): the
+# warehouse model version a snapshot's header names, and the data contract
+# version of each module whose tables they read. import_dashboards.py refuses
+# to import them into a warehouse loaded from another model version, and
+# test.sh fails unless these match packages/domain/src/warehouse/.
+model_version: 1
+data_contracts:
+  party: 1
+  grants: 1
+dashboards:
+  - Applications by round and status
+  - Awards by programme and period
+  - Funding by organisation type
