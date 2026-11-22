@@ -7,6 +7,9 @@
 // Audit events hold ids, codes and public or internal values only (ADR 0003,
 // D12), and are kept under the tenant's audit rule, at least 12 months; the
 // party an event is about is internal under the same rule (ADR 0027).
+// Workflow definitions last as long as the tenant, since requests pin them;
+// approval requests and decisions are audit evidence of ids, codes, counts
+// and times, kept under the audit rule (ADR 0038).
 
 import type {
   ClassificationRegistry,
@@ -73,6 +76,7 @@ export const notKept: ReadonlySet<string> = new Set([
   'app.note.body',
   'app.message.body',
   'app.tag.label',
+  'app.workflow_definition_version.document',
 ]);
 
 export const app = {
@@ -327,6 +331,49 @@ export const app = {
     created_by: internal,
     created_at: internal,
   },
+  'app.workflow_definition': {
+    tenant_id: internal,
+    id: internal,
+    key: internal,
+    created_at: internal,
+    created_by: internal,
+  },
+  'app.workflow_definition_version': {
+    tenant_id: internal,
+    id: internal,
+    definition_id: internal,
+    version: internal,
+    document: internal,
+    created_at: internal,
+    created_by: internal,
+  },
+  'app.approval_request': {
+    tenant_id: audit,
+    id: audit,
+    definition_version_id: audit,
+    definition_key: audit,
+    step_id: audit,
+    required_approvals: audit,
+    status: audit,
+    requested_by: audit,
+    requested_at: audit,
+    due_at: audit,
+    closed_by: audit,
+    close_reason: audit,
+    closed_at: audit,
+    updated_at: audit,
+    retain_until: audit,
+  },
+  'app.approval_decision': {
+    tenant_id: audit,
+    id: audit,
+    request_id: audit,
+    decided_by: audit,
+    outcome: audit,
+    reason_code: audit,
+    decided_at: audit,
+    retain_until: audit,
+  },
 } satisfies ClassificationRegistry;
 
 /**
@@ -354,6 +401,10 @@ export const appSubjects: SubjectPathRegistry = {
   // message names them directly.
   'app.note': { kind: 'join', column: 'author_id', table: 'app.membership' },
   'app.message': { kind: 'party', column: 'author_person_id' },
+  // An approval is about the member who asked or decided; its subject is
+  // reached through the module's link table.
+  'app.approval_request': { kind: 'join', column: 'requested_by', table: 'app.membership' },
+  'app.approval_decision': { kind: 'join', column: 'decided_by', table: 'app.membership' },
 };
 
 const stored = ['hosting', 'backup'] as const;
@@ -382,6 +433,15 @@ const auditRow: ProcessingEntry = {
   processors: stored,
   dataSubjects: tenantPeople,
   dataCategories: ['other'],
+};
+
+/** Who asked for or decided an approval, kept as evidence of separation of duties. */
+const approval: ProcessingEntry = {
+  purpose: 'audit',
+  legalBasis: 'legitimate_interests',
+  processors: stored,
+  dataSubjects: ['staff_member'],
+  dataCategories: ['identity'],
 };
 
 export const appProcessing: ProcessingRegistry<typeof app> = {
@@ -463,4 +523,8 @@ export const appProcessing: ProcessingRegistry<typeof app> = {
     dataCategories: ['other'],
   },
   'app.tag': setUp,
+  'app.workflow_definition': setUp,
+  'app.workflow_definition_version': setUp,
+  'app.approval_request': approval,
+  'app.approval_decision': approval,
 };

@@ -25,6 +25,35 @@ export type JsonValue = JsonArray | JsonObject | JsonPrimitive;
 
 export type Timestamp = ColumnType<Date, Date | string, Date | string>;
 
+export interface AppApprovalDecision {
+  decided_at: Generated<Timestamp>;
+  decided_by: string;
+  id: Generated<string>;
+  outcome: string;
+  reason_code: string | null;
+  request_id: string;
+  retain_until: Timestamp;
+  tenant_id: string;
+}
+
+export interface AppApprovalRequest {
+  close_reason: string | null;
+  closed_at: Timestamp | null;
+  closed_by: string | null;
+  definition_key: string;
+  definition_version_id: string;
+  due_at: Timestamp | null;
+  id: Generated<string>;
+  requested_at: Generated<Timestamp>;
+  requested_by: string;
+  required_approvals: number;
+  retain_until: Timestamp | null;
+  status: Generated<string>;
+  step_id: string;
+  tenant_id: string;
+  updated_at: Generated<Timestamp>;
+}
+
 export interface AppAuditEvent {
   action: string;
   actor_id: string | null;
@@ -267,7 +296,27 @@ export interface AppTenantTheme {
   updated_by: string;
 }
 
+export interface AppWorkflowDefinition {
+  created_at: Generated<Timestamp>;
+  created_by: string;
+  id: Generated<string>;
+  key: string;
+  tenant_id: string;
+}
+
+export interface AppWorkflowDefinitionVersion {
+  created_at: Generated<Timestamp>;
+  created_by: string;
+  definition_id: string;
+  document: Json;
+  id: Generated<string>;
+  tenant_id: string;
+  version: number;
+}
+
 export interface DB {
+  'app.approval_decision': AppApprovalDecision;
+  'app.approval_request': AppApprovalRequest;
   'app.audit_event': AppAuditEvent;
   'app.config_version': AppConfigVersion;
   'app.erasure_ledger': AppErasureLedger;
@@ -289,4 +338,6 @@ export interface DB {
   'app.tenant': AppTenant;
   'app.tenant_module': AppTenantModule;
   'app.tenant_theme': AppTenantTheme;
+  'app.workflow_definition': AppWorkflowDefinition;
+  'app.workflow_definition_version': AppWorkflowDefinitionVersion;
 }
