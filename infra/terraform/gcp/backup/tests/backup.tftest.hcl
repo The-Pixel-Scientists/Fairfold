@@ -8,8 +8,16 @@ mock_provider "google" {
   # IAM members are validated even when mocked, so a random string won't do.
   mock_resource "google_service_account" {
     defaults = {
+      name   = "projects/tps-test/serviceAccounts/x@tps-test.iam.gserviceaccount.com"
       email  = "x@tps-test.iam.gserviceaccount.com"
       member = "serviceAccount:x@tps-test.iam.gserviceaccount.com"
+    }
+  }
+
+  # A policy is checked as JSON before it is sent.
+  mock_data "google_iam_policy" {
+    defaults = {
+      policy_data = "{}"
     }
   }
 
@@ -113,6 +121,27 @@ run "job_is_private_and_fenced" {
       google_cloud_scheduler_job.backup.retry_config[0].retry_count == 0
     )
     error_message = "The job must be scheduled in UTC and never started twice by a retry."
+  }
+
+  assert {
+    condition = (
+      google_cloud_run_v2_job_iam_policy.job.policy_data == data.google_iam_policy.job.policy_data &&
+      length(data.google_iam_policy.job.binding) == 1 &&
+      alltrue([
+        for binding in data.google_iam_policy.job.binding :
+        binding.role == "roles/run.invoker" && binding.members == toset([google_service_account.trigger.member])
+      ])
+    )
+    error_message = "Only the trigger may hold a role on the job, and only to run it."
+  }
+
+  assert {
+    condition = (
+      google_service_account_iam_policy.job.service_account_id == google_service_account.job.name &&
+      google_service_account_iam_policy.job.policy_data == data.google_iam_policy.none.policy_data &&
+      length(data.google_iam_policy.none.binding) == 0
+    )
+    error_message = "No one may act as the job's service account, which can read backup_reader's password; the release deployer least of all."
   }
 }
 
