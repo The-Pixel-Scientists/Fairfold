@@ -46,7 +46,7 @@ export type SubmissionTables = {
     revoked_at: Date | null;
     revoke_reason_code: RevokeReason | null;
   };
-  'grants.stage': { id: string; round_id: string; name: string };
+  'grants.stage': { id: string; round_id: string; name: string; position: number };
   'grants.form_version': { id: string; version: number; definition: unknown };
   'grants.application': {
     id: string;
