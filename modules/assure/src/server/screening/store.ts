@@ -32,9 +32,8 @@ export const PAGE_SIZE = 50;
  * pg_trgm's `%`, written with its schema so the planner can use the trigram
  * index (ADR 0025). Kysely has no operator for it and a module has no raw SQL
  * tag, so the operator is a constant node and the value stays a bound
- * parameter. An exception to ADR 0016's no-raw-SQL rule, pending the lead:
- * S12-26's commit plan asks db-security for `trigramSimilar(eb, ref, value)`
- * in packages/db, which replaces this constant at its one use, in
+ * parameter. An exception to ADR 0016's no-raw-SQL rule until packages/db
+ * provides a trigram helper; replace this constant at its one use, in
  * candidatesQuery().
  */
 const TRIGRAM_OPERATOR = {
