@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
 // The database scripts' TLS rule against the development server, which offers
-// no TLS. Preparing connects as the superuser, so these run in the db-admin
-// Vitest project (`pnpm test:db`).
+// no TLS, and the status step. Preparing connects as the superuser, so these
+// run in the db-admin Vitest project (`pnpm test:db`).
 
 import { randomBytes } from 'node:crypto';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { migrateDatabase, prepareDatabase } from './db.ts';
-import { LOGIN_ROLES, passwordVariable } from './roles.ts';
+import { databaseStatus, migrateDatabase, prepareDatabase } from './db.ts';
+import { LOGIN_ROLES, passwordVariable, ROLES_SCRIPT_VERSION } from './roles.ts';
 import { readDatabaseName } from './settings.ts';
 
 const database = readDatabaseName(process.env, 'TPS_TEST_DB_NAME');
@@ -46,5 +46,25 @@ describe.each([undefined, 'disable'])('with PGSSLMODE %s', (pgSslMode) => {
     const env = settings({ TPS_DB_TLS: 'verify-full' });
     await expect(prepareDatabase(env, database)).rejects.toThrow(NO_TLS_SERVER);
     await expect(migrateDatabase(env, database, 'up')).rejects.toThrow(NO_TLS_SERVER);
+  });
+});
+
+// Reading every migration folder takes seconds on a busy machine.
+describe('status', { timeout: 60_000 }, () => {
+  it('reports the migrated test database as migrator, and that no worker is connected', async () => {
+    const { lines, healthy } = await databaseStatus(process.env, database);
+    expect(lines).toEqual([
+      `Database: connected to ${database} as migrator without TLS.`,
+      `Roles: match roles script version ${ROLES_SCRIPT_VERSION}.`,
+      'Migrations: none pending.',
+      'Worker: not connected.',
+    ]);
+    expect(healthy).toBe(false);
+  });
+
+  it('refuses a server elsewhere without TPS_DB_TLS before connecting', async () => {
+    await expect(databaseStatus({ ...process.env, ...REMOTE }, database)).rejects.toThrow(
+      NO_TLS_SETTING,
+    );
   });
 });
