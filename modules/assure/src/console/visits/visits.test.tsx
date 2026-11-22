@@ -10,14 +10,14 @@ const VISIT = id(5);
 const ORGANISATION = id(1);
 const stamp = '2026-12-01T10:00:00.000Z';
 
-const summary = {
+const record = {
   id: VISIT,
   organisationId: ORGANISATION,
   applicationId: null,
   visitedOn: '2026-11-30',
   type: 'in_person',
-  openFollowUps: 2,
 };
+const summary = { ...record, openFollowUps: 2 };
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -64,7 +64,7 @@ describe('visit form', () => {
       'POST /console/visits': {
         status: 201,
         body: {
-          ...summary,
+          ...record,
           attendeePersonIds: [],
           findings: 'Records in order.',
           followUps: [],
@@ -76,13 +76,13 @@ describe('visit form', () => {
     });
     open('/assure/visits/new');
 
-    await user.type(await screen.findByLabelText('Organisation'), 'Riverside');
+    await user.type(await screen.findByRole('combobox', { name: /Organisation/ }), 'Riverside');
     await user.click(await screen.findByRole('option', { name: /Riverside Lunch Club/ }));
     await user.type(screen.getByLabelText('Day'), '30');
     await user.type(screen.getByLabelText('Month'), '11');
     await user.type(screen.getByLabelText('Year'), '2026');
     await user.click(screen.getByLabelText('In person'));
-    await user.type(screen.getByLabelText(/Findings/), 'Records in order.');
+    await user.type(screen.getByRole('textbox', { name: /^Findings/ }), 'Records in order.');
     await user.click(screen.getByRole('button', { name: 'Record visit' }));
 
     expect(await screen.findByText('Visit recorded')).toBeTruthy();
