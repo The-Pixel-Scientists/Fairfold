@@ -6271,6 +6271,603 @@ exports[`the shipped map > matches the committed register 1`] = `
     "table": "crm.segment",
   },
   {
+    "article9Condition": null,
+    "columns": [
+      {
+        "column": "archived_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "closes_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "confirmation_message",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "created_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "created_by",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "description",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "opens_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "respondents",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "retention_months",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "tenant_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "title",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "updated_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "updated_by",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+    ],
+    "dataCategories": [],
+    "dataSubjects": [],
+    "highestSensitivity": "internal",
+    "legalBasis": "legitimate_interests",
+    "processors": [
+      "hosting",
+      "backup",
+    ],
+    "purpose": "form_responses",
+    "subjectPath": null,
+    "table": "forms.form",
+  },
+  {
+    "article9Condition": null,
+    "columns": [
+      {
+        "column": "config_version_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "created_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "created_by",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "definition",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "form_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "published_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "published_by",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "respondents",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "status",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "tenant_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "updated_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "updated_by",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "version",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+    ],
+    "dataCategories": [],
+    "dataSubjects": [],
+    "highestSensitivity": "internal",
+    "legalBasis": "legitimate_interests",
+    "processors": [
+      "hosting",
+      "backup",
+    ],
+    "purpose": "form_responses",
+    "subjectPath": null,
+    "table": "forms.form_version",
+  },
+  {
+    "article9Condition": null,
+    "columns": [
+      {
+        "column": "created_at",
+        "perField": false,
+        "retention": {
+          "days": 1,
+          "from": "expires_at",
+          "kind": "fixed",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "expires_at",
+        "perField": false,
+        "retention": {
+          "days": 1,
+          "from": "expires_at",
+          "kind": "fixed",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "id",
+        "perField": false,
+        "retention": {
+          "days": 1,
+          "from": "expires_at",
+          "kind": "fixed",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "response_id",
+        "perField": false,
+        "retention": {
+          "days": 1,
+          "from": "expires_at",
+          "kind": "fixed",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "revoked_at",
+        "perField": false,
+        "retention": {
+          "days": 1,
+          "from": "expires_at",
+          "kind": "fixed",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "revoked_by",
+        "perField": false,
+        "retention": {
+          "days": 1,
+          "from": "expires_at",
+          "kind": "fixed",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "tenant_id",
+        "perField": false,
+        "retention": {
+          "days": 1,
+          "from": "expires_at",
+          "kind": "fixed",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "token_hash",
+        "perField": false,
+        "retention": {
+          "days": 1,
+          "from": "expires_at",
+          "kind": "fixed",
+        },
+        "sensitivity": "personal",
+      },
+      {
+        "column": "updated_at",
+        "perField": false,
+        "retention": {
+          "days": 1,
+          "from": "expires_at",
+          "kind": "fixed",
+        },
+        "sensitivity": "internal",
+      },
+    ],
+    "dataCategories": [
+      "online_identifiers",
+    ],
+    "dataSubjects": [
+      "visitor",
+    ],
+    "highestSensitivity": "personal",
+    "legalBasis": "legitimate_interests",
+    "processors": [
+      "hosting",
+      "backup",
+    ],
+    "purpose": "form_responses",
+    "subjectPath": {
+      "column": "response_id",
+      "kind": "join",
+      "table": "forms.response",
+    },
+    "table": "forms.respondent_token",
+  },
+  {
+    "article9Condition": "explicit_consent",
+    "columns": [
+      {
+        "column": "answers",
+        "perField": true,
+        "retention": {
+          "days": 1,
+          "from": "retain_until",
+          "kind": "fixed",
+        },
+        "sensitivity": "special_category",
+      },
+      {
+        "column": "created_at",
+        "perField": false,
+        "retention": {
+          "days": 1,
+          "from": "retain_until",
+          "kind": "fixed",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "created_by",
+        "perField": false,
+        "retention": {
+          "days": 1,
+          "from": "retain_until",
+          "kind": "fixed",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "form_id",
+        "perField": false,
+        "retention": {
+          "days": 1,
+          "from": "retain_until",
+          "kind": "fixed",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "form_version_id",
+        "perField": false,
+        "retention": {
+          "days": 1,
+          "from": "retain_until",
+          "kind": "fixed",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "id",
+        "perField": false,
+        "retention": {
+          "days": 1,
+          "from": "retain_until",
+          "kind": "fixed",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "idempotency_key_hash",
+        "perField": false,
+        "retention": {
+          "days": 1,
+          "from": "retain_until",
+          "kind": "fixed",
+        },
+        "sensitivity": "personal",
+      },
+      {
+        "column": "proof_hash",
+        "perField": false,
+        "retention": {
+          "days": 1,
+          "from": "retain_until",
+          "kind": "fixed",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "request_hash",
+        "perField": false,
+        "retention": {
+          "days": 1,
+          "from": "retain_until",
+          "kind": "fixed",
+        },
+        "sensitivity": "personal",
+      },
+      {
+        "column": "respondent_person_id",
+        "perField": false,
+        "retention": {
+          "days": 1,
+          "from": "retain_until",
+          "kind": "fixed",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "retain_until",
+        "perField": false,
+        "retention": {
+          "days": 1,
+          "from": "retain_until",
+          "kind": "fixed",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "route",
+        "perField": false,
+        "retention": {
+          "days": 1,
+          "from": "retain_until",
+          "kind": "fixed",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "spam_marked_at",
+        "perField": false,
+        "retention": {
+          "days": 1,
+          "from": "retain_until",
+          "kind": "fixed",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "spam_marked_by",
+        "perField": false,
+        "retention": {
+          "days": 1,
+          "from": "retain_until",
+          "kind": "fixed",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "spam_reason",
+        "perField": false,
+        "retention": {
+          "days": 1,
+          "from": "retain_until",
+          "kind": "fixed",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "status",
+        "perField": false,
+        "retention": {
+          "days": 1,
+          "from": "retain_until",
+          "kind": "fixed",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "submitted_at",
+        "perField": false,
+        "retention": {
+          "days": 1,
+          "from": "retain_until",
+          "kind": "fixed",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "tenant_id",
+        "perField": false,
+        "retention": {
+          "days": 1,
+          "from": "retain_until",
+          "kind": "fixed",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "updated_at",
+        "perField": false,
+        "retention": {
+          "days": 1,
+          "from": "retain_until",
+          "kind": "fixed",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "updated_by",
+        "perField": false,
+        "retention": {
+          "days": 1,
+          "from": "retain_until",
+          "kind": "fixed",
+        },
+        "sensitivity": "internal",
+      },
+    ],
+    "dataCategories": [
+      "identity",
+      "contact",
+      "online_identifiers",
+      "other",
+    ],
+    "dataSubjects": [
+      "applicant",
+      "visitor",
+    ],
+    "highestSensitivity": "special_category",
+    "legalBasis": "legitimate_interests",
+    "processors": [
+      "hosting",
+      "backup",
+    ],
+    "purpose": "form_responses",
+    "subjectPath": {
+      "column": "respondent_person_id",
+      "kind": "party",
+    },
+    "table": "forms.response",
+  },
+  {
     "article9Condition": "substantial_public_interest",
     "columns": [
       {
