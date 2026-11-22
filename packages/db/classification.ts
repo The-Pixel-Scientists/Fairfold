@@ -122,6 +122,7 @@ export const PROCESSING_PURPOSES = [
   'due_diligence',
   'sanctions_screening',
   'grant_monitoring',
+  'data_protection',
 ] as const;
 export type ProcessingPurpose = (typeof PROCESSING_PURPOSES)[number];
 
@@ -252,6 +253,7 @@ export const subjectPaths: SubjectPathRegistry = mergeSchemaMaps({
   grants: grantsFile.grantsSubjects,
   assure: assureFile.assureSubjects,
   crm: crmFile.crmSubjects,
+  privacy: privacyFile.privacySubjects,
   impact: impactFile.impactSubjects,
 });
 
