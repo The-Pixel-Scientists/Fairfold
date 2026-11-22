@@ -49,8 +49,10 @@ export type Conversion =
 const INDIVIDUAL = /individual|recipient ind\b/i;
 const HIDDEN = /[\p{Cc}\p{Cf}]/gu;
 
-/** Digits after the decimal point, as moneySchema's currencies use them. */
-const minorDigits = { GBP: 2 } as const satisfies Record<Currency, number>;
+/** Each currency's digits after the decimal point, and the amount pattern that allows them. */
+const minorUnits = {
+  GBP: { digits: 2, amount: /^([0-9]{1,13})(?:\.([0-9]{1,2}))?$/ },
+} as const satisfies Record<Currency, { digits: number; amount: RegExp }>;
 
 const fields: Readonly<Record<string, Column>> = {
   id: 'Grant reference',
@@ -162,8 +164,8 @@ function cellsByColumn(
 
 /** Pence from "2500.50", by string, never by floating-point arithmetic. */
 function amountMinor(text: string, currency: Currency): number | undefined {
-  const digits = minorDigits[currency];
-  const match = new RegExp(`^([0-9]{1,13})(?:\\.([0-9]{1,${digits}}))?$`).exec(text);
+  const { digits, amount } = minorUnits[currency];
+  const match = amount.exec(text);
   if (match === null) return undefined;
   const [, whole = '', fraction = ''] = match;
   return Number(whole) * 10 ** digits + Number(fraction.padEnd(digits, '0'));
