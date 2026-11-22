@@ -153,6 +153,17 @@ jobs:
           for app in console portal; do
             docker build --file infra/docker/web.Dockerfile --build-arg "APP=$app" --tag "$REGISTRY/$app:$TAG" .
           done
+      # For the licence inventory, installed before any credential exists.
+      # No dependency runs an install script (pnpm-workspace.yaml).
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - name: Install the licence check's dependencies
+        run: |
+          npm install --global --ignore-scripts corepack@0.36.0
+          corepack enable
+          pnpm install --frozen-lockfile
       # The OIDC token's audience is the provider; STS exchanges it for a
       # federated token, which may only impersonate the job's service account.
       - name: Sign in to Google Cloud as the publisher
@@ -210,6 +221,14 @@ jobs:
             "$RUNNER_TEMP/tools/cosign-linux-amd64" attest --yes --type cyclonedx \
               --predicate "$RUNNER_TEMP/sbom/$name.cdx.json" "$ref"
           done
+      # The Gate 1 licence inventory (ADR 0002), from these SBOMs and the
+      # licence check of this commit, uploaded with them. A shipped package
+      # that fails the policy, or an exception past its review, fails the
+      # job, so nothing is promoted.
+      - name: Build the licence inventory
+        run: |
+          pnpm check:licences --summary "$RUNNER_TEMP/sbom/licences.json"
+          node scripts/licence-inventory.ts --sbom "$RUNNER_TEMP/sbom" --out "$RUNNER_TEMP/sbom"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-sbom
