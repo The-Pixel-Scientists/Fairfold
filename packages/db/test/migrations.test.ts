@@ -126,6 +126,10 @@ describe('migrations', { timeout: 30_000 }, () => {
       // and their tests leave behind. Row-level security hides those rows
       // from migrator, so TRUNCATE them too.
       await sql`TRUNCATE app.tenant_module, app.config_version`.execute(trx);
+      // And 0021's while a membership holds a wave 1 role, which the wave 1
+      // seed's tests leave behind. Empty the memberships and every table
+      // that refers to them.
+      await sql`TRUNCATE app.membership CASCADE`.execute(trx);
       // And 0033's down refuses while a party is erased, which the erasure
       // tests leave behind. Erased parties cannot be changed back, so empty
       // the party tables and every table that refers to them.
