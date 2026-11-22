@@ -12,6 +12,13 @@ platform.membership.roles_changed: Membership roles changed
 platform.membership.suspended: Membership suspended
 platform.membership.reinstated: Membership reinstated
 platform.membership.removed: Membership removed
+platform.team.created: Team created
+platform.team.renamed: Team renamed
+platform.team.archived: Team archived
+platform.team_member.added: Team member added
+platform.team_member.removed: Team member removed
+platform.break_glass.opened: Emergency access opened
+platform.break_glass.reviewed: Emergency access reviewed
 platform.warehouse.exported: Warehouse exported
 platform.file.uploaded: File uploaded
 platform.file.refused: File refused

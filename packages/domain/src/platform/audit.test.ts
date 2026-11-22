@@ -54,6 +54,22 @@ describe('platform audit actions', () => {
     );
   });
 
+  it("record team changes, emergency access and its review, never restriction, which is each module's", () => {
+    expect(platformAuditActions).toEqual(
+      expect.arrayContaining([
+        'platform.team.created',
+        'platform.team.renamed',
+        'platform.team.archived',
+        'platform.team_member.added',
+        'platform.team_member.removed',
+        'platform.break_glass.opened',
+        'platform.break_glass.reviewed',
+      ]),
+    );
+    const access = platformAuditActions.filter((code) => /restrict|record_access/.test(code));
+    expect(access).toEqual([]);
+  });
+
   it('name their entity type', () => {
     expect(auditEntityType('platform.membership.suspended')).toBe('platform.membership');
     expect(auditEntityType('platform.auth.sign_in_failed')).toBe('platform.auth');

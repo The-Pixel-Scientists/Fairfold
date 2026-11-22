@@ -72,6 +72,16 @@ export const platformAuditActions = defineAuditActions('platform', [
   'platform.membership.suspended',
   'platform.membership.reinstated',
   'platform.membership.removed',
+  // Teams and emergency access to restricted records (ADR 0037). Values are
+  // ids and codes only: never a member's name, a reason's text or a
+  // record's content.
+  'platform.team.created',
+  'platform.team.renamed',
+  'platform.team.archived',
+  'platform.team_member.added',
+  'platform.team_member.removed',
+  'platform.break_glass.opened',
+  'platform.break_glass.reviewed',
   'platform.warehouse.exported',
   // A file stored clean, a file refused as infected or unchecked, and a staff
   // download (ADR 0047). Their values are ids, type, size and verdict, never
