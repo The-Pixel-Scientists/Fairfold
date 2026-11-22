@@ -11,7 +11,7 @@ import type pg from 'pg';
 
 import type { SeededTenant, Tenant } from '../../scenario.ts';
 
-/** A wave 1 tenant, with the tools its data is for. */
+/** A wave 1 tenant: its tools are switched on and have its data. */
 export interface Wave1Tenant extends Tenant {
   readonly tools: readonly SwitchableModuleId[];
 }

@@ -2,8 +2,7 @@
 //
 // The wave1 scenario, on top of configured, against the test database,
 // under slugs no earlier run has used. Each tenant has on exactly the tools
-// it lists, each switch with its configuration version and audit event
-// (failing until writeTenant() uses the audited operator switch, index.ts).
+// it lists, each switch with its configuration version and audit event.
 // Every row it writes sits in its own tenant, out of sight and out of reach
 // of the others' app_api; the monitoring answers count up to the designed cells and appear nowhere else;
 // the merge, lists, segment and screening runs are as designed, with no
@@ -79,9 +78,11 @@ describe('the wave1 scenario', { timeout: 60_000 }, () => {
         }>(
           `SELECT t.module,
                   EXISTS (SELECT 1 FROM app.config_version v
-                           WHERE v.entity_type = 'platform.module' AND v.entity_id = t.id) AS versioned,
+                           WHERE v.entity_type = 'platform.module' AND v.entity_id = t.id
+                             AND v.version = 1 AND v.author_kind = 'operator') AS versioned,
                   EXISTS (SELECT 1 FROM app.audit_event a
-                           WHERE a.action = 'platform.module.switched_on' AND a.entity_id = t.id) AS audited
+                           WHERE a.action = 'platform.module.switched_on' AND a.entity_id = t.id
+                             AND a.actor_kind = 'operator') AS audited
              FROM app.tenant_module t WHERE t.enabled ORDER BY t.module`,
         );
         return rows;

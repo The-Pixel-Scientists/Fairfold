@@ -1,15 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// The wave1 scenario's three tenants. `tools` says which parts/ files write
-// a tenant's rows. It is not yet the tenant's switches: writeTenant() turns
-// grants on and every other tool off in all three, unaudited (index.ts).
+// The wave1 scenario's three tenants. `tools` is both the tools switched on
+// and the parts/ files that write the tenant's rows.
 //
 // Linnetford has every wave 1 tool's data and a closed Neighbourhood Fund
 // with two rounds of submitted applications, 62 in Spring 2026 and 10 in
 // Summer 2026, for the equality monitoring cells in parts/monitoring.ts.
-// Crowmere has grants and nothing else. Sedgebrook has crm and assure data
-// and no programme; it is meant to have grants off, but until the switches
-// follow `tools` it has grants on and crm and assure off.
+// Crowmere has grants and nothing else. Sedgebrook has crm and assure, with
+// grants off and no programme.
 //
 // Every name comes from the hand-written lists in ../../names.ts, every
 // address ends in .example and every postcode is fictional

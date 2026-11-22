@@ -8,14 +8,9 @@
 // new ids. The seed prints how many rows it wrote of each table, and
 // nothing else about them.
 //
-// The switches do not yet follow each tenant's tools. writeTenant() inserts
-// app.tenant and app.tenant_module itself, turning grants on and every other
-// tool off in every tenant, with no configuration version or audit event.
-// So crm and assure rows sit in tenants where those tools are off, and
-// Sedgebrook has grants on. The integration test's switch check fails until
-// writeTenant() switches each tenant's tools through the audited operator
-// switch; app.create_tenant() with a tool list (S11-59) writes no version or
-// event, so it alone does not pass it.
+// writeTenant() switches on exactly each tenant's tools as the operator does
+// when it makes a tenant, each with its configuration version and audit
+// event, and leaves every other tool without a row, so off.
 
 import { readdirSync } from 'node:fs';
 

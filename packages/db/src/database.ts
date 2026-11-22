@@ -259,7 +259,7 @@ export function internalsOf(db: object): DatabaseInternals {
  * nothing, so the caller decides whether it goes back to the pool or is
  * closed.
  */
-export function kyselyOn<DB>(client: pg.PoolClient): Kysely<DB> {
+export function kyselyOn<DB>(client: pg.ClientBase): Kysely<DB> {
   const connection: PostgresPoolClient = {
     query: client.query.bind(client),
     release: () => undefined,

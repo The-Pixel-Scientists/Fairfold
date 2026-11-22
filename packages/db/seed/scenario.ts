@@ -5,10 +5,10 @@
 // forced row-level security binds like any app role (ADR 0003), so it sets
 // each tenant in turn and writes that tenant's rows, all in one transaction.
 // Actor columns stay null, as for anything the system does, except where the
-// schema needs a member: the administrator switches the tenant's tools, the
-// programme manager publishes forms, moves applications on, fills reviewer
-// pools and records decisions, and applicants start, check and submit their
-// own.
+// schema needs a member: the administrator switches the tenant's tools
+// (unless the tenant lists them, when the operator does), the programme
+// manager publishes forms, moves applications on, fills reviewer pools and
+// records decisions, and applicants start, check and submit their own.
 
 import { argon2Sync, randomBytes, randomUUID } from 'node:crypto';
 
@@ -18,8 +18,14 @@ import {
   switchableModuleIds,
   type Preset,
   type Role,
+  type SwitchableModuleId,
 } from '@pixel-scientists/domain/platform';
+import { configDiffSchemas } from '@pixel-scientists/domain/platform/settings';
+import type { Transaction } from 'kysely';
 import type pg from 'pg';
+
+import { insertAuditEvent } from '../src/audit.ts';
+import { kyselyOn } from '../src/database.ts';
 
 /** Given name, family name and role. The address is given.family@<slug>.example. */
 export type StaffMember = readonly [givenName: string, familyName: string, role: Role];
@@ -120,6 +126,13 @@ export interface Tenant {
    */
   readonly theme?: { readonly brandColour: string; readonly preset: Preset };
   readonly programmes?: readonly Programme[];
+  /**
+   * The tools the operator switches on when it makes the tenant, each with
+   * its version and event; every other tool has no row, so it is off. With
+   * no list, the administrator has grants on and every other tool off, as
+   * development data with neither (S11-59).
+   */
+  readonly tools?: readonly SwitchableModuleId[];
 }
 
 export type Scenario = readonly Tenant[];
@@ -281,17 +294,21 @@ export async function writeTenant(
     if (granted.includes('platform.settings.manage')) settingsManager ??= membership;
     if (MANAGER.every((permission) => granted.includes(permission))) manager ??= membership;
   }
-  // No tool is on without its row (ADR 0024): grants on, every wave 1 tool off.
+  // No tool is on without its row (ADR 0024).
   if (settingsManager === undefined) {
     throw new Error(`${tenant.slug} needs a member who manages settings to switch its tools.`);
   }
-  for (const module of switchableModuleIds) {
-    await insert('app.tenant_module', {
-      tenant_id: tenantId,
-      module,
-      enabled: module === 'grants',
-      updated_by: settingsManager,
-    });
+  if (tenant.tools) {
+    await switchOnAsOperator(client, insert, tenantId, tenant.tools);
+  } else {
+    for (const module of switchableModuleIds) {
+      await insert('app.tenant_module', {
+        tenant_id: tenantId,
+        module,
+        enabled: module === 'grants',
+        updated_by: settingsManager,
+      });
+    }
   }
   if (tenant.theme) {
     await insert('app.tenant_theme', {
@@ -305,6 +322,54 @@ export async function writeTenant(
     await writeProgramme({ ...writer, manager, staff }, programme);
   }
   return { id: tenantId, slug: tenant.slug, rows };
+}
+
+/**
+ * Switch on each of `tools` in the tenant set, as the operator's command does
+ * when it makes a tenant (apps/api/src/operator/switch-on.ts): a row with the
+ * operator as author, its first configuration version (rule 10) and a
+ * switched_on event through the one audit insert (rule 4).
+ */
+async function switchOnAsOperator(
+  client: pg.ClientBase,
+  insert: Insert,
+  tenantId: string,
+  tools: readonly SwitchableModuleId[],
+): Promise<void> {
+  // The caller's transaction, on this client, with the tenant set.
+  const trx = kyselyOn(client) as unknown as Transaction<unknown>;
+  const requestId = randomUUID();
+  const changes: unknown = configDiffSchemas['platform.module'].parse([
+    { field: 'enabled', from: false, to: true },
+  ]);
+  for (const module of tools) {
+    const id = await insert('app.tenant_module', {
+      tenant_id: tenantId,
+      module,
+      enabled: true,
+      updated_by_kind: 'operator',
+    });
+    await insert('app.config_version', {
+      tenant_id: tenantId,
+      entity_type: 'platform.module',
+      entity_id: id,
+      version: 1,
+      author_kind: 'operator',
+      diff: JSON.stringify({ changes }),
+    });
+    await insertAuditEvent(trx, {
+      requestId,
+      actorKind: 'operator',
+      actorId: null,
+      action: 'platform.module.switched_on',
+      entityType: 'platform.module',
+      entityId: id,
+      changes: {
+        'app.tenant_module.module': { after: module },
+        'app.tenant_module.enabled': { before: false, after: true },
+      },
+    });
+  }
 }
 
 /** The instant that a wall-clock time names in a time zone, as PostgreSQL reads it. */
