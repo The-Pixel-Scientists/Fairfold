@@ -154,6 +154,10 @@ describe('migrations', { timeout: 120_000 }, () => {
       await sql`TRUNCATE impact.framework, impact.outcome, impact.indicator, impact.target,
                          impact.result, impact.result_evidence,
                          impact.learning_note`.execute(trx);
+      // And 0080's down refuses while any insight table holds a row, which
+      // the insight tests leave behind.
+      await sql`TRUNCATE insight.report_definition, insight.disclosure_rule,
+                         insight.publication_run`.execute(trx);
       // And 0068's down cannot validate the outcome check while a reminder
       // template exists, which the reminder tests leave behind. Empty the
       // template versions and every table that refers to them.
