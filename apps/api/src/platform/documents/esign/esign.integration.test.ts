@@ -78,7 +78,12 @@ beforeAll(async () => {
   test = await startJobsTest();
   [a, b] = [await addFunder(), await addFunder()];
 }, 60_000);
-afterAll(() => stopJobsTest(test));
+afterAll(async () => {
+  await stopJobsTest(test);
+  await withClient('migrator', (client) =>
+    client.query("DELETE FROM pgboss.job WHERE name = 'platform.signature_send'"),
+  );
+});
 beforeEach(() => {
   fake = new FakeEsignProvider();
   stored = vi.fn();
