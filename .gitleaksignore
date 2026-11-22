@@ -8,3 +8,15 @@
 # before 93b4def marked them.
 ac28f036d77490e39c7cbe1b44597cebd3d97218:packages/db/test/idempotency/idempotency-key.test.ts:generic-api-key:67
 ac28f036d77490e39c7cbe1b44597cebd3d97218:packages/db/test/idempotency/idempotency-key.test.ts:generic-api-key:68
+#
+# The fixed example idempotency key (a version 4 UUID written for the tests)
+# in the public form tests, before their lines were marked.
+3e8d6033cf77669f15b7247d1e5b233c8640e70c:modules/forms/src/portal/PublicFormPage.test.tsx:generic-api-key:300
+3e8d6033cf77669f15b7247d1e5b233c8640e70c:modules/forms/src/portal/PublicFormPage.test.tsx:generic-api-key:318
+14046753b0539851488a0357647c416fc42e89bc:modules/forms/src/portal/problems.test.ts:generic-api-key:9
+#
+# The made-up unsubscribe token in the portal's unit and e2e tests, before its
+# lines were marked. It is base64 of "test-token-for-synthetic-data-only-0001"
+# and no key signed it.
+2e4ba53c3cdbaa8f05b75f44c77efd91bd3d8278:apps/portal/e2e/unsubscribe-api.ts:generic-api-key:6
+80b44c15e457a40e8b2b6bcd9c5b4fb4a9eb7e90:apps/portal/src/unsubscribe/unsubscribe.test.tsx:generic-api-key:13
