@@ -72,8 +72,6 @@ beforeAll(async () => {
   other = await createTestTenant();
 }, 60_000);
 
-type PoolClient = Parameters<typeof kyselyOn>[0];
-
 const caller = (member: string) => ({ membership: { id: member, permissions: new Set<never>() } });
 
 /** The labels a list returns for `member`, through the shared filter. */
@@ -115,7 +113,7 @@ describe('the reach predicate', { timeout: 60_000 }, () => {
   it('gives lists and detail routes the same answer for every member', async () => {
     await asMigratorRolledBack(async (client) => {
       await client.query(SCRATCH);
-      const db = kyselyOn<Scratch>(client as unknown as PoolClient);
+      const db = kyselyOn<Scratch>(client);
 
       await setTestTenant(client, other.id);
       const stranger = await addMember(client, other);
@@ -263,7 +261,7 @@ describe('the reach predicate', { timeout: 60_000 }, () => {
     await asMigratorRolledBack(async (client) => {
       await client.query(SCRATCH);
       await setTestTenant(client, tenant.id);
-      const db = kyselyOn<Scratch>(client as unknown as PoolClient);
+      const db = kyselyOn<Scratch>(client);
       const resolver = reachResolvers([descriptor]).reachable;
       const check = (params: unknown, record: string | undefined = 'cases.case') =>
         resolver?.({

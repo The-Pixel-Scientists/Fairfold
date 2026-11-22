@@ -146,9 +146,9 @@ describe('BreakGlassDialog', () => {
       expect(screen.getByRole('button', { name: 'Open record in an emergency' })).toBeTruthy();
     });
     expect(screen.queryByRole('status')).toBeNull();
-    expect(
-      (screen.getByRole('textbox', { name: /Explain why/ }) as HTMLTextAreaElement).value,
-    ).toBe('The named people cannot be reached.');
+    expect(screen.getByRole<HTMLTextAreaElement>('textbox', { name: /Explain why/ }).value).toBe(
+      'The named people cannot be reached.',
+    );
   });
 
   it('shows the words of a refusal in the summary, and keeps the dialog open', async () => {
