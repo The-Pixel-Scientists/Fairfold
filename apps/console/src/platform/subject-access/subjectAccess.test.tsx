@@ -243,7 +243,9 @@ describe('the export status page', () => {
       },
     });
     await screen.findByText('Your export is being made');
-    const live = screen.getAllByRole('status').find((node) => node.classList.contains('sr-only'));
+    const live = within(screen.getByRole('main'))
+      .getAllByRole('status')
+      .find((node) => node.classList.contains('sr-only'));
     expect(live?.textContent).toBe('');
 
     await vi.advanceTimersByTimeAsync(3100);
@@ -272,7 +274,9 @@ describe('the export status page', () => {
       },
     });
     await screen.findByText('Your export is being made');
-    const live = screen.getAllByRole('status').find((node) => node.classList.contains('sr-only'));
+    const live = within(screen.getByRole('main'))
+      .getAllByRole('status')
+      .find((node) => node.classList.contains('sr-only'));
 
     await vi.advanceTimersByTimeAsync(3100);
 
