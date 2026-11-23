@@ -149,7 +149,7 @@ test.describe('search', () => {
     const table = page.getByRole('table', { name: 'Search results' });
     await expect(table.getByRole('link', { name: 'Riverside Trust' })).toBeVisible();
     await expect(table.getByRole('link', { name: 'Sam Patel' })).toBeVisible();
-    await expect(table.getByText('Verified')).toBeVisible();
+    await expect(table.getByText('Verified', { exact: true })).toBeVisible();
     await expect(table.getByText('Unverified')).toBeVisible();
     await expect(page.getByRole('status').filter({ hasText: '3 results' })).toBeVisible();
 
@@ -182,7 +182,7 @@ test.describe('organisation', () => {
 
     await expect(page.getByRole('heading', { level: 1, name: 'Riverside Trust' })).toBeVisible();
     const identifiers = page.getByRole('table', { name: 'Identifiers' });
-    await expect(identifiers.getByText('Verified')).toBeVisible();
+    await expect(identifiers.getByText('Verified', { exact: true })).toBeVisible();
     await expect(identifiers.getByText('Unverified')).toBeVisible();
     await expect(page.getByRole('link', { name: 'Sam Patel' })).toHaveAttribute(
       'href',

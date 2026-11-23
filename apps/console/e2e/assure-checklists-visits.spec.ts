@@ -161,7 +161,7 @@ test.describe('checklists', () => {
     await page.goto('/northfield/assure/checklists/new');
 
     await page.getByLabel('Name').fill('Governance checks');
-    await page.getByLabel('Check').fill('Has a constitution');
+    await page.getByRole('textbox', { name: 'Check' }).fill('Has a constitution');
     await page.getByRole('button', { name: 'Review and create' }).click();
     await page.getByRole('button', { name: 'Create checklist' }).click();
 
@@ -290,7 +290,7 @@ test.describe('visits', () => {
     });
     await page.goto('/northfield/assure/visits/new');
 
-    await page.getByLabel('Organisation').fill('Riverside');
+    await page.getByRole('combobox', { name: 'Organisation' }).fill('Riverside');
     await page.getByRole('option', { name: /Riverside Lunch Club/ }).click();
     await page.getByLabel('Day').fill('30');
     await page.getByLabel('Month').fill('11');
@@ -299,7 +299,7 @@ test.describe('visits', () => {
     await page.getByLabel('Add an attendee').fill('Ada');
     await page.getByRole('option', { name: /Ada Example/ }).click();
     await expect(page.getByRole('button', { name: 'Remove Ada Example' })).toBeVisible();
-    await page.getByLabel(/Findings/).fill('Records in order.');
+    await page.getByRole('textbox', { name: /Findings/ }).fill('Records in order.');
     await page.getByRole('button', { name: 'Record visit' }).dblclick();
 
     await expect(page.getByText('Visit recorded')).toBeVisible();
@@ -317,11 +317,11 @@ test.describe('visits', () => {
   test('keeps the form and links to the field when the type is missing', async ({ page }) => {
     await stub(page);
     await page.goto('/northfield/assure/visits/new');
-    await page.getByLabel(/Findings/).fill('Records in order.');
+    await page.getByRole('textbox', { name: /Findings/ }).fill('Records in order.');
     await page.getByRole('button', { name: 'Record visit' }).click();
 
     await expect(page.getByRole('link', { name: /Choose how the visit took place/ })).toBeVisible();
-    await expect(page.getByLabel(/Findings/)).toHaveValue('Records in order.');
+    await expect(page.getByRole('textbox', { name: /Findings/ })).toHaveValue('Records in order.');
   });
 });
 

@@ -207,7 +207,7 @@ test.describe('forms: build, preview and publish', () => {
     const dialog = page.getByRole('dialog', { name: 'Publish version 1?' });
     await expect(dialog.getByText(/cannot be changed/)).toBeVisible();
     await dialog.getByRole('button', { name: 'Publish form' }).click();
-    await expect(page.getByText('Version 1 is published.')).toBeAttached();
+    await expect(page.getByText('Version 1 is published.', { exact: true })).toBeAttached();
     await expect(
       page.getByText(/Version 1 is published\. Publishing again makes version 2/),
     ).toBeVisible();
@@ -233,7 +233,7 @@ test.describe('forms: build, preview and publish', () => {
     await expect(
       page.getByRole('alert').getByRole('link', { name: /Section 1, question 1/ }),
     ).toBeVisible();
-    await expect(page.getByText(refusal, { exact: true })).toBeVisible();
+    await expect(page.getByRole('tabpanel').getByText(refusal)).toBeVisible();
   });
 
   test('starts from a feedback template and opens the new draft', async ({ page }) => {
