@@ -12,13 +12,27 @@ import { FORM_ID, stubPublicForm, SUBMITTED } from './forms-api.ts';
 
 const h1 = (page: Page, name: string) => page.getByRole('heading', { level: 1, name });
 
-/** The embed origin serves the embed entry at every address; here the entry is opened at its own file. */
+/**
+ * The embed origin serves the embed entry at every address. Here the form's
+ * address is answered with the entry's own file and headers, as that origin
+ * would answer it.
+ */
 async function openEmbed(page: Page) {
   await page.goto('/embed.html');
-  await page.evaluate((path) => {
-    window.history.replaceState(null, '', path);
-  }, `/northfield/forms/${FORM_ID}`);
-  await page.reload();
+  const entry = await page.evaluate(async () => {
+    const response = await fetch('/embed.html');
+    return { headers: [...response.headers], body: await response.text() };
+  });
+  // The body is read decoded, so the headers that describe its encoding go.
+  const headers = Object.fromEntries(
+    entry.headers.filter(([name]) => !/^content-(encoding|length)$/.test(name)),
+  );
+  const path = `/northfield/forms/${FORM_ID}`;
+  await page.route(
+    (url) => url.pathname === path,
+    (route) => route.fulfill({ status: 200, headers, body: entry.body }),
+  );
+  await page.goto(path);
 }
 
 test.describe('the embed entry', () => {
