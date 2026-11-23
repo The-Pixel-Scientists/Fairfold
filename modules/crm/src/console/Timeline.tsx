@@ -87,7 +87,7 @@ function Items({ partyId, first }: { partyId: string; first: TimelinePage }) {
   return (
     <>
       <DataTable
-        caption="Timeline"
+        caption="Timeline of this record"
         captionHidden
         columns={columns}
         rows={items}

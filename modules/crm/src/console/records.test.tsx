@@ -252,13 +252,13 @@ describe('organisation', () => {
     open(`/crm/organisations/${id(1)}`);
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Riverside Trust' })).toBeTruthy();
-    const identifiers = screen.getByRole('table', { name: 'Identifiers' });
+    const identifiers = screen.getByRole('table', { name: 'Identifiers of this organisation' });
     expect(within(identifiers).getByText('Verified')).toBeTruthy();
     expect(within(identifiers).getByText('Unverified')).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Sam Patel' }).getAttribute('href')).toBe(
       `/crm/people/${id(2)}`,
     );
-    const timelineTable = await screen.findByRole('table', { name: 'Timeline' });
+    const timelineTable = await screen.findByRole('table', { name: 'Timeline of this record' });
     expect(within(timelineTable).getByText('Application submitted')).toBeTruthy();
     expect(within(timelineTable).queryByRole('link')).toBeNull();
     expect(screen.queryByRole('heading', { name: 'Value history' })).toBeNull();

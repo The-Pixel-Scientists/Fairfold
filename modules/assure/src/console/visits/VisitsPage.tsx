@@ -65,7 +65,7 @@ function List({ first: page }: { first: Page }) {
             key={visit.id}
             className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-lg border border-divider p-3"
           >
-            <div className="flex min-w-0 flex-col">
+            <div className="flex min-w-0 flex-col gap-1.5">
               <Link to={visitPath(visit.id)} className="font-medium">
                 {`${formatDay(visit.visitedOn)}, ${visitTypeWords[visit.type].toLowerCase()}`}
               </Link>

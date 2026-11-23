@@ -133,7 +133,7 @@ function TeamsView() {
                 </p>
               </EmptyState>
             ) : (
-              <section aria-label="Teams" className="flex flex-col gap-3">
+              <div className="flex flex-col gap-3">
                 {hasArchived && (
                   <Checkbox
                     label="Show archived teams"
@@ -153,7 +153,7 @@ function TeamsView() {
                     </p>
                   }
                 />
-              </section>
+              </div>
             )}
             {open?.kind === 'create' && <NameDialog {...common} />}
             {open?.kind === 'rename' && <NameDialog {...common} team={open.team} />}
