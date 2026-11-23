@@ -5,6 +5,7 @@
 // search is one line. Every provider is checked when the handler is made, so
 // the API does not start with one that breaks the rules.
 
+import { grantsSearch } from '@pixel-scientists/grants/server';
 import { partySearch } from '@pixel-scientists/party/server';
 import { checkSearchProvider, type searchTerm } from '@pixel-scientists/domain/platform/search';
 
@@ -13,7 +14,7 @@ import { runSearch, type SearchEntry } from './runner.ts';
 
 export { runSearch, SEARCH_TOTAL_LIMIT, type SearchEntry, type SearchRun } from './runner.ts';
 
-export const searchEntries: readonly SearchEntry[] = [...partySearch];
+export const searchEntries: readonly SearchEntry[] = [...partySearch, ...grantsSearch];
 
 export function searchHandler(
   entries: readonly SearchEntry[] = searchEntries,

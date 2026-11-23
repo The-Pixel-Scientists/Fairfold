@@ -24,6 +24,10 @@ const sources: Record<string, Record<string, string>> = {
     family_name: 'party.person.family_name',
     email: 'party.person.email',
   },
+  'grants.application': {
+    organisation_name: 'party.organisation.name',
+    organisation_identifier: 'party.organisation_identifier.identifier',
+  },
 };
 
 const rank = (level: Sensitivity): number => SENSITIVITIES.indexOf(level);

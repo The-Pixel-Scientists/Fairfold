@@ -50,6 +50,7 @@ export {
 export { sendTemplateEmail, type SendChecked, type TemplateEmail } from './email/index.ts';
 export { readApplicantContact, type ApplicantContact } from './applicant-contact.ts';
 export { grantsSubjectRules } from './audit.ts';
+export { grantsSearch } from './search/index.ts';
 // For a module that keeps a programme's id, such as impact: whether the tenant has the programme.
 export { programmeExists } from './programme/read.ts';
 export { monitoringCounts, type MonitoringCounts } from './monitoring/aggregate.ts';
