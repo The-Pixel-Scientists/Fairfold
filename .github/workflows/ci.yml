@@ -155,7 +155,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3, 4, 5, 6]
     container:
       image: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
       options: --ipc=host
@@ -268,7 +268,8 @@ jobs:
               --volume "$HOME/.tps:/root/.tps:ro" \
               --env CI --env TPS_E2E_STACK=1 --env-file "$RUNNER_TEMP/e2e-manager" \
               "$PLAYWRIGHT_IMAGE" \
-              node node_modules/@playwright/test/cli.js test "$@"
+              node node_modules/@playwright/test/cli.js test "$@" 2>&1 |
+              tee -a "$RUNNER_TEMP/specs.log"
           }
           pnpm stack seed "$SCENARIO"
           TPS_SEED_PASSWORD_FILE="$HOME/.tps/stack/$project/TPS_STACK_SEED_PASSWORD" \
@@ -325,6 +326,12 @@ jobs:
       - name: Show the stack's logs
         if: failure()
         run: pnpm stack logs
+      # The stack's logs are long, so what the specs reported is printed
+      # again after them: the failures are then the end of the job's log.
+      - name: Show the end of the specs' output again
+        if: failure()
+        run: |
+          if [ -f "$RUNNER_TEMP/specs.log" ]; then tail -n 400 "$RUNNER_TEMP/specs.log"; fi
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure()
         with:
