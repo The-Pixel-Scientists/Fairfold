@@ -34,22 +34,23 @@ test.describe('the emergency access page', () => {
   });
 
   test('shows why the list did not load, and tries again', async ({ page }) => {
-    let calls = 0;
+    // Busy until the member tries again, however often the page reads: the
+    // development server runs each effect twice.
+    let busy = true;
     await stubSignedIn(
       page,
       { permissions: allowed },
       {
-        'GET /console/break-glass': () => {
-          calls += 1;
-          return calls === 1
+        'GET /console/break-glass': () =>
+          busy
             ? problem(503, 'The service is busy. Try again in a minute.')
-            : { status: 200, body: { grants: [] } };
-        },
+            : { status: 200, body: { grants: [] } },
       },
     );
     await page.goto('/northfield/emergency-access');
 
     await expect(page.getByText('The service is busy. Try again in a minute.')).toBeVisible();
+    busy = false;
     await page.getByRole('button', { name: 'Try again' }).click();
     await expect(page.getByRole('heading', { name: 'No emergency access is open' })).toBeVisible();
   });

@@ -27,13 +27,16 @@ test.describe('unsubscribe', () => {
     const sent = await open(page, { [GET]: target, [POST]: outcome('unsubscribed') });
 
     await expect(h1(page, 'Stop emails about future funding')).toBeVisible();
-    expect(sent.map(({ key }) => key)).toEqual([GET]);
+    // The development server runs each effect twice, so the read may be sent twice there.
+    expect(new Set(sent.map(({ key }) => key))).toEqual(new Set([GET]));
 
     await button(page).click();
     await expect(h1(page, 'You have unsubscribed')).toBeFocused();
     await expect(page.getByText(CONFIRMED)).toBeVisible();
-    expect(sent.map(({ key }) => key)).toEqual([GET, POST]);
-    expect(sent[1]?.body).toEqual({ 'List-Unsubscribe': 'One-Click' });
+    const posts = sent.filter(({ key }) => key === POST);
+    expect(posts).toHaveLength(1);
+    expect(posts[0]?.body).toEqual({ 'List-Unsubscribe': 'One-Click' });
+    expect(new Set(sent.map(({ key }) => key))).toEqual(new Set([GET, POST]));
   });
 
   test('already withdrawn gets the same calm message', async ({ page }) => {

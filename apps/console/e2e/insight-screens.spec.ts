@@ -238,14 +238,16 @@ test.describe('insight publication runs', () => {
   test('prepares a run, sees it become ready, downloads it and records the submission', async ({
     page,
   }) => {
-    let reads = 0;
+    // Still preparing until the member checks again, however often the page
+    // reads: the development server runs each effect twice.
+    let prepared = false;
     const state = await stub(page, {
       'POST /console/publication-runs': {
         status: 201,
         body: { ...run, state: 'preparing', outputFileId: null },
       },
       [`GET /console/publication-runs/${RUN}`]: () =>
-        ok((reads += 1) === 1 ? { ...run, state: 'preparing', outputFileId: null } : run),
+        ok(prepared ? run : { ...run, state: 'preparing', outputFileId: null }),
       [`POST /console/publication-runs/${RUN}/mark-submitted`]: () =>
         state.recent
           ? ok({ ...run, state: 'submitted', submittedByMembershipId: ME, submittedAt: now })
@@ -262,6 +264,7 @@ test.describe('insight publication runs', () => {
     await page.getByRole('button', { name: 'Prepare a run' }).click();
 
     await expect(page.getByText('This can take a few minutes')).toBeVisible();
+    prepared = true;
     await page.getByRole('button', { name: 'Check again' }).click();
     await expect(page.getByRole('status').filter({ hasText: 'Ready to review' })).toBeVisible();
     const download = page.getByRole('link', { name: 'Download file' });

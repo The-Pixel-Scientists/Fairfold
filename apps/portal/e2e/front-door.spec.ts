@@ -51,7 +51,8 @@ test.describe('the front door', () => {
   test('opens a tool only when its address is opened', async ({ page }) => {
     const chunks: string[] = [];
     page.on('request', (request) => {
-      if (/grants.*portal|portal\/index/.test(request.url())) chunks.push(request.url());
+      // The grants tool's own code: other modules' portal entries are part of the portal itself.
+      if (/\/grants\/.*portal|grants[^/]*portal/i.test(request.url())) chunks.push(request.url());
     });
     await open(page, ['grants']);
     await page.goto('/northfield/');
