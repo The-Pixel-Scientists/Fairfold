@@ -37,6 +37,12 @@ export interface ComboboxProps {
   onSelect: (optionId: string) => void;
   /** For moving focus into the box from elsewhere. */
   inputRef?: Ref<HTMLInputElement>;
+  /**
+   * For a page header, where there is one line of room. The label shows
+   * inside the empty box, the label and hint are still read out, and the
+   * status line floats under the box when there is no list to show.
+   */
+  compact?: boolean;
 }
 
 /**
@@ -55,6 +61,7 @@ export function Combobox({
   status,
   onSelect,
   inputRef,
+  compact = false,
 }: ComboboxProps) {
   const base = useId();
   const [open, setOpen] = useState(false);
@@ -152,12 +159,15 @@ export function Combobox({
   let index = 0;
 
   return (
-    <div ref={root} className="relative flex min-w-0 flex-col gap-1">
-      <label htmlFor={`${base}-input`} className="text-body font-medium text-ink">
+    <div ref={root} className={cx('relative flex min-w-0 flex-col', !compact && 'gap-1')}>
+      <label
+        htmlFor={`${base}-input`}
+        className={compact ? 'sr-only' : 'text-body font-medium text-ink'}
+      >
         {label}
       </label>
       {hint && (
-        <p id={hintId} className="text-body text-muted">
+        <p id={hintId} className={compact ? 'sr-only' : 'text-body text-muted'}>
           {hint}
         </p>
       )}
@@ -172,6 +182,7 @@ export function Combobox({
         aria-describedby={hint ? hintId : undefined}
         autoComplete="off"
         spellCheck={false}
+        placeholder={compact ? label : undefined}
         value={value}
         onChange={(event) => {
           setOpen(true);
@@ -234,7 +245,17 @@ export function Combobox({
           );
         })}
       </div>
-      <p role="status" className="min-h-6 text-body text-muted">
+      <p
+        role="status"
+        className={cx(
+          'text-body text-muted',
+          !compact && 'min-h-6',
+          compact &&
+            (status && !visible
+              ? 'absolute top-full z-20 mt-1 w-full min-w-48 rounded-md border border-edge bg-surface px-3 py-2 shadow-lg'
+              : 'sr-only'),
+        )}
+      >
         {status}
       </p>
     </div>

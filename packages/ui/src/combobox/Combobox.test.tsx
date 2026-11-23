@@ -130,6 +130,16 @@ describe('Combobox', () => {
     expect(box().getAttribute('aria-expanded')).toBe('false');
   });
 
+  it('keeps its label and hint for screen readers when compact', () => {
+    render(<Example compact status="No matches" />);
+    const input = screen.getByRole('combobox', { name: 'Search' });
+    expect(input.getAttribute('placeholder')).toBe('Search');
+    expect(input.getAttribute('aria-describedby')).toBe(screen.getByText('Press Ctrl+K').id);
+    expect(screen.getByText('Search', { selector: 'label' }).className).toBe('sr-only');
+    expect(screen.getByText('Press Ctrl+K').className).toBe('sr-only');
+    expect(screen.getByRole('status').textContent).toBe('No matches');
+  });
+
   it('says what is loading and what the status is', () => {
     render(<Example loading status="3 results in 2 tools" />);
     expect(screen.getByRole('status').textContent).toBe('3 results in 2 tools');
