@@ -3,9 +3,12 @@
 // The crm module's staff screens: search, organisation and person records.
 // The console opens `/crm` with the default export, a page that loads when
 // someone first opens the section; `crmConsoleRoutes` adds the pages under it.
+// The console reads the routes as it starts, so nothing here loads a page
+// before it is opened.
 
 import { idSchema } from '@pixel-scientists/domain';
 import type { Params, RouteDefinition, SearchSchema } from '@pixel-scientists/ui';
+import { lazy } from 'react';
 
 /** Only real ids are the addresses of records, so typing mistakes never reach the API. */
 const ids: SearchSchema<Params> = {
@@ -73,4 +76,4 @@ export const crmConsoleRoutes: readonly RouteDefinition[] = [
   },
 ];
 
-export { default } from './Landing.tsx';
+export default lazy(() => import('./Landing.tsx'));

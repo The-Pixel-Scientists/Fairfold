@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { assureConsoleRoutes } from '@pixel-scientists/assure/console';
+import { crmConsoleRoutes } from '@pixel-scientists/crm/console';
 import { emailChangeLinkPath } from '@pixel-scientists/domain/auth';
+import { formsRoutes } from '@pixel-scientists/forms/console';
 import { grantsRoutes } from '@pixel-scientists/grants/console';
 import { impactConsoleRoutes } from '@pixel-scientists/impact/console';
 import { AppShell, NotFoundPage, Router, SessionProvider } from '@pixel-scientists/ui';
@@ -39,7 +41,7 @@ import {
 } from './platform/team/paths.ts';
 import { productName, titleSuffix } from './product.ts';
 import { memberRoutes } from './shell/memberRoutes.tsx';
-import { moduleRoutes } from './shell/moduleRoutes.tsx';
+import { moduleRoutes, toolRoutes } from './shell/moduleRoutes.tsx';
 import { TenantProvider, tenantSlugOf } from './tenant.ts';
 
 /**
@@ -64,7 +66,9 @@ export const topLevelRoutes: readonly RouteDefinition[] = [
 export const tenantRoutes: readonly RouteDefinition[] = [
   ...memberRoutes([
     ...grantsRoutes,
+    ...toolRoutes('crm', crmConsoleRoutes),
     ...assureConsoleRoutes,
+    ...toolRoutes('forms', formsRoutes),
     ...impactConsoleRoutes,
     {
       path: ACCOUNT_SECURITY_PATH,

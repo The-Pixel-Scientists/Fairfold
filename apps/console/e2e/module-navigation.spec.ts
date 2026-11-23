@@ -13,6 +13,14 @@ import { expectNoHorizontalScroll, expectNoViolations, widths } from './auth-axe
 
 const tools = ['crm', 'assure', 'forms', 'privacy', 'insight'];
 const sections = ['Programmes', 'CRM', 'Due Diligence', 'Forms', 'Data Protection', 'Reporting'];
+/** The heading of the page each tool's section opens. */
+const landings: Record<string, string> = {
+  CRM: 'Organisations and people',
+  'Due Diligence': 'Possible matches',
+  Forms: 'Forms',
+  'Data Protection': 'Data protection requests',
+  Reporting: 'Reports',
+};
 const permissions = [
   'grants.programmes.manage',
   'crm.records.read',
@@ -88,7 +96,7 @@ test.describe('module navigation', () => {
 
     await navigation(page).getByRole('link', { name: 'CRM' }).click();
 
-    await expect(page.getByRole('heading', { level: 1, name: 'CRM' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: landings['CRM'] })).toBeVisible();
     expect(requested.length).toBeGreaterThan(0);
   });
 
@@ -102,7 +110,7 @@ test.describe('module navigation', () => {
       for (let step = sections.indexOf(name); step > 0; step -= 1) await page.keyboard.press('Tab');
       await expect(navigation(page).getByRole('link', { name })).toBeFocused();
       await page.keyboard.press('Enter');
-      await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
+      await expect(page.getByRole('heading', { level: 1, name: landings[name] })).toBeVisible();
       await expect(navigation(page).getByRole('link', { name })).toHaveAttribute(
         'aria-current',
         'page',
@@ -115,7 +123,7 @@ test.describe('module navigation', () => {
     for (const { viewport } of widths) {
       await page.setViewportSize(viewport);
       await page.goto('/northfield/crm');
-      await expect(page.getByRole('heading', { level: 1, name: 'CRM' })).toBeVisible();
+      await expect(page.getByRole('heading', { level: 1, name: landings['CRM'] })).toBeVisible();
       await expect(navigation(page).getByRole('link', { name: 'CRM' })).toHaveAttribute(
         'aria-current',
         'page',

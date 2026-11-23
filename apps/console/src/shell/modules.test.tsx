@@ -3,6 +3,7 @@
 import { moduleIds, switchableModuleIds } from '@pixel-scientists/domain/platform';
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { lazy } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { consoleModules } from '../modules.ts';
@@ -10,11 +11,25 @@ import { consoleSession, stubApi } from '../testing/api.ts';
 import { expectTitle, openConsole, setUpConsoleTests } from '../testing/render.tsx';
 import { moduleItem, visibleItems } from './navigation.ts';
 
-const crmPage = vi.hoisted(() => ({ loaded: vi.fn() }));
-vi.mock('@pixel-scientists/crm/console', () => {
-  crmPage.loaded();
-  return { default: () => <h1>CRM records</h1> };
-});
+const crmPage = vi.hoisted(() => ({ loaded: vi.fn(), listsLoaded: vi.fn() }));
+// The console reads the tool's routes as it starts; its landing page is the
+// code that must wait until someone opens the section.
+vi.mock('@pixel-scientists/crm/console', () => ({
+  crmConsoleRoutes: [
+    {
+      path: '/crm/lists',
+      title: 'Lists',
+      load: () => {
+        crmPage.listsLoaded();
+        return Promise.resolve({ default: () => <h1>CRM lists</h1> });
+      },
+    },
+  ],
+  default: lazy(() => {
+    crmPage.loaded();
+    return Promise.resolve({ default: () => <h1>CRM records</h1> });
+  }),
+}));
 
 setUpConsoleTests();
 
@@ -104,6 +119,31 @@ describe('a tool in the console', () => {
   it('shows the not-found page when the member holds none of the tool permissions', async () => {
     stubApi(member(['grants', 'crm'], ['grants.programmes.manage']));
     openConsole('/northfield/crm');
+
+    await screen.findByRole('heading', { level: 1, name: 'Page not found' });
+  });
+
+  it('opens a page under the tool when the tool is on and permitted', async () => {
+    stubApi(member(['grants', 'crm'], ['grants.programmes.manage', 'crm.records.read']));
+    openConsole('/northfield/crm/lists');
+
+    await screen.findByRole('heading', { level: 1, name: 'CRM lists' });
+    await expectTitle('Lists – Fairfold Grants console');
+  });
+
+  it('shows the not-found page for a page under the tool, and does not fetch it, when the tool is off', async () => {
+    crmPage.listsLoaded.mockClear();
+    stubApi(member(['grants'], ['grants.programmes.manage', 'crm.records.read']));
+    openConsole('/northfield/crm/lists');
+
+    await screen.findByRole('heading', { level: 1, name: 'Page not found' });
+    await expectTitle('Page not found – Fairfold Grants console');
+    expect(crmPage.listsLoaded).not.toHaveBeenCalled();
+  });
+
+  it('shows the not-found page for a page under the tool to a member without its permissions', async () => {
+    stubApi(member(['grants', 'crm'], ['grants.programmes.manage']));
+    openConsole('/northfield/crm/lists');
 
     await screen.findByRole('heading', { level: 1, name: 'Page not found' });
   });
