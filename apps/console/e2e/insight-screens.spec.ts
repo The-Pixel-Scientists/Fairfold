@@ -218,19 +218,19 @@ test.describe('insight disclosure rule', () => {
     });
     await open(page, '?view=disclosure');
     await page.getByRole('button', { name: 'Change threshold' }).click();
-    await page.getByLabel('Threshold', { exact: false }).first().fill('5');
+    await page.getByRole('textbox', { name: 'Threshold', exact: true }).fill('5');
     await page.getByRole('button', { name: 'Save threshold' }).click();
     await expect(page.getByRole('alert', { name: 'There is a problem' })).toContainText(
       'Enter a threshold of 10 or more.',
     );
     expect(state.sent.some(({ key }) => key.startsWith('PUT'))).toBe(false);
 
-    await page.getByLabel('Threshold', { exact: false }).first().fill('12');
+    await page.getByRole('textbox', { name: 'Threshold', exact: true }).fill('12');
     await page.getByRole('button', { name: 'Save threshold' }).click();
     await confirmItsYou(page);
 
     await expect(page.getByText('Fewer than 12 people are hidden')).toBeVisible();
-    await expect(page.getByText('Version')).toBeVisible();
+    await expect(page.getByText('Version', { exact: true })).toBeVisible();
   });
 });
 
@@ -300,7 +300,7 @@ test.describe('insight data contracts', () => {
   test('lists each module, then its tables and columns with their class', async ({ page }) => {
     await stub(page);
     await open(page, '?view=contracts');
-    await page.getByRole('link', { name: 'Grants' }).click();
+    await page.getByRole('link', { name: 'Grants', exact: true }).click();
 
     await h1(page, 'Grants data contract').waitFor();
     await expect(page.getByRole('cell', { name: 'Public' })).toBeVisible();

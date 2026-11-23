@@ -117,8 +117,8 @@ export async function stubImpact(
       targets.push(target);
       return created(target);
     },
-    [`GET /console/indicator-results?frameworkId=${frameworkId}`]: () =>
-      ok({ results, nextCursor: null }),
+    // Keyed by path alone, as every stubbed answer is; the framework is in the query.
+    'GET /console/indicator-results': () => ok({ results, nextCursor: null }),
     'POST /console/indicator-results': (body) => {
       const { note, evidence, ...rest } = body as Body & { note: string; evidence: unknown[] };
       const result = {

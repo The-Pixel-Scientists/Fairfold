@@ -25,6 +25,8 @@ const permissions = [
   'grants.programmes.manage',
   'crm.records.read',
   'assure.lookup.read',
+  // The landing page of due diligence is the screening queue, which has its own permission.
+  'assure.screening.read',
   'forms.forms.manage',
   'privacy.requests.manage',
   'insight.reports.read',
@@ -37,6 +39,11 @@ async function openAs(page: Page, modules: string[], held = permissions) {
       body: { ...consoleSession({ permissions: held }), modules },
     },
     'GET /console/programmes': { status: 200, body: { programmes: [] } },
+    // What each tool's landing page reads, so a section opens on an empty list.
+    'GET /console/screening-matches': { status: 200, body: { matches: [], nextCursor: null } },
+    'GET /console/forms': { status: 200, body: { forms: [], nextCursor: null } },
+    'GET /console/rights-requests': { status: 200, body: { requests: [], nextCursor: null } },
+    'GET /console/reports': { status: 200, body: { reports: [] } },
   });
 }
 

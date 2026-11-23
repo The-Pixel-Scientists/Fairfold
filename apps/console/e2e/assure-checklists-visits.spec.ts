@@ -277,7 +277,11 @@ test.describe('visits', () => {
         'POST /console/visits': {
           status: 201,
           body: {
-            ...summary,
+            id: visit,
+            organisationId: organisation,
+            applicationId: null,
+            visitedOn: summary.visitedOn,
+            type: summary.type,
             attendeePersonIds: [person],
             findings: 'Records in order.',
             followUps: [],
@@ -296,7 +300,7 @@ test.describe('visits', () => {
     await page.getByLabel('Month').fill('11');
     await page.getByLabel('Year').fill('2026');
     await page.getByLabel('In person').check();
-    await page.getByLabel('Add an attendee').fill('Ada');
+    await page.getByRole('combobox', { name: 'Add an attendee' }).fill('Ada');
     await page.getByRole('option', { name: /Ada Example/ }).click();
     await expect(page.getByRole('button', { name: 'Remove Ada Example' })).toBeVisible();
     await page.getByRole('textbox', { name: /Findings/ }).fill('Records in order.');
