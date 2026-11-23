@@ -80,9 +80,13 @@ function retryFirstNavigation(page: Page): void {
     } catch (error) {
       if (!(error instanceof errors.TimeoutError)) throw error;
       // The page has moved on, so the navigation arrived and only its report
-      // was lost. Sending it again could differ only by the fragment, a
-      // same-document navigation Firefox never reports: wait for the load.
-      if (page.url() !== 'about:blank') {
+      // was lost. An address with a fragment is not sent again: the app may
+      // have cleared the fragment, and the second navigation would then
+      // differ only by it, a same-document navigation Firefox never reports.
+      // Wait for the load instead. Any other address is sent again, as a
+      // whole navigation, because the lost report can leave Playwright
+      // waiting for the first one to finish.
+      if (page.url() !== 'about:blank' && new URL(url, page.url()).hash !== '') {
         const state = options?.waitUntil ?? 'load';
         if (state !== 'commit') await page.waitForLoadState(state, { timeout: options?.timeout });
         return null;
