@@ -11,6 +11,11 @@ const can: Partial<Record<Role, string>> = {
     'Sets up programmes and rounds, assigns reviewers, records decisions and releases them.',
   reviewer:
     'Scores the applications assigned to them. Reviews are blind, so they never see applicant names.',
+  due_diligence_officer:
+    'Looks organisations up on the registers, runs sanctions screening and completes due diligence checklists and visits.',
+  data_protection_lead:
+    'Discloses equality monitoring answers when a person asks for their own data. Takes no part in assessing or deciding.',
+  analyst: 'Builds and reads reports and prepares figures for publication.',
 };
 
 /** The roles a team member can hold, in the order the domain package lists them. */
