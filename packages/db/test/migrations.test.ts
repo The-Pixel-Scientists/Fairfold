@@ -154,20 +154,20 @@ describe('migrations', { timeout: 300_000 }, () => {
       // which the crm retention tests leave behind; row-level security hides
       // the settings from migrator.
       await sql`TRUNCATE app.retention_policy`.execute(trx);
-      // And 0063's down refuses while any crm table holds a row, which the
-      // crm tests leave behind.
+      // And 0063's and 0109's downs refuse while a crm table holds a row,
+      // which the crm tests leave behind.
       await sql`TRUNCATE crm.list, crm.list_member, crm.segment, crm.interaction,
                          crm.merge_record, crm.import_job, crm.import_row,
-                         crm.external_reference`.execute(trx);
+                         crm.external_reference, crm.duplicate_dismissal`.execute(trx);
       // And 0067's down refuses while any impact table holds a row, which
       // the impact tests leave behind.
       await sql`TRUNCATE impact.framework, impact.outcome, impact.indicator, impact.target,
                          impact.result, impact.result_evidence,
                          impact.learning_note`.execute(trx);
-      // And 0080's down refuses while any insight table holds a row, which
-      // the insight tests leave behind.
+      // And 0080's and 0111's downs refuse while an insight table holds a
+      // row, which the insight tests leave behind.
       await sql`TRUNCATE insight.report_definition, insight.disclosure_rule,
-                         insight.publication_run`.execute(trx);
+                         insight.publication_run, insight.report_run`.execute(trx);
       // And 0089 to 0091's downs refuse while any privacy table holds a row,
       // which the privacy tests leave behind. Requests went with party.
       await sql`TRUNCATE privacy.breach, privacy.breach_assessment, privacy.processing_activity,

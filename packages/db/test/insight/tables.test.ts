@@ -59,8 +59,9 @@ async function ownTenant(): Promise<{ own: TestTenant; member: string }> {
 describe('insight grants', () => {
   const rights = (role: string, privilege: string, table: string, columns: readonly string[]) =>
     columns.map((column) => `${role} ${privilege} ${table}.${column}`);
+  // Only app_api, where the disclosure engine runs, reads the run log (ADR 0032).
   const reads = Object.entries(insight).flatMap(([table, columns]) =>
-    ['app_api', 'app_worker'].flatMap((role) =>
+    (table === 'insight.report_run' ? ['app_api'] : ['app_api', 'app_worker']).flatMap((role) =>
       rights(role, 'SELECT', table, Object.keys(columns)),
     ),
   );
@@ -102,6 +103,24 @@ describe('insight grants', () => {
       'prepared_by',
     ]),
     ...rights('app_api', 'UPDATE', 'insight.publication_run', ['state', 'submitted_by']),
+    ...rights('app_api', 'INSERT', 'insight.report_run', [
+      'tenant_id',
+      'report_id',
+      'report_version',
+      'kind',
+      'outcome',
+      'disclosure_rule_version',
+      'question',
+      'breakdown',
+      'filter_field',
+      'filter_id',
+      'filter_year',
+      'round_ids',
+      'population',
+      'shown_table',
+      'created_by',
+      'updated_by',
+    ]),
     ...rights('app_worker', 'UPDATE', 'insight.publication_run', [
       'state',
       'output_file_id',
