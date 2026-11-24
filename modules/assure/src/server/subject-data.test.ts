@@ -30,7 +30,8 @@ describe('assure subject data', () => {
     '%s reaches the subject as the map says',
     (table, listed) => {
       const path = subjectPaths[table];
-      expect(path).toMatchObject({ column: listed.column });
+      if (path?.kind === 'parties') expect(path.columns).toEqual(listed.column);
+      else expect(path).toMatchObject({ column: listed.column });
       if (path?.kind === 'join') expect(path.table).toBe(listed.parent);
     },
   );
