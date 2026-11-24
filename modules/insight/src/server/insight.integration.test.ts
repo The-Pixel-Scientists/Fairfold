@@ -29,7 +29,7 @@ import {
   monitoringReportSchema,
   type ReportDefinitionInput,
 } from '../contracts/index.ts';
-import type { InsightContext, MonitoringCounts, Tx } from './context.ts';
+import type { InsightContext, MonitoringCounts, Tx, WarehouseRead } from './context.ts';
 import { insightHandlers } from './index.ts';
 import { serverRefusals } from './messages.ts';
 import { insightRefusals } from '../contracts/index.ts';
@@ -46,12 +46,20 @@ class Refused extends Error {
 let answer: MonitoringCounts;
 const asked: unknown[][] = [];
 
+/** What the stand-in for the warehouse answers, and the tables it was asked for. */
+let warehouse: WarehouseRead = { status: 'unavailable' };
+const tablesAsked: string[] = [];
+
 const handlers = insightHandlers({
   notFound: () => new Refused(404, 'Not found'),
   refuse: (status, detail) => new Refused(status, detail),
   monitoringCounts: (_tx, roundIds) => {
     asked.push([...roundIds]);
     return Promise.resolve(answer);
+  },
+  warehouseRows: (_tx, table) => {
+    tablesAsked.push(table);
+    return Promise.resolve(warehouse);
   },
 });
 
@@ -75,8 +83,9 @@ interface Recorded {
 }
 
 /** A request's context that keeps what a handler wrote, after checking it as the platform would. */
-function request(who: Staff): { context: InsightContext; wrote: Recorded } {
+function request(who: Staff) {
   const wrote: Recorded = { audit: [], config: [] };
+  const after: (() => Promise<void>)[] = [];
   const context: InsightContext = {
     audit: {
       record: (event) => {
@@ -100,8 +109,11 @@ function request(who: Staff): { context: InsightContext; wrote: Recorded } {
     },
     membership: { id: who.member },
     requestId: randomUUID(),
+    afterCommit: (work) => {
+      after.push(work);
+    },
   };
-  return { context, wrote };
+  return { context, wrote, after };
 }
 
 const inTenant = <T>(who: Staff, work: (tx: Tx) => Promise<T>): Promise<T> =>
@@ -112,12 +124,12 @@ const asMigrator = <T>(who: Staff, sql: string, values: unknown[] = []) =>
 
 /** Calls a handler as `who`, in a transaction of its own, with the context it was given. */
 function call(who: Staff, name: keyof typeof handlers, input: object = {}) {
-  const { context, wrote } = request(who);
+  const { context, wrote, after } = request(who);
   const run = () =>
     inTenant(who, (tx) =>
       (handlers[name] as (args: object) => Promise<unknown>)({ tx, context, input }),
     );
-  return { run, wrote, result: run };
+  return { run, wrote, after, result: run };
 }
 
 const round = randomUUID();
@@ -372,6 +384,7 @@ describe('a monitoring run', () => {
     status: 'counted',
     rounds: [
       {
+        roundId: round,
         responses: options.reduce((total, [, count]) => total + count, 0),
         questions: [
           { fieldId: 'f_group', options: options.map(([value, count]) => ({ value, count })) },
@@ -487,5 +500,338 @@ describe('a monitoring run', () => {
       status: 404,
     });
     expect(asked).toEqual([]);
+  });
+});
+
+const runRows = (who: Staff) =>
+  asMigrator<Record<string, unknown>>(
+    who,
+    `SELECT id, report_id, report_version, kind, outcome, disclosure_rule_version, question,
+            breakdown, filter_field, filter_id, round_ids, population, shown_table, created_by
+       FROM insight.report_run ORDER BY created_at, id`,
+  );
+
+const rowsOf = (...rows: Record<string, string | number | boolean | null>[]): WarehouseRead => ({
+  status: 'rows',
+  columns: [...new Set(rows.flatMap((row) => Object.keys(row)))],
+  rows,
+});
+
+interface Result {
+  run: { id: string; outcome: string; kind: string };
+  columns: { itemId: string; role: string }[];
+  rows: unknown[][];
+  truncated: boolean;
+}
+
+describe('a warehouse run', () => {
+  const [byStatus, count, amount] = [randomUUID(), randomUUID(), randomUUID()];
+  const applications = () =>
+    rowsOf(
+      ...['submitted', 'submitted', 'withdrawn', 'decided', 'submitted', 'decided'].map(
+        (status) => ({ id: randomUUID(), status }),
+      ),
+    );
+  const body = (change: object): ReportDefinitionInput => ({
+    kind: 'warehouse',
+    name: `Run ${randomUUID()}`,
+    description: null,
+    source: 'grants_application',
+    measures: { [count]: 'count' },
+    groupBy: {},
+    filters: {},
+    ...change,
+  });
+
+  const run = async (who: Staff, change: object) => {
+    const { report } = await made(who, body(change));
+    const attempt = call(who, 'runReport', { params: { reportId: report.id } });
+    return { report, ...attempt, result: () => attempt.run() as Promise<Result> };
+  };
+
+  it('counts and groups the warehouse rows, filtered, and keeps only who ran it', async () => {
+    const t = await staff();
+    warehouse = applications();
+    const { report, result, wrote } = await run(t, {
+      groupBy: { [byStatus]: 'status' },
+      filters: { [randomUUID()]: { field: 'status', operator: 'ne', value: 'withdrawn' } },
+    });
+
+    const response = await result();
+
+    expect(response.columns).toEqual([
+      { itemId: byStatus, role: 'group' },
+      { itemId: count, role: 'measure' },
+    ]);
+    expect(response.rows).toEqual([
+      ['decided', 2],
+      ['submitted', 3],
+    ]);
+    expect(response.truncated).toBe(false);
+    expect(response.run).toMatchObject({ kind: 'warehouse', outcome: 'shown', reportVersion: 1 });
+    expect(wrote.audit).toEqual([
+      {
+        action: 'insight.report.run',
+        entityId: report.id,
+        changes: { 'insight.report_definition.version': { after: 1 } },
+      },
+    ]);
+    expect(await runRows(t)).toMatchObject([
+      {
+        id: response.run.id,
+        kind: 'warehouse',
+        outcome: 'shown',
+        created_by: t.member,
+        shown_table: null,
+        population: null,
+        round_ids: null,
+        question: null,
+      },
+    ]);
+  });
+
+  it('adds up, takes the least and most, and averages the values that are there', async () => {
+    const t = await staff();
+    warehouse = rowsOf(
+      { currency: 'GBP', amount_minor: 100, committed_on: '2026-04-01' },
+      { currency: 'GBP', amount_minor: 250, committed_on: '2026-05-01' },
+      { currency: 'GBP', amount_minor: 400, committed_on: '2026-06-01' },
+      { currency: 'GBP', amount_minor: null, committed_on: '2026-07-01' },
+      { currency: 'USD', amount_minor: 10, committed_on: '2026-04-01' },
+      { currency: 'USD', amount_minor: 99, committed_on: '2026-09-01' },
+    );
+    // A report keeps its items in the order of their ids, as the database sorts a document's keys.
+    const ids = [1, 2, 3, 4, 5].map((n) => `00000000-0000-4000-8000-00000000000${n}`);
+    const { result } = await run(t, {
+      source: 'commitment',
+      groupBy: { [byStatus]: 'currency' },
+      measures: {
+        [ids[0] as string]: 'sum.amount_minor',
+        [ids[1] as string]: 'min.amount_minor',
+        [ids[2] as string]: 'max.amount_minor',
+        [ids[3] as string]: 'average.amount_minor',
+        [ids[4] as string]: 'count',
+      },
+      filters: { [amount]: { field: 'committed_on', operator: 'lt', value: '2026-08-01' } },
+    });
+
+    expect((await result()).rows).toEqual([
+      ['GBP', 750, 100, 400, 250, 4],
+      ['USD', 10, 10, 10, 10, 1],
+    ]);
+  });
+
+  it('answers one row of totals with no grouping, and says when it cuts a long answer', async () => {
+    const t = await staff();
+    warehouse = rowsOf({ amount_minor: null });
+    const [first, second] = [1, 2].map((n) => `00000000-0000-4000-8000-00000000000${n}`);
+    const totals = await run(t, {
+      source: 'commitment',
+      measures: { [first as string]: 'count', [second as string]: 'sum.amount_minor' },
+    });
+    expect((await totals.result()).rows).toEqual([[1, null]]);
+
+    warehouse = rowsOf(...Array.from({ length: 1001 }, () => ({ id: randomUUID() })));
+    const long = await run(t, { groupBy: { [byStatus]: 'id' } });
+    const response = await long.result();
+    expect(response.rows).toHaveLength(1000);
+    expect(response.truncated).toBe(true);
+  });
+
+  it('is refused for what it cannot read, and a refusal records no run', async () => {
+    const t = await staff();
+    const monitoring = await made(t);
+    const archived = await run(t, {});
+    await call(t, 'archiveReportDefinition', { params: { reportId: archived.report.id } }).run();
+    const unknownColumn = await run(t, { groupBy: { [byStatus]: 'applicant_person_id' } });
+
+    for (const [report, state, message] of [
+      [monitoring.report.id, applications(), insightRefusals.monitoringOnly],
+      [archived.report.id, applications(), insightRefusals.archived],
+      [unknownColumn.report.id, rowsOf({ id: randomUUID() }), serverRefusals.columnUnavailable],
+      [unknownColumn.report.id, { status: 'off' } as const, serverRefusals.sourceOff],
+      [
+        unknownColumn.report.id,
+        { status: 'unavailable' } as const,
+        serverRefusals.sourceUnavailable,
+      ],
+    ] as const) {
+      warehouse = state;
+      const attempt = call(t, 'runReport', { params: { reportId: report } });
+      await expect(attempt.run()).rejects.toThrow(message);
+      expect(attempt.wrote.audit).toEqual([]);
+    }
+    expect(await runRows(t)).toEqual([]);
+  });
+
+  it('is read back without a figure, by the tenant that ran it alone', async () => {
+    const t = await staff();
+    warehouse = applications();
+    const { result } = await run(t, {});
+    const { run: ran } = await result();
+    const params = { runId: ran.id };
+
+    expect(await call(t, 'getReportRun', { params }).run()).toEqual({
+      id: ran.id,
+      reportId: expect.any(String) as string,
+      reportVersion: 1,
+      kind: 'warehouse',
+      outcome: 'shown',
+      disclosureRuleVersion: null,
+      ranAt: expect.any(String) as string,
+      ranByMembershipId: t.member,
+    });
+    for (const [who, name, runId] of [
+      [t, 'getMonitoringReportRun', ran.id],
+      [b, 'getReportRun', ran.id],
+      [t, 'getReportRun', randomUUID()],
+    ] as const) {
+      await expect(call(who, name, { params: { runId } }).run()).rejects.toMatchObject({
+        status: 404,
+      });
+    }
+    const outside = call(b, 'runReport', { params: { reportId: randomUUID() } });
+    tablesAsked.length = 0;
+    await expect(outside.run()).rejects.toMatchObject({ status: 404 });
+    expect(tablesAsked).toEqual([]);
+  });
+});
+
+describe('the run log', () => {
+  const options = (...counts: number[]): MonitoringCounts => ({
+    status: 'counted',
+    rounds: [
+      {
+        roundId: round,
+        responses: counts.reduce((total, n) => total + n, 0),
+        questions: [
+          {
+            fieldId: 'f_group',
+            options: counts.map((count, index) => ({ value: `marker_${index}`, count })),
+          },
+        ],
+      },
+    ],
+  });
+
+  const monitor = async (who: Staff, counts: MonitoringCounts, reportId?: string) => {
+    answer = counts;
+    const id = reportId ?? (await made(who)).report.id;
+    const attempt = call(who, 'runMonitoringReport', { params: { reportId: id } });
+    return { id, ...attempt, result: () => attempt.run() as Promise<{ runId: string }> };
+  };
+
+  it('keeps the table it showed, with its rounds and responses and no small count', async () => {
+    const t = await staff();
+    const first = await monitor(t, options(40, 3, 17));
+    const response = await first.result();
+
+    const [stored] = await runRows(t);
+    expect(stored).toMatchObject({
+      id: response.runId,
+      report_id: first.id,
+      kind: 'monitoring',
+      outcome: 'shown',
+      disclosure_rule_version: null,
+      question: 'f_group',
+      breakdown: null,
+      filter_field: 'round',
+      filter_id: round,
+      round_ids: [round],
+      population: 60,
+    });
+    const text = JSON.stringify(await runRows(t)) + JSON.stringify(first.wrote);
+    expect(text).not.toMatch(/"count":(3|17)\b/);
+    expect(text).toContain('"count":40');
+    expect(
+      await call(t, 'getMonitoringReportRun', { params: { runId: response.runId } }).run(),
+    ).toMatchObject({ outcome: 'shown', kind: 'monitoring', ranByMembershipId: t.member });
+  });
+
+  it('keeps a table withheld as a run with no table', async () => {
+    const t = await staff();
+    const withheld = await monitor(t, options(8, 5));
+    await withheld.result();
+
+    expect(await runRows(t)).toMatchObject([
+      {
+        outcome: 'withheld',
+        shown_table: null,
+        population: null,
+        round_ids: null,
+        question: 'f_group',
+      },
+    ]);
+  });
+
+  it('refuses a run that, set against an earlier one, would show a small group, and keeps the refusal', async () => {
+    const t = await staff();
+    const first = await monitor(t, options(40, 30));
+    await first.result();
+
+    // Five more responses: five people in a cell, and in the whole.
+    const second = await monitor(t, options(45, 30), first.id);
+    const response = (await second.result()) as unknown as { result: object };
+    expect(response.result).toEqual({ status: 'withheld' });
+    expect(second.after).toHaveLength(1);
+    const refused = await (second.after[0] as () => Promise<void>)().catch(
+      (error: unknown) => error,
+    );
+    expect((refused as Error).message).toBe(insightRefusals.monitoringRefused);
+    expect((refused as Error).message).not.toMatch(/\d/);
+    expect(second.wrote.audit).toEqual([
+      {
+        action: 'insight.monitoring_report.refused',
+        entityId: first.id,
+        changes: {
+          'insight.report_definition.version': { after: 1 },
+          'insight.disclosure_rule.version': { after: null },
+        },
+      },
+    ]);
+    expect((await runRows(t)).map((row) => row.outcome)).toEqual(['shown', 'refused']);
+    expect((await runRows(t))[1]).toMatchObject({ shown_table: null, population: null });
+    expect(JSON.stringify(second.wrote)).not.toMatch(/marker_/);
+
+    // A repeat of the first figures shows nothing new, and a wide step is far from every cell.
+    for (const counts of [options(40, 30), options(40, 55)]) {
+      const again = await monitor(t, counts, first.id);
+      await again.result();
+      expect(again.after).toEqual([]);
+    }
+    expect((await runRows(t)).map((row) => row.outcome)).toEqual([
+      'shown',
+      'refused',
+      'shown',
+      'shown',
+    ]);
+  });
+
+  it('refuses a cell that moved by a few people even when the whole moved by many', async () => {
+    const t = await staff();
+    const first = await monitor(t, options(40, 30));
+    await first.result();
+
+    const second = await monitor(t, options(60, 35), first.id);
+    await second.result();
+
+    expect(second.after).toHaveLength(1);
+    expect((await runRows(t)).map((row) => row.outcome)).toEqual(['shown', 'refused']);
+  });
+
+  it('compares only the tenant’s own runs, of the same table', async () => {
+    const t = await staff();
+    const other = await staff();
+    const first = await monitor(t, options(40, 30));
+    await first.result();
+
+    const elsewhere = await monitor(other, options(45, 30));
+    await elsewhere.result();
+    const another = await monitor(t, options(45, 30));
+    await another.result();
+
+    expect(elsewhere.after).toEqual([]);
+    expect(another.after).toHaveLength(1);
+    expect((await runRows(other)).map((row) => row.outcome)).toEqual(['shown']);
   });
 });
