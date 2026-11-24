@@ -32,7 +32,9 @@ describe('crm routes', () => {
   const built = Object.entries(crmRoutes).filter(([name]) => !notBuilt.includes(name));
 
   it('answers every route this task builds, and none by accident', () => {
-    expect(Object.keys(handlers).sort()).toEqual(built.map(([name]) => name).sort());
+    // The `replay` readers answer a repeated key's request; they are not routes.
+    const answered = Object.keys(handlers).filter((name) => !name.startsWith('replay'));
+    expect(answered.sort()).toEqual(built.map(([name]) => name).sort());
   });
 
   it.each(built)('%s needs a crm permission that a reviewer does not hold', (_name, route) => {

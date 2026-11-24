@@ -15,7 +15,15 @@ import {
   type InteractionInput,
   type TimelinePage,
 } from '../../contracts/index.ts';
-import { iso, nextCursor, PAGE, readCursor, type Args, type CrmDependencies } from '../context.ts';
+import {
+  iso,
+  nextCursor,
+  PAGE,
+  readCursor,
+  type Args,
+  type CrmDependencies,
+  type Tx,
+} from '../context.ts';
 import { interactionDb } from './tables.ts';
 
 const COLUMNS = [
@@ -128,5 +136,16 @@ export function timelineHandlers(deps: CrmDependencies) {
     return toInteraction(row);
   }
 
-  return { getTimeline, recordInteraction };
+  /** What a replay of `recordInteraction` answers: the item as it reads now, with no read audited. */
+  async function replayInteraction({ tx, id }: { tx: Tx; id: string }): Promise<Interaction> {
+    const row = await interactionDb(tx)
+      .selectFrom('crm.interaction')
+      .select(COLUMNS)
+      .where('id', '=', id)
+      .executeTakeFirst();
+    if (row === undefined) throw deps.notFound();
+    return toInteraction(row);
+  }
+
+  return { getTimeline, recordInteraction, replayInteraction };
 }
