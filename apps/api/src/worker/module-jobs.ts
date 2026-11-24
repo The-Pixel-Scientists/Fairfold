@@ -2,6 +2,7 @@
 //
 // The jobs the worker takes from the modules (ADR 0009, ADR 0016). The grants
 // release email, message notification and reminder jobs send through the mail server the worker is given.
+// The rest come from the module compositions (apps/api/src/modules/).
 
 import { partyErasureTarget } from '@pixel-scientists/party/server';
 
@@ -9,10 +10,11 @@ import { releaseEmailJob } from '../decision-emails.ts';
 import { messageNotificationJob } from '../message-notifications.ts';
 import { reminderScanJob, reminderSendJob } from '../reminders.ts';
 import { erasureJob } from '../platform/erasure/index.ts';
-import { collectModuleJobs, erasureContributions, type Mail } from '../modules.ts';
+import { collectModuleJobs, composedFor, type Mail, type ModuleInputs } from '../modules.ts';
 import type { ModuleJob } from './registry.ts';
 
-export function workerModuleJobs(mail: Mail): readonly ModuleJob[] {
+export function workerModuleJobs(mail: Mail, inputs: ModuleInputs = {}): readonly ModuleJob[] {
+  const composed = composedFor({ ...inputs, mail });
   return collectModuleJobs([
     {
       jobs: [
@@ -20,8 +22,9 @@ export function workerModuleJobs(mail: Mail): readonly ModuleJob[] {
         messageNotificationJob(mail),
         reminderScanJob(),
         reminderSendJob(mail),
-        erasureJob({ contributions: erasureContributions, target: partyErasureTarget }),
+        erasureJob({ contributions: composed.erasure, target: partyErasureTarget }),
       ],
     },
+    composed,
   ]);
 }

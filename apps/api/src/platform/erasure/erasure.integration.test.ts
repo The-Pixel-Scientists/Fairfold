@@ -185,7 +185,7 @@ const statusOf = async (member: Member, requestId: string): Promise<Status> => {
 const runJob = (
   tenant: TestTenant,
   requestId: string,
-  contributions: readonly Contribution[] = erasureContributions,
+  contributions: readonly Contribution[] = erasureContributions(),
 ) =>
   withTenant(worker, trustedTenantId(tenant.id), (trx) =>
     erasureJob({ contributions, target: partyErasureTarget }).handler(trx, {
@@ -498,7 +498,7 @@ describe('the erasure', () => {
       erase: () => Promise.reject(new Error('The crm module failed for Ada Lovelace.')),
     };
 
-    await runJob(t.tenantA, requestId, [...erasureContributions, failing]);
+    await runJob(t.tenantA, requestId, [...erasureContributions(), failing]);
 
     expect(await personRow(t.tenantA, person)).toMatchObject({ given_name: 'Ada' });
     expect(await answersOf(t.tenantA, application)).toEqual(ANSWERS);
