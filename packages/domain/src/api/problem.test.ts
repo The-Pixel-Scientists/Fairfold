@@ -16,6 +16,12 @@ describe('problemSchema', () => {
     }
   });
 
+  it("takes the forms module's changed-form and failed-check types", () => {
+    for (const type of ['/problems/form-changed', '/problems/proof-invalid']) {
+      expect(problemSchema.safeParse({ ...base, type }).success, type).toBe(true);
+    }
+  });
+
   it('refuses any other type, so an unknown problem reads as a generic failure', () => {
     for (const type of ['/problems/other', 'https://example.org/problems/x', '', undefined]) {
       expect(problemSchema.safeParse({ ...base, type }).success, String(type)).toBe(false);
