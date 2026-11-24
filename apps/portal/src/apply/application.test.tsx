@@ -231,7 +231,9 @@ describe('a section', () => {
 
     const heading = await h1('Your project');
 
-    await waitFor(() => expect(document.activeElement).toBe(heading));
+    await waitFor(() => {
+      expect(document.activeElement).toBe(heading);
+    });
   });
 
   it('opens at the question a link names', async () => {
@@ -239,7 +241,10 @@ describe('a section', () => {
 
     await h1('Your project');
 
-    expect(document.activeElement?.id).toBe('f_people');
+    // The page moves focus in an effect, after the heading is on screen.
+    await waitFor(() => {
+      expect(document.activeElement?.id).toBe('f_people');
+    });
   });
 
   it('shows a question only when an earlier answer asks for it', async () => {

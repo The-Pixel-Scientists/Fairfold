@@ -147,7 +147,7 @@ describe('the erasure status page', () => {
       'PartyPerson1',
     ]);
     expect(screen.getByText(/shows no values/)).toBeTruthy();
-    expect(document.querySelector('[role="status"].sr-only')?.textContent).toBe('');
+    expect(document.querySelector('main [role="status"].sr-only')?.textContent).toBe('');
   });
 
   it('says nothing was erased when it failed', async () => {
@@ -183,7 +183,7 @@ describe('the erasure status page', () => {
     await vi.advanceTimersByTimeAsync(3100);
 
     await waitFor(() => {
-      expect(document.querySelector('[role="status"].sr-only')?.textContent).toBe(
+      expect(document.querySelector('main [role="status"].sr-only')?.textContent).toBe(
         'The personal data is erased.',
       );
     });

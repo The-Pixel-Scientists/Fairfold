@@ -184,11 +184,13 @@ describe('the reach predicate', { timeout: 60_000 }, () => {
 
       // An expired grant: only the trigger being off can insert one. The database's clock decides.
       const expired = await record('expired grant');
+      // One reading of the clock: the table checks the grant lasts exactly an hour.
+      const now = Date.now();
       const old = breakGlassRow(tenant, expiredHolder, {
         record_id: expired,
-        granted_at: new Date(Date.now() - 2 * 3_600_000),
-        expires_at: new Date(Date.now() - 3_600_000),
-        retain_until: new Date(Date.now() + 400 * 86_400_000),
+        granted_at: new Date(now - 2 * 3_600_000),
+        expires_at: new Date(now - 3_600_000),
+        retain_until: new Date(now + 400 * 86_400_000),
       });
       await client.query('ALTER TABLE app.break_glass DISABLE TRIGGER set_break_glass_times');
       await insertRow(client, 'app.break_glass', old);

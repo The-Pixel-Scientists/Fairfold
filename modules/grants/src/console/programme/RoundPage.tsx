@@ -3,6 +3,7 @@
 import { formatMoney } from '@pixel-scientists/domain/platform';
 import {
   DataTable,
+  Link,
   PageHeader,
   SummaryList,
   Tabs,
@@ -15,6 +16,10 @@ import type { ReactNode } from 'react';
 
 import { latePolicies } from '../../contracts/index.ts';
 import type { Round, Stage } from '../../contracts/index.ts';
+import { reviewersPath, spreadPath } from '../assessment/paths.ts';
+import { decisionsPath } from '../decisions/paths.ts';
+import { formPath } from '../forms/paths.ts';
+import { submissionsPath } from '../submissions/paths.ts';
 import { ConfigHistory } from './ConfigHistory.tsx';
 import { formatLocal } from './format.ts';
 import { loadRound, loadRoundHistory } from './loaders.ts';
@@ -23,9 +28,69 @@ import { RoundAdjustments } from './RoundAdjustments.tsx';
 import { LinkButton, ManagePage, useParam } from './Page.tsx';
 import { editRoundPath, PROGRAMMES_PATH, programmePath, rubricPath, stagesPath } from './paths.ts';
 
+/** The pages that work on a round, which is where staff look for them. Each shows only to those who may open it. */
+function RoundWork({ round }: { round: Round }) {
+  const read = useCan('grants.applications.read');
+  const assign = useCan('grants.reviews.assign');
+  const decide = useCan('grants.decisions.record');
+  const submissions = submissionsPath(`?programmeId=${round.programmeId}&roundId=${round.id}`);
+  const places: readonly { to: string; label: string; about: string; show: boolean }[] = [
+    {
+      to: formPath(round.id),
+      label: 'Application form',
+      about: 'Build, preview and publish the form applicants fill in.',
+      show: true,
+    },
+    {
+      to: submissions,
+      label: 'Submissions',
+      about: 'What applicants have sent, and where each one stands.',
+      show: read,
+    },
+    {
+      to: reviewersPath(round.id),
+      label: 'Reviewers',
+      about: 'Who reviews this round, and which submissions each has.',
+      show: assign,
+    },
+    {
+      to: spreadPath(round.id),
+      label: 'Score spread',
+      about: 'How far reviewers agree on each submission.',
+      show: assign,
+    },
+    {
+      to: decisionsPath(round.id),
+      label: 'Decisions',
+      about: 'Record each decision, then release them together.',
+      show: decide,
+    },
+  ];
+  return (
+    <section aria-labelledby="round-work" className="flex flex-col gap-3">
+      <h2 id="round-work" className="text-lg font-semibold tracking-tight text-ink">
+        Work on this round
+      </h2>
+      <ul className="flex flex-col divide-y divide-divider">
+        {places
+          .filter(({ show }) => show)
+          .map(({ to, label, about }) => (
+            <li
+              key={to}
+              className="flex flex-col gap-1 py-2.5 first:pt-0 last:pb-0 sm:grid sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] sm:items-baseline sm:gap-x-6"
+            >
+              <Link to={to}>{label}</Link>
+              <span className="text-sm text-muted">{about}</span>
+            </li>
+          ))}
+      </ul>
+    </section>
+  );
+}
+
 function RoundDetails({ round }: { round: Round }) {
   return (
-    <div className="max-w-4xl">
+    <div className="flex max-w-4xl flex-col gap-8">
       <SummaryList
         items={[
           { term: 'Opens', value: formatLocal(round.opensAt) },
@@ -45,6 +110,7 @@ function RoundDetails({ round }: { round: Round }) {
           },
         ]}
       />
+      <RoundWork round={round} />
     </div>
   );
 }

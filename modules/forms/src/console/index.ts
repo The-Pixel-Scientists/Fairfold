@@ -7,10 +7,11 @@
 
 import { idSchema } from '@pixel-scientists/domain';
 import type { Params, RouteDefinition, SearchSchema } from '@pixel-scientists/ui';
+import { lazy } from 'react';
 
 import { FORMS_PATH, NEW_FORM_PATH, TEMPLATES_PATH } from './paths.ts';
 
-export { default } from './list/FormsListPage.tsx';
+export default lazy(() => import('./list/FormsListPage.tsx'));
 
 /** Only real ids are the addresses of forms, so `/forms/new` and typing mistakes never reach them. */
 const ids: SearchSchema<Params> = {

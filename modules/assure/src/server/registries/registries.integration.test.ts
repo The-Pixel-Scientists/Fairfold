@@ -148,27 +148,7 @@ let a: Fixture;
 let b: Fixture;
 let off: Fixture;
 
-/**
- * What the refresh job needs to re-read an organisation's identifier through
- * party's server, and no migration yet grants app_worker. Granted for this
- * file and revoked after, so no other test sees it. Delete this once a
- * migration grants the worker exactly these columns.
- */
-const STAND_IN_GRANTS: readonly [grant: string, revoke: string][] = [
-  [
-    'GRANT SELECT (legal_form) ON party.organisation TO app_worker',
-    'REVOKE SELECT (legal_form) ON party.organisation FROM app_worker',
-  ],
-  [
-    'GRANT SELECT (tenant_id, organisation_id, scheme, identifier, verified_at) ON party.organisation_identifier TO app_worker',
-    'REVOKE SELECT (tenant_id, organisation_id, scheme, identifier, verified_at) ON party.organisation_identifier FROM app_worker',
-  ],
-];
-
 beforeAll(async () => {
-  await withClient('migrator', async (client) => {
-    for (const [grant] of STAND_IN_GRANTS) await client.query(grant);
-  });
   {
     const { host, port, database, password } = databaseSettings('app_api', 4);
     api = createDatabase<unknown>({
@@ -205,7 +185,6 @@ afterAll(async () => {
   await stopJobSender(apiSender);
   await stopJobSender(workerSender);
   await withClient('migrator', async (client) => {
-    for (const [, revoke] of STAND_IN_GRANTS) await client.query(revoke);
     await client.query('DELETE FROM pgboss.job WHERE name = $1 AND data ->> $2 = ANY($3)', [
       'assure.registry_refresh',
       'tenantId',

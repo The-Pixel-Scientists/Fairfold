@@ -106,7 +106,7 @@ function Loaded({ organisationId }: { organisationId: string }) {
             <Details organisation={organisation} />
             <Panel title="Identifiers">
               <DataTable
-                caption="Identifiers"
+                caption="Identifiers of this organisation"
                 captionHidden
                 columns={identifierColumns}
                 rows={organisation.identifiers}
@@ -116,7 +116,7 @@ function Loaded({ organisationId }: { organisationId: string }) {
             </Panel>
             <Panel title="Contacts">
               <DataTable
-                caption="Contacts"
+                caption="Contacts of this organisation"
                 captionHidden
                 columns={contactColumns}
                 rows={organisation.contacts}

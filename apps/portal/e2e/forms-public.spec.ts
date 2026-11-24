@@ -94,8 +94,9 @@ test.describe('answering a form without an account', () => {
     await page.getByRole('button', { name: 'Send my answers' }).click();
 
     await expect(h1(page, SUBMITTED)).toBeVisible();
-    const challenges = sent.filter(({ key }) => key === PUBLIC_ROUTES.challenge);
-    expect(challenges.length).toBeGreaterThanOrEqual(3);
+    // One check as the page opens, and one more after the refusal.
+    expect(attempts).toBe(2);
+    expect(sent.filter(({ key }) => key === PUBLIC_ROUTES.challenge)).toHaveLength(2);
   });
 
   test('shows the wait on a 429, and keeps the answers', async ({ page }) => {

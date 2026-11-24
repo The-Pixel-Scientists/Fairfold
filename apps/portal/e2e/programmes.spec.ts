@@ -83,12 +83,15 @@ test.describe('open grants before sign-in', () => {
   test('sets no cookie, stores nothing and calls only its own origin', async ({
     page,
     context,
+    baseURL,
   }) => {
+    // The portal's origin from the settings: the page has no address yet when its first request leaves.
+    const own = new URL(baseURL ?? '').origin;
     const foreign: string[] = [];
     page.on('request', (request) => {
       const url = new URL(request.url());
       if (!['http:', 'https:'].includes(url.protocol)) return;
-      if (url.origin !== new URL(page.url()).origin) foreign.push(request.url());
+      if (url.origin !== own) foreign.push(request.url());
     });
     await stubApi(page, {
       'GET /auth/session': signedOut,

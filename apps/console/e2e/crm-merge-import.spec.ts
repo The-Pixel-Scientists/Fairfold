@@ -254,16 +254,20 @@ test.describe('duplicates', () => {
     });
     await page.goto(`/northfield/crm/duplicates/organisation/${trust}/${club}`);
 
+    const previews = () =>
+      sent.filter(({ key }) => key === 'POST /console/crm/merges/preview').length;
+
     await page.getByRole('button', { name: 'Review merge of organisations' }).click();
-    await page
+    const confirm = page
       .getByRole('dialog', { name: 'Merge organisations' })
-      .getByRole('button', { name: 'Merge organisations' })
-      .click();
+      .getByRole('button', { name: 'Merge organisations' });
+    await expect(confirm).toBeVisible();
+    // Counted from here: the development server runs each effect twice, so the first read may be sent twice.
+    const before = previews();
+    await confirm.click();
 
     await expect(page.getByText(/Compare the records again, then merge/)).toBeVisible();
-    await expect
-      .poll(() => sent.filter(({ key }) => key === 'POST /console/crm/merges/preview').length)
-      .toBe(2);
+    await expect.poll(previews).toBe(before + 1);
   });
 
   test('blocks a merge the server cannot do and says how to resolve it', async ({ page }) => {

@@ -8,7 +8,9 @@
 // among them (rule 8); the reviewer is readable only for the reminder jobs
 // (migration 0061), and the export leaves it out. Audit event changes are
 // the export's to filter. The board pack job reads a snapshot's tenant,
-// id and name alone (migration 0107).
+// id and name alone (migration 0107). The registry refresh job reads an
+// organisation's legal form and its identifiers, without their actors
+// (migration 0108).
 // The cross-tenant tests of grants.decision, grants.decision_email,
 // grants.email_template_version, party.person, party.relationship and
 // app.audit_event run as every role with a grant, app_worker now included.
@@ -219,6 +221,12 @@ const RELEASE_EMAIL_RIGHTS = [
   ...['tenant_id', 'id', 'name'].map(
     (column) => `SELECT on column party.organisation_snapshot.${column}`,
   ),
+  // The registry refresh job (migration 0108): the legal form, and the
+  // identifier an organisation claims with whether staff verified it.
+  'SELECT on column party.organisation.legal_form',
+  ...['tenant_id', 'id', 'organisation_id', 'scheme', 'identifier', 'verified_at'].map(
+    (column) => `SELECT on column party.organisation_identifier.${column}`,
+  ),
 ];
 
 /** A released decision, with its applicant as a contact for its organisation, and a snapshot of it. */
@@ -283,7 +291,11 @@ describe("app_worker's release email and subject access rights", { timeout: 60_0
           .rowCount;
       expect(await snapshotName(mine.snapshot)).toBe(1);
       expect(await snapshotName(theirs.snapshot)).toBe(0);
-      for (const table of ['app.tenant_module', 'party.organisation']) {
+      for (const table of [
+        'app.tenant_module',
+        'party.organisation',
+        'party.organisation_identifier',
+      ]) {
         const seen = await client.query(`SELECT FROM ${table} WHERE tenant_id = $1`, [other.id]);
         expect(seen.rowCount, table).toBe(0);
       }
@@ -302,6 +314,9 @@ describe("app_worker's release email and subject access rights", { timeout: 60_0
         'SELECT token_hash FROM app.invitation',
         'SELECT address_postcode FROM party.organisation_snapshot',
         'UPDATE party.organisation_snapshot SET name = name',
+        'SELECT verified_by FROM party.organisation_identifier',
+        'UPDATE party.organisation_identifier SET verified_at = verified_at',
+        'UPDATE party.organisation SET legal_form = legal_form',
       ]) {
         expect(await outcome(client, statement), statement).toBe('42501');
       }

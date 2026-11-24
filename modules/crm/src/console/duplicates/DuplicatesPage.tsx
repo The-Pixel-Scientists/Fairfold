@@ -107,7 +107,7 @@ function Duplicates() {
       header: 'Records',
       rowHeader: true,
       cell: (pair) => (
-        <span className="flex flex-col gap-0.5">
+        <span className="flex flex-col gap-1.5">
           <PartyLink kind={pair.kind} id={pair.partyId} />
           <PartyLink kind={pair.kind} id={pair.otherPartyId} />
         </span>

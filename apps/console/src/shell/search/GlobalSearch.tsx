@@ -173,6 +173,7 @@ function SearchBox() {
   return (
     <div className="w-full min-w-0 sm:w-72">
       <Combobox
+        compact
         label="Search"
         hint={`Organisations, people and applications. Shortcut: ${SHORTCUT}`}
         inputRef={input}

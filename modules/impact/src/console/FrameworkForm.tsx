@@ -189,7 +189,7 @@ function OutcomeEditor({
         />
       </FormField>
       <div className="flex flex-col gap-3">
-        <h3 className="text-body font-semibold text-ink">Indicators for outcome {at}</h3>
+        <h2 className="text-body font-semibold text-ink">Indicators for outcome {at}</h2>
         {outcome.indicators.length === 0 ? (
           <p className="text-body text-muted">
             No indicators yet. Add one to measure this outcome with a figure.

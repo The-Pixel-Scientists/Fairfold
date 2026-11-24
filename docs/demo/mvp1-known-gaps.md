@@ -17,6 +17,11 @@ were cut or left to make that date.
 These work wrongly today. Each has a way round for the demo, and each needs a
 fix.
 
+- **Five tools have screens and no API.** CRM, Due Diligence, Forms, Data
+  Protection and Reporting can be switched on under Settings, Modules, and
+  their screens open, but the API does not serve their routes yet, so every
+  screen shows an error or "Page not found". Leave them switched off for the
+  demo. The journey needs only Grants.
 - **The audit log cannot read back a stylesheet change.** Saving a funder
   stylesheet records an event the log's page cannot show. A page of the log
   that holds it fails with an error, so the unfiltered log may not open. The
@@ -31,10 +36,6 @@ fix.
   Administrator role, and the seeded administrator has only the first. The
   route itself needs only the export permission. The demo gets round it by
   inviting a colleague who has both roles.
-- **The round page does not link to the application form.** The form builder
-  is reached by its address, `/rounds/<round id>/form`. The reviewers and score
-  spread pages are reached from Submissions, and the decisions page from a
-  submission.
 - **`pnpm tenant:create` does not reach the stack.** It works on the database
   that `pnpm dev` uses. The stack's database is on a network only its
   containers can reach, so a funder in the stack comes from `pnpm stack seed`.
