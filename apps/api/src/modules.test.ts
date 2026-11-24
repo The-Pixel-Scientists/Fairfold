@@ -103,7 +103,12 @@ describe('composeModules', () => {
     expect(
       routes
         .map((route) => route.contract)
-        .filter((contract) => contract.module !== 'crm' && contract.module !== 'privacy'),
+        .filter(
+          (contract) =>
+            contract.module !== 'crm' &&
+            contract.module !== 'privacy' &&
+            contract.module !== 'insight',
+        ),
     ).toEqual([
       listAuditEvents,
       searchAuditEvents,
@@ -267,7 +272,7 @@ describe('the module compositions', () => {
     const compositions = moduleCompositions.map((factory) => factory(deps));
 
     expect(compositions).toHaveLength(6);
-    expect(compositions.slice(4)).toEqual(Array.from({ length: 2 }, () => ({})));
+    expect(compositions.slice(5)).toEqual([{}]);
   });
 
   it('gives the forms composition its routes, scope rules and erasure, and the anonymous routes only with the two keys', () => {
