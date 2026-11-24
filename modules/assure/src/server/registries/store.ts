@@ -288,3 +288,37 @@ export async function staleLookups(
     return [{ organisationId: row.organisation_id, registry: row.registry as Registry }];
   });
 }
+
+/** An officer's organisation and the person it is linked to, locked for a link; null when this tenant has no such officer. */
+export async function lockOfficer(
+  tx: Tx,
+  officerId: string,
+): Promise<{ organisationId: string; personId: string | null } | null> {
+  const row = await assureDb(tx)
+    .selectFrom('assure.lookup_officer as o')
+    .innerJoin('assure.lookup_snapshot as s', 's.id', 'o.snapshot_id')
+    .select(['s.organisation_id', 'o.person_id'])
+    .where('o.id', '=', officerId)
+    .forUpdate('o')
+    .executeTakeFirst();
+  return row === undefined
+    ? null
+    : { organisationId: row.organisation_id, personId: row.person_id };
+}
+
+/** Links an officer that has no person yet to `personId`, as the member; the database sets the time. */
+export async function linkOfficer(tx: Tx, officerId: string, personId: string, member: string) {
+  const row = await assureDb(tx)
+    .updateTable('assure.lookup_officer')
+    .set({ person_id: personId, linked_by: member })
+    .where('id', '=', officerId)
+    .where('person_id', 'is', null)
+    .returning(['id', 'name', 'role', 'person_id'])
+    .executeTakeFirstOrThrow();
+  return {
+    id: row.id,
+    name: row.name,
+    role: row.role as RegistryResult['officers'][number]['role'],
+    personId: row.person_id,
+  };
+}
