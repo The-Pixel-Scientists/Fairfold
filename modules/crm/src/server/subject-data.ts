@@ -80,6 +80,21 @@ export const subjectTables: Readonly<
       'merged_at',
     ),
   },
+  'crm.duplicate_dismissal': {
+    subjectColumn: ['party_id', 'other_party_id'],
+    columns: internal(
+      'tenant_id',
+      'id',
+      'kind',
+      'party_id',
+      'other_party_id',
+      'reason',
+      'created_at',
+      'updated_at',
+      'created_by',
+      'updated_by',
+    ),
+  },
   'crm.import_row': {
     subjectColumn: ['created_party_id', 'duplicate_party_id'],
     columns: [
