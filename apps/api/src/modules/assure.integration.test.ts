@@ -30,7 +30,12 @@ import {
   snapshotRow,
 } from '../../../../packages/db/test/assure/fixtures.ts';
 import { jobRows } from '../../../../packages/db/test/jobs/helpers.ts';
-import { addOrganisation } from '../../../../packages/db/test/party/fixtures.ts';
+import {
+  addApplication,
+  addFile,
+  submit,
+} from '../../../../packages/db/test/grants/application-fixtures.ts';
+import { addOrganisation, addPerson } from '../../../../packages/db/test/party/fixtures.ts';
 import { asMigratorIn, createTestTenant, insertRow } from '../../../../packages/db/test/tenants.ts';
 import { switchModule } from '../../test/modules-on.ts';
 import { rowsOf } from '../../test/programme-api.ts';
@@ -490,6 +495,540 @@ describe('checklists', () => {
     expect(
       (await events(a.tenant, 'assure.checklist.published')).map(({ entity_id: id }) => id),
     ).toEqual([created.id]);
+  });
+});
+
+/** A submitted application in `tenant`, with the organisation and person it is from. */
+async function addSubmitted(tenant: Tenant) {
+  return asMigratorIn(tenant.id, async (client) => {
+    const { id, parts } = await addApplication(client, tenant);
+    await submit(client, id, parts.stages[0]);
+    return { application: id, organisation: parts.organisation, person: parts.person };
+  });
+}
+
+const cleanFile = (funder: Funder) =>
+  asMigratorIn(funder.tenant.id, (client) =>
+    addFile(client, funder.tenant, funder.officer.membershipId),
+  );
+
+const fileState = async (funder: Funder, file: string) =>
+  (
+    await rowsOf<{ linked: boolean; released: boolean }>(
+      funder.tenant,
+      'SELECT linked_at IS NOT NULL AS linked, released_at IS NOT NULL AS released FROM app.file WHERE id = $1',
+      [file],
+    )
+  )[0];
+
+describe('linking an officer to a person', () => {
+  const link = (officer: string) => `/console/lookup-officers/${officer}/link`;
+  let officer: string;
+  let person: string;
+  let stranger: string;
+
+  beforeAll(async () => {
+    officer = String(
+      (
+        await rowsOf<{ id: string }>(
+          a.tenant,
+          'SELECT id FROM assure.lookup_officer WHERE snapshot_id = $1',
+          [a.snapshot],
+        )
+      )[0]?.id,
+    );
+    person = await asMigratorIn(a.tenant.id, (client) => addPerson(client, a.tenant));
+    stranger = await asMigratorIn(b.tenant.id, (client) => addPerson(client, b.tenant));
+  });
+
+  it('refuses a member without the permission, another tenant’s officer and a body it cannot trust, and links nothing', async () => {
+    const body = { personId: person };
+    expect((await send(reviewerA, 'POST', link(officer), body)).statusCode).toBe(403);
+    expectLooksMissing(
+      await send(b.officer, 'POST', link(officer), { personId: stranger }),
+      await send(b.officer, 'POST', link(randomUUID()), { personId: stranger }),
+    );
+    expect(
+      (await send(a.officer, 'POST', link(officer), { ...body, linkedBy: randomUUID() }))
+        .statusCode,
+    ).toBe(400);
+    expect((await send(a.officer, 'POST', link(officer), { personId: 'nope' })).statusCode).toBe(
+      400,
+    );
+    // Another tenant's person, and a party that is an organisation, are not people of this tenant.
+    expect((await send(a.officer, 'POST', link(officer), { personId: stranger })).statusCode).toBe(
+      400,
+    );
+    expect(
+      (await send(a.officer, 'POST', link(officer), { personId: a.organisation })).statusCode,
+    ).toBe(400);
+    const [row] = await rowsOf<{ person_id: string | null }>(
+      a.tenant,
+      'SELECT person_id FROM assure.lookup_officer WHERE id = $1',
+      [officer],
+    );
+    expect(row?.person_id).toBeNull();
+    expect(await auditRows(a.tenant, 'assure.lookup_officer.linked')).toHaveLength(0);
+  });
+
+  it('links the officer as the member in the session, once, and audits the person as the subject', async () => {
+    const linked = await answer<{ id: string; personId: string }>(
+      send(a.officer, 'POST', link(officer), { personId: person }),
+    );
+    expect(linked).toMatchObject({ id: officer, personId: person });
+    expect(await auditRows(a.tenant, 'assure.lookup_officer.linked')).toEqual([
+      expect.objectContaining({ entity_id: officer, subject_party_id: person }),
+    ]);
+    const [row] = await rowsOf<{ linked_by: string; linked_at: Date }>(
+      a.tenant,
+      'SELECT linked_by, linked_at FROM assure.lookup_officer WHERE id = $1',
+      [officer],
+    );
+    expect(row?.linked_by).toBe(a.officer.membershipId);
+    expect(row?.linked_at).toBeInstanceOf(Date);
+
+    const again = await send(a.officer, 'POST', link(officer), { personId: person });
+    expect(again.statusCode).toBe(409);
+    expect(await auditRows(a.tenant, 'assure.lookup_officer.linked')).toHaveLength(1);
+    const read = await answer<{ officers: { personId: string | null }[] }>(
+      send(a.officer, 'GET', `/console/lookups/${a.snapshot}/officers`),
+    );
+    expect(read.officers.map(({ personId }) => personId)).toEqual([person]);
+  });
+});
+
+describe('dismissing a duplicate flag', () => {
+  let twin: string;
+  let flag: { id: string; signal: string; dismissal: unknown };
+
+  beforeAll(async () => {
+    twin = await asMigratorIn(a.tenant.id, (client) =>
+      addOrganisation(client, a.tenant, { name: 'Quillfeather Trust' }),
+    );
+  });
+
+  const flagsOf = async (party: string) =>
+    (
+      await answer<{ flags: (typeof flag)[] }>(
+        send(a.officer, 'GET', `/console/parties/${party}/duplicate-flags`),
+      )
+    ).flags;
+  const dismissal = (id: string) => `/console/duplicate-flags/${id}/dismissal`;
+
+  it('lists a flag under one id whichever of the two parties it is listed for', async () => {
+    const [mine] = await flagsOf(a.organisation);
+    const [theirs] = await flagsOf(twin);
+    expect(mine).toMatchObject({ signal: 'similar_name', dismissal: null });
+    expect(theirs?.id).toBe(mine?.id);
+    flag = mine as typeof flag;
+    const rows = await rowsOf<{ n: string }>(
+      a.tenant,
+      'SELECT count(*) AS n FROM assure.duplicate_flag',
+    );
+    expect(Number(rows[0]?.n)).toBe(1);
+  });
+
+  it('refuses a member without the permission, another tenant, a reason outside the list and a body it cannot trust', async () => {
+    const body = { reason: 'different_organisation' };
+    expect((await send(reviewerA, 'POST', dismissal(flag.id), body)).statusCode).toBe(403);
+    expectLooksMissing(
+      await send(b.officer, 'POST', dismissal(flag.id), body),
+      await send(b.officer, 'POST', dismissal(randomUUID()), body),
+    );
+    expect((await send(a.officer, 'POST', dismissal(flag.id), { reason: 'tidy' })).statusCode).toBe(
+      400,
+    );
+    expect(
+      (await send(a.officer, 'POST', dismissal(flag.id), { ...body, dismissedBy: randomUUID() }))
+        .statusCode,
+    ).toBe(400);
+    expect((await flagsOf(a.organisation))[0]?.dismissal).toBeNull();
+    expect(await auditRows(a.tenant, 'assure.duplicate_flag.dismissed')).toHaveLength(0);
+  });
+
+  it('dismisses it once as the member in the session, keeps it dismissed on both parties, and audits a code', async () => {
+    const dismissed = await answer<{ dismissal: { reason: string; dismissedBy: string } }>(
+      send(a.officer, 'POST', dismissal(flag.id), { reason: 'different_organisation' }),
+    );
+    expect(dismissed.dismissal).toMatchObject({
+      reason: 'different_organisation',
+      dismissedBy: a.officer.membershipId,
+    });
+    expect(
+      (await send(a.officer, 'POST', dismissal(flag.id), { reason: 'different_organisation' }))
+        .statusCode,
+    ).toBe(409);
+    expect((await flagsOf(a.organisation))[0]?.dismissal).toMatchObject({
+      reason: 'different_organisation',
+    });
+    expect((await flagsOf(twin))[0]?.dismissal).toMatchObject({ reason: 'different_organisation' });
+    const [event] = await auditRows(a.tenant, 'assure.duplicate_flag.dismissed');
+    expect(event).toMatchObject({ entity_id: flag.id });
+    expect([a.organisation, twin]).toContain(event?.subject_party_id);
+    expect(JSON.stringify(event)).toContain('different_organisation');
+    expect(await auditRows(b.tenant, 'assure.duplicate_flag.dismissed')).toHaveLength(0);
+  });
+});
+
+describe('checklist answers', () => {
+  const NOTE = 'Quillfeather accounts filed late';
+  let checklist: { id: string; version: { id: string; items: { id: string; kind: string }[] } };
+  let applied: Awaited<ReturnType<typeof addSubmitted>>;
+  let draft: string;
+  let url: string;
+
+  const itemOf = (kind: string) => {
+    const found = checklist.version.items.find((item) => item.kind === kind);
+    if (found === undefined) throw new Error(`No ${kind} item.`);
+    return found.id;
+  };
+  const answers = (file: string, change: object = {}) => ({
+    versionId: checklist.version.id,
+    answers: {
+      [itemOf('yes_no')]: { kind: 'yes_no', value: 'yes' },
+      [itemOf('short_text')]: { kind: 'short_text', value: NOTE },
+      [itemOf('file')]: { kind: 'file', fileIds: [file] },
+    },
+    ...change,
+  });
+  const stored = async () =>
+    Number(
+      (
+        await rowsOf<{ n: string }>(a.tenant, 'SELECT count(*) AS n FROM assure.checklist_response')
+      )[0]?.n,
+    );
+
+  beforeAll(async () => {
+    applied = await addSubmitted(a.tenant);
+    draft = await asMigratorIn(
+      a.tenant.id,
+      async (client) => (await addApplication(client, a.tenant)).id,
+    );
+    await switchModule(a.tenant, 'grants');
+    await switchModule(b.tenant, 'grants');
+    checklist = await answer<typeof checklist>(
+      send(a.officer, 'POST', '/console/checklists', {
+        name: 'Answers checklist',
+        items: [
+          { id: randomUUID(), label: 'Accounts checked', kind: 'yes_no', required: true },
+          { id: randomUUID(), label: 'Visit date', kind: 'date', required: false },
+          { id: randomUUID(), label: 'Notes', kind: 'short_text', required: false },
+          { id: randomUUID(), label: 'Evidence', kind: 'file', required: true },
+        ],
+      }),
+      201,
+    );
+    url = `/console/applications/${applied.application}/checklists/${checklist.id}`;
+  }, 60_000);
+
+  it('refuses a member without the permission, another tenant, a draft and an unknown checklist', async () => {
+    const list = `/console/applications/${applied.application}/checklists`;
+    expect((await send(reviewerA, 'GET', url)).statusCode).toBe(403);
+    expect((await send(reviewerA, 'PUT', url, answers(randomUUID()))).statusCode).toBe(403);
+    expect((await send(reviewerA, 'GET', list)).statusCode).toBe(403);
+    expectLooksMissing(
+      await send(b.officer, 'GET', list),
+      await send(b.officer, 'GET', `/console/applications/${randomUUID()}/checklists`),
+    );
+    expectLooksMissing(
+      await send(b.officer, 'GET', url),
+      await send(
+        b.officer,
+        'GET',
+        `/console/applications/${randomUUID()}/checklists/${randomUUID()}`,
+      ),
+    );
+    expect((await send(b.officer, 'PUT', url, answers(randomUUID()))).statusCode).toBe(404);
+    expect(
+      (await send(a.officer, 'GET', `/console/applications/${draft}/checklists/${checklist.id}`))
+        .statusCode,
+    ).toBe(404);
+    expect(
+      (
+        await send(
+          a.officer,
+          'GET',
+          `/console/applications/${applied.application}/checklists/${randomUUID()}`,
+        )
+      ).statusCode,
+    ).toBe(404);
+  });
+
+  it('reads the newest version with no answers before the first save, without an audit event', async () => {
+    const read = await answer<{
+      version: { id: string };
+      answers: object;
+      savedAt: unknown;
+      complete: boolean;
+    }>(send(a.officer, 'GET', url));
+    expect(read).toMatchObject({ answers: {}, savedAt: null, complete: false });
+    expect(read.version.id).toBe(checklist.version.id);
+    const listed = await answer<{ checklists: { checklistId: string; complete: boolean }[] }>(
+      send(a.officer, 'GET', `/console/applications/${applied.application}/checklists`),
+    );
+    expect(listed.checklists).toContainEqual(
+      expect.objectContaining({ checklistId: checklist.id, complete: false }),
+    );
+    expect(await auditRows(a.tenant, 'assure.checklist_response.viewed')).toHaveLength(0);
+  });
+
+  it('refuses answers that do not fit the version, a file that cannot be linked and a body it cannot trust, saving nothing', async () => {
+    const file = await cleanFile(a);
+    const infected = await asMigratorIn(a.tenant.id, (client) =>
+      addFile(client, a.tenant, a.officer.membershipId, 'infected'),
+    );
+    const theirs = await cleanFile(b);
+    const mismatched = answers(file, {
+      answers: { [itemOf('yes_no')]: { kind: 'date', value: '2026-11-02' } },
+    });
+    const unknown = answers(file, {
+      answers: { [randomUUID()]: { kind: 'yes_no', value: 'yes' } },
+    });
+    for (const body of [
+      mismatched,
+      unknown,
+      answers(infected),
+      answers(theirs),
+      { ...answers(file), savedBy: randomUUID() },
+    ]) {
+      expect((await send(a.officer, 'PUT', url, body)).statusCode).toBe(400);
+    }
+    expect(
+      (await send(a.officer, 'PUT', url, answers(file, { versionId: randomUUID() }))).statusCode,
+    ).toBe(409);
+    expect(await stored()).toBe(0);
+    expect(await fileState(a, file)).toEqual({ linked: false, released: false });
+    expect(await fileState(b, theirs)).toEqual({ linked: false, released: false });
+  });
+
+  it('saves the answers, links the file and audits the applicant as the subject without an answer', async () => {
+    const file = await cleanFile(a);
+    const saved = await answer<{
+      complete: boolean;
+      savedAt: string;
+      answers: Record<string, unknown>;
+    }>(send(a.officer, 'PUT', url, answers(file)));
+    expect(saved.complete).toBe(true);
+    expect(saved.answers[itemOf('file')]).toEqual({ kind: 'file', fileIds: [file] });
+    expect(saved.answers[itemOf('short_text')]).toEqual({ kind: 'short_text', value: NOTE });
+    expect(await fileState(a, file)).toEqual({ linked: true, released: false });
+    const events = await auditRows(a.tenant, 'assure.checklist_response.saved');
+    expect(events).toEqual([expect.objectContaining({ subject_party_id: applied.person })]);
+    expect(JSON.stringify(events)).not.toContain(NOTE);
+    expect(await auditRows(b.tenant, 'assure.checklist_response.saved')).toHaveLength(0);
+
+    // The same answers again keep the file's link, and a replaced file is released.
+    await answer(send(a.officer, 'PUT', url, answers(file)));
+    expect(await fileState(a, file)).toEqual({ linked: true, released: false });
+    const next = await cleanFile(a);
+    await answer(send(a.officer, 'PUT', url, answers(next)));
+    expect(await fileState(a, file)).toEqual({ linked: true, released: true });
+    expect(await fileState(a, next)).toEqual({ linked: true, released: false });
+    expect((await send(a.officer, 'PUT', url, answers(file))).statusCode).toBe(400);
+  });
+
+  it('audits a read of saved answers, and shows another tenant nothing', async () => {
+    const read = await answer<{ answers: Record<string, unknown> }>(send(a.officer, 'GET', url));
+    expect(Object.keys(read.answers)).toHaveLength(3);
+    expect(await auditRows(a.tenant, 'assure.checklist_response.viewed')).toEqual([
+      expect.objectContaining({ subject_party_id: applied.person }),
+    ]);
+    expect((await send(b.officer, 'GET', url)).statusCode).toBe(404);
+    expect(await auditRows(b.tenant, 'assure.checklist_response.viewed')).toHaveLength(0);
+    const listed = await answer<{ checklists: { checklistId: string; complete: boolean }[] }>(
+      send(a.officer, 'GET', `/console/applications/${applied.application}/checklists`),
+    );
+    expect(listed.checklists).toContainEqual(
+      expect.objectContaining({ checklistId: checklist.id, complete: true }),
+    );
+  });
+
+  it('keeps answers on the version they were saved against, and answers 409 for another', async () => {
+    const published = await answer<{ version: { id: string } }>(
+      send(a.officer, 'POST', `/console/checklists/${checklist.id}/versions`, {
+        name: 'Answers checklist',
+        items: checklist.version.items.map((item, position) => ({
+          ...item,
+          label: `Question ${String(position)}`,
+          help: '',
+          required: false,
+        })),
+      }),
+      201,
+    );
+    expect(published.version.id).not.toBe(checklist.version.id);
+    const next = await cleanFile(a);
+    expect(
+      (await send(a.officer, 'PUT', url, answers(next, { versionId: published.version.id })))
+        .statusCode,
+    ).toBe(409);
+    const read = await answer<{ version: { id: string } }>(send(a.officer, 'GET', url));
+    expect(read.version.id).toBe(checklist.version.id);
+  });
+});
+
+describe('monitoring visits', () => {
+  let applied: Awaited<ReturnType<typeof addSubmitted>>;
+  let other: Awaited<ReturnType<typeof addSubmitted>>;
+  let attendee: string;
+  let spare: string;
+  let visit: { id: string };
+
+  const body = (change: object = {}) => ({
+    organisationId: applied.organisation,
+    applicationId: applied.application,
+    visitedOn: '2026-11-02',
+    type: 'in_person',
+    attendeePersonIds: [attendee],
+    findings: 'The trustees showed us the accounts.',
+    followUps: [{ action: 'Send the accounts', dueOn: '2026-12-01', done: false }],
+    evidence: [] as { fileId: string; caption: string }[],
+    ...change,
+  });
+
+  beforeAll(async () => {
+    applied = await addSubmitted(a.tenant);
+    other = await addSubmitted(a.tenant);
+    attendee = await asMigratorIn(a.tenant.id, (client) => addPerson(client, a.tenant));
+    spare = await asMigratorIn(b.tenant.id, (client) => addPerson(client, b.tenant));
+    await switchModule(a.tenant, 'grants');
+  }, 60_000);
+
+  it('refuses a member without the permission, and records nothing for records outside the tenant or the organisation', async () => {
+    expect((await send(reviewerA, 'POST', '/console/visits', body())).statusCode).toBe(403);
+    expect((await send(reviewerA, 'GET', '/console/visits')).statusCode).toBe(403);
+    const file = await cleanFile(a);
+    const infected = await asMigratorIn(a.tenant.id, (client) =>
+      addFile(client, a.tenant, a.officer.membershipId, 'infected'),
+    );
+    for (const refused of [
+      body({ organisationId: b.organisation }),
+      body({ applicationId: other.application }),
+      body({ applicationId: randomUUID() }),
+      body({ attendeePersonIds: [spare] }),
+      body({ attendeePersonIds: [applied.organisation] }),
+      body({ evidence: [{ fileId: infected, caption: 'Accounts' }] }),
+      body({ type: 'carrier_pigeon' }),
+      { ...body(), recordedBy: randomUUID() },
+    ]) {
+      expect((await send(a.officer, 'POST', '/console/visits', refused)).statusCode).toBe(400);
+    }
+    expect(
+      (await send(b.officer, 'POST', '/console/visits', body({ attendeePersonIds: [spare] })))
+        .statusCode,
+    ).toBe(400);
+    expect(await auditRows(a.tenant, 'assure.visit.recorded')).toHaveLength(0);
+    expect(await fileState(a, file)).toEqual({ linked: false, released: false });
+  });
+
+  it('records a visit once for a repeated key, links its evidence and audits the organisation without findings', async () => {
+    const file = await cleanFile(a);
+    const key = randomUUID();
+    const payload = body({ evidence: [{ fileId: file, caption: 'Accounts 2025' }] });
+    visit = await answer(send(a.officer, 'POST', '/console/visits', payload, { key }), 201);
+    const again = await answer<{ id: string }>(
+      send(a.officer, 'POST', '/console/visits', payload, { key }),
+      201,
+    );
+
+    expect(again.id).toBe(visit.id);
+    expect(visit).toMatchObject({
+      organisationId: applied.organisation,
+      applicationId: applied.application,
+      visitedOn: '2026-11-02',
+      attendeePersonIds: [attendee],
+      evidence: [{ fileId: file, caption: 'Accounts 2025' }],
+    });
+    expect(await fileState(a, file)).toEqual({ linked: true, released: false });
+    const events = await auditRows(a.tenant, 'assure.visit.recorded');
+    expect(events).toEqual([
+      expect.objectContaining({ entity_id: visit.id, subject_party_id: applied.organisation }),
+    ]);
+    expect(JSON.stringify(events)).not.toContain('trustees');
+  });
+
+  it('audits a read of a visit with its findings, and answers another tenant as missing', async () => {
+    const url = `/console/visits/${visit.id}`;
+    const read = await answer<{ findings: string }>(send(a.officer, 'GET', url));
+    expect(read.findings).toContain('trustees');
+    expect(await auditRows(a.tenant, 'assure.visit.viewed')).toEqual([
+      expect.objectContaining({ entity_id: visit.id, subject_party_id: applied.organisation }),
+    ]);
+    expectLooksMissing(
+      await send(b.officer, 'GET', url),
+      await send(b.officer, 'GET', `/console/visits/${randomUUID()}`),
+    );
+    expect(await auditRows(b.tenant, 'assure.visit.viewed')).toHaveLength(0);
+  });
+
+  it('changes a visit, keeping its organisation, and releases evidence it drops', async () => {
+    const url = `/console/visits/${visit.id}`;
+    const kept = visit as unknown as { evidence: { fileId: string }[] };
+    const [first] = kept.evidence;
+    const added = await cleanFile(a);
+    const update = {
+      visitedOn: '2026-11-03',
+      type: 'video_call',
+      attendeePersonIds: [],
+      findings: 'Everything was in order.',
+      followUps: [{ action: 'Send the accounts', dueOn: null, done: true }],
+      evidence: [{ fileId: added, caption: 'Signed report' }],
+    };
+    expect((await send(reviewerA, 'PUT', url, update)).statusCode).toBe(403);
+    expect((await send(b.officer, 'PUT', url, update)).statusCode).toBe(404);
+    expect(
+      (await send(a.officer, 'PUT', url, { ...update, organisationId: randomUUID() })).statusCode,
+    ).toBe(400);
+
+    const changed = await answer<{
+      organisationId: string;
+      visitedOn: string;
+      attendeePersonIds: string[];
+      evidence: { fileId: string; caption: string }[];
+    }>(send(a.officer, 'PUT', url, update));
+    expect(changed).toMatchObject({
+      organisationId: applied.organisation,
+      visitedOn: '2026-11-03',
+      attendeePersonIds: [],
+      evidence: [{ fileId: added, caption: 'Signed report' }],
+    });
+    expect(await fileState(a, String(first?.fileId))).toEqual({ linked: true, released: true });
+    expect(await auditRows(a.tenant, 'assure.visit.updated')).toEqual([
+      expect.objectContaining({ entity_id: visit.id, subject_party_id: applied.organisation }),
+    ]);
+    expect(await auditRows(b.tenant, 'assure.visit.updated')).toHaveLength(0);
+  });
+
+  it('lists visits newest first a page at a time, counts open follow-ups and keeps other tenants out', async () => {
+    const only = await answer<{
+      visits: { id: string; openFollowUps: number }[];
+      nextCursor: null;
+    }>(send(a.officer, 'GET', `/console/visits?applicationId=${applied.application}`));
+    expect(only.visits).toEqual([expect.objectContaining({ id: visit.id, openFollowUps: 0 })]);
+
+    await asMigratorIn(a.tenant.id, (client) =>
+      client.query(
+        `INSERT INTO assure.monitoring_visit
+           (tenant_id, organisation_id, visited_on, visit_type, recorded_by, updated_by)
+         SELECT $1::uuid, $2::uuid, DATE '2026-01-01' + n, 'phone_call', $3::uuid, $3::uuid FROM generate_series(1, 51) AS n`,
+        [a.tenant.id, other.organisation, a.officer.membershipId],
+      ),
+    );
+    const url = `/console/visits?organisationId=${other.organisation}`;
+    const first = await answer<{ visits: { visitedOn: string }[]; nextCursor: string }>(
+      send(a.officer, 'GET', url),
+    );
+    expect(first.visits).toHaveLength(50);
+    expect(first.visits[0]?.visitedOn).toBe('2026-02-21');
+    const second = await answer<{ visits: { visitedOn: string }[]; nextCursor: null }>(
+      send(a.officer, 'GET', `${url}&cursor=${first.nextCursor}`),
+    );
+    expect(second.visits.map(({ visitedOn }) => visitedOn)).toEqual(['2026-01-02']);
+    expect(second.nextCursor).toBeNull();
+    expect((await send(a.officer, 'GET', `${url}&cursor=bm9wZQ`)).statusCode).toBe(400);
+
+    const theirs = await answer<{ visits: unknown[] }>(send(b.officer, 'GET', url));
+    expect(theirs.visits).toEqual([]);
   });
 });
 
