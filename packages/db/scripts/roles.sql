@@ -1,6 +1,6 @@
 -- SPDX-License-Identifier: AGPL-3.0-or-later
 --
--- Fairfold Grants database roles, version 5 (ADR 0003), part 1 of 2: the roles.
+-- Fairfold Grants database roles, version 6 (ADR 0003), part 1 of 2: the roles.
 --
 -- Creates the login roles and the function-owner roles, and resets their
 -- attributes, memberships, settings and passwords. Roles belong to the
@@ -64,7 +64,7 @@ SET LOCAL lock_timeout = '30s';
 
 DO $roles$
 DECLARE
-  roles_version CONSTANT text := '5';
+  roles_version CONSTANT text := '6';
   managed CONSTANT boolean := current_setting('tps.admin_mode', true) = 'managed';
   backup_role CONSTANT text := 'backup_reader';
   login_roles CONSTANT text[] := ARRAY['migrator', 'app_api', 'app_worker', 'app_auth', 'app_queue', backup_role];
@@ -97,7 +97,8 @@ DECLARE
     'owner_app_resolve_signature_callback',    -- S12-62
     'owner_app_erase_documents',               -- S12-62
     'owner_app_delete_swept_file',             -- S11-74, app.delete_swept_file()
-    'owner_app_erase_file'                     -- S11-74, app.erase_file()
+    'owner_app_erase_file',                    -- S11-74, app.erase_file()
+    'owner_forms_public_form'                  -- S12-44, forms.public_form() (ADR 0036)
   ];
   all_roles CONSTANT text[] := login_roles || operator_role || owner_roles;
   admin record;

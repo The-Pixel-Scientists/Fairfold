@@ -217,7 +217,7 @@ describe('roles.sql', () => {
       await resetRoles();
     }
     expect(problems).toEqual([
-      'role app_queue was not set up by roles script version 5',
+      'role app_queue was not set up by roles script version 6',
       `role ${BACKUP_ROLE} does not bypass row-level security, so a backup would miss rows`,
       `role ${role} can log in`,
       `role ${role} bypasses row-level security`,
@@ -337,6 +337,34 @@ describe('roles.sql', () => {
     ]);
     expect(missing).toEqual([`app_worker is not a SET-only member of role ${OPERATOR_ROLE}`]);
     await expectRolesUnchanged();
+  });
+
+  it("sets owner_forms_public_form up as version 6's new owner, with migrator's SET-only membership alone", async () => {
+    const { rows } = await withClient(MAINTENANCE_DATABASE, (client) =>
+      client.query(
+        `SELECT r.rolcanlogin, r.rolpassword, r.rolsuper, r.rolbypassrls, r.rolcreaterole,
+                r.rolcreatedb, r.rolreplication,
+                pg_catalog.shobj_description(r.oid, 'pg_authid') AS comment,
+                array(SELECT format('%s in %s admin=%s inherit=%s set=%s', m.member::regrole,
+                                    m.roleid::regrole, m.admin_option, m.inherit_option, m.set_option)
+                        FROM pg_catalog.pg_auth_members m
+                       WHERE m.roleid = r.oid OR m.member = r.oid) AS memberships
+           FROM pg_catalog.pg_authid r WHERE r.rolname = 'owner_forms_public_form'`,
+      ),
+    );
+    expect(rows).toEqual([
+      {
+        rolcanlogin: false,
+        rolpassword: null,
+        rolsuper: false,
+        rolbypassrls: false,
+        rolcreaterole: false,
+        rolcreatedb: false,
+        rolreplication: false,
+        comment: 'tps-roles-version=6',
+        memberships: ['migrator in owner_forms_public_form admin=f inherit=f set=t'],
+      },
+    ]);
   });
 
   it('never repeats a password verifier in its errors', async () => {
