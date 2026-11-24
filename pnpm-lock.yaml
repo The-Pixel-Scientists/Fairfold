@@ -239,21 +239,36 @@ importers:
       '@opentelemetry/semantic-conventions':
         specifier: 1.44.0
         version: 1.44.0
+      '@pixel-scientists/assure':
+        specifier: workspace:*
+        version: link:../../modules/assure
+      '@pixel-scientists/crm':
+        specifier: workspace:*
+        version: link:../../modules/crm
       '@pixel-scientists/db':
         specifier: workspace:*
         version: link:../../packages/db
       '@pixel-scientists/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@pixel-scientists/forms':
+        specifier: workspace:*
+        version: link:../../modules/forms
       '@pixel-scientists/grants':
         specifier: workspace:*
         version: link:../../modules/grants
       '@pixel-scientists/impact':
         specifier: workspace:*
         version: link:../../modules/impact
+      '@pixel-scientists/insight':
+        specifier: workspace:*
+        version: link:../../modules/insight
       '@pixel-scientists/party':
         specifier: workspace:*
         version: link:../../modules/party
+      '@pixel-scientists/privacy':
+        specifier: workspace:*
+        version: link:../../modules/privacy
       '@smithy/signature-v4':
         specifier: 5.7.5
         version: 5.7.5

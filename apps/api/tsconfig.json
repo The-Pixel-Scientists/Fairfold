@@ -23,6 +23,21 @@
     },
     {
       "path": "../../modules/impact/tsconfig.server.json"
+    },
+    {
+      "path": "../../modules/crm/tsconfig.server.json"
+    },
+    {
+      "path": "../../modules/assure/tsconfig.server.json"
+    },
+    {
+      "path": "../../modules/forms/tsconfig.server.json"
+    },
+    {
+      "path": "../../modules/privacy/tsconfig.server.json"
+    },
+    {
+      "path": "../../modules/insight/tsconfig.server.json"
     }
   ]
 }
