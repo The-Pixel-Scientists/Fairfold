@@ -17,9 +17,11 @@
 // of people the tenant may not hold as parties; list entries 90 days after
 // their list version is replaced. Checklists are tenant configuration.
 // Answers and visits stay with the application or organisation they belong
-// to, as those do. Erasure anonymises in place through assure.erase_subject
-// (migration 0058): names and free text become 'erased' or are cleared, and
-// a person's attendee rows are removed.
+// to, as those do. Duplicate flags (migration 0110) hold party ids and
+// codes only, and stay as long as the parties. Erasure anonymises in place
+// through assure.erase_subject (migration 0058): names and free text become
+// 'erased' or are cleared, and a person's attendee rows are removed; a flag
+// has nothing to clear.
 
 import type {
   ClassificationRegistry,
@@ -237,6 +239,20 @@ export const assure = {
     added_by: internal,
     created_at: internal,
   },
+  'assure.duplicate_flag': {
+    tenant_id: internal,
+    id: internal,
+    party_id: internal,
+    other_party_id: internal,
+    signal: internal,
+    dismiss_reason: internal,
+    dismissed_by: internal,
+    dismissed_at: internal,
+    created_at: internal,
+    created_by: internal,
+    updated_at: internal,
+    updated_by: internal,
+  },
 } satisfies ClassificationRegistry;
 
 /**
@@ -268,6 +284,7 @@ export const assureSubjects: SubjectPathRegistry = {
   'assure.monitoring_visit': { kind: 'party', column: 'organisation_id' },
   'assure.visit_attendee': { kind: 'party', column: 'person_id' },
   'assure.visit_evidence': { kind: 'join', column: 'visit_id', table: 'assure.monitoring_visit' },
+  'assure.duplicate_flag': { kind: 'parties', columns: ['party_id', 'other_party_id'] },
 };
 
 const stored = ['hosting', 'backup'] as const;
@@ -312,4 +329,5 @@ export const assureProcessing: ProcessingRegistry<typeof assure> = {
   'assure.monitoring_visit': monitoring,
   'assure.visit_attendee': monitoring,
   'assure.visit_evidence': monitoring,
+  'assure.duplicate_flag': dueDiligence(['applicant', 'applicant_contact']),
 };
