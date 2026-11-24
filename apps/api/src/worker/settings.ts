@@ -9,7 +9,15 @@
 import { isLoopbackHost, readSecret, type Env } from '@pixel-scientists/db';
 
 import { loadFileSettings, type FileSettings } from '../platform/files/index.ts';
-import { ConfigError, loadConfig, Secret, type Config, type LogLevel } from '../config.ts';
+import {
+  ConfigError,
+  loadConfig,
+  loadModuleSettings,
+  Secret,
+  type Config,
+  type LogLevel,
+  type ModuleSettings,
+} from '../config.ts';
 import { loadTelemetrySettings, type TelemetrySettings } from '../telemetry/index.ts';
 
 export interface WorkerSettings {
@@ -27,6 +35,8 @@ export interface WorkerSettings {
   readonly smtp: Config['smtp'];
   /** The applicant portal's origin, which the release emails link to. */
   readonly portalOrigin: string;
+  /** The secrets and addresses the modules' jobs use; a feature without its setting stays off. */
+  readonly modules: ModuleSettings;
 }
 
 const MINIMUM_PASSWORD_LENGTH = 16;
@@ -105,13 +115,15 @@ export function loadWorkerSettings(env: Env): WorkerSettings {
   const telemetry = attempt(() => loadTelemetrySettings(env));
   const files = attempt(() => loadFileSettings(env, undefined, { removal: true }));
   const origin = attempt(() => portalOrigin(env));
+  const modules = attempt(() => loadModuleSettings(env));
   if (
     config === undefined ||
     workerPassword === undefined ||
     queuePassword === undefined ||
     telemetry === undefined ||
     files === undefined ||
-    origin === undefined
+    origin === undefined ||
+    modules === undefined
   ) {
     throw new ConfigError(problems);
   }
@@ -126,5 +138,6 @@ export function loadWorkerSettings(env: Env): WorkerSettings {
     files,
     smtp: config.smtp,
     portalOrigin: origin,
+    modules,
   };
 }

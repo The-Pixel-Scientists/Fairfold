@@ -68,6 +68,22 @@ describe('the worker settings', () => {
     expect(settings.portalOrigin).toBe('https://portal.example.org');
   });
 
+  it('reads the module settings its jobs use, leaves a feature without one off, and names a bad one', () => {
+    const off = loadWorkerSettings(env).modules;
+    expect(off.marketing).toBeUndefined();
+    expect(off.assure.sanctionsListUrl).toBeUndefined();
+
+    const on = loadWorkerSettings({
+      ...env,
+      TPS_SANCTIONS_LIST_URL: 'https://lists.example.org/sanctions.json',
+    }).modules;
+    expect(on.assure.sanctionsListUrl?.hostname).toBe('lists.example.org');
+
+    expect(problems({ ...env, TPS_SUPPRESSION_SECRET: 'short' })).toEqual([
+      'TPS_SUPPRESSION_SECRET must be at least 32 bytes.',
+    ]);
+  });
+
   it('names a missing mail server or portal origin, and refuses a portal origin with a path', () => {
     const found = problems({ ...env, TPS_SMTP_HOST: undefined, TPS_PORTAL_ORIGIN: undefined });
     expect(found.join(', ')).toContain('TPS_SMTP_HOST');

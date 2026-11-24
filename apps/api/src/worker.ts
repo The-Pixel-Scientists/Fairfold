@@ -86,7 +86,7 @@ async function main(): Promise<void> {
       setup: { db, sender, logger: jobLogger(logger) },
       handlers: handlerRegistry(
         jobLogger(logger),
-        workerModuleJobs(mail),
+        workerModuleJobs(mail, { jobs: sender, settings: settings.modules }),
         createFilesJob(settings.files, pinnedFetch(settings.files.storage.endpoint)),
       ),
       schedules,
