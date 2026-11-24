@@ -23,7 +23,7 @@ describe('forms.response answers', { timeout: 30_000 }, () => {
   it('are classified per field from the pinned version', () => {
     expect(classification['forms.response']?.['answers']).toEqual({
       sensitivity: 'special_category',
-      retention: { kind: 'fixed', days: 1, from: 'retain_until' },
+      retention: { kind: 'fixed', days: 1, from: 'retain_until', policy: 'forms_responses' },
       perField: {
         versionColumn: 'form_version_id',
         definition: { table: 'forms.form_version', column: 'definition' },

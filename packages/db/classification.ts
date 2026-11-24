@@ -43,9 +43,16 @@ export type Sensitivity = (typeof SENSITIVITIES)[number];
 export type RetentionRule =
   /**
    * A fixed period: deleted `days` days after the time in the same row's
-   * `from` column, such as 7 days after a job's completion.
+   * `from` column, such as 7 days after a job's completion. With a
+   * `policy`, app.apply_retention(policy) deletes them, and the retention
+   * sweep calls it.
    */
-  | { readonly kind: 'fixed'; readonly days: number; readonly from: string }
+  | {
+      readonly kind: 'fixed';
+      readonly days: number;
+      readonly from: string;
+      readonly policy?: string;
+    }
   /**
    * A period each tenant sets under `policy` in its retention settings,
    * never shorter than `minimumDays`, which only a migration can lower.

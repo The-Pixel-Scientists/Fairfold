@@ -15,9 +15,10 @@
 // database sets from the form's retention months (12 at most for a form
 // anyone can answer) and no app role changes; a token ends with it. The
 // existing rule kinds cannot say "until this row's time", so these are a
-// day past it, and retention takes them once a later migration gives
-// app.apply_retention() its forms targets. A draft is the respondent's own
-// unsaved work and has no retain_until until it is submitted.
+// day past it, under the forms_responses policy: app.apply_retention()
+// deletes them (migration 0113) when the retention sweep calls it. A draft
+// is the respondent's own unsaved work and has no retain_until until it is
+// submitted.
 //
 // A signed-in response is about its respondent's person; its token, through
 // the response. Forms and versions are about no one. An anonymous response
@@ -39,12 +40,12 @@ const internal: FieldClassification = {
 };
 const response: FieldClassification = {
   sensitivity: 'internal',
-  retention: { kind: 'fixed', days: 1, from: 'retain_until' },
+  retention: { kind: 'fixed', days: 1, from: 'retain_until', policy: 'forms_responses' },
 };
 const responseHash: FieldClassification = { ...response, sensitivity: 'personal' };
 const token: FieldClassification = {
   sensitivity: 'internal',
-  retention: { kind: 'fixed', days: 1, from: 'expires_at' },
+  retention: { kind: 'fixed', days: 1, from: 'expires_at', policy: 'forms_responses' },
 };
 
 const key = { tenant_id: internal, id: internal } as const;
