@@ -35,6 +35,7 @@ export {
 } from './handlers.ts';
 export { partyRecordHandlers, type PartyRecordDependencies } from './record-handlers.ts';
 export { emailRecipient, mayContact } from './contact/index.ts';
+export { preferenceHandlers } from './preferences/index.ts';
 export { partyReadsForCrm } from './crm-reads.ts';
 export { createPartyMerges } from './merge.ts';
 export type { PartyRequest } from './request.ts';
