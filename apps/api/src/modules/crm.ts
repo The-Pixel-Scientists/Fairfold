@@ -6,7 +6,9 @@
 // caller's tenant, and the platform has checked the module switch, the
 // permission and the step-up window before it runs.
 //
-// Not yet wired, each for want of a piece another owner holds: the import
+// Not yet wired, each for want of a piece another owner holds: the merge
+// reversal (party's merge contract has no unmerge, and the schema has no
+// record of the rows a merge moved), the import
 // routes and their parse job (the file service has no clean-only read for a
 // job, and party has no duplicate check or staff create for a record that
 // does not exist yet), the timeline's event handler (grants has no read
@@ -53,8 +55,16 @@ export const crmComposition: ModuleFactory = ({ platform, settings }) => {
     }),
     route(crmRoutes.listDuplicates, handlers.listDuplicates),
     route(crmRoutes.listPartyDuplicates, handlers.listPartyDuplicates),
+    route(crmRoutes.dismissDuplicate, handlers.dismissDuplicate, {
+      replay: ({ tx, id }) => handlers.replayDismissal({ tx, id: platform.created(id) }),
+    }),
     route(crmRoutes.getMergeRecord, handlers.getMergeRecord),
     route(crmRoutes.listPartyMerges, handlers.listPartyMerges),
+    route(crmRoutes.listExternalReferences, handlers.listExternalReferences),
+    route(crmRoutes.addExternalReference, handlers.addExternalReference, {
+      replay: ({ tx, id }) => handlers.replayReference({ tx, id: platform.created(id) }),
+    }),
+    route(crmRoutes.removeExternalReference, handlers.removeExternalReference),
     route(crmRoutes.listLists, handlers.listLists),
     route(crmRoutes.createList, handlers.createList, {
       replay: ({ tx, id }) => handlers.replayList({ tx, id: platform.created(id) }),

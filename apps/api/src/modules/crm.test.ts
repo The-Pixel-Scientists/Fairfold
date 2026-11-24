@@ -16,13 +16,9 @@ const withSecret = moduleDependencies({
   },
 });
 
-/** Routes whose handlers are not built yet (B15-05) or whose wiring waits on another owner. */
+/** Routes whose handlers wait on another owner: party's unmerge, and the import's file and party reads. */
 const unregistered = [
-  'dismissDuplicate',
   'reverseMerge',
-  'listExternalReferences',
-  'addExternalReference',
-  'removeExternalReference',
   'startImport',
   'getImport',
   'listImportRows',
