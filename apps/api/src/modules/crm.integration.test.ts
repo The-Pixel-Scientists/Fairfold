@@ -370,3 +370,180 @@ describe('merge', () => {
     expect(await count(tenantB, 'crm.merge_record')).toBe(0);
   });
 });
+
+describe('dismissing a duplicate', () => {
+  type Pair = { partyId: string; otherPartyId: string };
+
+  /** Every pair the tenant list finds for organisations, page by page. */
+  async function tenantPairs(member: Member): Promise<Pair[]> {
+    const pairs: Pair[] = [];
+    let cursor: string | undefined;
+    do {
+      const page: { pairs: Pair[]; nextCursor: string | null } = await answer(
+        send(member, 'POST', '/console/crm/duplicates/query', { kind: 'organisation', cursor }),
+      );
+      pairs.push(...page.pairs);
+      cursor = page.nextCursor ?? undefined;
+    } while (cursor !== undefined);
+    return pairs;
+  }
+
+  const holds = (pairs: Pair[], ids: string[]) =>
+    pairs.some((pair) => ids.includes(pair.partyId) && ids.includes(pair.otherPartyId));
+
+  it('hides the pair from both lists, audits it, and answers a repeat with the same dismissal', async () => {
+    const ids = [await org(tenantA, 'Dismisswell Trust'), await org(tenantA, 'Dismisswell Trust')];
+    expect(holds(await tenantPairs(managerA), ids)).toBe(true);
+    const body = { partyId: ids[1], otherPartyId: ids[0], reason: 'different_organisation' };
+    const key = randomUUID();
+
+    const first = await answer<{ id: string; partyId: string; otherPartyId: string }>(
+      send(managerA, 'POST', '/console/crm/duplicate-dismissals', body, { key }),
+      201,
+    );
+    const replayed = await answer<{ id: string }>(
+      send(managerA, 'POST', '/console/crm/duplicate-dismissals', body, { key }),
+      201,
+    );
+    const repeated = await answer<{ id: string }>(
+      send(managerA, 'POST', '/console/crm/duplicate-dismissals', body),
+      201,
+    );
+
+    expect([replayed.id, repeated.id]).toEqual([first.id, first.id]);
+    expect([first.partyId, first.otherPartyId]).toEqual([...ids].sort());
+    expect(await events(tenantA, 'crm.duplicate.dismissed')).toEqual([
+      expect.objectContaining({ entity_id: first.id, actor_id: managerA.membershipId }),
+    ]);
+    expect(await count(tenantA, 'crm.duplicate_dismissal')).toBe(1);
+    const own = await answer<{ pairs: Pair[] }>(
+      send(managerA, 'GET', `/console/crm/parties/${ids[0]}/duplicates`),
+    );
+    expect(holds(own.pairs, ids)).toBe(false);
+    expect(holds(await tenantPairs(managerA), ids)).toBe(false);
+  });
+
+  it('refuses a reason that does not fit, two kinds of record, and a member without the permission', async () => {
+    const [a, b] = [await org(tenantA, 'Fitwell One'), await org(tenantA, 'Fitwell Two')];
+    const ada = await person(tenantA, { given_name: 'Fit', family_name: 'Person' });
+    const url = '/console/crm/duplicate-dismissals';
+    const dismiss = (member: Member, partyId: string, otherPartyId: string, reason: string) =>
+      send(member, 'POST', url, { partyId, otherPartyId, reason });
+
+    expect((await dismiss(managerA, a, b, 'different_person')).statusCode).toBe(400);
+    expect((await dismiss(managerA, a, ada, 'related_but_separate')).statusCode).toBe(400);
+    expect((await dismiss(managerA, a, a, 'duplicate_allowed')).statusCode).toBe(400);
+    expect((await dismiss(reviewerA, a, b, 'duplicate_allowed')).statusCode).toBe(403);
+    expect(await count(tenantA, 'crm.duplicate_dismissal')).toBe(1);
+  });
+
+  it('answers another tenant’s party as missing and writes nothing', async () => {
+    const [mine, theirs] = [await org(tenantA, 'Mine Again'), await org(tenantB, 'Theirs Again')];
+    const response = await send(managerA, 'POST', '/console/crm/duplicate-dismissals', {
+      partyId: mine,
+      otherPartyId: theirs,
+      reason: 'duplicate_allowed',
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(await count(tenantB, 'crm.duplicate_dismissal')).toBe(0);
+  });
+});
+
+describe('external references', () => {
+  const urlOf = (partyId: string) => `/console/crm/parties/${partyId}/external-references`;
+  const reference = (externalId: string) => ({
+    system: 'twenty',
+    externalId,
+    url: 'https://crm.example.test/record',
+  });
+
+  it('adds, lists and removes a reference, audits each change without the id, and replays a repeated key', async () => {
+    const harbour = await org(tenantA, 'Reference Harbour');
+    const externalId = `ref-${randomUUID()}`;
+    const key = randomUUID();
+
+    const added = await answer<{ id: string; externalId: string; url: string }>(
+      send(managerA, 'POST', urlOf(harbour), reference(externalId), { key }),
+      201,
+    );
+    const replayed = await answer<{ id: string }>(
+      send(managerA, 'POST', urlOf(harbour), reference(externalId), { key }),
+      201,
+    );
+    expect(replayed.id).toBe(added.id);
+    expect(added).toMatchObject({ externalId, url: 'https://crm.example.test/record' });
+
+    const listed = await answer<{ references: { id: string }[] }>(
+      send(managerA, 'GET', urlOf(harbour)),
+    );
+    expect(listed.references.map(({ id }) => id)).toEqual([added.id]);
+    const viewed = (await events(tenantA, 'crm.party.viewed')).filter(
+      (e) => e.entity_id === harbour,
+    );
+    expect(viewed.length).toBeGreaterThan(0);
+    expect(viewed.at(-1)?.actor_id).toBe(managerA.membershipId);
+    expect(JSON.stringify(viewed)).not.toContain(externalId);
+    const [event] = (await events(tenantA, 'crm.external_reference.added')).filter(
+      (e) => e.entity_id === added.id,
+    );
+    expect(event?.actor_id).toBe(managerA.membershipId);
+    expect(JSON.stringify(event?.changes)).not.toContain(externalId);
+
+    expect((await send(managerA, 'DELETE', `${urlOf(harbour)}/${added.id}`)).statusCode).toBe(204);
+    expect(
+      (await events(tenantA, 'crm.external_reference.removed')).map((e) => e.entity_id),
+    ).toEqual([added.id]);
+    expect(
+      (await answer<{ references: unknown[] }>(send(managerA, 'GET', urlOf(harbour)))).references,
+    ).toEqual([]);
+  });
+
+  it('refuses a second reference to the same system and id, and an address that is not https', async () => {
+    const harbour = await org(tenantA, 'Twice Harbour');
+    const externalId = `twice-${randomUUID()}`;
+    await answer(send(managerA, 'POST', urlOf(harbour), reference(externalId)), 201);
+
+    expect((await send(managerA, 'POST', urlOf(harbour), reference(externalId))).statusCode).toBe(
+      409,
+    );
+    expect(
+      (
+        await send(managerA, 'POST', urlOf(harbour), {
+          ...reference(`plain-${randomUUID()}`),
+          url: 'http://crm.example.test/record',
+        })
+      ).statusCode,
+    ).toBe(400);
+  });
+
+  it('refuses a member without the permission', async () => {
+    const harbour = await org(tenantA, 'Closed Harbour');
+
+    expect((await send(reviewerA, 'GET', urlOf(harbour))).statusCode).toBe(403);
+    expect(
+      (await send(reviewerA, 'POST', urlOf(harbour), reference(`no-${randomUUID()}`))).statusCode,
+    ).toBe(403);
+  });
+
+  it('keeps references inside the tenant', async () => {
+    const [mine, theirs] = [
+      await org(tenantA, 'Mine Harbour'),
+      await org(tenantB, 'Their Harbour'),
+    ];
+    const own = await answer<{ id: string }>(
+      send(managerA, 'POST', urlOf(mine), reference(`mine-${randomUUID()}`)),
+      201,
+    );
+
+    expect((await send(managerA, 'GET', urlOf(theirs))).statusCode).toBe(404);
+    expect(
+      (await send(managerA, 'POST', urlOf(theirs), reference(`x-${randomUUID()}`))).statusCode,
+    ).toBe(404);
+    expect((await send(managerB, 'GET', urlOf(mine))).statusCode).toBe(404);
+    expect((await send(managerB, 'DELETE', `${urlOf(theirs)}/${own.id}`)).statusCode).toBe(404);
+    expect((await send(managerB, 'DELETE', `${urlOf(mine)}/${own.id}`)).statusCode).toBe(404);
+    expect(await count(tenantB, 'crm.external_reference')).toBe(0);
+    expect(await count(tenantA, 'crm.external_reference')).toBeGreaterThanOrEqual(1);
+  });
+});
