@@ -175,12 +175,14 @@ export const app: SchemaCatalogue = {
       'app.apply_retention(text)',
       {
         owner: 'owner_app_apply_retention',
-        // Its targets are the crm import tables (migration 0064). It reads
-        // the tenant's settings, writes its own event, and releases a
-        // deleted job's file; never a column the database sets.
+        // Its targets are the crm import tables (migration 0064) and form
+        // responses and their tokens (migration 0113). It reads the tenant's
+        // settings, writes its own event, and releases a deleted job's file;
+        // never a column the database sets.
         rights: [
           'USAGE on schema app',
           'USAGE on schema crm',
+          'USAGE on schema forms',
           'EXECUTE on function app.current_tenant_id()',
           'EXECUTE on function app.release_file(uuid)',
           ...['tenant_id', 'policy', 'days'].map(
@@ -194,6 +196,14 @@ export const app: SchemaCatalogue = {
             (column) => `SELECT on column crm.import_job.${column}`,
           ),
           'DELETE on crm.import_job',
+          ...['tenant_id', 'id', 'response_id', 'expires_at'].map(
+            (column) => `SELECT on column forms.respondent_token.${column}`,
+          ),
+          'DELETE on forms.respondent_token',
+          ...['tenant_id', 'id', 'retain_until'].map(
+            (column) => `SELECT on column forms.response.${column}`,
+          ),
+          'DELETE on forms.response',
           ...['tenant_id', 'id', 'released_at'].map(
             (column) => `SELECT on column app.file.${column}`,
           ),
@@ -211,6 +221,8 @@ export const app: SchemaCatalogue = {
         policies: [
           'crm.import_row policy retention_delete',
           'crm.import_job policy retention_delete',
+          'forms.respondent_token policy retention_delete',
+          'forms.response policy retention_delete',
           'app.audit_event policy retention_insert',
         ],
       },

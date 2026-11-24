@@ -4,8 +4,10 @@
 // checked the session, the permission and that insight is on. Grants' server
 // counts the answers inside this request's transaction, and the counts go
 // straight to the suppression function: they are never returned, logged,
-// stored, audited or kept past the request. Only the suppressed table leaves.
-// The run's audit event holds the report and the rule's version, never a count.
+// stored, audited or kept past the request. Only the suppressed table leaves,
+// and the run log keeps it (run-log.ts), which may refuse the run. A refusal
+// is kept with its audit event and answered after the commit. The run's audit
+// event holds the report and the rule's version, never a count.
 
 import {
   insightRefusals,
@@ -16,6 +18,7 @@ import type { Args, InsightDependencies, MonitoringCounts, ReportParams } from '
 import { appliedRule } from './disclosure.ts';
 import { inputOf, readDefinitionRow } from './definitions.ts';
 import { serverRefusals } from './messages.ts';
+import { insertRun, lockQuestion, revealsSmallGroup, type RunTable } from './run-log.ts';
 import { disclose, type CountTable } from './suppress.ts';
 
 type Counted = Extract<MonitoringCounts, { status: 'counted' }>;
@@ -63,25 +66,64 @@ export function monitoringHandlers(deps: InsightDependencies) {
     const rule = await appliedRule(tx);
     const counts = await deps.monitoringCounts(tx, [filter.value]);
     if (counts.status === 'grants_off') throw deps.refuse(409, serverRefusals.needsGrants);
-    const result = disclose(tableOf(counts, definition.source, breakdown), rule);
+    const counted = tableOf(counts, definition.source, breakdown);
+    const result = disclose(counted, rule);
+
+    const table: RunTable = { question: definition.source, breakdown, roundId: filter.value };
+    const run = {
+      reportId,
+      reportVersion: row.version,
+      kind: 'monitoring',
+      ruleVersion: rule.version,
+    } as const;
+    const by = context.membership.id;
+    const changes = {
+      'insight.report_definition.version': { after: row.version },
+      'insight.disclosure_rule.version': { after: rule.version },
+    };
+
+    let outcome: 'shown' | 'withheld' | 'refused' = result.status;
+    const now = result.status === 'shown' && {
+      responses: counted.respondents,
+      table: result.table,
+    };
+    if (now) {
+      await lockQuestion(tx, definition.source);
+      if (await revealsSmallGroup(tx, table, now, rule)) outcome = 'refused';
+    }
+    const runId = await insertRun(tx, {
+      ...run,
+      outcome,
+      by,
+      table,
+      ...(now && outcome === 'shown'
+        ? { shown: { ...now, roundIds: counts.rounds.map(({ roundId }) => roundId) } }
+        : {}),
+    });
 
     await context.audit.record({
-      action: 'insight.monitoring_report.run',
+      action:
+        outcome === 'refused'
+          ? 'insight.monitoring_report.refused'
+          : 'insight.monitoring_report.run',
       entityId: reportId,
-      changes: {
-        'insight.report_definition.version': { after: row.version },
-        'insight.disclosure_rule.version': { after: rule.version },
-      },
+      changes,
     });
+    // The refusal is answered once the run and its event are kept, and shows nothing of the table.
+    if (outcome === 'refused') {
+      context.afterCommit(() =>
+        Promise.reject(deps.refuse(409, insightRefusals.monitoringRefused)),
+      );
+    }
     return {
-      runId: crypto.randomUUID(),
+      runId,
       reportId,
       reportVersion: row.version,
       question: definition.source,
       breakdown,
       filter,
       disclosureRule: rule,
-      result,
+      result: outcome === 'shown' ? result : { status: 'withheld' },
     };
   }
 

@@ -41,6 +41,7 @@ import type { MemberContext, RequestContext, SessionRead } from '../context.ts';
 import type { InTenant, TenantTransaction } from '../database.ts';
 import type { WorkflowService } from '../platform/approvals/index.ts';
 import type { Admission, FileService, UploadGate } from '../platform/files/index.ts';
+import { clientNetwork } from '../limits/client-key.ts';
 import { ApiError, handleError, handleNotFound, PROBLEM_CONTENT_TYPE } from '../problems.ts';
 import { asMember, checkSession, type ScopeInput, type ScopeResolvers } from '../policy/index.ts';
 import { requestHash, withIdempotencyKey } from './idempotency.ts';
@@ -86,14 +87,27 @@ export type Output<C extends RouteContract> = {
       : undefined;
 }[keyof C['responses']];
 
+/**
+ * A public route's handler gets the client network the request limits count
+ * (never a header), and for an idempotent route the validated key. Its
+ * database function keeps the key and replays, so it has no replay reader.
+ */
 export type Handler<C extends RouteContract> = C extends { readonly audience: MemberAudience }
   ? (args: { tx: TenantTransaction; context: MemberContext; input: Input<C> }) => Promise<Output<C>>
-  : (args: { context: RequestContext; input: Input<C> }) => Promise<Output<C>>;
+  : (
+      args: { context: RequestContext; input: Input<C>; client: string } & (C extends {
+        readonly idempotent: true;
+      }
+        ? { idempotencyKey: string }
+        : unknown),
+    ) => Promise<Output<C>>;
 
 interface HandlerArgs {
   tx?: TenantTransaction;
   context: RequestContext;
   input: ScopeInput;
+  client?: string;
+  idempotencyKey?: string;
 }
 
 /**
@@ -268,6 +282,12 @@ function missingForBadParams(error: unknown, request: FastifyRequest, reply: Fas
 }
 
 /**
+ * The one public route allowed to be idempotent (ADR 0036, proposed): its
+ * database function keeps the key and the replay, so it has no replay reader.
+ */
+const IDEMPOTENT_PUBLIC_ROUTE = 'POST /public/tenants/:slug/forms/:formId/responses';
+
+/**
  * Refuses, with an error that stops start-up, any route that cannot be served
  * safely: one that breaks the contract rules (so one built without
  * defineRoute() is caught), has more than one success response, or has a
@@ -279,10 +299,19 @@ function checkRegistration(
   replay: Route['replay'],
 ): void {
   const problems = checkRoute(contract);
-  if (idempotent(contract) && contract.audience !== 'console' && contract.audience !== 'portal') {
-    problems.push('Only a console or portal route can be idempotent until ADR 0036 is accepted.');
-  } else if (idempotent(contract) !== (replay !== undefined)) {
+  const member = contract.audience === 'console' || contract.audience === 'portal';
+  if (
+    idempotent(contract) &&
+    !member &&
+    `${contract.method} ${contract.path}` !== IDEMPOTENT_PUBLIC_ROUTE
+  ) {
+    problems.push(
+      'Only a console or portal route can be idempotent until ADR 0036 is accepted, and it lifts the refusal for the anonymous response route alone.',
+    );
+  } else if (member && idempotent(contract) !== (replay !== undefined)) {
     problems.push('An idempotent route has a replay reader, and any other route has none.');
+  } else if (!member && replay !== undefined) {
+    problems.push('Only a console or portal route has a replay reader.');
   }
   if (Object.keys(contract.responses).length !== 1) {
     problems.push('The API registers routes with exactly one success response.');
@@ -485,7 +514,12 @@ export function registerRoutes(
             },
           );
         } else {
-          body = await handler({ context, input });
+          body = await handler({
+            context,
+            input,
+            client: clientNetwork(request.ip),
+            idempotencyKey: keys.get(request),
+          });
         }
         reply.code(status);
         const rawTypes = contract.responses[status];

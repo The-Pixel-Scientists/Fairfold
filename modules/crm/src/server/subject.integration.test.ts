@@ -123,6 +123,7 @@ describe('crmSubjectData', () => {
     const data = await inTenant(api, a, (tx) => crmSubjectData.subjectData(tx, a.person));
 
     expect(Object.keys(data).sort()).toEqual([
+      'crm.duplicate_dismissal',
       'crm.external_reference',
       'crm.import_row',
       'crm.interaction',

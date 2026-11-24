@@ -5,7 +5,8 @@
 // input is checked again here. Nothing here calls a register: a refresh
 // queues a job in the request's transaction. A record the caller may not
 // reach reads exactly as a missing one does. The audit events hold the
-// register and codes, with the organisation as the subject, never a name.
+// register and codes, with the organisation as the subject (the person, for a
+// link), never a name.
 
 import type { AuditChanges, Transaction } from '@pixel-scientists/db';
 import { idSchema } from '@pixel-scientists/domain';
@@ -13,16 +14,20 @@ import { organisationSummaries } from '@pixel-scientists/party/server';
 
 import {
   lookupRefreshInputSchema,
+  officerLinkInputSchema,
   registries,
   registryIds,
   type AssureAuditAction,
   type OrganisationLookups,
   type Registry,
 } from '../../contracts/index.ts';
+import { isMissingReference, isRefusedByRule } from '../checklists/context.ts';
 import type { RegistryAdapters } from './adapters.ts';
 import type { QueueRefresh } from './refresh.ts';
 import {
   latestSnapshot,
+  linkOfficer,
+  lockOfficer,
   organisationIsErased,
   snapshotOfficers,
   snapshotOrganisation,
@@ -81,10 +86,10 @@ export function registryHandlers(deps: RegistryDependencies) {
 
   return {
     /** The newest snapshot of each identifier the organisation claims. Officers' names are not here. */
-    async listOrganisationLookups({
+    listOrganisationLookups: async ({
       tx,
       input,
-    }: Args<{ params: { organisationId: string } }>): Promise<OrganisationLookups> {
+    }: Args<{ params: { organisationId: string } }>): Promise<OrganisationLookups> => {
       const organisationId = idOrNotFound(input.params.organisationId);
       const [organisation] = await organisationSummaries(tx, [organisationId]);
       if (organisation === undefined) throw deps.notFound();
@@ -102,11 +107,11 @@ export function registryHandlers(deps: RegistryDependencies) {
     },
 
     /** Queues a fresh lookup of an identifier the organisation already claims. */
-    async refreshOrganisationLookup({
+    refreshOrganisationLookup: async ({
       tx,
       context,
       input,
-    }: Args<{ params: { organisationId: string }; body: unknown }>) {
+    }: Args<{ params: { organisationId: string }; body: unknown }>) => {
       const organisationId = idOrNotFound(input.params.organisationId);
       const body = lookupRefreshInputSchema.safeParse(input.body);
       if (!body.success) throw deps.refuse(400, 'Choose a register to look up.');
@@ -135,7 +140,11 @@ export function registryHandlers(deps: RegistryDependencies) {
     },
 
     /** A snapshot's officers by name and role: personal data, so each read is audited. */
-    async listLookupOfficers({ tx, context, input }: Args<{ params: { snapshotId: string } }>) {
+    listLookupOfficers: async ({
+      tx,
+      context,
+      input,
+    }: Args<{ params: { snapshotId: string } }>) => {
       const snapshotId = idOrNotFound(input.params.snapshotId);
       const organisationId = await snapshotOrganisation(tx, snapshotId);
       if (organisationId === null) throw deps.notFound();
@@ -145,6 +154,39 @@ export function registryHandlers(deps: RegistryDependencies) {
         subjectPartyId: organisationId,
       });
       return { officers: await snapshotOfficers(tx, snapshotId) };
+    },
+
+    /** Links an officer to the person a member says they are, once; the person is the audit event's subject. */
+    linkLookupOfficer: async ({
+      tx,
+      context,
+      input,
+    }: Args<{ params: { officerId: string }; body: unknown }>) => {
+      const officerId = idOrNotFound(input.params.officerId);
+      const body = officerLinkInputSchema.safeParse(input.body);
+      if (!body.success) throw deps.refuse(400, 'Choose the person this officer is.');
+      const officer = await lockOfficer(tx, officerId);
+      if (officer === null) throw deps.notFound();
+      if (officer.personId !== null) {
+        throw deps.refuse(409, 'This officer is already linked to a person.');
+      }
+      const { personId } = body.data;
+      let linked;
+      try {
+        linked = await linkOfficer(tx, officerId, personId, context.membership.id);
+      } catch (error) {
+        if (isMissingReference(error)) throw deps.refuse(400, 'Choose a person from your records.');
+        if (isRefusedByRule(error)) {
+          throw deps.refuse(409, "This person has been erased, so they can't be linked.");
+        }
+        throw error;
+      }
+      await context.audit.record({
+        action: 'assure.lookup_officer.linked',
+        entityId: officerId,
+        subjectPartyId: personId,
+      });
+      return linked;
     },
   };
 }

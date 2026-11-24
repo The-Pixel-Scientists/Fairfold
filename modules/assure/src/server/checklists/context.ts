@@ -50,6 +50,11 @@ export interface ChecklistContext {
       readonly subjectPartyId?: string;
       readonly changes?: AuditChanges;
     }): Promise<void>;
+    read(entity: {
+      readonly action: AssureAuditAction;
+      readonly entityId: string;
+      readonly subjectPartyId: string;
+    }): Promise<void>;
   };
   /** Writes the checklist's next configuration version (rule 10) in the request's transaction. */
   readonly config: {
@@ -89,6 +94,7 @@ export interface Args<I> {
 }
 
 const UNIQUE_VIOLATION = '23505';
+const FOREIGN_KEY_VIOLATION = '23503';
 const CHECK_VIOLATION = '23514';
 const NOT_IN_STATE = '55000';
 
@@ -96,6 +102,10 @@ const codeOf = (error: unknown): unknown => (error as { code?: unknown }).code;
 
 /** Whether a statement failed because a row like it is already there. */
 export const isTaken = (error: unknown): boolean => codeOf(error) === UNIQUE_VIOLATION;
+
+/** Whether a statement failed because a record it names is not there, or is another tenant's. */
+export const isMissingReference = (error: unknown): boolean =>
+  codeOf(error) === FOREIGN_KEY_VIOLATION;
 
 /** Whether a check or trigger refused a change the server could not foresee, such as a lost race or an erased party. */
 export const isRefusedByRule = (error: unknown): boolean =>

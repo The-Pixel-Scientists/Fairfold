@@ -59,6 +59,12 @@ export function choice<const T extends readonly [string, ...string[]]>(
     .pipe(z.enum(values));
 }
 
+/**
+ * An id, as a UUID in lower case. Postgres reads a UUID in any case, so one
+ * id has one spelling wherever a handler keys, binds or compares it.
+ */
+export const idSchema = z.uuid().toLowerCase();
+
 /** Opaque to the apps: a page's `nextCursor`, sent back to read the next page. */
 export const cursorSchema = z.string().regex(/^[A-Za-z0-9_-]{1,200}$/);
 

@@ -92,9 +92,11 @@ export interface Reservation {
   readonly status: number;
 }
 
+/** The created record's `id`, or `responseId` where the route answers with a receipt. */
 const createdId = (body: unknown): string | null => {
-  const id = (body as { id?: unknown } | null | undefined)?.id;
-  return typeof id === 'string' ? id : null;
+  const { id, responseId } = (body ?? {}) as { id?: unknown; responseId?: unknown };
+  const created = id ?? responseId;
+  return typeof created === 'string' ? created : null;
 };
 
 /**

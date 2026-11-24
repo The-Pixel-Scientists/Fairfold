@@ -4,7 +4,8 @@
 // refuses, the key check before the transaction, the OpenAPI document, and a
 // walk over every route the API registers.
 
-import { defineRoute, type RouteContract } from '@pixel-scientists/domain/api';
+import { defineRoute } from '@pixel-scientists/domain/api';
+import { submitPublicResponse } from '@pixel-scientists/forms/contracts';
 import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 
@@ -67,21 +68,60 @@ describe('start-up', () => {
     await expect(buildApp({ ...quiet, routes: [withReader] })).rejects.toThrow(/replay reader/);
   });
 
-  it('stops for an idempotent public route', async () => {
-    const forged = {
-      method: 'POST',
-      path: '/public/things',
-      audience: 'public',
-      module: 'platform',
-      permission: null,
-      scope: null,
-      summary: 'Create',
-      idempotent: true,
-      responses: { 200: z.strictObject({ id: z.uuid() }) },
-    } as unknown as RouteContract;
-    await expect(buildApp({ ...quiet, routes: [route(forged, created as never)] })).rejects.toThrow(
-      /Only a console or portal route can be idempotent/,
+  const publicPost = defineRoute({
+    method: 'POST',
+    path: '/public/things',
+    audience: 'public',
+    module: 'platform',
+    permission: null,
+    scope: null,
+    summary: 'Create',
+    idempotent: true,
+    body,
+    responses: { 201: z.strictObject({ id: z.uuid() }) },
+  });
+
+  it('stops for an idempotent public route other than the anonymous response route', async () => {
+    await expect(
+      buildApp({ ...quiet, routes: [route(publicPost, created as never)] }),
+    ).rejects.toThrow(/Only a console or portal route can be idempotent/);
+  });
+
+  it('stops for a replay reader on a public route', async () => {
+    const withReader = { ...route(submitPublicResponse, created as never), replay: created };
+    await expect(buildApp({ ...quiet, routes: [withReader] })).rejects.toThrow(
+      /Only a console or portal route has a replay reader/,
     );
+  });
+
+  it('gives the anonymous response route its key and the client network, and refuses a request with no key', async () => {
+    const seen = vi.fn(created);
+    const key = crypto.randomUUID();
+    const app = await buildApp({
+      ...quiet,
+      routes: [route(submitPublicResponse, seen as never)],
+    });
+    const send = (headers: Record<string, string>) =>
+      app.inject({
+        method: 'POST',
+        url: `/api/public/tenants/acme/forms/${crypto.randomUUID()}/responses`,
+        headers,
+        payload: {
+          formVersionId: crypto.randomUUID(),
+          respondentToken: `${'A'.repeat(42)}A`,
+          proof: null,
+          answers: {},
+        },
+        remoteAddress: '203.0.113.9',
+      });
+
+    expect((await send({})).statusCode).toBe(400);
+    expect(seen).not.toHaveBeenCalled();
+    await send({ 'idempotency-key': key });
+    expect(seen).toHaveBeenCalledWith(
+      expect.objectContaining({ client: '203.0.113.9', idempotencyKey: key }),
+    );
+    await app.close();
   });
 });
 

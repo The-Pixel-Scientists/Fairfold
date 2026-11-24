@@ -3825,6 +3825,130 @@ exports[`the shipped map > matches the committed register 1`] = `
         "column": "created_at",
         "perField": false,
         "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "created_by",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "dismiss_reason",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "dismissed_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "dismissed_by",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "other_party_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "party_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "signal",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "tenant_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "updated_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "updated_by",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+    ],
+    "dataCategories": [
+      "identity",
+      "other",
+    ],
+    "dataSubjects": [
+      "applicant",
+      "applicant_contact",
+    ],
+    "highestSensitivity": "internal",
+    "legalBasis": "legitimate_interests",
+    "processors": [
+      "hosting",
+      "backup",
+    ],
+    "purpose": "due_diligence",
+    "subjectPath": {
+      "columns": [
+        "party_id",
+        "other_party_id",
+      ],
+      "kind": "parties",
+    },
+    "table": "assure.duplicate_flag",
+  },
+  {
+    "article9Condition": null,
+    "columns": [
+      {
+        "column": "created_at",
+        "perField": false,
+        "retention": {
           "days": 365,
           "from": "created_at",
           "kind": "fixed",
@@ -6764,6 +6888,113 @@ exports[`the shipped map > matches the committed register 1`] = `
     "article9Condition": null,
     "columns": [
       {
+        "column": "created_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "created_by",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "kind",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "other_party_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "party_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "reason",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "tenant_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "updated_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "updated_by",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+    ],
+    "dataCategories": [
+      "other",
+    ],
+    "dataSubjects": [
+      "applicant",
+      "applicant_contact",
+    ],
+    "highestSensitivity": "internal",
+    "legalBasis": "legitimate_interests",
+    "processors": [
+      "hosting",
+      "backup",
+    ],
+    "purpose": "party_records",
+    "subjectPath": {
+      "columns": [
+        "party_id",
+        "other_party_id",
+      ],
+      "kind": "parties",
+    },
+    "table": "crm.duplicate_dismissal",
+  },
+  {
+    "article9Condition": null,
+    "columns": [
+      {
         "column": "added_by",
         "perField": false,
         "retention": {
@@ -7935,6 +8166,7 @@ exports[`the shipped map > matches the committed register 1`] = `
           "days": 1,
           "from": "expires_at",
           "kind": "fixed",
+          "policy": "forms_responses",
         },
         "sensitivity": "internal",
       },
@@ -7945,6 +8177,7 @@ exports[`the shipped map > matches the committed register 1`] = `
           "days": 1,
           "from": "expires_at",
           "kind": "fixed",
+          "policy": "forms_responses",
         },
         "sensitivity": "internal",
       },
@@ -7955,6 +8188,7 @@ exports[`the shipped map > matches the committed register 1`] = `
           "days": 1,
           "from": "expires_at",
           "kind": "fixed",
+          "policy": "forms_responses",
         },
         "sensitivity": "internal",
       },
@@ -7965,6 +8199,7 @@ exports[`the shipped map > matches the committed register 1`] = `
           "days": 1,
           "from": "expires_at",
           "kind": "fixed",
+          "policy": "forms_responses",
         },
         "sensitivity": "internal",
       },
@@ -7975,6 +8210,7 @@ exports[`the shipped map > matches the committed register 1`] = `
           "days": 1,
           "from": "expires_at",
           "kind": "fixed",
+          "policy": "forms_responses",
         },
         "sensitivity": "internal",
       },
@@ -7985,6 +8221,7 @@ exports[`the shipped map > matches the committed register 1`] = `
           "days": 1,
           "from": "expires_at",
           "kind": "fixed",
+          "policy": "forms_responses",
         },
         "sensitivity": "internal",
       },
@@ -7995,6 +8232,7 @@ exports[`the shipped map > matches the committed register 1`] = `
           "days": 1,
           "from": "expires_at",
           "kind": "fixed",
+          "policy": "forms_responses",
         },
         "sensitivity": "internal",
       },
@@ -8005,6 +8243,7 @@ exports[`the shipped map > matches the committed register 1`] = `
           "days": 1,
           "from": "expires_at",
           "kind": "fixed",
+          "policy": "forms_responses",
         },
         "sensitivity": "personal",
       },
@@ -8015,6 +8254,7 @@ exports[`the shipped map > matches the committed register 1`] = `
           "days": 1,
           "from": "expires_at",
           "kind": "fixed",
+          "policy": "forms_responses",
         },
         "sensitivity": "internal",
       },
@@ -8049,6 +8289,7 @@ exports[`the shipped map > matches the committed register 1`] = `
           "days": 1,
           "from": "retain_until",
           "kind": "fixed",
+          "policy": "forms_responses",
         },
         "sensitivity": "special_category",
       },
@@ -8059,6 +8300,7 @@ exports[`the shipped map > matches the committed register 1`] = `
           "days": 1,
           "from": "retain_until",
           "kind": "fixed",
+          "policy": "forms_responses",
         },
         "sensitivity": "internal",
       },
@@ -8069,6 +8311,7 @@ exports[`the shipped map > matches the committed register 1`] = `
           "days": 1,
           "from": "retain_until",
           "kind": "fixed",
+          "policy": "forms_responses",
         },
         "sensitivity": "internal",
       },
@@ -8079,6 +8322,7 @@ exports[`the shipped map > matches the committed register 1`] = `
           "days": 1,
           "from": "retain_until",
           "kind": "fixed",
+          "policy": "forms_responses",
         },
         "sensitivity": "internal",
       },
@@ -8089,6 +8333,7 @@ exports[`the shipped map > matches the committed register 1`] = `
           "days": 1,
           "from": "retain_until",
           "kind": "fixed",
+          "policy": "forms_responses",
         },
         "sensitivity": "internal",
       },
@@ -8099,6 +8344,7 @@ exports[`the shipped map > matches the committed register 1`] = `
           "days": 1,
           "from": "retain_until",
           "kind": "fixed",
+          "policy": "forms_responses",
         },
         "sensitivity": "internal",
       },
@@ -8109,6 +8355,7 @@ exports[`the shipped map > matches the committed register 1`] = `
           "days": 1,
           "from": "retain_until",
           "kind": "fixed",
+          "policy": "forms_responses",
         },
         "sensitivity": "personal",
       },
@@ -8119,6 +8366,7 @@ exports[`the shipped map > matches the committed register 1`] = `
           "days": 1,
           "from": "retain_until",
           "kind": "fixed",
+          "policy": "forms_responses",
         },
         "sensitivity": "internal",
       },
@@ -8129,6 +8377,7 @@ exports[`the shipped map > matches the committed register 1`] = `
           "days": 1,
           "from": "retain_until",
           "kind": "fixed",
+          "policy": "forms_responses",
         },
         "sensitivity": "personal",
       },
@@ -8139,6 +8388,7 @@ exports[`the shipped map > matches the committed register 1`] = `
           "days": 1,
           "from": "retain_until",
           "kind": "fixed",
+          "policy": "forms_responses",
         },
         "sensitivity": "internal",
       },
@@ -8149,6 +8399,7 @@ exports[`the shipped map > matches the committed register 1`] = `
           "days": 1,
           "from": "retain_until",
           "kind": "fixed",
+          "policy": "forms_responses",
         },
         "sensitivity": "internal",
       },
@@ -8159,6 +8410,7 @@ exports[`the shipped map > matches the committed register 1`] = `
           "days": 1,
           "from": "retain_until",
           "kind": "fixed",
+          "policy": "forms_responses",
         },
         "sensitivity": "internal",
       },
@@ -8169,6 +8421,7 @@ exports[`the shipped map > matches the committed register 1`] = `
           "days": 1,
           "from": "retain_until",
           "kind": "fixed",
+          "policy": "forms_responses",
         },
         "sensitivity": "internal",
       },
@@ -8179,6 +8432,7 @@ exports[`the shipped map > matches the committed register 1`] = `
           "days": 1,
           "from": "retain_until",
           "kind": "fixed",
+          "policy": "forms_responses",
         },
         "sensitivity": "internal",
       },
@@ -8189,6 +8443,7 @@ exports[`the shipped map > matches the committed register 1`] = `
           "days": 1,
           "from": "retain_until",
           "kind": "fixed",
+          "policy": "forms_responses",
         },
         "sensitivity": "internal",
       },
@@ -8199,6 +8454,7 @@ exports[`the shipped map > matches the committed register 1`] = `
           "days": 1,
           "from": "retain_until",
           "kind": "fixed",
+          "policy": "forms_responses",
         },
         "sensitivity": "internal",
       },
@@ -8209,6 +8465,7 @@ exports[`the shipped map > matches the committed register 1`] = `
           "days": 1,
           "from": "retain_until",
           "kind": "fixed",
+          "policy": "forms_responses",
         },
         "sensitivity": "internal",
       },
@@ -8219,6 +8476,7 @@ exports[`the shipped map > matches the committed register 1`] = `
           "days": 1,
           "from": "retain_until",
           "kind": "fixed",
+          "policy": "forms_responses",
         },
         "sensitivity": "internal",
       },
@@ -8229,6 +8487,7 @@ exports[`the shipped map > matches the committed register 1`] = `
           "days": 1,
           "from": "retain_until",
           "kind": "fixed",
+          "policy": "forms_responses",
         },
         "sensitivity": "internal",
       },
@@ -8239,6 +8498,7 @@ exports[`the shipped map > matches the committed register 1`] = `
           "days": 1,
           "from": "retain_until",
           "kind": "fixed",
+          "policy": "forms_responses",
         },
         "sensitivity": "internal",
       },
@@ -12151,6 +12411,174 @@ exports[`the shipped map > matches the committed register 1`] = `
     "purpose": "grant_monitoring",
     "subjectPath": null,
     "table": "insight.report_definition",
+  },
+  {
+    "article9Condition": null,
+    "columns": [
+      {
+        "column": "breakdown",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "created_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "created_by",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "disclosure_rule_version",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "filter_field",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "filter_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "filter_year",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "kind",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "outcome",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "population",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "question",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "report_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "report_version",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "round_ids",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "shown_table",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "tenant_id",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "updated_at",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+      {
+        "column": "updated_by",
+        "perField": false,
+        "retention": {
+          "kind": "tenant_lifetime",
+        },
+        "sensitivity": "internal",
+      },
+    ],
+    "dataCategories": [],
+    "dataSubjects": [],
+    "highestSensitivity": "internal",
+    "legalBasis": "legitimate_interests",
+    "processors": [
+      "hosting",
+      "backup",
+    ],
+    "purpose": "grant_monitoring",
+    "subjectPath": null,
+    "table": "insight.report_run",
   },
   {
     "article9Condition": null,

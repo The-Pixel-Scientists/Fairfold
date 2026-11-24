@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
-// Field classification for the crm schema (migration 0063, ADR 0016, ADR
-// 0025). crm holds party ids, never a copy of a party's name, email,
+// Field classification for the crm schema (migrations 0063 and 0109, ADR
+// 0016, ADR 0025). crm holds party ids, never a copy of a party's name, email,
 // address or identifier. Ids, codes, counts, hashes and times are internal.
 // Staff's interaction summaries, import cells and external ids and URLs are
 // personal. List and segment names and descriptions are configuration that
@@ -9,7 +9,8 @@
 // field ids, operators and ids. Nothing is special category.
 //
 // Rows about a party are kept as long as the party, which is the tenant's
-// lifetime; merge records too, as the audit trail of every merge. Import rows
+// lifetime; merge records too, as the audit trail of every merge, and
+// duplicate dismissals, as staff's word on a pair. Import rows
 // are kept at least 30 days after their job last changed, and import jobs at
 // least 90 days, as the record of who imported what, once no row is left:
 // tenant policies that app.apply_retention() applies (migration 0064), which
@@ -132,6 +133,16 @@ export const crm = {
     created_at: importRow,
     updated_at: importRow,
   },
+  // Party ids and a code: nothing for erasure to clear.
+  'crm.duplicate_dismissal': {
+    ...key,
+    kind: internal,
+    party_id: internal,
+    other_party_id: internal,
+    reason: internal,
+    ...times,
+    ...actors,
+  },
   'crm.external_reference': {
     ...key,
     party_id: internal,
@@ -153,6 +164,7 @@ export const crmSubjects: SubjectPathRegistry = {
   'crm.interaction': { kind: 'party', column: 'party_id' },
   'crm.merge_record': { kind: 'parties', columns: ['loser_id', 'survivor_id'] },
   'crm.import_row': { kind: 'parties', columns: ['created_party_id', 'duplicate_party_id'] },
+  'crm.duplicate_dismissal': { kind: 'parties', columns: ['party_id', 'other_party_id'] },
   'crm.external_reference': { kind: 'party', column: 'party_id' },
 };
 
@@ -178,5 +190,6 @@ export const crmProcessing: ProcessingRegistry<typeof crm> = {
   'crm.merge_record': records(parties, ['other']),
   'crm.import_job': records([], []),
   'crm.import_row': records(parties, ['identity', 'contact']),
+  'crm.duplicate_dismissal': records(parties, ['other']),
   'crm.external_reference': records(parties, ['online_identifiers']),
 };

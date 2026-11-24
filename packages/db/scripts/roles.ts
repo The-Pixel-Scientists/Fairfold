@@ -11,7 +11,7 @@ import { scramSha256Verifier } from './scram.ts';
 import { isLocalDevelopment, readSecret, readSetting, type Env } from './settings.ts';
 
 /** Bump together with the version in roles.sql and database-privileges.sql. */
-export const ROLES_SCRIPT_VERSION = '5';
+export const ROLES_SCRIPT_VERSION = '6';
 
 /** The login roles that roles.sql creates, in the order it creates them. */
 export const LOGIN_ROLES = [
@@ -66,6 +66,7 @@ export const OWNER_ROLES = [
   'owner_app_erase_documents',
   'owner_app_delete_swept_file',
   'owner_app_erase_file',
+  'owner_forms_public_form',
 ] as const;
 
 /**

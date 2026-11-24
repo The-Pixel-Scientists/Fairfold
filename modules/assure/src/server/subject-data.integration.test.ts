@@ -7,6 +7,8 @@
 // Neither depends on the tenant having assure switched on (these tenants
 // have no switch row), and no other tenant's rows are read or changed.
 
+import { randomUUID } from 'node:crypto';
+
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { createDatabase } from '../../../../packages/db/src/database.ts';
@@ -109,6 +111,15 @@ async function addFixture(): Promise<Fixture> {
       caption: 'Synthetic caption',
       added_by: staff,
     });
+    await insertRow(client, 'assure.duplicate_flag', {
+      tenant_id: tenant.id,
+      id: randomUUID(),
+      party_id: person,
+      other_party_id: organisation,
+      signal: 'similar_name',
+      created_by: staff,
+      updated_by: staff,
+    });
     const elsewhere = await addVisit(client, tenant);
     await insertRow(client, 'assure.visit_attendee', {
       tenant_id: tenant.id,
@@ -172,7 +183,16 @@ describe('assure subject data', () => {
       sensitivity: 'personal',
     });
     expect(rows('assure.visit_attendee')).toHaveLength(1);
+    expect(rows('assure.duplicate_flag')).toHaveLength(1);
     expect(rows('assure.lookup_snapshot')).toEqual([]);
+  });
+
+  it('lists a duplicate flag for either of its two parties', async () => {
+    const data = await subjectData(a, a.organisation);
+    expect(data['assure.duplicate_flag']?.[0]?.['assure.duplicate_flag.party_id']).toEqual({
+      value: a.person,
+      sensitivity: 'internal',
+    });
   });
 
   it("lists an organisation's snapshots, runs and visits, dates as their own day", async () => {

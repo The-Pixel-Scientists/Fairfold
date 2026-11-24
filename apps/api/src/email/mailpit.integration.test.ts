@@ -148,7 +148,7 @@ describe.skipIf(smtp === undefined)('sending to Mailpit', () => {
     expect(marketing['List-Unsubscribe']).toEqual([
       `<https://portal.example.org/api/public/unsubscribe?token=${token}>`,
     ]);
-    expect(marketing['List-Unsubscribe-Post']).toEqual(['List-Unsubscribe=One-Click']);
+    expect(marketing).not.toHaveProperty('List-Unsubscribe-Post');
     const service = await headersOf(serviceTo);
     expect(service).not.toHaveProperty('List-Unsubscribe');
     expect(service).not.toHaveProperty('List-Unsubscribe-Post');

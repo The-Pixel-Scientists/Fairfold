@@ -30,10 +30,17 @@ export const idempotencyProblems = {
   },
 } as const;
 
+/**
+ * Every problem type the API answers. A module keeps its own problems' words
+ * beside its contracts and its type here, so the apps can tell it apart:
+ * forms' changed form and failed browser check (ADR 0036).
+ */
 export const problemTypes = [
   'about:blank',
   idempotencyProblems.reused.type,
   idempotencyProblems.inProgress.type,
+  '/problems/form-changed',
+  '/problems/proof-invalid',
 ] as const;
 
 export type ProblemType = (typeof problemTypes)[number];

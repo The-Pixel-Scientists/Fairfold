@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
 // The catalogue test's allowlists for the assure schema (migrations 0053 to
-// 0058), and every right an app role holds in it
+// 0058 and 0110), and every right an app role holds in it
 // (test/assure/catalogue.test.ts).
 
 import type { AppRole } from '../connect.ts';
@@ -101,6 +101,7 @@ export const ASSURE_RIGHTS: Readonly<Record<AppRole, readonly string[]>> = {
       'monitoring_visit',
       'visit_attendee',
       'visit_evidence',
+      'duplicate_flag',
     ].map((table) => `SELECT on assure.${table}`),
     ...columns('UPDATE', 'lookup_officer', ['person_id', 'linked_by']),
     ...columns('INSERT', 'screening_run', ['tenant_id', 'party_id', 'trigger', 'requested_by']),
@@ -175,6 +176,16 @@ export const ASSURE_RIGHTS: Readonly<Record<AppRole, readonly string[]>> = {
       'added_by',
     ]),
     ...columns('UPDATE', 'visit_evidence', ['caption']),
+    ...columns('INSERT', 'duplicate_flag', [
+      'tenant_id',
+      'id',
+      'party_id',
+      'other_party_id',
+      'signal',
+      'created_by',
+      'updated_by',
+    ]),
+    ...columns('UPDATE', 'duplicate_flag', ['dismiss_reason', 'dismissed_by', 'updated_by']),
   ],
   app_worker: [
     'USAGE on schema assure',
@@ -194,6 +205,7 @@ export const ASSURE_RIGHTS: Readonly<Record<AppRole, readonly string[]>> = {
       'monitoring_visit',
       'visit_attendee',
       'visit_evidence',
+      'duplicate_flag',
     ].map((table) => `SELECT on assure.${table}`),
     ...columns('INSERT', 'lookup_snapshot', [
       'tenant_id',

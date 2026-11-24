@@ -85,10 +85,8 @@ export function createSmtpTransport(
           ...(unsubscribeUrl === undefined
             ? {}
             : {
-                headers: {
-                  'List-Unsubscribe': `<${unsubscribeUrl}>`,
-                  'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
-                },
+                // No List-Unsubscribe-Post until the API takes a mail client's form post, which has no Origin.
+                headers: { 'List-Unsubscribe': `<${unsubscribeUrl}>` },
               }),
           envelope: { from: message.from, to: [message.to] },
         });

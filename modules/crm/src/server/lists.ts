@@ -18,6 +18,7 @@ import {
   type Args,
   type CrmDb,
   type CrmDependencies,
+  type Tx,
 } from './context.ts';
 
 const nameTaken = 'A list with this name already exists. Choose a different name.';
@@ -278,5 +279,17 @@ export function listHandlers(deps: CrmDependencies) {
     return { changed: removed.length, unchanged: partyIds.length - removed.length };
   }
 
-  return { listLists, createList, updateList, archiveList, listMembers, addMembers, removeMembers };
+  /** What a replay of `createList` answers: the list as it reads now. */
+  const replayList = ({ tx, id }: { tx: Tx; id: string }): Promise<List> => readList(crmDb(tx), id);
+
+  return {
+    listLists,
+    createList,
+    updateList,
+    archiveList,
+    listMembers,
+    addMembers,
+    removeMembers,
+    replayList,
+  };
 }

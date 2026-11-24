@@ -26,7 +26,7 @@ const notFound = (): Error => new ApiError(404, undefined, { reason: 'not_found'
 
 /** Where a stylesheet problem is logged, as a code and never the tokens. */
 export interface PublicLog {
-  warn(object: { code: string }, message: string): void;
+  warn(object: { code: string; client?: string }, message: string): void;
 }
 
 /**

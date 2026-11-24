@@ -74,6 +74,21 @@ export interface AssureChecklistVersion {
   version: number;
 }
 
+export interface AssureDuplicateFlag {
+  created_at: Generated<Timestamp>;
+  created_by: string;
+  dismiss_reason: string | null;
+  dismissed_at: Timestamp | null;
+  dismissed_by: string | null;
+  id: string;
+  other_party_id: string;
+  party_id: string;
+  signal: string;
+  tenant_id: string;
+  updated_at: Generated<Timestamp>;
+  updated_by: string;
+}
+
 export interface AssureLookupOfficer {
   created_at: Generated<Timestamp>;
   id: Generated<string>;
@@ -228,6 +243,7 @@ export interface DB {
   'assure.checklist_response': AssureChecklistResponse;
   'assure.checklist_response_file': AssureChecklistResponseFile;
   'assure.checklist_version': AssureChecklistVersion;
+  'assure.duplicate_flag': AssureDuplicateFlag;
   'assure.lookup_officer': AssureLookupOfficer;
   'assure.lookup_snapshot': AssureLookupSnapshot;
   'assure.match_decision': AssureMatchDecision;

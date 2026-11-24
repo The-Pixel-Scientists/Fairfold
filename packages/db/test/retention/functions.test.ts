@@ -13,12 +13,17 @@
 // one adds its targets to the function and TARGETS, with tests that it acts
 // only past the tenant's setting (or the minimum), in its batch size, in the
 // tenant set, and writes its audit event (test/crm/retention.test.ts).
+// Migration 0113 adds forms_responses, whose rows are kept a fixed day past
+// a time each row holds, so no tenant setting applies
+// (test/forms/retention.test.ts). The map names the policy on those fixed
+// rules, so the policies the function accepts are exactly the map's, which
+// the retention sweep calls.
 
 import { readFile } from 'node:fs/promises';
 
 import { describe, expect, it } from 'vitest';
 
-import { classification } from '../../classification.ts';
+import { classification, type RetentionRule } from '../../classification.ts';
 import { APP_ROLES, withClient } from '../connect.ts';
 import { heldRights } from '../privilege-lint.ts';
 import { asRoleIn, createTestTenant, outcome } from '../tenants.ts';
@@ -42,6 +47,8 @@ const wholeTable = (policy: string, table: string): Target => ({
 const TARGETS: readonly Target[] = [
   wholeTable('crm_import_jobs', 'crm.import_job'),
   wholeTable('crm_import_rows', 'crm.import_row'),
+  wholeTable('forms_responses', 'forms.respondent_token'),
+  wholeTable('forms_responses', 'forms.response'),
 ];
 
 /**
@@ -71,14 +78,20 @@ const ADR_0003 = new URL(
   import.meta.url,
 );
 
-/** "<policy> <table>.<column>" for each column under a tenant_policy other than audit. */
+/** The policy, other than audit, that deletes a rule's values, if any. */
+const policyOf = (retention: RetentionRule): string | undefined =>
+  (retention.kind === 'tenant_policy' || retention.kind === 'fixed') && retention.policy !== 'audit'
+    ? retention.policy
+    : undefined;
+
+/** "<policy> <table>.<column>" for each column under a policy other than audit. */
 const mapColumns = Object.entries(classification).flatMap(([table, columns]) =>
-  Object.entries(columns).flatMap(([column, { retention }]) =>
-    retention.kind === 'tenant_policy' && retention.policy !== 'audit'
-      ? [`${retention.policy} ${table}.${column}`]
-      : [],
-  ),
+  Object.entries(columns).flatMap(([column, { retention }]) => {
+    const policy = policyOf(retention);
+    return policy === undefined ? [] : [`${policy} ${table}.${column}`];
+  }),
 );
+const mapPolicies = [...new Set(mapColumns.map((entry) => entry.split(' ')[0] ?? ''))].sort();
 
 describe('app.apply_retention', { timeout: 30_000 }, () => {
   it('may be called by app_worker alone', async () => {
@@ -127,6 +140,42 @@ describe('app.apply_retention', { timeout: 30_000 }, () => {
     );
     expect(new Set(targeted).size).toBe(targeted.length);
     expect(targeted.sort()).toEqual([...mapColumns].sort());
+  });
+
+  it('deletes forms rows a fixed day past the time each row holds, as the map says', () => {
+    for (const [table, from] of [
+      ['forms.respondent_token', 'expires_at'],
+      ['forms.response', 'retain_until'],
+    ] as const) {
+      for (const [column, { retention }] of Object.entries(classification[table] ?? {})) {
+        expect(retention, `${table}.${column}`).toEqual({
+          kind: 'fixed',
+          days: 1,
+          from,
+          policy: 'forms_responses',
+        });
+      }
+    }
+  });
+
+  it('accepts every policy the map names, and names no other', async () => {
+    expect(mapPolicies).toEqual(['crm_import_jobs', 'crm_import_rows', 'forms_responses']);
+    const { rows } = await withClient('migrator', (client) =>
+      client.query<{ source: string }>(
+        'SELECT pg_catalog.pg_get_functiondef($1::regprocedure) AS source',
+        [FUNCTION],
+      ),
+    );
+    const named = [...(rows[0]?.source ?? '').matchAll(/(?:policy = |WHEN )'([a-z_]+)'/g)].map(
+      ([, policy]) => policy,
+    );
+    expect([...new Set(named)].sort()).toEqual(['audit', ...mapPolicies].sort());
+    const tenant = await createTestTenant();
+    await asRoleIn('app_worker', tenant.id, async (client) => {
+      for (const policy of mapPolicies) {
+        expect(await outcome(client, CALL, [policy]), policy).toBe('ok');
+      }
+    });
   });
 
   it('names no table but its targets', async () => {

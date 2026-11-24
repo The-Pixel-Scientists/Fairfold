@@ -13,7 +13,13 @@ import './outbound/install.ts';
 import { buildApp } from './app.ts';
 import { loadAuthSettings, createAuth, type AuthSettings } from './auth/index.ts';
 import { recordBreachSetting } from './breach-setting.ts';
-import { ConfigError, loadConfig, type Config } from './config.ts';
+import {
+  ConfigError,
+  loadConfig,
+  loadModuleSettings,
+  type Config,
+  type ModuleSettings,
+} from './config.ts';
 import { openDatabase } from './database.ts';
 import {
   approvalKinds,
@@ -48,6 +54,7 @@ function readSettings():
       fileSettings: FileSettings;
       telemetrySettings: TelemetrySettings;
       limitSettings: LimitSettings;
+      moduleSettings: ModuleSettings;
     }
   | undefined {
   const problems: string[] = [];
@@ -67,17 +74,19 @@ function readSettings():
   const fileSettings = read(() => loadFileSettings(process.env));
   const telemetrySettings = read(() => loadTelemetrySettings(process.env));
   const limitSettings = read(() => loadLimitSettings(process.env));
+  const moduleSettings = read(() => loadModuleSettings(process.env));
   if (
     config === undefined ||
     authSettings === undefined ||
     fileSettings === undefined ||
     telemetrySettings === undefined ||
-    limitSettings === undefined
+    limitSettings === undefined ||
+    moduleSettings === undefined
   ) {
     process.stderr.write(`${new ConfigError(problems).message}\n`);
     return undefined;
   }
-  return { config, authSettings, fileSettings, telemetrySettings, limitSettings };
+  return { config, authSettings, fileSettings, telemetrySettings, limitSettings, moduleSettings };
 }
 
 async function main(): Promise<void> {
@@ -87,6 +96,7 @@ async function main(): Promise<void> {
     return;
   }
   const { config, authSettings, fileSettings, telemetrySettings, limitSettings } = settings;
+  const { moduleSettings } = settings;
   const telemetry = startTelemetry({ service: 'api', settings: telemetrySettings });
 
   const logger = createLogger({ level: config.logLevel });
@@ -121,16 +131,17 @@ async function main(): Promise<void> {
     const jobs = await database.startJobs((error) => {
       logger.error({ err: error }, 'The job queue reported a problem');
     });
+    // The object store is a fixed destination: its own pinned client, not the global one.
+    const files = createFileService(
+      fileSettings,
+      createStorage(fileSettings.storage, pinnedFetch(fileSettings.storage.endpoint)),
+      createScannerStorage(fileSettings.storage, pinnedFetch(fileSettings.storage.endpoint)),
+    );
     app = await buildApp({
       logger,
       checkDatabase: () => database.check(),
       inTenant: database.inTenant,
-      // The object store is a fixed destination: its own pinned client, not the global one.
-      files: createFileService(
-        fileSettings,
-        createStorage(fileSettings.storage, pinnedFetch(fileSettings.storage.endpoint)),
-        createScannerStorage(fileSettings.storage, pinnedFetch(fileSettings.storage.endpoint)),
-      ),
+      files,
       workflow: createWorkflowService(approvalKinds, publishApprovalDecided(jobs)),
       auth,
       ...composeModules({
@@ -139,6 +150,9 @@ async function main(): Promise<void> {
         log: logger,
         mail: { sender, portalOrigin: authSettings.origins.portal },
         jobs,
+        database,
+        files,
+        settings: moduleSettings,
       }),
       trustProxy: config.trustProxy,
       limits: { store: database.requestLimits, key: limitSettings.key },

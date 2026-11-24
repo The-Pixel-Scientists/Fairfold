@@ -59,6 +59,8 @@ export interface ApiDatabase {
   /** Resolves if the database answers a trivial query, and rejects if it does not. */
   check(): Promise<void>;
   inTenant: InTenant;
+  /** The `app_api` pool with no tenant set, for the approved functions the public routes call. */
+  pool: Kysely<unknown>;
   /** For routes that need no session. */
   publicTenants: PublicTenants;
   /** The request limits' counters, in no tenant (S11-36). */
@@ -109,6 +111,7 @@ export function openDatabase(settings: Config['database'], log: FastifyBaseLogge
       await db.selectNoFrom((eb) => eb.lit(1).as('ok')).execute();
     },
     inTenant: (tenant, work) => withTenant(db, tenant, work),
+    pool: db,
     publicTenants: publicTenantsOn(db),
     requestLimits: counterStore(counters),
     startJobs: (onError) => (jobs ??= startJobSender(db, onError)),

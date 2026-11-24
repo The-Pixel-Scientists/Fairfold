@@ -23,6 +23,19 @@ export type JsonValue = JsonArray | JsonObject | JsonPrimitive;
 
 export type Timestamp = ColumnType<Date, Date | string, Date | string>;
 
+export interface CrmDuplicateDismissal {
+  created_at: Generated<Timestamp>;
+  created_by: string;
+  id: Generated<string>;
+  kind: string;
+  other_party_id: string;
+  party_id: string;
+  reason: string;
+  tenant_id: string;
+  updated_at: Generated<Timestamp>;
+  updated_by: string;
+}
+
 export interface CrmExternalReference {
   added_by: string;
   created_at: Generated<Timestamp>;
@@ -133,6 +146,7 @@ export interface CrmSegment {
 }
 
 export interface DB {
+  'crm.duplicate_dismissal': CrmDuplicateDismissal;
   'crm.external_reference': CrmExternalReference;
   'crm.import_job': CrmImportJob;
   'crm.import_row': CrmImportRow;

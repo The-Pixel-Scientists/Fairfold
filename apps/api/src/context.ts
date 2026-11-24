@@ -11,6 +11,7 @@ import type { ConfigDiff, ConfigEntityType } from '@pixel-scientists/domain/plat
 import { grantsSubjectRules } from '@pixel-scientists/grants/server';
 import { impactSubjectRules } from '@pixel-scientists/impact/server';
 import { partySubjectRules } from '@pixel-scientists/party/server';
+import { privacySubjectRules } from '@pixel-scientists/privacy/server';
 import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
 
 import type { AuditEvent } from './audit/writer.ts';
@@ -52,7 +53,12 @@ export interface RequestAudit {
 
 /** The modules' rules for the party an event is about (ADR 0027), by action. */
 const subjectRules = new Map(
-  Object.entries({ ...partySubjectRules, ...grantsSubjectRules, ...impactSubjectRules }),
+  Object.entries({
+    ...partySubjectRules,
+    ...grantsSubjectRules,
+    ...impactSubjectRules,
+    ...privacySubjectRules,
+  }),
 );
 
 /**

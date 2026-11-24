@@ -98,7 +98,7 @@ describe('delivery to a stub server', () => {
     expect(logs.text()).toBe('');
   });
 
-  it('sends the two one-click unsubscribe headers of a marketing message, and none otherwise', async () => {
+  it('sends the unsubscribe link header of a marketing message and no one-click header, and none otherwise', async () => {
     const server = await stub();
     const { sender } = setup(settings(server.port));
     const token = 'B'.repeat(160);
@@ -111,7 +111,7 @@ describe('delivery to a stub server', () => {
     expect(unfolded).toContain(
       `List-Unsubscribe: <https://portal.example.org/api/public/unsubscribe?token=${token}>\r\n`,
     );
-    expect(unfolded).toContain('List-Unsubscribe-Post: List-Unsubscribe=One-Click\r\n');
+    expect(unfolded).not.toMatch(/List-Unsubscribe-Post/i);
     expect(service?.data).not.toMatch(/List-Unsubscribe/i);
   });
 

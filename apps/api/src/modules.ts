@@ -38,7 +38,6 @@ import {
   grantsResolvers,
   grantsWarehouse,
   programmeExists,
-  type MailSender,
 } from '@pixel-scientists/grants/server';
 import { impactRoutes } from '@pixel-scientists/impact/contracts';
 import { impactHandlers } from '@pixel-scientists/impact/server';
@@ -50,6 +49,7 @@ import {
   partyWarehouse,
 } from '@pixel-scientists/party/server';
 
+import type { ModuleSettings } from './config.ts';
 import type { PublicTenants, TenantTransaction } from './database.ts';
 import { queueReleaseEmail } from './decision-emails.ts';
 import { publishGrantsEvent } from './grant-events.ts';
@@ -58,7 +58,8 @@ import { inboxRoutes } from './platform/approvals/index.ts';
 import { listAuditEventsHandler, searchAuditEventsHandler } from './platform/audit-log/index.ts';
 import { insertConfigVersion, readConfigHistory } from './platform/config-versions.ts';
 import { documentsErasure } from './platform/documents/erasure.ts';
-import { erasureRoutes, type Contribution } from './platform/erasure/index.ts';
+import { erasureRoutes } from './platform/erasure/index.ts';
+import type { FileService } from './platform/files/index.ts';
 import { membersWith } from './platform/members.ts';
 import { notesPlatform } from './platform/notes/index.ts';
 import { retentionRoutes } from './platform/retention/index.ts';
@@ -67,6 +68,22 @@ import { settingsRoutes } from './platform/settings/index.ts';
 import { settingsTables } from './platform/settings/tables.ts';
 import { teamRoutes, type TeamAuth } from './platform/team/index.ts';
 import { warehouseSnapshotHandler } from './platform/warehouse/index.ts';
+import { assureComposition } from './modules/assure.ts';
+import { consentComposition } from './modules/consent.ts';
+import { crmComposition } from './modules/crm.ts';
+import { formsComposition } from './modules/forms.ts';
+import { insightComposition } from './modules/insight.ts';
+import { privacyComposition } from './modules/privacy.ts';
+import type {
+  Mail,
+  ModuleComposition,
+  ModuleDatabase,
+  ModuleDependencies,
+  ModuleFactory,
+  Outbound,
+  PlatformHelpers,
+} from './modules/types.ts';
+import { pinnedFetch } from './outbound/pinned.ts';
 import type { ScopeResolvers } from './policy/index.ts';
 import { ApiError } from './problems.ts';
 import { publicRoutes } from './public/index.ts';
@@ -74,12 +91,7 @@ import type { PublicLog } from './public/tenants.ts';
 import { route, type Route } from './routes/register.ts';
 import type { ModuleJob } from './worker/registry.ts';
 
-/** Every module's erasure contribution, one line each; the erasure job calls them all, whether or not a tenant has the module on. */
-export const erasureContributions: readonly Contribution[] = [
-  partyErasure,
-  grantsErasure,
-  documentsErasure,
-];
+export type { Mail } from './modules/types.ts';
 
 /** What the platform reads from a module's server entry point besides its routes. */
 export interface ModuleServer {
@@ -141,12 +153,6 @@ const tenantTimeZone = async (tx: TenantTransaction, tenant: string): Promise<st
       .executeTakeFirstOrThrow()
   ).timezone;
 
-/** What a module that sends email needs: the sender, and the portal origin its emails link to. */
-export interface Mail {
-  readonly sender: MailSender;
-  readonly portalOrigin: string;
-}
-
 /** For callers that send no email: every send fails with a code, and nothing leaves the process. */
 const noMail: Mail = {
   sender: { send: () => Promise.resolve({ sent: false, code: 'connection_failed' }) },
@@ -164,15 +170,168 @@ const noAuth: TeamAuth = {
   revokeSessionsForMembership: missingAuth,
 };
 
-export function composeModules(deps: {
-  publicTenants: PublicTenants;
-  /** The auth module, for the team routes. */
-  auth?: TeamAuth;
-  mail?: Mail;
+/** For callers with no database or file service: using one fails, and nothing is read or stored. */
+const noDatabase: ModuleDatabase = {
+  inTenant: () => Promise.reject(new Error('This process was built without the database.')),
+  pool: {} as ModuleDatabase['pool'],
+  requestLimits: {} as ModuleDatabase['requestLimits'],
+};
+const noFiles: FileService = () => {
+  throw new Error('This process was built without the file service.');
+};
+
+/** For callers with no module settings: every feature that needs one stays off. */
+const noSettings: ModuleSettings = {
+  crm: undefined,
+  marketing: undefined,
+  forms: undefined,
+  assure: { registryKeys: {}, sanctionsListUrl: undefined },
+};
+
+/** Outbound requests, through the dispatcher that `outbound/install.ts` sets. */
+const outbound: Outbound = {
+  fetch: (input, init) => globalThis.fetch(input, init),
+  pinned: pinnedFetch,
+};
+
+const platform: PlatformHelpers = {
+  notFound,
+  missing,
+  refuse,
+  forbidden,
+  slowDown,
+  created,
+  tenantTimeZone,
+  recordConfig: insertConfigVersion,
+  configHistory: readConfigHistory,
+  membersWith,
+  notes: notesPlatform,
+};
+
+/** What a process has to give the modules; what it leaves out fails when a module uses it. */
+export interface ModuleInputs {
+  publicTenants?: PublicTenants;
+  database?: ModuleDatabase;
   /** The job sender, for the jobs a request queues (ADR 0009). */
   jobs?: JobSender;
+  files?: FileService;
+  mail?: Mail;
+  settings?: ModuleSettings;
   log?: PublicLog;
-}): ComposedModules {
+}
+
+export function moduleDependencies(inputs: ModuleInputs): ModuleDependencies {
+  return {
+    database: inputs.database ?? noDatabase,
+    publicTenants: inputs.publicTenants ?? ({} as PublicTenants),
+    jobs: inputs.jobs ?? noJobs,
+    files: inputs.files ?? noFiles,
+    mail: inputs.mail ?? noMail,
+    outbound,
+    settings: inputs.settings ?? noSettings,
+    platform,
+    log: inputs.log,
+  };
+}
+
+/** The wave 1 modules, each composed from a file of its own. */
+export const moduleCompositions: readonly ModuleFactory[] = [
+  crmComposition,
+  assureComposition,
+  formsComposition,
+  privacyComposition,
+  insightComposition,
+  consentComposition,
+];
+
+/** What party, grants and the platform's documents contribute, in the order the erasure runs them. */
+const builtIn: ModuleComposition = {
+  resolvers: { ...partyResolvers, ...grantsResolvers },
+  erasure: [partyErasure, grantsErasure, documentsErasure],
+  warehouse: [partyWarehouse, grantsWarehouse],
+};
+
+function uniqueBy<T>(items: readonly T[], name: (item: T) => string, what: string): readonly T[] {
+  const seen = new Set<string>();
+  for (const item of items) {
+    const key = name(item);
+    if (seen.has(key)) throw new Error(`The ${what} ${key} is defined twice.`);
+    seen.add(key);
+  }
+  return items;
+}
+
+const routeName = ({ contract }: Route): string => `${contract.method} ${contract.path}`;
+
+/** The lists the platform wires today. */
+type Composed = Required<
+  Pick<ModuleComposition, 'routes' | 'resolvers' | 'jobs' | 'erasure' | 'warehouse'>
+>;
+
+/** The lists no platform code reads yet: a composition that supplies one is refused, not dropped. */
+const UNWIRED = ['subjectRules', 'subjectData', 'repoints'] as const;
+
+/**
+ * Every list of the compositions, with a route, queue, resolver or module
+ * entry defined twice refused by name. The audit hiding rules, the subject
+ * access walk and the party merge re-points are not read by the platform yet
+ * (the audit writer and the request context fix their rules), so a
+ * composition that supplies one stops start-up rather than lose it.
+ */
+export function mergeCompositions(
+  compositions: readonly ModuleComposition[],
+  first: ModuleComposition = builtIn,
+): Composed {
+  const all = [first, ...compositions];
+  for (const list of UNWIRED) {
+    if (all.some((composition) => composition[list] !== undefined)) {
+      throw new Error(`The platform does not wire the ${list} of a composition yet.`);
+    }
+  }
+  const resolvers = all.flatMap(({ resolvers: found = {} }) => Object.entries(found));
+  const byModule = <T extends { readonly module: string }>(items: readonly T[], what: string) =>
+    uniqueBy(items, ({ module }) => module, what);
+  return {
+    routes: uniqueBy(
+      all.flatMap(({ routes = [] }) => routes),
+      routeName,
+      'route',
+    ),
+    resolvers: Object.fromEntries(uniqueBy(resolvers, ([rule]) => rule, 'scope rule')),
+    jobs: collectModuleJobs(all),
+    erasure: byModule(
+      all.flatMap(({ erasure = [] }) => erasure),
+      'erasure contribution of',
+    ),
+    warehouse: byModule(
+      all.flatMap(({ warehouse = [] }) => warehouse),
+      'warehouse contribution of',
+    ),
+  };
+}
+
+/** Every module's contributions for a process, whether or not a tenant has the module on. */
+export const composedFor = (
+  inputs: ModuleInputs,
+  factories: readonly ModuleFactory[] = moduleCompositions,
+): Composed => {
+  const deps = moduleDependencies(inputs);
+  return mergeCompositions(factories.map((factory) => factory(deps)));
+};
+
+/** Every module's erasure contribution; the erasure job calls them all, whether or not a tenant has the module on. */
+export const erasureContributions = (inputs: ModuleInputs = {}) => composedFor(inputs).erasure;
+
+export function composeModules(
+  inputs: ModuleInputs & {
+    publicTenants: PublicTenants;
+    /** The auth module, for the team routes. */
+    auth?: TeamAuth;
+  },
+  factories: readonly ModuleFactory[] = moduleCompositions,
+): ComposedModules {
+  const deps = moduleDependencies(inputs);
+  const composed = composedFor(inputs, factories);
   const party = partyHandlers({ notFound });
   const grants = grantsHandlers({
     notFound,
@@ -183,28 +342,25 @@ export function composeModules(deps: {
     recordConfig: insertConfigVersion,
     configHistory: readConfigHistory,
     membersWith,
-    queueEmail: queueReleaseEmail(deps.jobs ?? noJobs),
-    queueNotification: queueMessageNotification(deps.jobs ?? noJobs),
+    queueEmail: queueReleaseEmail(deps.jobs),
+    queueNotification: queueMessageNotification(deps.jobs),
     notes: notesPlatform,
-    publish: publishGrantsEvent(deps.jobs ?? noJobs),
-    ...(deps.mail ?? noMail),
+    publish: publishGrantsEvent(deps.jobs),
+    ...deps.mail,
   });
   const impact = impactHandlers({ notFound, refuse, programmeExists });
-  return {
+  const modules: ComposedModules = {
     routes: [
       route(listAuditEvents, listAuditEventsHandler),
       route(searchAuditEvents, searchAuditEventsHandler),
       route(searchTerm, searchHandler()),
       ...inboxRoutes,
-      ...teamRoutes(deps.auth ?? noAuth),
+      ...teamRoutes(inputs.auth ?? noAuth),
       ...settingsRoutes,
       ...retentionRoutes,
-      ...erasureRoutes(deps.jobs ?? noJobs),
-      route(
-        getWarehouseSnapshot,
-        warehouseSnapshotHandler({ contributions: [partyWarehouse, grantsWarehouse] }),
-      ),
-      ...publicRoutes(deps.publicTenants, deps.log),
+      ...erasureRoutes(deps.jobs),
+      route(getWarehouseSnapshot, warehouseSnapshotHandler({ contributions: composed.warehouse })),
+      ...publicRoutes(inputs.publicTenants, inputs.log),
       route(partyRoutes.getProfile, party.getProfile),
       route(partyRoutes.updateProfile, party.updateProfile),
       route(partyRoutes.recordConsent, party.recordConsent, {
@@ -424,7 +580,10 @@ export function composeModules(deps: {
           impact.getLearningNote({ tx, context, input: { params: { noteId: created(id) } } }),
       }),
       route(impactRoutes.removeLearningNote, impact.removeLearningNote),
+      ...composed.routes,
     ],
-    resolvers: { ...partyResolvers, ...grantsResolvers },
+    resolvers: composed.resolvers,
   };
+  uniqueBy(modules.routes, routeName, 'route');
+  return modules;
 }

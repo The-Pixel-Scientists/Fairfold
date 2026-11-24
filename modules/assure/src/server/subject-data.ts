@@ -6,7 +6,7 @@
 // its field id with its sensitivity. That is the organisation's lookup
 // snapshots, the officer rows linked to the person, screening runs and
 // matches (with their decisions) about them, checklist answers on their
-// applications, visits and attendance. The column lists copy the
+// applications, visits and attendance, and duplicate flags that name them. The column lists copy the
 // classification map, which a module may not import; a test keeps them in
 // step, and the platform checks every cell against the map again. Read in
 // the caller's transaction, so row-level security leaves out any other
@@ -28,12 +28,12 @@ const personal = (...names: string[]): Columns => names.map((name) => [name, 'pe
 
 /**
  * Each table, its classified columns, and its subject path: the column that
- * holds the party id, or, with a `parent`, the column that joins to the
- * parent's rows. An application is the parent of checklist answers, and is
+ * holds the party id (either of two, for a duplicate flag), or, with a
+ * `parent`, the column that joins to the parent's rows. An application is the parent of checklist answers, and is
  * read for its id alone.
  */
 export const subjectTables: Readonly<
-  Record<string, { column: string; parent?: string; columns: Columns }>
+  Record<string, { column: string | readonly string[]; parent?: string; columns: Columns }>
 > = {
   'assure.lookup_snapshot': {
     column: 'organisation_id',
@@ -195,6 +195,23 @@ export const subjectTables: Readonly<
       ...personal('file_id', 'caption'),
     ],
   },
+  'assure.duplicate_flag': {
+    column: ['party_id', 'other_party_id'],
+    columns: internal(
+      'tenant_id',
+      'id',
+      'party_id',
+      'other_party_id',
+      'signal',
+      'dismiss_reason',
+      'dismissed_by',
+      'dismissed_at',
+      'created_at',
+      'created_by',
+      'updated_at',
+      'updated_by',
+    ),
+  },
 };
 
 /** Columns of type `date`, which the driver reads as a local midnight. */
@@ -222,7 +239,7 @@ function cellValue(field: string, value: unknown): Cell['value'] {
 function rowsOf(
   tx: Tx,
   table: string,
-  column: string,
+  matching: string | readonly string[],
   columns: Columns,
   values: readonly string[],
 ): Promise<StoredRow[]> {
@@ -231,7 +248,7 @@ function rowsOf(
     .$extendTables<Tables>()
     .selectFrom(table)
     .select(columns.map(([name]) => name))
-    .where(column, 'in', values)
+    .where((eb) => eb.or([matching].flat().map((column) => eb(column, 'in', values))))
     .orderBy('id')
     .execute();
 }

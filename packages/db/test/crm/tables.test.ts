@@ -41,6 +41,7 @@ const CRM_TABLES = [
   'crm.import_job',
   'crm.import_row',
   'crm.external_reference',
+  'crm.duplicate_dismissal',
 ];
 
 let tenant: TestTenant;

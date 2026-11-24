@@ -28,6 +28,7 @@ import {
   registerRoutes,
   type Route,
 } from './routes/register.ts';
+import { registerUnsubscribeTransport } from './public/unsubscribe/index.ts';
 import { createServer } from './server.ts';
 import { registerTelemetry, type Telemetry } from './telemetry/index.ts';
 
@@ -129,6 +130,10 @@ export async function buildApp(options: AppOptions): Promise<FastifyInstance> {
     (scope) =>
       // A route that cannot be served rejects here, which stops start-up.
       new Promise<void>((resolve) => {
+        // The one-click POST arrives as a form, which only this scope's parser reads.
+        if (options.routes?.some(({ contract }) => 'oneClickUnsubscribe' in contract)) {
+          registerUnsubscribeTransport(scope);
+        }
         registerRoutes(scope, options.routes ?? [], deps);
         resolve();
       }),

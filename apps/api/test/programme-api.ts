@@ -15,10 +15,10 @@ import { addPerson } from '../../../packages/db/test/party/fixtures.ts';
 import { asMigratorIn, type TestTenant } from '../../../packages/db/test/tenants.ts';
 import { buildApp } from '../src/app.ts';
 import { loadConfig } from '../src/config.ts';
-import { openDatabase } from '../src/database.ts';
+import { openDatabase, type ApiDatabase } from '../src/database.ts';
 import type { FileService } from '../src/platform/files/index.ts';
 import { createLogger } from '../src/logger.ts';
-import { composeModules, type Mail } from '../src/modules.ts';
+import { composeModules, type Mail, type ModuleInputs } from '../src/modules.ts';
 import { createGrantsTenant } from './modules-on.ts';
 import { addMember, type Member } from './settings-api.ts';
 import { smtpTestSettings, testAuth, testSession } from './support.ts';
@@ -164,7 +164,13 @@ export const storedVersions = (tenant: TestTenant, entityType: string, entityId:
  * second one with a name on a person record (`ada`), a reviewer, an
  * administrator and an applicant. In tenant B: a programme manager.
  */
-export async function startProgrammeApi(port: string, mail?: Mail, files?: FileService) {
+export async function startProgrammeApi(
+  port: string,
+  mail?: Mail,
+  files?: FileService,
+  /** What else the modules need from this process, given the API's database. */
+  modules: (database: ApiDatabase) => Partial<ModuleInputs> = () => ({}),
+) {
   const { database: settings } = loadConfig({
     ...process.env,
     ...smtpTestSettings,
@@ -181,7 +187,7 @@ export async function startProgrammeApi(port: string, mail?: Mail, files?: FileS
     inTenant: database.inTenant,
     files,
     auth: auth.module,
-    ...composeModules({ publicTenants: database.publicTenants, mail, jobs }),
+    ...composeModules({ publicTenants: database.publicTenants, mail, jobs, ...modules(database) }),
   });
 
   const [tenantA, tenantB] = await Promise.all([createGrantsTenant(), createGrantsTenant()]);

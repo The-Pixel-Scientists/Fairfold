@@ -27,6 +27,7 @@ app.tenant_module | platform | tenant_administration | contract | internal | ten
 app.tenant_theme | platform | tenant_administration | contract | internal | tenant_lifetime - | - | -
 app.workflow_definition | platform | tenant_administration | contract | internal | tenant_lifetime - | - | -
 app.workflow_definition_version | platform | tenant_administration | contract | internal | tenant_lifetime - | - | -
+crm.duplicate_dismissal | crm | party_records | legitimate_interests | internal | tenant_lifetime - | other | crm.duplicate_dismissal.party_id,crm.duplicate_dismissal.other_party_id
 crm.external_reference | crm | party_records | legitimate_interests | personal | tenant_lifetime - | online_identifiers | crm.external_reference.party_id
 crm.import_job | crm | party_records | legitimate_interests | internal | tenant_policy 90 | - | -
 crm.import_row | crm | party_records | legitimate_interests | personal | tenant_policy 30 | identity,contact | crm.import_row.created_party_id,crm.import_row.duplicate_party_id
@@ -109,6 +110,7 @@ assure.checklist | assure | due_diligence | legitimate_interests | internal | te
 assure.checklist_response | assure | due_diligence | legitimate_interests | personal | tenant_lifetime - | identity,other | assure.checklist_response.application_id
 assure.checklist_response_file | assure | due_diligence | legitimate_interests | personal | tenant_lifetime - | identity,other | assure.checklist_response_file.response_id
 assure.checklist_version | assure | due_diligence | legitimate_interests | internal | tenant_lifetime - | - | -
+assure.duplicate_flag | assure | due_diligence | legitimate_interests | internal | tenant_lifetime - | identity,other | assure.duplicate_flag.party_id,assure.duplicate_flag.other_party_id
 assure.lookup_officer | assure | due_diligence | legitimate_interests | personal | fixed 365 | identity,other | assure.lookup_officer.person_id
 assure.lookup_snapshot | assure | due_diligence | legitimate_interests | personal | fixed 2190 | identity,other | assure.lookup_snapshot.organisation_id
 assure.match_decision | assure | sanctions_screening | legal_obligation | internal | fixed 2190 | identity | assure.match_decision.match_id
@@ -129,6 +131,7 @@ impact.target | impact | grant_monitoring | legitimate_interests | internal | te
 insight.disclosure_rule | insight | grant_monitoring | legitimate_interests | internal | tenant_lifetime - | - | -
 insight.publication_run | insight | grant_monitoring | legal_obligation | internal | tenant_lifetime - | - | -
 insight.report_definition | insight | grant_monitoring | legitimate_interests | internal | tenant_lifetime - | - | -
+insight.report_run | insight | grant_monitoring | legitimate_interests | internal | tenant_lifetime - | - | -
 forms.form | forms | form_responses | legitimate_interests | internal | tenant_lifetime - | - | -
 forms.form_version | forms | form_responses | legitimate_interests | internal | tenant_lifetime - | - | -
 forms.respondent_token | forms | form_responses | legitimate_interests | personal | fixed 1 | online_identifiers | forms.respondent_token.response_id

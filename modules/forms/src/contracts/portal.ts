@@ -18,12 +18,11 @@
 // - A person reads their own responses projected for the respondent, which
 //   carry no staff data, spam state or anyone else's answers.
 
-import { idSchema } from '@pixel-scientists/domain';
 import { defineRoute, projectedAnswersSchemas } from '@pixel-scientists/domain/api';
 import { answersSchema, formDefinitionSchema } from '@pixel-scientists/domain/forms';
 import { z } from 'zod';
 
-import { classified, cursorSchema, timestampSchema } from './schemas.ts';
+import { classified, cursorSchema, idSchema, timestampSchema } from './schemas.ts';
 
 /** The answers and the version they answer. */
 export const portalAnswersInputSchema = z.strictObject({

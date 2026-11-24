@@ -7,9 +7,11 @@
 // holds two party ids and a signal, never a name, identifier, email or
 // phone. Nothing here reads payment details (wave 2).
 //
-// A flag's id is derived from its parties and signal, so the same flag has
-// the same id on every read. A flag cannot be dismissed until the schema
-// can hold one.
+// A flag's id is derived from its two parties, in a fixed order, and its
+// signal, so the same flag has the same id whichever party it is listed
+// for. Listing a flag records its id, parties and signal (so it can be
+// dismissed later) and nothing else; dismissing one needs a named member and
+// a reason from the list, and a dismissed flag is listed with its dismissal.
 
 import { idSchema } from '@pixel-scientists/domain';
 import type {
@@ -18,8 +20,13 @@ import type {
 } from '@pixel-scientists/party/contracts';
 import type { PartyRequest } from '@pixel-scientists/party/server';
 
-import { duplicateSignals, type DuplicateFlag } from '../../contracts/index.ts';
-import type { Applicant, Tx } from '../checklists/context.ts';
+import {
+  duplicateSignals,
+  flagDismissalInputSchema,
+  type DuplicateFlag,
+} from '../../contracts/index.ts';
+import type { Applicant, ChecklistContext, Tx } from '../checklists/context.ts';
+import { dismiss, lockFlag, recordFlags, type FlagKey, type StoredFlag } from './store.ts';
 
 type FlagSignal = (typeof duplicateSignals)[number];
 
@@ -36,23 +43,23 @@ const RAISES: Record<PartySignal, FlagSignal | null> = {
   email: 'shared_contact_point',
 };
 
-/** What the handlers read from the request context: party's request, as party's contract takes it. */
+/** What the handlers read from the request context: party's request, as party's contract takes it, and the audit of assure's own events. */
 export interface DuplicateContext {
-  readonly audit: PartyRequest['audit'];
+  readonly audit: PartyRequest['audit'] & Pick<ChecklistContext['audit'], 'record'>;
   readonly membership: { readonly id: string };
 }
 
 export interface DuplicateDependencies {
   /** A failure that reads exactly as a missing record does. */
   readonly notFound: () => Error;
+  /** A failure the caller can fix, in plain words that show nothing they sent. */
+  readonly refuse: (status: 400 | 409, detail: string) => Error;
   /** Party's contract: candidates, and whether the tenant has the party. */
   readonly parties: Pick<PartyMerges<PartyRequest>, 'duplicateCandidates' | 'resolveParty'>;
   /** The application's organisation and applicant, through grants' server; null when missing, a draft or grants is off. */
   readonly readApplicant: (tx: Tx, applicationId: string) => Promise<Applicant | null>;
   /** SHA-256 of a text, in lower-case hex, which this module may not compute itself. */
   readonly digest: (text: string) => string;
-  /** The clock tests move. */
-  readonly now?: () => Date;
 }
 
 interface Args<I> {
@@ -81,32 +88,49 @@ export function duplicateHandlers(deps: DuplicateDependencies) {
     membership,
   });
 
-  /** The flags raised for one party, from party's candidates. */
+  /** The flag as stored, which holds its two parties in a fixed order. */
+  const keyOf = (partyId: string, otherPartyId: string, signal: FlagKey['signal']): FlagKey => {
+    const [low, high] = partyId < otherPartyId ? [partyId, otherPartyId] : [otherPartyId, partyId];
+    return { id: flagId(deps.digest, low, high, signal), partyId: low, otherPartyId: high, signal };
+  };
+
+  const shown = (
+    stored: StoredFlag,
+    partyId: string,
+    otherPartyId: string,
+    applicationId: string | null,
+  ): DuplicateFlag => ({
+    id: stored.id,
+    partyId,
+    otherPartyId,
+    applicationId,
+    otherApplicationId: null,
+    signal: stored.signal,
+    raisedAt: stored.raisedAt,
+    dismissal: stored.dismissal,
+  });
+
+  /** The flags raised for one party, from party's candidates, recorded as listed. */
   async function flagsFor(
     request: PartyRequest,
     partyId: string,
     applicationId: string | null,
   ): Promise<DuplicateFlag[]> {
-    const raisedAt = (deps.now ?? (() => new Date()))().toISOString();
     const candidates = await deps.parties.duplicateCandidates(request, partyId);
-    return candidates.flatMap(({ partyId: otherPartyId, signals }) =>
+    const raised = candidates.flatMap(({ partyId: otherPartyId, signals }) =>
       [...new Set(signals.map((signal) => RAISES[signal]))].flatMap((signal) =>
-        signal === null
-          ? []
-          : [
-              {
-                id: flagId(deps.digest, partyId, otherPartyId, signal),
-                partyId,
-                otherPartyId,
-                applicationId,
-                otherApplicationId: null,
-                signal,
-                raisedAt,
-                dismissal: null,
-              },
-            ],
+        signal === null ? [] : [{ otherPartyId, key: keyOf(partyId, otherPartyId, signal) }],
       ),
     );
+    const stored = await recordFlags(
+      request.tx,
+      request.membership.id,
+      raised.map(({ key }) => key),
+    );
+    return raised.flatMap(({ otherPartyId, key }) => {
+      const flag = stored.get(key.id);
+      return flag === undefined ? [] : [shown(flag, partyId, otherPartyId, applicationId)];
+    });
   }
 
   const ordered = (flags: DuplicateFlag[]) =>
@@ -142,5 +166,27 @@ export function duplicateHandlers(deps: DuplicateDependencies) {
     return { flags: ordered(await flagsFor(request, partyId, null)) };
   }
 
-  return { listApplicationDuplicateFlags, listPartyDuplicateFlags };
+  /** Dismisses a flag once, with a reason from the list, as the member in the session. */
+  async function dismissDuplicateFlag({
+    tx,
+    context,
+    input,
+  }: Args<{ params: { flagId: string }; body: unknown }>) {
+    const id = idOrNotFound(input.params.flagId);
+    const body = flagDismissalInputSchema.safeParse(input.body);
+    if (!body.success) throw deps.refuse(400, 'Choose a reason from the list.');
+    const flag = await lockFlag(tx, id);
+    if (flag === undefined) throw deps.notFound();
+    if (flag.dismissal !== null) throw deps.refuse(409, 'This flag has already been dismissed.');
+    const dismissed = await dismiss(tx, id, body.data.reason, context.membership.id);
+    await context.audit.record({
+      action: 'assure.duplicate_flag.dismissed',
+      entityId: id,
+      subjectPartyId: dismissed.partyId,
+      changes: { 'assure.duplicate_flag.dismiss_reason': { after: body.data.reason } },
+    });
+    return shown(dismissed, dismissed.partyId, dismissed.otherPartyId, null);
+  }
+
+  return { listApplicationDuplicateFlags, listPartyDuplicateFlags, dismissDuplicateFlag };
 }
