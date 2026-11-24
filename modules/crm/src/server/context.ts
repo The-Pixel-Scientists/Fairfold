@@ -70,7 +70,19 @@ type Tables = {
     system: string;
     external_id: string;
     url: string | null;
+    added_by: string;
     created_at: Generated<Date>;
+  };
+  'crm.duplicate_dismissal': {
+    tenant_id: string;
+    id: Generated<string>;
+    kind: PartyKind;
+    party_id: string;
+    other_party_id: string;
+    reason: string;
+    created_at: Generated<Date>;
+    created_by: string;
+    updated_by: string;
   };
   'crm.merge_record': {
     tenant_id: string;
