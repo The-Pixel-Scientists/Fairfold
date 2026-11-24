@@ -65,8 +65,31 @@ export interface InsightReportDefinition {
   version: Generated<number>;
 }
 
+export interface InsightReportRun {
+  breakdown: string | null;
+  created_at: Generated<Timestamp>;
+  created_by: string;
+  disclosure_rule_version: number | null;
+  filter_field: string | null;
+  filter_id: string | null;
+  filter_year: number | null;
+  id: Generated<string>;
+  kind: string;
+  outcome: string;
+  population: number | null;
+  question: string | null;
+  report_id: string;
+  report_version: number;
+  round_ids: string[] | null;
+  shown_table: Json | null;
+  tenant_id: string;
+  updated_at: Generated<Timestamp>;
+  updated_by: string;
+}
+
 export interface DB {
   'insight.disclosure_rule': InsightDisclosureRule;
   'insight.publication_run': InsightPublicationRun;
   'insight.report_definition': InsightReportDefinition;
+  'insight.report_run': InsightReportRun;
 }
