@@ -6,6 +6,7 @@
 
 import type { AuditChanges, Transaction } from '@pixel-scientists/db';
 import type { DB } from '@pixel-scientists/db/generated/insight';
+import type { WarehouseTableName } from '@pixel-scientists/domain/warehouse';
 
 import type { InsightAuditAction, ReportDefinitionChange } from '../contracts/index.ts';
 
@@ -53,6 +54,11 @@ export interface InsightContext {
   readonly membership: { readonly id: string };
   /** The request's id, which a job sent from it carries for log correlation. */
   readonly requestId: string;
+  /**
+   * Runs `work` once the request has committed. A failure there answers the
+   * request, so a refusal can be given after what it records is kept.
+   */
+  readonly afterCommit: (work: () => Promise<void>) => void;
 }
 
 /**
@@ -65,12 +71,29 @@ export type MonitoringCounts =
   | {
       readonly status: 'counted';
       readonly rounds: readonly {
+        readonly roundId: string;
         readonly responses: number;
         readonly questions: readonly {
           readonly fieldId: string;
           readonly options: readonly { readonly value: string; readonly count: number }[];
         }[];
       }[];
+    };
+
+/** One row of a warehouse table, by column name. */
+export type WarehouseRow = Readonly<Record<string, string | number | boolean | null>>;
+
+/**
+ * A warehouse table as the warehouse feeds it, with only the columns its data
+ * contract lets through: public and internal ones, never personal data.
+ */
+export type WarehouseRead =
+  | { readonly status: 'off' }
+  | { readonly status: 'unavailable' }
+  | {
+      readonly status: 'rows';
+      readonly columns: readonly string[];
+      readonly rows: readonly WarehouseRow[];
     };
 
 /** What the platform passes in. */
@@ -81,6 +104,8 @@ export interface InsightDependencies {
   readonly refuse: (status: 400 | 409, detail: string) => Error;
   /** Grants' own server counts the answers, in the request's transaction (ADR 0016). */
   readonly monitoringCounts: (tx: Tx, roundIds: readonly string[]) => Promise<MonitoringCounts>;
+  /** The warehouse's rows of one table, read in the request's transaction. */
+  readonly warehouseRows: (tx: Tx, table: WarehouseTableName) => Promise<WarehouseRead>;
 }
 
 export interface Args<I> {
