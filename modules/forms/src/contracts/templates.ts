@@ -10,13 +10,12 @@
 // `forms.forms.manage` lists and reads them, and creates a form whose draft
 // is a template's definition (`forms.form.created`).
 
-import { idSchema } from '@pixel-scientists/domain';
 import { defineRoute } from '@pixel-scientists/domain/api';
 import { formDefinitionSchema, type FormDefinition } from '@pixel-scientists/domain/forms';
 import { z } from 'zod';
 
 import { formSchema, formSettingsInputSchema } from './forms.ts';
-import { classified } from './schemas.ts';
+import { classified, idSchema } from './schemas.ts';
 
 const quality = [
   { value: 'very_good', label: 'Very good' },

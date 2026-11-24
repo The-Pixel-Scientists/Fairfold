@@ -20,7 +20,6 @@
 // sent without the browser check is shown with that fact, for staff to
 // judge.
 
-import { idSchema } from '@pixel-scientists/domain';
 import { defineRoute, projectedAnswersSchemas } from '@pixel-scientists/domain/api';
 import { formDefinitionSchema } from '@pixel-scientists/domain/forms';
 import { z } from 'zod';
@@ -31,6 +30,7 @@ import {
   choice,
   classified,
   cursorSchema,
+  idSchema,
   responseRoutes,
   timestampSchema,
   type FieldClasses,

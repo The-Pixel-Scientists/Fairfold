@@ -19,7 +19,6 @@
 //   with publishProblems(), by field id only, against every earlier version.
 //   No route changes or removes a published version.
 
-import { idSchema } from '@pixel-scientists/domain';
 import { defineRoute } from '@pixel-scientists/domain/api';
 import {
   changedFieldTypes,
@@ -40,6 +39,7 @@ import {
   formStatuses,
   HIDDEN,
   HIDDEN_IN_TEXT,
+  idSchema,
   line,
   paragraphs,
   respondentOptions,

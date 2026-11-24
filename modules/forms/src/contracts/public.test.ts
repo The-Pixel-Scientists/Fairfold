@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+import { problemTypes } from '@pixel-scientists/domain/api';
 import { describe, expect, it } from 'vitest';
 
 import { formsMessages } from './messages.ts';
 import {
+  getPublicForm,
   leadingZeroBits,
   PROOF_SOLUTIONS,
   proofChallengePayloadSchema,
@@ -42,6 +44,28 @@ const input = {
   proof: { challenge, nonces: Array.from({ length: PROOF_SOLUTIONS }, (_, i) => i * 1000) },
   answers: { f_overall: 'good', f_helped: 'The staff listened.' },
 };
+
+describe('the form and its tenant', () => {
+  it('have one spelling: an id is lowercased, and a slug in any other case is refused', () => {
+    const params = getPublicForm.params;
+    expect(params.parse({ slug: 'northfield', formId: id.toUpperCase() })).toEqual({
+      slug: 'northfield',
+      formId: id,
+    });
+    for (const slug of ['Northfield', 'NORTHFIELD', 'northField']) {
+      expect(params.safeParse({ slug, formId: id }).success, slug).toBe(false);
+    }
+    expect(proofChallengePayloadSchema.safeParse({ ...payload, slug: 'Northfield' }).success).toBe(
+      false,
+    );
+    expect(proofChallengePayloadSchema.parse({ ...payload, formId: id.toUpperCase() })).toEqual(
+      payload,
+    );
+    expect(
+      publicResponseInputSchema.parse({ ...input, formVersionId: id.toUpperCase() }).formVersionId,
+    ).toBe(id);
+  });
+});
 
 describe('the respondent token', () => {
   it('is 32 bytes as unpadded base64url, in exactly one spelling', () => {
@@ -122,6 +146,11 @@ describe('a public response', () => {
       publicResponseReceiptSchema.safeParse({ ...receipt, respondentToken: token }).success,
     ).toBe(false);
     expect(Object.keys(publicFormSchema.shape)).not.toContain('confirmationMessage');
+  });
+
+  it('uses only problem types the apps know', () => {
+    const known: readonly string[] = problemTypes;
+    for (const { type } of Object.values(publicFormProblems)) expect(known).toContain(type);
   });
 
   it('has its own fixed problems for a changed form and a failed check', () => {

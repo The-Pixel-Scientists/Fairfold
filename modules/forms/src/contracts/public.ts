@@ -20,14 +20,13 @@
 // alone. The function writes `forms.response.submitted` with the system
 // actor and the request id, and never a client address or token.
 
-import { idSchema } from '@pixel-scientists/domain';
 import { defineRoute } from '@pixel-scientists/domain/api';
 import { answersSchema, formDefinitionSchema } from '@pixel-scientists/domain/forms';
 import { slugSchema } from '@pixel-scientists/domain/platform';
 import { z } from 'zod';
 
 import { formsMessages as m } from './messages.ts';
-import { classified, timestampSchema } from './schemas.ts';
+import { classified, idSchema, timestampSchema } from './schemas.ts';
 
 export const PUBLIC_SUBMIT_MAX_BYTES = 256 * 1024;
 
