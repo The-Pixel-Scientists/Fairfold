@@ -99,7 +99,7 @@ export function screeningHandlers(deps: ScreeningRouteDependencies) {
 
   return {
     /** Queues a run for a party of this tenant. The run is matched later, by the worker. */
-    async startScreeningRun({ tx, context, input }: Args<{ params: { partyId: string } }>) {
+    startScreeningRun: async ({ tx, context, input }: Args<{ params: { partyId: string } }>) => {
       const partyId = await partyOrNotFound(tx, input.params.partyId);
       if (await organisationIsErased(tx, partyId)) {
         throw deps.refuse(409, "This party has been erased, so it can't be screened.");
@@ -122,32 +122,38 @@ export function screeningHandlers(deps: ScreeningRouteDependencies) {
     },
 
     /** For a replay of the run request: the run as it reads now. Queues, audits and writes nothing. */
-    async replayScreeningRun({ tx, id }: { tx: Tx; id: string | null }) {
+    replayScreeningRun: async ({ tx, id }: { tx: Tx; id: string | null }) => {
       const run = await readRun(tx, idOrNotFound(id));
       if (run === null) throw deps.notFound();
       return run;
     },
 
     /** For a replay of a decision: that decision as it reads now. Records and audits nothing. */
-    async replayMatchDecision({ tx, id }: { tx: Tx; id: string | null }): Promise<MatchDecision> {
+    replayMatchDecision: async ({
+      tx,
+      id,
+    }: {
+      tx: Tx;
+      id: string | null;
+    }): Promise<MatchDecision> => {
       const decision = await readDecision(tx, idOrNotFound(id));
       if (decision === null) throw deps.notFound();
       return decision;
     },
 
-    async listScreeningRuns({ tx, input }: Args<{ params: { partyId: string } }>) {
+    listScreeningRuns: async ({ tx, input }: Args<{ params: { partyId: string } }>) => {
       const partyId = await partyOrNotFound(tx, input.params.partyId);
       return { runs: await partyRuns(tx, partyId, RUN_LIMIT) };
     },
 
-    async getScreeningRun({ tx, input }: Args<{ params: { runId: string } }>) {
+    getScreeningRun: async ({ tx, input }: Args<{ params: { runId: string } }>) => {
       const run = await readRun(tx, idOrNotFound(input.params.runId));
       if (run === null) throw deps.notFound();
       return run;
     },
 
     /** Matches by ids and codes, oldest first: no name, so no sensitive read. */
-    async listScreeningMatches({ tx, input }: Args<{ query: unknown }>) {
+    listScreeningMatches: async ({ tx, input }: Args<{ query: unknown }>) => {
       const query = matchQuerySchema.safeParse(input.query);
       if (!query.success) throw deps.refuse(400, 'Check the filters and try again.');
       const after = query.data.cursor === undefined ? null : decodeCursor(query.data.cursor);
@@ -156,13 +162,13 @@ export function screeningHandlers(deps: ScreeningRouteDependencies) {
       }
       const { rows, next } = await matchPage(tx, query.data, after);
       return {
-        matches: rows,
+        matches: [...rows],
         nextCursor: next === null ? null : encodeCursor(next.raised, next.id),
       };
     },
 
     /** A match beside its listed entry: names, so each read is audited. */
-    async getScreeningMatch({ tx, context, input }: Args<{ params: { matchId: string } }>) {
+    getScreeningMatch: async ({ tx, context, input }: Args<{ params: { matchId: string } }>) => {
       const match = await readMatch(tx, idOrNotFound(input.params.matchId));
       if (match === null) throw deps.notFound();
       await context.audit.read({
@@ -174,11 +180,11 @@ export function screeningHandlers(deps: ScreeningRouteDependencies) {
     },
 
     /** Records a named member's decision. A later decision supersedes an earlier one. */
-    async decideScreeningMatch({
+    decideScreeningMatch: async ({
       tx,
       context,
       input,
-    }: Args<{ params: { matchId: string }; body: unknown }>): Promise<MatchDecision> {
+    }: Args<{ params: { matchId: string }; body: unknown }>): Promise<MatchDecision> => {
       const matchId = idOrNotFound(input.params.matchId);
       const body = matchDecisionInputSchema.safeParse(input.body);
       if (!body.success) throw deps.refuse(400, 'Choose an outcome with a reason that fits it.');

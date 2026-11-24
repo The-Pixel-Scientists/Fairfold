@@ -81,10 +81,10 @@ export function registryHandlers(deps: RegistryDependencies) {
 
   return {
     /** The newest snapshot of each identifier the organisation claims. Officers' names are not here. */
-    async listOrganisationLookups({
+    listOrganisationLookups: async ({
       tx,
       input,
-    }: Args<{ params: { organisationId: string } }>): Promise<OrganisationLookups> {
+    }: Args<{ params: { organisationId: string } }>): Promise<OrganisationLookups> => {
       const organisationId = idOrNotFound(input.params.organisationId);
       const [organisation] = await organisationSummaries(tx, [organisationId]);
       if (organisation === undefined) throw deps.notFound();
@@ -102,11 +102,11 @@ export function registryHandlers(deps: RegistryDependencies) {
     },
 
     /** Queues a fresh lookup of an identifier the organisation already claims. */
-    async refreshOrganisationLookup({
+    refreshOrganisationLookup: async ({
       tx,
       context,
       input,
-    }: Args<{ params: { organisationId: string }; body: unknown }>) {
+    }: Args<{ params: { organisationId: string }; body: unknown }>) => {
       const organisationId = idOrNotFound(input.params.organisationId);
       const body = lookupRefreshInputSchema.safeParse(input.body);
       if (!body.success) throw deps.refuse(400, 'Choose a register to look up.');
@@ -135,7 +135,11 @@ export function registryHandlers(deps: RegistryDependencies) {
     },
 
     /** A snapshot's officers by name and role: personal data, so each read is audited. */
-    async listLookupOfficers({ tx, context, input }: Args<{ params: { snapshotId: string } }>) {
+    listLookupOfficers: async ({
+      tx,
+      context,
+      input,
+    }: Args<{ params: { snapshotId: string } }>) => {
       const snapshotId = idOrNotFound(input.params.snapshotId);
       const organisationId = await snapshotOrganisation(tx, snapshotId);
       if (organisationId === null) throw deps.notFound();
