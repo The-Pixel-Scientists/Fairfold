@@ -101,7 +101,9 @@ describe('composeModules', () => {
 
     // The wave 1 modules' routes are checked beside each module's composition.
     expect(
-      routes.map((route) => route.contract).filter((contract) => contract.module !== 'crm'),
+      routes
+        .map((route) => route.contract)
+        .filter((contract) => contract.module !== 'crm' && contract.module !== 'privacy'),
     ).toEqual([
       listAuditEvents,
       searchAuditEvents,
@@ -265,7 +267,7 @@ describe('the module compositions', () => {
     const compositions = moduleCompositions.map((factory) => factory(deps));
 
     expect(compositions).toHaveLength(6);
-    expect(compositions.slice(3)).toEqual(Array.from({ length: 3 }, () => ({})));
+    expect(compositions.slice(4)).toEqual(Array.from({ length: 2 }, () => ({})));
   });
 
   it('gives the forms composition its routes, scope rules and erasure, and the anonymous routes only with the two keys', () => {
@@ -318,6 +320,7 @@ describe('the module compositions', () => {
       'crm',
       'assure',
       'forms',
+      'privacy',
     ]);
     expect(workerModuleJobs(mail).map(({ queue }) => queue.name)).toEqual([
       'grants.release_email',

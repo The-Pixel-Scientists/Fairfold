@@ -616,7 +616,7 @@ describe('across tenants', () => {
 });
 
 describe('nothing erases without a request', () => {
-  it('has one route that asks, one that reads, and a job no schedule sends', () => {
+  it('has the routes that ask and read, and a job no schedule sends', () => {
     const { routes } = composeModules({
       publicTenants: {
         tenant: () => Promise.resolve(undefined),
@@ -629,6 +629,9 @@ describe('nothing erases without a request', () => {
     expect(erasure.map(({ contract }) => `${contract.method} ${contract.path}`)).toEqual([
       'POST /console/erasure-requests',
       'GET /console/erasure-requests/:requestId',
+      // A rights request starts the same erasure, as a named member after step-up.
+      'POST /console/rights-requests/:requestId/erasure',
+      'GET /console/rights-requests/:requestId/erasure',
     ]);
     const jobs = workerModuleJobs({
       sender: { send: () => Promise.resolve({ sent: true }) },
