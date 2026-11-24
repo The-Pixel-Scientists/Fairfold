@@ -33,6 +33,7 @@ import { isIP } from 'node:net';
 import { readListUrl, readRegistryKeys, type RegistryKeys } from '@pixel-scientists/assure/server';
 import { isLoopbackHost, readSecret, type Env } from '@pixel-scientists/db';
 import { emailSchema } from '@pixel-scientists/domain/auth';
+import { PROOF_DIFFICULTY } from '@pixel-scientists/forms/contracts';
 import { z } from 'zod';
 
 export type { Env };
@@ -482,8 +483,21 @@ export interface ModuleSettings {
    */
   readonly marketing:
     { readonly suppression: VersionedSecrets; readonly unsubscribe: VersionedSecrets } | undefined;
-  /** TPS_FORMS_PROOF_KEY and TPS_FORMS_HASH_KEY (ADR 0036), only when both are set. */
-  readonly forms: { readonly proofKey: Secret; readonly hashKey: Secret } | undefined;
+  /**
+   * TPS_FORMS_PROOF_KEY and TPS_FORMS_HASH_KEY (ADR 0036), only when both are
+   * set. The browser check's difficulty in leading zero bits
+   * (TPS_FORMS_PROOF_DIFFICULTY, 8 to 24) and whether a response may be sent
+   * without it (TPS_FORMS_NO_PROOF_FALLBACK, 1 or 0, on by default), which
+   * an operator changes by restarting.
+   */
+  readonly forms:
+    | {
+        readonly proofKey: Secret;
+        readonly hashKey: Secret;
+        readonly difficulty: number;
+        readonly noProof: boolean;
+      }
+    | undefined;
   /** The registry keys, and TPS_SANCTIONS_LIST_URL (ADR 0031); a register without a key is off. */
   readonly assure: {
     readonly registryKeys: RegistryKeys;
@@ -492,6 +506,8 @@ export interface ModuleSettings {
 }
 
 const MODULE_SECRET_BYTES = 32;
+/** A starting point: ADR 0036 sets it by measurement, so that a low-end phone finishes in about 2 seconds. */
+const DEFAULT_PROOF_DIFFICULTY = 14;
 const REGISTRY_KEY_BYTES = 16;
 const MAX_KEY_VERSION = 255;
 const KEY_VERSION_SUFFIX = /^([2-9]|[1-9][0-9]{1,2})(?:_FILE)?$/;
@@ -585,6 +601,21 @@ export function loadModuleSettings(
     }
   }
 
+  const difficulty = env['TPS_FORMS_PROOF_DIFFICULTY'] || String(DEFAULT_PROOF_DIFFICULTY);
+  if (
+    !/^[0-9]{1,2}$/.test(difficulty) ||
+    Number(difficulty) < PROOF_DIFFICULTY.min ||
+    Number(difficulty) > PROOF_DIFFICULTY.max
+  ) {
+    problems.push(
+      `TPS_FORMS_PROOF_DIFFICULTY must be a whole number from ${String(PROOF_DIFFICULTY.min)} to ${String(PROOF_DIFFICULTY.max)}.`,
+    );
+  }
+  const noProof = env['TPS_FORMS_NO_PROOF_FALLBACK'] || '1';
+  if (noProof !== '1' && noProof !== '0') {
+    problems.push('TPS_FORMS_NO_PROOF_FALLBACK must be 1 or 0.');
+  }
+
   let registryKeys: RegistryKeys = {};
   try {
     registryKeys = readRegistryKeys(env);
@@ -613,7 +644,10 @@ export function loadModuleSettings(
       suppression === undefined || unsubscribe === undefined
         ? undefined
         : { suppression, unsubscribe },
-    forms: proofKey === undefined || hashKey === undefined ? undefined : { proofKey, hashKey },
+    forms:
+      proofKey === undefined || hashKey === undefined
+        ? undefined
+        : { proofKey, hashKey, difficulty: Number(difficulty), noProof: noProof === '1' },
     assure: { registryKeys, sanctionsListUrl },
   };
 }

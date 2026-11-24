@@ -631,6 +631,28 @@ describe('loadModuleSettings', () => {
       );
       expect(forms?.proofKey.reveal()).toBe(A);
       expect(forms?.hashKey.reveal()).toBe(B);
+      expect(forms).toMatchObject({ difficulty: 14, noProof: true });
+    });
+
+    it('reads the difficulty and the switch for sending without the check, and refuses what is not a setting', () => {
+      const keys = { TPS_FORMS_PROOF_KEY: A, TPS_FORMS_HASH_KEY: B };
+      const { forms } = loadModuleSettings(
+        { ...keys, TPS_FORMS_PROOF_DIFFICULTY: '20', TPS_FORMS_NO_PROOF_FALLBACK: '0' },
+        readFile,
+      );
+      expect(forms).toMatchObject({ difficulty: 20, noProof: false });
+      for (const value of ['7', '25', '1.5', 'fast', '']) {
+        const env = { ...keys, TPS_FORMS_PROOF_DIFFICULTY: value };
+        if (value === '') expect(loadModuleSettings(env, readFile).forms?.difficulty).toBe(14);
+        else {
+          expect(problemsOfModules(env), value).toEqual([
+            'TPS_FORMS_PROOF_DIFFICULTY must be a whole number from 8 to 24.',
+          ]);
+        }
+      }
+      expect(problemsOfModules({ ...keys, TPS_FORMS_NO_PROOF_FALLBACK: 'off' })).toEqual([
+        'TPS_FORMS_NO_PROOF_FALLBACK must be 1 or 0.',
+      ]);
     });
 
     it('refuses one key without the other, a short key, and two keys that are the same', () => {
