@@ -30,6 +30,7 @@
 import { readFileSync } from 'node:fs';
 import { isIP } from 'node:net';
 
+import { readListUrl, readRegistryKeys, type RegistryKeys } from '@pixel-scientists/assure/server';
 import { isLoopbackHost, readSecret, type Env } from '@pixel-scientists/db';
 import { emailSchema } from '@pixel-scientists/domain/auth';
 import { z } from 'zod';
@@ -457,5 +458,162 @@ export function loadConfig(env: Env, readFile: (path: string) => string = readTe
           : { mode: tlsMode, ...(tlsCa === undefined ? {} : { ca: tlsCa }) },
     },
     smtp: mailSettings(values),
+  };
+}
+
+/** The secrets by key version, and the version that signs or hashes new values. */
+export interface VersionedSecrets {
+  readonly current: number;
+  readonly versions: ReadonlyMap<number, Secret>;
+}
+
+/**
+ * What the modules' wiring needs beyond the platform's settings. A feature
+ * whose setting is absent stays off; a setting that is set badly stops
+ * start-up with a message that names the variable, never its value.
+ */
+export interface ModuleSettings {
+  /** TPS_CRM_PREVIEW_SECRET: signs the crm merge preview tokens. */
+  readonly crm: { readonly previewSecret: Secret } | undefined;
+  /**
+   * Marketing email (ADR 0033), only when both are set: the suppression
+   * hash secret, TPS_SUPPRESSION_SECRET, and the unsubscribe token
+   * secret, TPS_UNSUBSCRIBE_SECRET, each by key version.
+   */
+  readonly marketing:
+    { readonly suppression: VersionedSecrets; readonly unsubscribe: VersionedSecrets } | undefined;
+  /** TPS_FORMS_PROOF_KEY and TPS_FORMS_HASH_KEY (ADR 0036), only when both are set. */
+  readonly forms: { readonly proofKey: Secret; readonly hashKey: Secret } | undefined;
+  /** The registry keys, and TPS_SANCTIONS_LIST_URL (ADR 0031); a register without a key is off. */
+  readonly assure: {
+    readonly registryKeys: RegistryKeys;
+    readonly sanctionsListUrl: URL | undefined;
+  };
+}
+
+const MODULE_SECRET_BYTES = 32;
+const REGISTRY_KEY_BYTES = 16;
+const MAX_KEY_VERSION = 255;
+const KEY_VERSION_SUFFIX = /^([2-9]|[1-9][0-9]{1,2})(?:_FILE)?$/;
+
+/**
+ * The versions of one secret: NAME is version 1, NAME_<n> is version n (2 to
+ * 255), and NAME_CURRENT names the version that signs new values, which is
+ * needed when more than one is set. Undefined when none is set.
+ */
+function versionedSecrets(
+  name: string,
+  read: (name: string) => Secret | undefined,
+  env: Env,
+  problems: string[],
+): VersionedSecrets | undefined {
+  const versions = new Map<number, Secret>();
+  const first = read(name);
+  if (first !== undefined) versions.set(1, first);
+  const seen = new Set<string>();
+  for (const [key, value] of Object.entries(env)) {
+    const ignored = [`${name}_FILE`, `${name}_CURRENT`];
+    if (!value || !key.startsWith(`${name}_`) || ignored.includes(key)) continue;
+    const version = KEY_VERSION_SUFFIX.exec(key.slice(name.length + 1))?.[1];
+    if (version === undefined || Number(version) > MAX_KEY_VERSION) {
+      problems.push(`${key} is not a setting. Name key versions ${name}_2 to _${MAX_KEY_VERSION}.`);
+    } else if (!seen.has(version)) {
+      seen.add(version);
+      const secret = read(`${name}_${version}`);
+      if (secret !== undefined) versions.set(Number(version), secret);
+    }
+  }
+  if (versions.size === 0) return undefined;
+  const named = env[`${name}_CURRENT`] || undefined;
+  if (named === undefined) {
+    if (versions.size === 1) return { current: [...versions.keys()][0] as number, versions };
+    problems.push(`More than one ${name} key version is set, so set ${name}_CURRENT.`);
+  } else if (/^[1-9][0-9]{0,2}$/.test(named) && versions.has(Number(named))) {
+    return { current: Number(named), versions };
+  } else {
+    problems.push(`${name}_CURRENT must name a key version that is set.`);
+  }
+  return undefined;
+}
+
+/** Read and check the modules' settings, or throw a ConfigError naming every problem. */
+export function loadModuleSettings(
+  env: Env,
+  readFile: (path: string) => string = readTextFile,
+): ModuleSettings {
+  const problems: string[] = [];
+  const development = env['TPS_DEV'] === '1';
+  const secret = (name: string, minimum = MODULE_SECRET_BYTES): Secret | undefined => {
+    if ((env[name] ?? '') === '' && (env[`${name}_FILE`] ?? '') === '') return undefined;
+    try {
+      const value = readSecret(env, name, readFile);
+      if (Buffer.byteLength(value) < minimum) {
+        problems.push(`${name} must be at least ${String(minimum)} bytes.`);
+      } else if (DEVELOPMENT_PASSWORD.test(value) && !development) {
+        problems.push(`${name} is a development value, which works only with TPS_DEV=1.`);
+      } else return new Secret(value);
+    } catch (error) {
+      problems.push(error instanceof Error ? error.message : `Set ${name}.`);
+    }
+    return undefined;
+  };
+
+  const previewSecret = secret('TPS_CRM_PREVIEW_SECRET');
+
+  const before = problems.length;
+  const suppression = versionedSecrets('TPS_SUPPRESSION_SECRET', secret, env, problems);
+  const unsubscribe = versionedSecrets('TPS_UNSUBSCRIBE_SECRET', secret, env, problems);
+  if (problems.length === before && (suppression === undefined) !== (unsubscribe === undefined)) {
+    problems.push(
+      'Set TPS_SUPPRESSION_SECRET and TPS_UNSUBSCRIBE_SECRET together: marketing email needs both.',
+    );
+  }
+
+  const formsBefore = problems.length;
+  const proofKey = secret('TPS_FORMS_PROOF_KEY');
+  const hashKey = secret('TPS_FORMS_HASH_KEY');
+  // A key that was refused is reported once, not again as missing.
+  if (problems.length === formsBefore) {
+    if ((proofKey === undefined) !== (hashKey === undefined)) {
+      problems.push(
+        'Set TPS_FORMS_PROOF_KEY and TPS_FORMS_HASH_KEY together: public forms need both.',
+      );
+    } else if (proofKey !== undefined && proofKey.reveal() === hashKey?.reveal()) {
+      problems.push(
+        'TPS_FORMS_PROOF_KEY and TPS_FORMS_HASH_KEY must differ: each is used for one thing.',
+      );
+    }
+  }
+
+  let registryKeys: RegistryKeys = {};
+  try {
+    registryKeys = readRegistryKeys(env);
+    for (const [name, key] of [
+      ['TPS_CHARITY_COMMISSION_API_KEY', registryKeys.charityCommission],
+      ['TPS_COMPANIES_HOUSE_API_KEY', registryKeys.companiesHouse],
+    ] as const) {
+      if (key !== undefined && key.reveal().length < REGISTRY_KEY_BYTES) {
+        problems.push(`${name} must be at least ${String(REGISTRY_KEY_BYTES)} characters.`);
+      }
+    }
+  } catch (error) {
+    problems.push(error instanceof Error ? error.message : 'A registry key is not valid.');
+  }
+  let sanctionsListUrl: URL | undefined;
+  try {
+    sanctionsListUrl = readListUrl(env);
+  } catch (error) {
+    problems.push(error instanceof Error ? error.message : 'TPS_SANCTIONS_LIST_URL is not valid.');
+  }
+
+  if (problems.length > 0) throw new ConfigError(problems);
+  return {
+    crm: previewSecret === undefined ? undefined : { previewSecret },
+    marketing:
+      suppression === undefined || unsubscribe === undefined
+        ? undefined
+        : { suppression, unsubscribe },
+    forms: proofKey === undefined || hashKey === undefined ? undefined : { proofKey, hashKey },
+    assure: { registryKeys, sanctionsListUrl },
   };
 }
