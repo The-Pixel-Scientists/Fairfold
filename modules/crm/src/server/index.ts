@@ -18,6 +18,7 @@ import { duplicateHandlers } from './duplicates.ts';
 import { listHandlers } from './lists.ts';
 import { mergeHandlers } from './merge.ts';
 import { recordHandlers } from './records.ts';
+import { referenceHandlers } from './references.ts';
 import { searchHandlers } from './search.ts';
 import { segmentHandlers } from './segments.ts';
 import { timelineHandlers } from './timeline/read.ts';
@@ -47,6 +48,7 @@ export function crmHandlers(deps: CrmDependencies) {
     ...recordHandlers(deps),
     ...duplicateHandlers(deps),
     ...mergeHandlers(deps),
+    ...referenceHandlers(deps),
     ...listHandlers(deps),
     ...segmentHandlers(deps),
     ...timelineHandlers(deps),
