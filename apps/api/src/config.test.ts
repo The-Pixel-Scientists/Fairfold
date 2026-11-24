@@ -4,7 +4,7 @@ import { inspect } from 'node:util';
 
 import { describe, expect, it } from 'vitest';
 
-import { ConfigError, loadConfig, Secret, type Env } from './config.ts';
+import { ConfigError, loadConfig, loadModuleSettings, Secret, type Env } from './config.ts';
 
 /** A complete, valid environment for a deployed API. */
 const deployed: Env = {
@@ -515,5 +515,183 @@ describe('the mail server', () => {
     expect(problemsOf({ ...deployed, TPS_SMTP_USER: 'a\nb', TPS_SMTP_PASSWORD: 'p4ss' })).toEqual([
       expect.stringContaining('TPS_SMTP_USER must be') as string,
     ]);
+  });
+});
+
+describe('loadModuleSettings', () => {
+  const A = 'a'.repeat(32);
+  const B = 'b'.repeat(32);
+  const C = 'c'.repeat(32);
+
+  const problemsOfModules = (env: Env): readonly string[] => {
+    try {
+      loadModuleSettings(env, readFile);
+    } catch (error) {
+      if (error instanceof ConfigError) return error.problems;
+      throw error;
+    }
+    throw new Error('Expected the settings to be refused.');
+  };
+
+  it('leaves every feature off when nothing is set', () => {
+    expect(loadModuleSettings({}, readFile)).toEqual({
+      crm: undefined,
+      marketing: undefined,
+      forms: undefined,
+      assure: { registryKeys: {}, sanctionsListUrl: undefined },
+    });
+  });
+
+  describe('TPS_CRM_PREVIEW_SECRET', () => {
+    it('is read from the variable or from its file', () => {
+      const fromVariable = loadModuleSettings({ TPS_CRM_PREVIEW_SECRET: A }, readFile);
+      expect(fromVariable.crm?.previewSecret.reveal()).toBe(A);
+      files['/run/secrets/preview'] = `${B}\n`;
+      const fromFile = { TPS_CRM_PREVIEW_SECRET_FILE: '/run/secrets/preview' };
+      expect(loadModuleSettings(fromFile, readFile).crm?.previewSecret.reveal()).toBe(B);
+    });
+
+    it('is refused when it is too short, naming the variable and not the value', () => {
+      const problems = problemsOfModules({ TPS_CRM_PREVIEW_SECRET: 'short-secret' });
+      expect(problems).toEqual(['TPS_CRM_PREVIEW_SECRET must be at least 32 bytes.']);
+    });
+
+    it('is refused when set in both forms, or as a development value outside TPS_DEV=1', () => {
+      expect(
+        problemsOfModules({ TPS_CRM_PREVIEW_SECRET: A, TPS_CRM_PREVIEW_SECRET_FILE: '/x' }),
+      ).toEqual(['Set TPS_CRM_PREVIEW_SECRET or TPS_CRM_PREVIEW_SECRET_FILE, not both.']);
+      const dev = { TPS_CRM_PREVIEW_SECRET: `${'d'.repeat(20)}-dev-value-not-a-secret` };
+      expect(problemsOfModules(dev)).toEqual([
+        'TPS_CRM_PREVIEW_SECRET is a development value, which works only with TPS_DEV=1.',
+      ]);
+      expect(loadModuleSettings({ ...dev, TPS_DEV: '1' }, readFile).crm).toBeDefined();
+    });
+  });
+
+  describe('marketing email', () => {
+    const together =
+      'Set TPS_SUPPRESSION_SECRET and TPS_UNSUBSCRIBE_SECRET together: marketing email needs both.';
+
+    it('is off with neither secret, and refused with only one', () => {
+      expect(problemsOfModules({ TPS_SUPPRESSION_SECRET: A })).toEqual([together]);
+      expect(problemsOfModules({ TPS_UNSUBSCRIBE_SECRET: A })).toEqual([together]);
+    });
+
+    it('reads one version of each as version 1, current', () => {
+      const { marketing } = loadModuleSettings(
+        { TPS_SUPPRESSION_SECRET: A, TPS_UNSUBSCRIBE_SECRET: B },
+        readFile,
+      );
+      expect(marketing?.suppression.current).toBe(1);
+      expect(marketing?.suppression.versions.get(1)?.reveal()).toBe(A);
+      expect(marketing?.unsubscribe.versions.get(1)?.reveal()).toBe(B);
+    });
+
+    it('reads numbered versions, with the current one named', () => {
+      const env = {
+        TPS_SUPPRESSION_SECRET: A,
+        TPS_SUPPRESSION_SECRET_2: B,
+        TPS_SUPPRESSION_SECRET_CURRENT: '2',
+        TPS_UNSUBSCRIBE_SECRET: C,
+      };
+      const { marketing } = loadModuleSettings(env, readFile);
+      expect(marketing?.suppression.current).toBe(2);
+      expect([...(marketing?.suppression.versions.keys() ?? [])]).toEqual([1, 2]);
+    });
+
+    it('needs the current version named when more than one is set, and set', () => {
+      const base = { TPS_SUPPRESSION_SECRET: A, TPS_UNSUBSCRIBE_SECRET: B };
+      expect(problemsOfModules({ ...base, TPS_SUPPRESSION_SECRET_2: C })).toEqual([
+        'More than one TPS_SUPPRESSION_SECRET key version is set, so set TPS_SUPPRESSION_SECRET_CURRENT.',
+      ]);
+      expect(problemsOfModules({ ...base, TPS_UNSUBSCRIBE_SECRET_CURRENT: '3' })).toEqual([
+        'TPS_UNSUBSCRIBE_SECRET_CURRENT must name a key version that is set.',
+      ]);
+    });
+
+    it('refuses a short secret and a version name that is not one', () => {
+      expect(
+        problemsOfModules({
+          TPS_SUPPRESSION_SECRET: 'too-short',
+          TPS_UNSUBSCRIBE_SECRET: B,
+          TPS_UNSUBSCRIBE_SECRET_256: C,
+        }),
+      ).toEqual([
+        'TPS_SUPPRESSION_SECRET must be at least 32 bytes.',
+        'TPS_UNSUBSCRIBE_SECRET_256 is not a setting. Name key versions TPS_UNSUBSCRIBE_SECRET_2 to _255.',
+      ]);
+    });
+  });
+
+  describe('public forms', () => {
+    it('reads both keys', () => {
+      const { forms } = loadModuleSettings(
+        { TPS_FORMS_PROOF_KEY: A, TPS_FORMS_HASH_KEY: B },
+        readFile,
+      );
+      expect(forms?.proofKey.reveal()).toBe(A);
+      expect(forms?.hashKey.reveal()).toBe(B);
+    });
+
+    it('refuses one key without the other, a short key, and two keys that are the same', () => {
+      const both =
+        'Set TPS_FORMS_PROOF_KEY and TPS_FORMS_HASH_KEY together: public forms need both.';
+      expect(problemsOfModules({ TPS_FORMS_PROOF_KEY: A })).toEqual([both]);
+      expect(problemsOfModules({ TPS_FORMS_PROOF_KEY: A, TPS_FORMS_HASH_KEY: 'short' })).toEqual([
+        'TPS_FORMS_HASH_KEY must be at least 32 bytes.',
+      ]);
+      expect(problemsOfModules({ TPS_FORMS_PROOF_KEY: A, TPS_FORMS_HASH_KEY: A })).toEqual([
+        'TPS_FORMS_PROOF_KEY and TPS_FORMS_HASH_KEY must differ: each is used for one thing.',
+      ]);
+    });
+  });
+
+  describe('due diligence', () => {
+    const KEY = 'registry-key-of-sixteen-or-more';
+
+    it('leaves a register off with no key, and reads one that is set', () => {
+      const { assure } = loadModuleSettings({ TPS_COMPANIES_HOUSE_API_KEY: KEY }, readFile);
+      expect(assure.registryKeys.charityCommission).toBeUndefined();
+      expect(assure.registryKeys.companiesHouse?.reveal()).toBe(KEY);
+    });
+
+    it('refuses a key that is too short, or set in both forms', () => {
+      expect(problemsOfModules({ TPS_CHARITY_COMMISSION_API_KEY: 'short' })).toEqual([
+        'TPS_CHARITY_COMMISSION_API_KEY must be at least 16 characters.',
+      ]);
+      const both = { TPS_COMPANIES_HOUSE_API_KEY: KEY, TPS_COMPANIES_HOUSE_API_KEY_FILE: '/x' };
+      expect(problemsOfModules(both)).toEqual([
+        'Set TPS_COMPANIES_HOUSE_API_KEY or TPS_COMPANIES_HOUSE_API_KEY_FILE, not both.',
+      ]);
+    });
+
+    it('reads the sanctions list address, and refuses one that is not plain HTTPS', () => {
+      const url = 'https://lists.example.org/sanctions.json';
+      const { assure } = loadModuleSettings({ TPS_SANCTIONS_LIST_URL: url }, readFile);
+      expect(assure.sanctionsListUrl).toEqual(new URL(url));
+      expect(problemsOfModules({ TPS_SANCTIONS_LIST_URL: 'http://lists.example.org/x' })).toEqual([
+        'TPS_SANCTIONS_LIST_URL must be an https:// address with no user name.',
+      ]);
+      expect(problemsOfModules({ TPS_SANCTIONS_LIST_URL: 'not a url' })).toEqual([
+        'TPS_SANCTIONS_LIST_URL must be an https:// address.',
+      ]);
+    });
+  });
+
+  it('reports every problem at once and never repeats a secret', () => {
+    const secretLooking = 'x'.repeat(8);
+    const problems = problemsOfModules({
+      TPS_CRM_PREVIEW_SECRET: secretLooking,
+      TPS_FORMS_PROOF_KEY: secretLooking,
+      TPS_CHARITY_COMMISSION_API_KEY: secretLooking,
+    });
+    expect(problems.length).toBeGreaterThanOrEqual(3);
+    expect(problems.join()).not.toContain(secretLooking);
+  });
+
+  it('keeps every secret out of a log line and a JSON document', () => {
+    const { crm } = loadModuleSettings({ TPS_CRM_PREVIEW_SECRET: A }, readFile);
+    expect(JSON.stringify(crm)).not.toContain(A);
+    expect(inspect(crm)).not.toContain(A);
   });
 });
