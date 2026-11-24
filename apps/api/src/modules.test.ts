@@ -53,6 +53,10 @@ import {
   templateRoutes,
   triageRoutes,
 } from '@pixel-scientists/grants/contracts';
+import {
+  formRoutes as formsFormRoutes,
+  templateRoutes as formsTemplateRoutes,
+} from '@pixel-scientists/forms/contracts';
 import { impactRoutes } from '@pixel-scientists/impact/contracts';
 import { partyRoutes } from '@pixel-scientists/party/contracts';
 import { partyResolvers } from '@pixel-scientists/party/server';
@@ -70,6 +74,7 @@ import {
   moduleCompositions,
   moduleDependencies,
 } from './modules.ts';
+import { formsComposition } from './modules/forms.ts';
 import type { ModuleComposition, ModuleFactory } from './modules/types.ts';
 import { workerModuleJobs } from './worker/module-jobs.ts';
 import type { ModuleJob } from './worker/registry.ts';
@@ -146,6 +151,8 @@ describe('composeModules', () => {
       ...Object.values(reminderRoutes),
       ...Object.values(impactRoutes),
       ...Object.values(assureRoutes),
+      ...Object.values(formsFormRoutes),
+      ...Object.values(formsTemplateRoutes),
     ]);
   });
 
@@ -246,7 +253,17 @@ describe('the module compositions', () => {
     const compositions = moduleCompositions.map((factory) => factory(deps));
 
     expect(compositions).toHaveLength(6);
-    expect(compositions.slice(2)).toEqual(Array.from({ length: 4 }, () => ({})));
+    expect(compositions.slice(3)).toEqual(Array.from({ length: 3 }, () => ({})));
+  });
+
+  it('gives the forms composition its staff routes and nothing else yet', () => {
+    const { routes, ...rest } = formsComposition(moduleDependencies({}));
+
+    expect(rest).toEqual({});
+    expect(routes?.map(({ contract }) => contract)).toEqual([
+      ...Object.values(formsFormRoutes),
+      ...Object.values(formsTemplateRoutes),
+    ]);
   });
 
   it('takes the erasure contributions and worker queues of the modules wired so far', () => {
