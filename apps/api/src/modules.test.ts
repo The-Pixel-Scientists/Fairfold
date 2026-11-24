@@ -56,6 +56,7 @@ import {
 import { impactRoutes } from '@pixel-scientists/impact/contracts';
 import { partyRoutes } from '@pixel-scientists/party/contracts';
 import { partyResolvers } from '@pixel-scientists/party/server';
+import { assureRoutes } from '@pixel-scientists/assure/contracts';
 import { defineQueue } from '@pixel-scientists/db/jobs';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
@@ -72,6 +73,19 @@ import {
 import type { ModuleComposition, ModuleFactory } from './modules/types.ts';
 import { workerModuleJobs } from './worker/module-jobs.ts';
 import type { ModuleJob } from './worker/registry.ts';
+
+/** The assure routes whose handlers wait for B15-07. */
+const assureWithoutHandler: readonly (keyof typeof assureRoutes)[] = [
+  'linkLookupOfficer',
+  'dismissDuplicateFlag',
+  'listApplicationChecklists',
+  'getChecklistResponse',
+  'saveChecklistResponse',
+  'listVisits',
+  'createVisit',
+  'getVisit',
+  'updateVisit',
+];
 
 const publicTenants = {
   tenant: () => Promise.resolve(undefined),
@@ -144,6 +158,9 @@ describe('composeModules', () => {
       ...Object.values(exportRoutes),
       ...Object.values(reminderRoutes),
       ...Object.values(impactRoutes),
+      ...Object.entries(assureRoutes)
+        .filter(([name]) => !(assureWithoutHandler as readonly string[]).includes(name))
+        .map(([, contract]) => contract),
     ]);
   });
 
@@ -239,20 +256,21 @@ describe('the module compositions', () => {
   const firstRoute = composeModules({ publicTenants }).routes[0];
   if (firstRoute === undefined) throw new Error('The platform has no routes.');
 
-  it('has one composition per wave 1 module, and each but crm starts empty', () => {
+  it('has one composition per wave 1 module, and each not yet wired starts empty', () => {
     const deps = moduleDependencies({});
     const compositions = moduleCompositions.map((factory) => factory(deps));
 
     expect(compositions).toHaveLength(6);
-    expect(compositions.slice(1)).toEqual(Array.from({ length: 5 }, () => ({})));
+    expect(compositions.slice(2)).toEqual(Array.from({ length: 4 }, () => ({})));
   });
 
-  it('adds nothing to the erasure contributions or the worker queues while empty', () => {
+  it('takes the erasure contributions and worker queues of the modules wired so far', () => {
     expect(composedFor({}).erasure.map(({ module }) => module)).toEqual([
       'party',
       'grants',
       'platform',
       'crm',
+      'assure',
     ]);
     expect(workerModuleJobs(mail).map(({ queue }) => queue.name)).toEqual([
       'grants.release_email',
@@ -260,6 +278,9 @@ describe('the module compositions', () => {
       'grants.reminder_scan',
       'grants.reminder_send',
       'platform.erasure',
+      'assure.registry_refresh',
+      'assure.screening',
+      'events.assure',
     ]);
   });
 
