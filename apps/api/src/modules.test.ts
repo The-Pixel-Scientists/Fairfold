@@ -54,7 +54,10 @@ import {
   triageRoutes,
 } from '@pixel-scientists/grants/contracts';
 import {
+  consoleResponseRoutes,
   formRoutes as formsFormRoutes,
+  portalFormRoutes,
+  publicFormRoutes,
   templateRoutes as formsTemplateRoutes,
 } from '@pixel-scientists/forms/contracts';
 import { impactRoutes } from '@pixel-scientists/impact/contracts';
@@ -65,6 +68,7 @@ import { defineQueue } from '@pixel-scientists/db/jobs';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
+import { Secret } from './config.ts';
 import { releaseEmailJob } from './decision-emails.ts';
 import {
   collectModuleJobs,
@@ -85,6 +89,11 @@ const publicTenants = {
   rounds: () => Promise.resolve([]),
   embedOrigins: () => Promise.resolve([]),
 };
+
+/** The lookup by reference needs the forms keys, so a process without them has no such route. */
+const formsResponseRoutes = Object.values(consoleResponseRoutes).filter(
+  (contract) => contract !== consoleResponseRoutes.findResponseByReference,
+);
 
 describe('composeModules', () => {
   it('registers a handler for every platform, party, grants and impact route contract, once', () => {
@@ -153,6 +162,8 @@ describe('composeModules', () => {
       ...Object.values(assureRoutes),
       ...Object.values(formsFormRoutes),
       ...Object.values(formsTemplateRoutes),
+      ...formsResponseRoutes,
+      ...Object.values(portalFormRoutes),
     ]);
   });
 
@@ -184,6 +195,7 @@ describe('composeModules', () => {
         ...Object.values(exportRoutes),
         ...Object.values(decisionRoutes),
         ...Object.values(reminderRoutes),
+        ...Object.values(portalFormRoutes),
       ].map((contract) => contract.scope),
     );
 
@@ -256,14 +268,46 @@ describe('the module compositions', () => {
     expect(compositions.slice(3)).toEqual(Array.from({ length: 3 }, () => ({})));
   });
 
-  it('gives the forms composition its staff routes and nothing else yet', () => {
-    const { routes, ...rest } = formsComposition(moduleDependencies({}));
+  it('gives the forms composition its routes, scope rules and erasure, and the anonymous routes only with the two keys', () => {
+    const staff = formsComposition(moduleDependencies({}));
+    const contracts = (composition: ModuleComposition) =>
+      composition.routes?.map(({ contract }) => contract);
 
-    expect(rest).toEqual({});
-    expect(routes?.map(({ contract }) => contract)).toEqual([
-      ...Object.values(formsFormRoutes),
-      ...Object.values(formsTemplateRoutes),
-    ]);
+    expect(Object.keys(staff.resolvers ?? {}).sort()).toEqual(['open_form', 'own_response']);
+    expect(staff.erasure?.map(({ module }) => module)).toEqual(['forms']);
+    expect(contracts(staff)).toEqual(
+      expect.arrayContaining([
+        ...Object.values(formsFormRoutes),
+        ...formsResponseRoutes,
+        ...Object.values(portalFormRoutes),
+      ]),
+    );
+    expect(contracts(staff)).not.toContain(consoleResponseRoutes.findResponseByReference);
+    for (const contract of Object.values(publicFormRoutes)) {
+      expect(contracts(staff)).not.toContain(contract);
+    }
+
+    const keyed = formsComposition(
+      moduleDependencies({
+        settings: {
+          crm: undefined,
+          marketing: undefined,
+          assure: { registryKeys: {}, sanctionsListUrl: undefined },
+          forms: {
+            proofKey: new Secret('a'.repeat(32)),
+            hashKey: new Secret('b'.repeat(32)),
+            difficulty: 8,
+            noProof: true,
+          },
+        },
+      }),
+    );
+    expect(contracts(keyed)).toEqual(
+      expect.arrayContaining([
+        consoleResponseRoutes.findResponseByReference,
+        ...Object.values(publicFormRoutes),
+      ]),
+    );
   });
 
   it('takes the erasure contributions and worker queues of the modules wired so far', () => {
@@ -273,6 +317,7 @@ describe('the module compositions', () => {
       'platform',
       'crm',
       'assure',
+      'forms',
     ]);
     expect(workerModuleJobs(mail).map(({ queue }) => queue.name)).toEqual([
       'grants.release_email',
