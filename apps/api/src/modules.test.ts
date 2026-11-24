@@ -67,6 +67,7 @@ import {
   composedFor,
   mergeCompositions,
   moduleCompositions,
+  moduleDependencies,
 } from './modules.ts';
 import type { ModuleComposition, ModuleFactory } from './modules/types.ts';
 import { workerModuleJobs } from './worker/module-jobs.ts';
@@ -83,7 +84,10 @@ describe('composeModules', () => {
   it('registers a handler for every platform, party, grants and impact route contract, once', () => {
     const { routes } = composeModules({ publicTenants });
 
-    expect(routes.map((route) => route.contract)).toEqual([
+    // The wave 1 modules' routes are checked beside each module's composition.
+    expect(
+      routes.map((route) => route.contract).filter((contract) => contract.module !== 'crm'),
+    ).toEqual([
       listAuditEvents,
       searchAuditEvents,
       searchTerm,
@@ -235,11 +239,12 @@ describe('the module compositions', () => {
   const firstRoute = composeModules({ publicTenants }).routes[0];
   if (firstRoute === undefined) throw new Error('The platform has no routes.');
 
-  it('has one composition per wave 1 module, and each starts empty', () => {
-    const deps = moduleCompositions.map((factory) => factory({} as Parameters<ModuleFactory>[0]));
+  it('has one composition per wave 1 module, and each but crm starts empty', () => {
+    const deps = moduleDependencies({});
+    const compositions = moduleCompositions.map((factory) => factory(deps));
 
-    expect(deps).toHaveLength(6);
-    expect(deps).toEqual(Array.from({ length: 6 }, () => ({})));
+    expect(compositions).toHaveLength(6);
+    expect(compositions.slice(1)).toEqual(Array.from({ length: 5 }, () => ({})));
   });
 
   it('adds nothing to the erasure contributions or the worker queues while empty', () => {
@@ -247,6 +252,7 @@ describe('the module compositions', () => {
       'party',
       'grants',
       'platform',
+      'crm',
     ]);
     expect(workerModuleJobs(mail).map(({ queue }) => queue.name)).toEqual([
       'grants.release_email',
