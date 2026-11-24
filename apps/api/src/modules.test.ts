@@ -61,7 +61,7 @@ import {
   templateRoutes as formsTemplateRoutes,
 } from '@pixel-scientists/forms/contracts';
 import { impactRoutes } from '@pixel-scientists/impact/contracts';
-import { partyRoutes } from '@pixel-scientists/party/contracts';
+import { partyPreferenceRoutes, partyRoutes } from '@pixel-scientists/party/contracts';
 import { partyResolvers } from '@pixel-scientists/party/server';
 import { assureRoutes } from '@pixel-scientists/assure/contracts';
 import { defineQueue } from '@pixel-scientists/db/jobs';
@@ -171,6 +171,7 @@ describe('composeModules', () => {
       ...Object.values(formsTemplateRoutes),
       ...formsResponseRoutes,
       ...Object.values(portalFormRoutes),
+      ...Object.values(partyPreferenceRoutes),
     ]);
   });
 
@@ -267,12 +268,10 @@ describe('the module compositions', () => {
   const firstRoute = composeModules({ publicTenants }).routes[0];
   if (firstRoute === undefined) throw new Error('The platform has no routes.');
 
-  it('has one composition per wave 1 module, and each not yet wired starts empty', () => {
-    const deps = moduleDependencies({});
-    const compositions = moduleCompositions.map((factory) => factory(deps));
+  it('has one composition per wave 1 module', () => {
+    const compositions = moduleCompositions.map((factory) => factory(moduleDependencies({})));
 
     expect(compositions).toHaveLength(6);
-    expect(compositions.slice(5)).toEqual([{}]);
   });
 
   it('gives the forms composition its routes, scope rules and erasure, and the anonymous routes only with the two keys', () => {
