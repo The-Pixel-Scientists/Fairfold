@@ -8,27 +8,12 @@ import { describe, expect, it, vi } from 'vitest';
 import { moduleDependencies } from '../modules.ts';
 import { assureComposition, refreshQueue, screeningQueue } from './assure.ts';
 
-/** Routes whose handlers are B15-07's: linking an officer, dismissing a flag, answers and visits. */
-const unregistered = [
-  'linkLookupOfficer',
-  'dismissDuplicateFlag',
-  'listApplicationChecklists',
-  'getChecklistResponse',
-  'saveChecklistResponse',
-  'listVisits',
-  'createVisit',
-  'getVisit',
-  'updateVisit',
-] as const;
-
 const composed = assureComposition(moduleDependencies({}));
 const name = ({ method, path }: { method: string; path: string }) => `${method} ${path}`;
 
 describe('the assure composition', () => {
-  it('registers every assure route that has a handler, and no other', () => {
-    const wanted = Object.entries(assureRoutes)
-      .filter(([route]) => !(unregistered as readonly string[]).includes(route))
-      .map(([, contract]) => name(contract));
+  it('registers every assure route, once', () => {
+    const wanted = Object.values(assureRoutes).map((contract) => name(contract));
 
     expect((composed.routes ?? []).map(({ contract }) => name(contract))).toEqual(wanted);
   });

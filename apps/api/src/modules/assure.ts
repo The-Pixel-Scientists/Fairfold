@@ -15,10 +15,8 @@
 // list download (the platform has no scheduled module job, and the database
 // has no `assure.load_reference_list()` loader yet), the screening of a
 // person's own record and of an organisation's contacts (party's server has
-// no name read the worker may use), assure's subject data (the platform does
-// not read a composition's `subjectData`), and the routes whose handlers are
-// B15-07's: linking an officer, dismissing a flag, an application's checklist
-// answers and visits.
+// no name read the worker may use), and assure's subject data (the platform
+// does not read a composition's `subjectData`).
 
 import { createHash } from 'node:crypto';
 
@@ -35,11 +33,13 @@ import {
   registersOff,
   registryHandlers,
   registryRefresh,
+  responseHandlers,
   SCREENING_QUEUE,
   screeningHandlers,
   screeningJob,
   submissionSubscriber,
   templateHandlers,
+  visitHandlers,
   type PartyReader,
   type QueueRefresh,
 } from '@pixel-scientists/assure/server';
@@ -146,13 +146,17 @@ export const assureComposition: ModuleFactory = ({ jobs, log, outbound, platform
     notFound: platform.notFound,
     refuse: platform.refuse,
   });
-  const checklists = templateHandlers({
+  const checklistDeps = {
     notFound: platform.notFound,
     refuse: platform.refuse,
     readApplicant: readApplicantContact,
-  });
+  };
+  const checklists = templateHandlers(checklistDeps);
+  const responses = responseHandlers(checklistDeps);
+  const visits = visitHandlers(checklistDeps);
   const duplicates = duplicateHandlers({
     notFound: platform.notFound,
+    refuse: platform.refuse,
     parties: createPartyMerges({
       repoints: registerRepoints([partyRepoint]),
       notFound: platform.notFound,
@@ -169,6 +173,7 @@ export const assureComposition: ModuleFactory = ({ jobs, log, outbound, platform
         Promise.reject(platform.refuse(409, 'A lookup for this register is already queued.')),
     }),
     route(assureRoutes.listLookupOfficers, registry.listLookupOfficers),
+    route(assureRoutes.linkLookupOfficer, registry.linkLookupOfficer),
     route(assureRoutes.startScreeningRun, screening.startScreeningRun, {
       replay: ({ tx, id }) => screening.replayScreeningRun({ tx, id }),
     }),
@@ -181,6 +186,7 @@ export const assureComposition: ModuleFactory = ({ jobs, log, outbound, platform
     }),
     route(assureRoutes.listApplicationDuplicateFlags, duplicates.listApplicationDuplicateFlags),
     route(assureRoutes.listPartyDuplicateFlags, duplicates.listPartyDuplicateFlags),
+    route(assureRoutes.dismissDuplicateFlag, duplicates.dismissDuplicateFlag),
     route(assureRoutes.listChecklists, checklists.listChecklists),
     route(assureRoutes.getChecklist, checklists.getChecklist),
     route(assureRoutes.createChecklist, checklists.createChecklist, {
@@ -189,6 +195,15 @@ export const assureComposition: ModuleFactory = ({ jobs, log, outbound, platform
     route(assureRoutes.publishChecklistVersion, checklists.publishChecklistVersion, {
       replay: ({ tx, input }) => checklists.replayChecklist({ tx, id: input.params.checklistId }),
     }),
+    route(assureRoutes.listApplicationChecklists, responses.listApplicationChecklists),
+    route(assureRoutes.getChecklistResponse, responses.getChecklistResponse),
+    route(assureRoutes.saveChecklistResponse, responses.saveChecklistResponse),
+    route(assureRoutes.listVisits, visits.listVisits),
+    route(assureRoutes.createVisit, visits.createVisit, {
+      replay: ({ tx, id }) => visits.replayVisit({ tx, id: platform.created(id) }),
+    }),
+    route(assureRoutes.getVisit, visits.getVisit),
+    route(assureRoutes.updateVisit, visits.updateVisit),
   ];
 
   const refresh = registryRefresh({

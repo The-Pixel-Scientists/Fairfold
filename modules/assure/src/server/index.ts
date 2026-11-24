@@ -13,8 +13,9 @@
 // `submissionSubscriber` of the event queue's submission events (wired
 // through defineEventHandler('assure', ...)) and
 // `sanctionsListRefresh` of the daily list download, all for apps/api alone.
-// `templateHandlers` serves the checklist routes and `duplicateHandlers` the
-// duplicate flag routes.
+// `templateHandlers` and `responseHandlers` serve the checklist routes,
+// `duplicateHandlers` the duplicate flag routes and `visitHandlers` the
+// monitoring visit routes.
 
 export {
   createRegistryAdapters,
@@ -58,6 +59,7 @@ export {
   type SubmissionJob,
 } from './screening/index.ts';
 export {
+  responseHandlers,
   templateHandlers,
   type Applicant,
   type ChecklistContext,
@@ -68,5 +70,6 @@ export {
   type DuplicateContext,
   type DuplicateDependencies,
 } from './duplicates/index.ts';
+export { visitHandlers } from './visits/index.ts';
 export { assureErasure } from './erasure.ts';
 export { assureSubjectData } from './subject-data.ts';

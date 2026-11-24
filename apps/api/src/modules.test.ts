@@ -74,19 +74,6 @@ import type { ModuleComposition, ModuleFactory } from './modules/types.ts';
 import { workerModuleJobs } from './worker/module-jobs.ts';
 import type { ModuleJob } from './worker/registry.ts';
 
-/** The assure routes whose handlers wait for B15-07. */
-const assureWithoutHandler: readonly (keyof typeof assureRoutes)[] = [
-  'linkLookupOfficer',
-  'dismissDuplicateFlag',
-  'listApplicationChecklists',
-  'getChecklistResponse',
-  'saveChecklistResponse',
-  'listVisits',
-  'createVisit',
-  'getVisit',
-  'updateVisit',
-];
-
 const publicTenants = {
   tenant: () => Promise.resolve(undefined),
   logo: () => Promise.resolve(undefined),
@@ -158,9 +145,7 @@ describe('composeModules', () => {
       ...Object.values(exportRoutes),
       ...Object.values(reminderRoutes),
       ...Object.values(impactRoutes),
-      ...Object.entries(assureRoutes)
-        .filter(([name]) => !(assureWithoutHandler as readonly string[]).includes(name))
-        .map(([, contract]) => contract),
+      ...Object.values(assureRoutes),
     ]);
   });
 
